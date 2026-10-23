@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -149,7 +150,7 @@ func (m *model) debug(p *problem.Problem) tea.Cmd {
 	m.message = fmt.Sprintf("debugged case %d", caseNum)
 	return tea.Exec(&clearScreenCmd{Cmd: cmd}, func(err error) tea.Msg {
 		// The debugger's exit status is not ours to report.
-		if _, ok := err.(*exec.ExitError); ok {
+		if _, ok := errors.AsType[*exec.ExitError](err); ok {
 			err = nil
 		}
 		return execDoneMsg{err}

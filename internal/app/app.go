@@ -4,7 +4,6 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -342,7 +341,7 @@ func (a *App) BuildCases(ctx context.Context, p *problem.Problem, langName strin
 				res.Changed = append(res.Changed, cr.Index)
 			}
 		}
-		cases[cr.Index-1].Expected = json.RawMessage(cr.Output)
+		cases[cr.Index-1].Expected = cr.Output
 		res.Filled++
 	}
 	if err := p.SaveCases(cases); err != nil {
