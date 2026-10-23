@@ -1,0 +1,16 @@
+id: "46"
+slug: permutations
+title: Permutations
+difficulty: medium
+tags: [array, backtracking]
+kind: function
+function:
+  name: permute
+  params:
+    - {name: nums, type: "integer[]"}
+  returns: "integer[][]"
+judge:
+  compare: unordered
+source:
+  site: builtin
+  url: https://leetcode.com/problems/permutations/

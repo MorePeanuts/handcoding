@@ -1,0 +1,15 @@
+id: "4"
+slug: median-of-two-sorted-arrays
+title: Median of Two Sorted Arrays
+difficulty: hard
+tags: [array, binary-search, divide-and-conquer]
+kind: function
+function:
+  name: findMedianSortedArrays
+  params:
+    - {name: nums1, type: "integer[]"}
+    - {name: nums2, type: "integer[]"}
+  returns: double
+source:
+  site: builtin
+  url: https://leetcode.com/problems/median-of-two-sorted-arrays/

@@ -1,0 +1,14 @@
+id: "206"
+slug: reverse-linked-list
+title: Reverse Linked List
+difficulty: easy
+tags: [linked-list, recursion]
+kind: function
+function:
+  name: reverseList
+  params:
+    - {name: head, type: ListNode}
+  returns: ListNode
+source:
+  site: builtin
+  url: https://leetcode.com/problems/reverse-linked-list/

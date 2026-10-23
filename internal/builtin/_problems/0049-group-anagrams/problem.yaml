@@ -1,0 +1,16 @@
+id: "49"
+slug: group-anagrams
+title: Group Anagrams
+difficulty: medium
+tags: [array, hash-table, string, sorting]
+kind: function
+function:
+  name: groupAnagrams
+  params:
+    - {name: strs, type: "string[]"}
+  returns: "string[][]"
+judge:
+  compare: unordered_deep
+source:
+  site: builtin
+  url: https://leetcode.com/problems/group-anagrams/

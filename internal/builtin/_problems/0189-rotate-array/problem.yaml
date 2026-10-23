@@ -1,0 +1,17 @@
+id: "189"
+slug: rotate-array
+title: Rotate Array
+difficulty: medium
+tags: [array, math, two-pointers]
+kind: function
+function:
+  name: rotate
+  params:
+    - {name: nums, type: "integer[]"}
+    - {name: k, type: integer}
+  returns: void
+judge:
+  output: nums
+source:
+  site: builtin
+  url: https://leetcode.com/problems/rotate-array/

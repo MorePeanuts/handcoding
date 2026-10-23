@@ -1,0 +1,6 @@
+{"input":{"root":[3,9,20,null,null,15,7]},"expected":3,"example":true}
+{"input":{"root":[1,null,2]},"expected":2,"example":true}
+{"input":{"root":[]},"expected":0,"note":"empty tree"}
+{"input":{"root":[0]},"expected":1}
+{"input":{"root":[1,2,null,3,null,4,null,5]},"expected":5,"note":"left skewed"}
+{"input":{"root":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]},"expected":4,"note":"perfect tree"}

@@ -1,0 +1,17 @@
+id: "1"
+slug: two-sum
+title: Two Sum
+difficulty: easy
+tags: [array, hash-table]
+kind: function
+function:
+  name: twoSum
+  params:
+    - {name: nums, type: "integer[]"}
+    - {name: target, type: integer}
+  returns: "integer[]"
+judge:
+  compare: unordered
+source:
+  site: builtin
+  url: https://leetcode.com/problems/two-sum/

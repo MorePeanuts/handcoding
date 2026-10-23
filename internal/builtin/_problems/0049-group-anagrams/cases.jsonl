@@ -1,0 +1,5 @@
+{"input":{"strs":["eat","tea","tan","ate","nat","bat"]},"expected":[["eat","tea","ate"],["tan","nat"],["bat"]],"example":true}
+{"input":{"strs":[""]},"expected":[[""]],"example":true}
+{"input":{"strs":["a"]},"expected":[["a"]],"example":true}
+{"input":{"strs":["abc","bca","cab","xyz","zyx","yxz","q"]},"expected":[["abc","bca","cab"],["xyz","zyx","yxz"],["q"]]}
+{"input":{"strs":["",""]},"expected":[["",""]],"note":"duplicate empty strings"}

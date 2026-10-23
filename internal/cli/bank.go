@@ -1,0 +1,609 @@
+package cli
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/spf13/cobra"
+
+	"github.com/MorePeanuts/handcoding/internal/app"
+	"github.com/MorePeanuts/handcoding/internal/builtin"
+	"github.com/MorePeanuts/handcoding/internal/problem"
+	"github.com/MorePeanuts/handcoding/internal/runner"
+	"github.com/MorePeanuts/handcoding/internal/ui"
+	"github.com/MorePeanuts/handcoding/internal/workspace"
+)
+
+func newInitCmd(_ *rootOptions) *cobra.Command {
+	var noSamples bool
+	cmd := &cobra.Command{
+		Use:   "init [dir]",
+		Short: "Create a workspace (default ~/handcoding)",
+		Long: `Create a handcoding workspace with the built-in sample problems, the agent
+skill (.claude/skills/handcoding) and AGENTS.md for Codex.
+
+hc finds the workspace from $HC_WORKSPACE, the nearest parent directory with
+hc.yaml, or ~/handcoding — so using the default lets you run hc anywhere.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir := ""
+			if len(args) == 1 {
+				dir = args[0]
+			} else {
+				home, err := os.UserHomeDir()
+				if err != nil {
+					return err
+				}
+				dir = filepath.Join(home, "handcoding")
+			}
+			ws, err := workspace.Create(dir)
+			if err != nil {
+				return err
+			}
+			n := 0
+			if !noSamples {
+				if n, err = builtin.InstallProblems(ws.ProblemsPath()); err != nil {
+					return err
+				}
+			}
+			if _, err := installSkill(ws.Root); err != nil {
+				return err
+			}
+			fmt.Printf("%s workspace at %s (%d sample problems)\n\n", ui.Green.Render("Created"), ws.Root, n)
+			fmt.Println("Next steps:")
+			fmt.Println("  hc                      open the problem list")
+			fmt.Println("  hc start two-sum -e     start a problem in your editor")
+			fmt.Println("  hc test two-sum         run the examples")
+			fmt.Println("  hc submit two-sum       judge all cases")
+			fmt.Println("  hc fetch 3              fetch a problem from LeetCode")
+			fmt.Println("\nTip: version your progress with `git init` in the workspace.")
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&noSamples, "no-samples", false, "do not install the sample problems")
+	return cmd
+}
+
+func newNewCmd(root *rootOptions) *cobra.Command {
+	var (
+		title, kind, id string
+	)
+	cmd := &cobra.Command{
+		Use:   "new <slug>",
+		Short: "Scaffold a custom problem in the bank",
+		Long: `Create problems/<slug>/ with a problem.yaml skeleton, description.md and an
+empty cases.jsonl. Edit them, then run ` + "`hc validate <slug>`" + ` and
+` + "`hc gen <slug>`" + ` to have an agent write test cases.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a, err := root.openApp()
+			if err != nil {
+				return err
+			}
+			defer a.Close()
+			p := &problem.Problem{ID: id, Slug: args[0], Title: title, Difficulty: problem.Easy, Kind: problem.Kind(kind)}
+			if p.Title == "" {
+				p.Title = titleFromSlug(p.Slug)
+			}
+			switch p.Kind {
+			case problem.KindFunction:
+				p.Function = &problem.Function{
+					Name:    lowerCamel(p.Slug),
+					Params:  []problem.Param{{Name: "nums", Type: "integer[]"}},
+					Returns: problem.TypeInteger,
+				}
+			case problem.KindClass:
+				p.Class = &problem.Class{
+					Name:        upperCamel(p.Slug),
+					Constructor: []problem.Param{},
+					Methods:     []problem.Method{{Name: "add", Params: []problem.Param{{Name: "x", Type: problem.TypeInteger}}, Returns: problem.TypeVoid}},
+				}
+			default:
+				return fmt.Errorf("--kind must be function or class")
+			}
+			p.Source = problem.Source{Site: "custom"}
+			p.Normalize()
+			if err := p.Validate(); err != nil {
+				return err
+			}
+			if _, err := a.WS.Problem(p.Slug); err == nil {
+				return fmt.Errorf("problem %s already exists", p.Slug)
+			}
+			p.Dir = a.WS.NewProblemDir(p)
+			if err := p.Save(); err != nil {
+				return err
+			}
+			desc := fmt.Sprintf("# %s\n\nDescribe the problem here.\n\n**Example 1:**\n\n```\nInput: nums = [1,2,3]\nOutput: 6\n```\n\n**Constraints:**\n\n- `1 <= nums.length <= 10^5`\n", p.Title)
+			if err := os.WriteFile(filepath.Join(p.Dir, problem.DescriptionFile), []byte(desc), 0o644); err != nil {
+				return err
+			}
+			if err := os.WriteFile(filepath.Join(p.Dir, problem.CasesFile), nil, 0o644); err != nil {
+				return err
+			}
+			fmt.Printf("%s %s\n", ui.Green.Render("created"), p.Dir)
+			fmt.Println("Edit problem.yaml and description.md, then run `hc validate " + p.Slug + "` and `hc gen " + p.Slug + "`.")
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&title, "title", "", "problem title")
+	cmd.Flags().StringVar(&kind, "kind", "function", "function or class")
+	cmd.Flags().StringVar(&id, "id", "", "optional numeric ID")
+	return cmd
+}
+
+func newImportCmd(root *rootOptions) *cobra.Command {
+	var force bool
+	cmd := &cobra.Command{
+		Use:   "import <dir>...",
+		Short: "Import custom problems (directories in the hc problem format)",
+		Long: `Copy problems into the bank. Each argument is a problem directory containing
+problem.yaml, or a directory whose subdirectories are problems. See
+docs/protocol.md for the format.`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a, err := root.openApp()
+			if err != nil {
+				return err
+			}
+			defer a.Close()
+			var dirs []string
+			for _, arg := range args {
+				if _, err := os.Stat(filepath.Join(arg, problem.MetaFile)); err == nil {
+					dirs = append(dirs, arg)
+					continue
+				}
+				entries, err := os.ReadDir(arg)
+				if err != nil {
+					return err
+				}
+				for _, e := range entries {
+					if _, err := os.Stat(filepath.Join(arg, e.Name(), problem.MetaFile)); e.IsDir() && err == nil {
+						dirs = append(dirs, filepath.Join(arg, e.Name()))
+					}
+				}
+			}
+			if len(dirs) == 0 {
+				return errors.New("no problem directories found")
+			}
+			var failed int
+			for _, dir := range dirs {
+				if err := importProblem(a, dir, force); err != nil {
+					fmt.Fprintf(os.Stderr, "%s %s: %v\n", ui.Red.Render("skip"), dir, err)
+					failed++
+				}
+			}
+			if failed > 0 {
+				return fmt.Errorf("%d of %d problem(s) not imported", failed, len(dirs))
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "overwrite existing problems")
+	return cmd
+}
+
+func importProblem(a *app.App, dir string, force bool) error {
+	p, err := problem.Load(dir)
+	if err != nil {
+		return err
+	}
+	if err := p.Validate(); err != nil {
+		return err
+	}
+	cases, err := p.LoadCases()
+	if err != nil {
+		return err
+	}
+	for i, c := range cases {
+		if err := p.ValidateCase(c); err != nil {
+			return fmt.Errorf("case %d: %w", i+1, err)
+		}
+	}
+	target := a.WS.NewProblemDir(p)
+	if existing, err := a.WS.Problem(p.Slug); err == nil {
+		if !force {
+			return fmt.Errorf("%s already exists (use --force to overwrite)", p.Slug)
+		}
+		if err := os.RemoveAll(existing.Dir); err != nil {
+			return err
+		}
+	}
+	if err := os.CopyFS(target, os.DirFS(dir)); err != nil {
+		return err
+	}
+	fmt.Printf("%s %s (%d cases)\n", ui.Green.Render("imported"), p.Slug, len(cases))
+	return nil
+}
+
+func newCasesCmd(root *rootOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cases",
+		Short: "Inspect and edit test cases",
+	}
+	cmd.AddCommand(
+		newCasesListCmd(root),
+		newCasesBuildCmd(root),
+		newCasesAddCmd(root),
+		newCasesRmCmd(root),
+		newCasesEditCmd(root),
+	)
+	return cmd
+}
+
+func withProblemOnly(root *rootOptions, ref string, fn func(a *app.App, p *problem.Problem) error) error {
+	a, err := root.openApp()
+	if err != nil {
+		return err
+	}
+	defer a.Close()
+	p, err := a.WS.Problem(ref)
+	if err != nil {
+		return err
+	}
+	return fn(a, p)
+}
+
+func newCasesListCmd(root *rootOptions) *cobra.Command {
+	var (
+		nums    []int
+		asJSON  bool
+		verbose bool
+	)
+	cmd := &cobra.Command{
+		Use:     "list <problem>",
+		Aliases: []string{"ls"},
+		Short:   "List test cases",
+		Args:    cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withProblemOnly(root, args[0], func(_ *app.App, p *problem.Problem) error {
+				cases, err := p.LoadCases()
+				if err != nil {
+					return err
+				}
+				sel, err := app.Select(cases, nums, true)
+				if err != nil {
+					return err
+				}
+				if asJSON {
+					for _, s := range sel {
+						line, err := problem.MarshalCase(s.Case)
+						if err != nil {
+							return err
+						}
+						fmt.Println(string(line))
+					}
+					return nil
+				}
+				maxLen := 200
+				if verbose || len(nums) > 0 {
+					maxLen = 1 << 30
+				}
+				for _, s := range sel {
+					tags := ""
+					if s.Case.Example {
+						tags += ui.Cyan.Render(" example")
+					}
+					if s.Case.Note != "" {
+						tags += ui.Faint.Render(" (" + s.Case.Note + ")")
+					}
+					fmt.Printf("%s%s\n", ui.Bold.Render(fmt.Sprintf("Case %d", s.Index)), tags)
+					fmt.Printf("  %s %s\n", ui.Faint.Render("Input   "), clip(p.FormatInput(s.Case), maxLen))
+					exp := ui.Yellow.Render("(missing — run hc cases build)")
+					if s.Case.HasExpected() {
+						exp = clip(string(s.Case.Expected), maxLen)
+					}
+					fmt.Printf("  %s %s\n", ui.Faint.Render("Expected"), exp)
+				}
+				fmt.Println()
+				fmt.Println(ui.Faint.Render(fmt.Sprintf("%d case(s), compare mode %s", len(cases), p.Judge.Compare)))
+				return nil
+			})
+		},
+	}
+	cmd.Flags().IntSliceVarP(&nums, "case", "c", nil, "only these cases")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "print raw JSON lines")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "do not truncate")
+	return cmd
+}
+
+func clip(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + ui.Faint.Render(fmt.Sprintf("… (+%d bytes)", len(s)-n))
+}
+
+func newCasesBuildCmd(root *rootOptions) *cobra.Command {
+	var (
+		force    bool
+		langName string
+	)
+	cmd := &cobra.Command{
+		Use:   "build <problem>",
+		Short: "Compute expected outputs by running the reference solution",
+		Long: `Run the reference solution (problems/<dir>/reference/solution.{py,go}) on
+every case without an expected output and store the results. With --force,
+recompute all expected outputs and report which ones changed.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
+				res, err := a.BuildCases(cmd.Context(), p, langName, force)
+				if res != nil && res.Filled > 0 {
+					fmt.Printf("%s %d expected output(s) using the %s reference\n", ui.Green.Render("filled"), res.Filled, res.Lang.Name())
+				}
+				if res != nil && len(res.Changed) > 0 {
+					fmt.Printf("%s cases %v differ from the previous expected output\n", ui.Yellow.Render("changed"), res.Changed)
+				}
+				if err != nil {
+					return err
+				}
+				if res.Filled == 0 {
+					fmt.Println("All cases already have expected outputs (use --force to recompute).")
+				}
+				return nil
+			})
+		},
+	}
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "recompute every expected output")
+	langFlag(cmd, &langName)
+	return cmd
+}
+
+func newCasesAddCmd(root *rootOptions) *cobra.Command {
+	var (
+		input, expected, note string
+		example               bool
+	)
+	cmd := &cobra.Command{
+		Use:   "add <problem> --input JSON [--expected JSON]",
+		Short: "Append a test case",
+		Long: `Append a case. Without --expected, the reference solution computes it if
+there is one.
+
+  hc cases add two-sum --input '{"nums":[1,4],"target":5}' --expected '[0,1]'`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
+				c, err := parseInput(p, input)
+				if err != nil {
+					return err
+				}
+				c.Note, c.Example = note, example
+				if expected != "" {
+					if !json.Valid([]byte(expected)) {
+						return errors.New("--expected is not valid JSON")
+					}
+					c.Expected = json.RawMessage(expected)
+				}
+				cases, err := p.LoadCases()
+				if err != nil {
+					return err
+				}
+				cases = append(cases, c)
+				if err := p.SaveCases(cases); err != nil {
+					return err
+				}
+				fmt.Printf("%s case %d\n", ui.Green.Render("added"), len(cases))
+				if c.Expected == nil {
+					if _, _, err := a.ReferenceLang(p, ""); err == nil {
+						res, err := a.BuildCases(cmd.Context(), p, "", false)
+						if err != nil {
+							return err
+						}
+						fmt.Printf("%s %d expected output(s) using the %s reference\n", ui.Green.Render("filled"), res.Filled, res.Lang.Name())
+					} else {
+						fmt.Println(ui.Yellow.Render("no expected output (no reference solution); the case only shows your output"))
+					}
+				}
+				return nil
+			})
+		},
+	}
+	cmd.Flags().StringVarP(&input, "input", "i", "", "input as a JSON object (required)")
+	cmd.Flags().StringVarP(&expected, "expected", "e", "", "expected output as JSON")
+	cmd.Flags().StringVar(&note, "note", "", "remark")
+	cmd.Flags().BoolVar(&example, "example", false, "mark as example (run by hc test)")
+	_ = cmd.MarkFlagRequired("input")
+	return cmd
+}
+
+func newCasesRmCmd(root *rootOptions) *cobra.Command {
+	return &cobra.Command{
+		Use:   "rm <problem> <case>...",
+		Short: "Remove test cases by number",
+		Args:  cobra.MinimumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withProblemOnly(root, args[0], func(_ *app.App, p *problem.Problem) error {
+				cases, err := p.LoadCases()
+				if err != nil {
+					return err
+				}
+				drop := map[int]bool{}
+				for _, arg := range args[1:] {
+					var n int
+					if _, err := fmt.Sscanf(arg, "%d", &n); err != nil || n < 1 || n > len(cases) {
+						return fmt.Errorf("invalid case number %q", arg)
+					}
+					drop[n] = true
+				}
+				var kept []problem.Case
+				for i, c := range cases {
+					if !drop[i+1] {
+						kept = append(kept, c)
+					}
+				}
+				if err := p.SaveCases(kept); err != nil {
+					return err
+				}
+				fmt.Printf("%s %d case(s); %d left (later cases were renumbered)\n", ui.Red.Render("removed"), len(drop), len(kept))
+				return nil
+			})
+		},
+	}
+}
+
+func newCasesEditCmd(root *rootOptions) *cobra.Command {
+	return &cobra.Command{
+		Use:   "edit <problem>",
+		Short: "Open cases.jsonl in your editor",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
+				path := filepath.Join(p.Dir, problem.CasesFile)
+				ed, err := editorCommand(a.WS.Config, path)
+				if err != nil {
+					return err
+				}
+				if err := ed.Run(); err != nil {
+					return err
+				}
+				return validateProblem(cmd, a, p, false)
+			})
+		},
+	}
+}
+
+func newValidateCmd(root *rootOptions) *cobra.Command {
+	var run bool
+	cmd := &cobra.Command{
+		Use:   "validate [problem]...",
+		Short: "Check problems against the protocol (all problems by default)",
+		Long: `Validate problem.yaml, cases.jsonl and starter generation. With --run, also
+run the reference solution on every case and require it to pass.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a, err := root.openApp()
+			if err != nil {
+				return err
+			}
+			defer a.Close()
+			var probs []*problem.Problem
+			if len(args) == 0 {
+				probs, err = a.WS.Problems()
+				if err != nil {
+					fmt.Fprintln(os.Stderr, ui.Red.Render(err.Error()))
+				}
+			} else {
+				for _, arg := range args {
+					p, err := a.WS.Problem(arg)
+					if err != nil {
+						return err
+					}
+					probs = append(probs, p)
+				}
+			}
+			bad := 0
+			for _, p := range probs {
+				if err := validateProblem(cmd, a, p, run); err != nil {
+					bad++
+				}
+			}
+			if bad > 0 || err != nil {
+				return fmt.Errorf("%d problem(s) with errors", bad)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&run, "run", false, "run the reference solution on every case")
+	return cmd
+}
+
+// validateProblem prints the findings for one problem.
+func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run bool) error {
+	var errs, warns []string
+	if err := p.Validate(); err != nil {
+		errs = append(errs, strings.Split(err.Error(), "\n")...)
+	}
+	cases, err := p.LoadCases()
+	if err != nil {
+		errs = append(errs, err.Error())
+	}
+	missing, examples := 0, 0
+	for i, c := range cases {
+		if err := p.ValidateCase(c); err != nil {
+			errs = append(errs, fmt.Sprintf("case %d: %v", i+1, err))
+		}
+		if !c.HasExpected() {
+			missing++
+		}
+		if c.Example {
+			examples++
+		}
+	}
+	if len(errs) == 0 {
+		for _, l := range a.Langs.All() {
+			if _, err := l.Starter(p); err != nil {
+				errs = append(errs, err.Error())
+			}
+		}
+	}
+	if len(cases) == 0 {
+		warns = append(warns, "no test cases (hc gen "+p.Slug+")")
+	}
+	if missing > 0 {
+		warns = append(warns, fmt.Sprintf("%d case(s) without expected output (hc cases build %s)", missing, p.Slug))
+	}
+	if len(cases) > 0 && examples == 0 {
+		warns = append(warns, "no case marked as example; hc test runs the first 3")
+	}
+	if _, _, err := a.ReferenceLang(p, ""); err != nil {
+		warns = append(warns, "no reference solution")
+	} else if run && len(errs) == 0 && len(cases) > 0 {
+		sel, _ := app.Select(cases, nil, true)
+		rep, l, err := a.RunReference(cmd.Context(), p, "", sel, app.RunOptions{Stderr: os.Stderr})
+		switch {
+		case err != nil:
+			errs = append(errs, "reference: "+err.Error())
+		case rep.Verdict == runner.CompileError:
+			errs = append(errs, "reference does not compile: "+rep.CompileError)
+		default:
+			for _, c := range rep.Cases {
+				switch c.Verdict {
+				case runner.Accepted, runner.NoExpected:
+				default:
+					errs = append(errs, fmt.Sprintf("reference (%s) case %d: %s %s", l.ID(), c.Index, c.Verdict, c.Error))
+				}
+			}
+		}
+	}
+	status := ui.Green.Render("ok  ")
+	if len(errs) > 0 {
+		status = ui.Red.Render("FAIL")
+	} else if len(warns) > 0 {
+		status = ui.Yellow.Render("warn")
+	}
+	fmt.Printf("%s %s %s\n", status, p.Slug, ui.Faint.Render(fmt.Sprintf("(%d cases)", len(cases))))
+	for _, e := range errs {
+		fmt.Printf("     %s %s\n", ui.Red.Render("error:"), e)
+	}
+	for _, w := range warns {
+		fmt.Printf("     %s %s\n", ui.Yellow.Render("warn:"), w)
+	}
+	if len(errs) > 0 {
+		return errors.New(p.Slug + " is invalid")
+	}
+	return nil
+}
+
+func titleFromSlug(slug string) string {
+	words := strings.Split(slug, "-")
+	for i, w := range words {
+		if w != "" {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	return strings.Join(words, " ")
+}
+
+func upperCamel(slug string) string { return strings.ReplaceAll(titleFromSlug(slug), " ", "") }
+
+func lowerCamel(slug string) string {
+	s := upperCamel(slug)
+	if s == "" {
+		return s
+	}
+	return strings.ToLower(s[:1]) + s[1:]
+}

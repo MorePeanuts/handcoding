@@ -1,0 +1,14 @@
+id: "104"
+slug: maximum-depth-of-binary-tree
+title: Maximum Depth of Binary Tree
+difficulty: easy
+tags: [tree, depth-first-search, breadth-first-search, binary-tree]
+kind: function
+function:
+  name: maxDepth
+  params:
+    - {name: root, type: TreeNode}
+  returns: integer
+source:
+  site: builtin
+  url: https://leetcode.com/problems/maximum-depth-of-binary-tree/

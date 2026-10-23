@@ -1,0 +1,5 @@
+{"input":{"head":[1,2,3,4,5]},"expected":[5,4,3,2,1],"example":true}
+{"input":{"head":[1,2]},"expected":[2,1],"example":true}
+{"input":{"head":[]},"expected":[],"example":true}
+{"input":{"head":[7]},"expected":[7],"note":"single node"}
+{"input":{"head":[-5000,0,5000,0,-5000]},"expected":[-5000,0,5000,0,-5000]}

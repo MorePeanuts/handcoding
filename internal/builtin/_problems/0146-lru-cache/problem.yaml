@@ -1,0 +1,23 @@
+id: "146"
+slug: lru-cache
+title: LRU Cache
+difficulty: medium
+tags: [design, hash-table, linked-list, doubly-linked-list]
+kind: class
+class:
+  name: LRUCache
+  constructor:
+    - {name: capacity, type: integer}
+  methods:
+    - name: get
+      params:
+        - {name: key, type: integer}
+      returns: integer
+    - name: put
+      params:
+        - {name: key, type: integer}
+        - {name: value, type: integer}
+      returns: void
+source:
+  site: builtin
+  url: https://leetcode.com/problems/lru-cache/

@@ -1,0 +1,14 @@
+id: "200"
+slug: number-of-islands
+title: Number of Islands
+difficulty: medium
+tags: [array, depth-first-search, breadth-first-search, union-find, matrix]
+kind: function
+function:
+  name: numIslands
+  params:
+    - {name: grid, type: "character[][]"}
+  returns: integer
+source:
+  site: builtin
+  url: https://leetcode.com/problems/number-of-islands/
