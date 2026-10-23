@@ -1,5 +1,8 @@
 # handcoding (`hc`)
 
+> [!WARNING]
+> 本项目处于早期开发阶段（`v0.x`）。在 1.0 之前，命令行接口、配置文件、题目协议和数据格式都可能发生不兼容的变化，升级后可能需要重新初始化工作区。
+
 本地刷题、本地判题的命令行工具。用你自己的编辑器（neovim、VS Code……）写代码，用 `hc` 在本地测试、提交、调试 —— 不需要联网，不需要付费调试器，测试用例完全可见。
 
 - **本地题库 + 本地判题**：Go / Python，支持函数题、设计题（LRU Cache 这类）、原地修改题、链表、二叉树、字符矩阵、浮点误差、无序答案等常见题型
@@ -12,10 +15,13 @@
 ## 安装
 
 ```sh
-go install github.com/MorePeanuts/handcoding/cmd/hc@latest
+go install github.com/MorePeanuts/handcoding/cmd/hc@latest          # 最新版本
+go install github.com/MorePeanuts/handcoding/cmd/hc@v0.1.0-alpha.1  # 指定版本
 # 或在仓库内
-make build   # 生成 bin/hc
+make install   # 安装到 $(go env GOBIN)，或 make build 生成 bin/hc
 ```
+
+也可以从 [GitHub Releases](https://github.com/MorePeanuts/handcoding/releases) 下载预编译的二进制文件。
 
 依赖：Go（写 Go 题）、Python 3.8+（写 Python 题）、可选 [Delve](https://github.com/go-delve/delve)（Go 调试）、debugpy（Python headless 调试）、`claude` 或 `codex`（生成用例）。
 
@@ -172,3 +178,7 @@ internal/builtin        内置示例题与 skill（embed）
 - 暂不支持 `Node`（图、N 叉树、随机指针链表）、`NestedInteger`、带环链表输入等特殊签名，以及需要特殊判题器（checker）的题目
 - 只统计运行时间，不限制内存
 - LeetCode 会员题无法拉取
+
+## 许可证
+
+[MIT](LICENSE)
