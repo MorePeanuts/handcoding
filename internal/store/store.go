@@ -21,6 +21,9 @@ type Submission struct {
 	Total     int
 	ElapsedMs int64
 	Code      string
+	// Details is the judge report as JSON (see app.EncodeReport); empty for
+	// submissions recorded by older versions.
+	Details   string
 	CreatedAt time.Time
 }
 
@@ -53,11 +56,42 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := db.Exec(schema); err != nil {
+	if err := migrate(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("migrate %s: %w", path, err)
 	}
 	return &Store{db: db}, nil
+}
+
+// migrate creates the schema and adds columns introduced after the first
+// release, so databases created by older versions keep working.
+func migrate(db *sql.DB) error {
+	if _, err := db.Exec(schema); err != nil {
+		return err
+	}
+	rows, err := db.Query(`SELECT name FROM pragma_table_info('submissions')`)
+	if err != nil {
+		return err
+	}
+	cols := map[string]bool{}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			rows.Close()
+			return err
+		}
+		cols[name] = true
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if !cols["details"] {
+		if _, err := db.Exec(`ALTER TABLE submissions ADD COLUMN details TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Close closes the database.
@@ -69,9 +103,9 @@ func (s *Store) Add(ctx context.Context, sub *Submission) error {
 		sub.CreatedAt = time.Now()
 	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO submissions (slug, lang, verdict, passed, total, elapsed_ms, code, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		sub.Slug, sub.Lang, sub.Verdict, sub.Passed, sub.Total, sub.ElapsedMs, sub.Code, sub.CreatedAt.UnixMilli())
+		`INSERT INTO submissions (slug, lang, verdict, passed, total, elapsed_ms, code, details, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		sub.Slug, sub.Lang, sub.Verdict, sub.Passed, sub.Total, sub.ElapsedMs, sub.Code, sub.Details, sub.CreatedAt.UnixMilli())
 	if err != nil {
 		return err
 	}
@@ -82,7 +116,7 @@ func (s *Store) Add(ctx context.Context, sub *Submission) error {
 // List returns the submissions of a problem, newest first. An empty slug
 // lists every submission.
 func (s *Store) List(ctx context.Context, slug string) ([]Submission, error) {
-	q := `SELECT id, slug, lang, verdict, passed, total, elapsed_ms, code, created_at FROM submissions`
+	q := `SELECT ` + columns + ` FROM submissions`
 	var args []any
 	if slug != "" {
 		q += ` WHERE slug = ?`
@@ -111,7 +145,7 @@ var ErrNotFound = errors.New("submission not found")
 // Get returns a submission by ID.
 func (s *Store) Get(ctx context.Context, id int64) (Submission, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, slug, lang, verdict, passed, total, elapsed_ms, code, created_at FROM submissions WHERE id = ?`, id)
+		`SELECT `+columns+` FROM submissions WHERE id = ?`, id)
 	sub, err := scan(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return sub, fmt.Errorf("%w: #%d", ErrNotFound, id)
@@ -129,6 +163,16 @@ func (s *Store) Delete(ctx context.Context, id int64) error {
 		return fmt.Errorf("%w: #%d", ErrNotFound, id)
 	}
 	return nil
+}
+
+// DeleteSlug removes every submission of a problem and returns how many
+// were deleted.
+func (s *Store) DeleteSlug(ctx context.Context, slug string) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM submissions WHERE slug = ?`, slug)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 // Status summarizes the best result per problem.
@@ -161,6 +205,8 @@ func (s *Store) Statuses(ctx context.Context) (map[string]Status, error) {
 	return out, rows.Err()
 }
 
+const columns = `id, slug, lang, verdict, passed, total, elapsed_ms, code, details, created_at`
+
 type scanner interface{ Scan(dest ...any) error }
 
 func scan(r scanner) (Submission, error) {
@@ -168,7 +214,7 @@ func scan(r scanner) (Submission, error) {
 		sub Submission
 		ts  int64
 	)
-	err := r.Scan(&sub.ID, &sub.Slug, &sub.Lang, &sub.Verdict, &sub.Passed, &sub.Total, &sub.ElapsedMs, &sub.Code, &ts)
+	err := r.Scan(&sub.ID, &sub.Slug, &sub.Lang, &sub.Verdict, &sub.Passed, &sub.Total, &sub.ElapsedMs, &sub.Code, &sub.Details, &ts)
 	sub.CreatedAt = time.UnixMilli(ts)
 	return sub, err
 }

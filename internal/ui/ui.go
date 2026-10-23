@@ -100,7 +100,11 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 		field := func(name, value string) {
 			fmt.Fprintf(w, "    %s %s\n", Faint.Render(fmt.Sprintf("%-9s", name)), truncate(value, o.MaxLen))
 		}
-		field("Input", p.FormatInput(c.Case))
+		input := c.InputText
+		if input == "" {
+			input = p.FormatInput(c.Case)
+		}
+		field("Input", input)
 		switch c.Verdict {
 		case runner.RuntimeError:
 			fmt.Fprintln(w, indent(Red.Render(c.Error), "    "))

@@ -48,6 +48,9 @@ type CaseResult struct {
 	Error    string
 	Elapsed  time.Duration
 	JudgeErr error
+	// InputText overrides the rendered input; set for results restored from
+	// history, where the input may be truncated.
+	InputText string
 }
 
 // Report is the result of a run.

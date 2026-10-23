@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/glamour"
 	"github.com/spf13/cobra"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
@@ -118,14 +117,7 @@ func newShowCmd(root *rootOptions) *cobra.Command {
 				fmt.Println(desc)
 				return nil
 			}
-			r, err := glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(100))
-			if err != nil {
-				return err
-			}
-			out, err := r.Render(desc)
-			if err != nil {
-				return err
-			}
+			out := ui.NewMarkdown(ui.DetectTheme(a.WS.Config.Theme)).Render(desc, 100)
 			fmt.Println("  " + meta)
 			fmt.Print(out)
 			if doPause {
@@ -376,6 +368,31 @@ func newResetCmd(root *rootOptions) *cobra.Command {
 		},
 	}
 	langFlag(cmd, &langName)
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
+	return cmd
+}
+
+func newDiscardCmd(root *rootOptions) *cobra.Command {
+	var yes bool
+	cmd := &cobra.Command{
+		Use:   "discard <problem>",
+		Short: "Delete your solutions and submission history of a problem",
+		Long:  "Delete the solution files (every language) and all submissions of a problem, so it is back to \"not started\". The problem itself stays in the bank.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
+				if !yes && !confirm(fmt.Sprintf("Discard your solutions and submission history of %s?", p.Slug)) {
+					return errors.New("aborted (use --yes to skip the prompt)")
+				}
+				n, err := a.Discard(cmd.Context(), p)
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(os.Stderr, "%s %s: solution files and %d submission(s) removed\n", ui.Red.Render("discarded"), p.Slug, n)
+				return nil
+			})
+		},
+	}
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
 	return cmd
 }

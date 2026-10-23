@@ -101,9 +101,15 @@ func newHistoryShowCmd(root *rootOptions) *cobra.Command {
 		Short: "Print the code of a submission",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withSubmission(root, cmd, args[0], func(_ *app.App, _ *store.Store, s store.Submission) error {
+			return withSubmission(root, cmd, args[0], func(a *app.App, _ *store.Store, s store.Submission) error {
 				fmt.Fprintf(os.Stderr, "%s #%d %s [%s] %s %d/%d · %s\n\n", ui.Bold.Render("submission"), s.ID, s.Slug, s.Lang,
 					ui.VerdictStyle(runner.Verdict(s.Verdict)).Render(s.Verdict), s.Passed, s.Total, s.CreatedAt.Format("2006-01-02 15:04:05"))
+				if rep := app.DecodeReport(s.Details); rep != nil {
+					if p, err := a.WS.Problem(s.Slug); err == nil {
+						ui.PrintReport(os.Stderr, p, rep, ui.ReportOptions{})
+						fmt.Fprintln(os.Stderr)
+					}
+				}
 				fmt.Print(s.Code)
 				return nil
 			})

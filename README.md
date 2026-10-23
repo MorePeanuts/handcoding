@@ -32,21 +32,29 @@ hc debug two-sum -c 4      # 用第 4 个用例启动调试器
 
 题目可以用 slug、slug 前缀、题号或目录名引用：`hc test 1`、`hc test two`。
 
-### 交互列表快捷键
+### 交互界面
+
+推荐用法：终端左右分屏，左边运行 `hc`，右边开编辑器。
+
+- 在列表中按 `enter` 进入题目详情：显示题面，自动生成模板，并把解答文件的绝对路径**复制到剪贴板**，到右边 `:e <粘贴>` 即可开始写。
+- 详情页里可以直接测试、提交、调试、查看历史。测试和提交的结果在界面内显示，程序自己的输出单独列在下方。
+- 调试器需要独占终端，启动前会先清屏，退出后回到原界面。如果上一次运行有失败的用例，`d` 会直接调试那个用例。
+- 题面的配色按终端背景自动选择。如果显示不对，在 `hc.yaml` 里设置 `theme: light` 或 `theme: dark`。
 
 | 键 | 作用 | 键 | 作用 |
 |---|---|---|---|
-| `↑↓` / `jk` | 移动 | `v` / 空格 | 查看题面 |
-| `enter` / `e` | 编辑 | `h` | 提交历史 |
-| `t` | 测试示例 | `r` | 重置为模板 |
-| `s` | 提交 | `f` | 过滤 全部/未完成/已解决 |
-| `d` | 调试 | `/` | 搜索（标题/slug/题号/标签） |
-| `L` | 切换语言 | `q` | 退出 |
+| `enter` | 进入题目详情（并复制解答路径） | `e` | 用编辑器打开解答 |
+| `t` | 测试示例用例 | `s` | 提交（全部用例） |
+| `d` | 调试（优先选上次失败的用例） | `h` | 提交历史（可查看代码与判题详情、恢复、删除） |
+| `y` | 再次复制解答路径 | `L` | 切换语言 |
+| `r` | 重置为模板 | `D` | 放弃这道题：删除解答文件和提交历史，状态回到未做 |
+| `/` | 搜索 | `f` | 过滤 全部/未完成/已解决 |
+| `esc` / `q` | 返回上一层；在列表页按 `q` 退出 | `ctrl+c` | 退出 |
 
 ## 命令一览
 
 ```
-练习      list  start  edit  show  test  submit  debug  reset  history
+练习      list  start  edit  show  test  submit  debug  reset  discard  history
 题库      init  fetch  new  import  cases  validate
 智能体    gen  fix  skill
 ```
@@ -63,6 +71,7 @@ hc history two-sum          # 提交历史
 hc history show 12          # 查看某次提交的代码
 hc history restore 12       # 把某次提交恢复为当前代码
 hc history rm 12 13         # 删除提交记录
+hc discard two-sum          # 删除解答文件和全部提交记录，状态回到未做
 
 hc fetch 3 146 lru-cache    # 从 leetcode.com 拉题
 hc fetch --site cn 1        # 从 leetcode.cn 拉题（默认使用中文题面）

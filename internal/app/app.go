@@ -124,6 +124,22 @@ func (a *App) Reset(p *problem.Problem, l lang.Language) (string, error) {
 	return path, err
 }
 
+// Discard deletes the user's solutions of p in every language and its
+// submission history, so the problem is back to "not started". The problem
+// itself is kept. It returns the number of deleted submissions.
+func (a *App) Discard(ctx context.Context, p *problem.Problem) (int64, error) {
+	for _, l := range a.Langs.All() {
+		if err := os.RemoveAll(a.WS.SolutionDir(p, l.ID())); err != nil {
+			return 0, err
+		}
+	}
+	st, err := a.Store()
+	if err != nil {
+		return 0, err
+	}
+	return st.DeleteSlug(ctx, p.Slug)
+}
+
 // Restore writes code (e.g. from a past submission) into the solution file.
 func (a *App) Restore(p *problem.Problem, l lang.Language, code string) (string, error) {
 	path, _, err := a.Start(p, l)
@@ -221,6 +237,7 @@ func (a *App) Submit(ctx context.Context, p *problem.Problem, l lang.Language, o
 	sub := &store.Submission{
 		Slug: p.Slug, Lang: l.ID(), Verdict: string(rep.Verdict),
 		Passed: rep.Passed, Total: rep.Total, ElapsedMs: total.Milliseconds(), Code: string(code),
+		Details: EncodeReport(p, rep),
 	}
 	st, err := a.Store()
 	if err != nil {
