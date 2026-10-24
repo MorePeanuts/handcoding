@@ -1,127 +1,127 @@
-# handcoding 协议
+# handcoding protocols
 
-本文档定义两套协议：
+This document defines two protocols:
 
-1. **题目协议**：题库中一道题在磁盘上的格式，用于自定义题目导入（`hc new` / `hc import`）。
-2. **驱动协议**：hc 与各语言测试驱动之间的约定，用于扩展新语言。
+1. **Problem protocol**: how a problem in the bank is laid out on disk. Use it to write your own problems (`hc new`, `hc import`).
+2. **Driver protocol**: the contract between hc and the per-language test drivers. Use it to add a language.
 
 ---
 
-## 1. 题目协议
+## 1. Problem protocol
 
-### 目录结构
+### Layout
 
 ```
-problems/0001-two-sum/          目录名：<4 位编号>-<slug>，无编号时为 <slug>
-  problem.yaml                  元数据、函数签名、判题选项（必需）
-  description.md                题面，Markdown
-  assets/rev1ex1.jpg            题面引用的图片（可选），写作 ![](assets/rev1ex1.jpg)
-  cases.jsonl                   测试用例，每行一个 JSON 对象
-  reference/solution.py         参考解（可选，可多语言），用于计算期望输出
+problems/0001-two-sum/          directory name: <4-digit number>-<slug>, or <slug> without a number
+  problem.yaml                  metadata, signature and judge options (required)
+  description.md                statement, in Markdown
+  assets/rev1ex1.jpg            images used by the statement (optional), written as ![](assets/rev1ex1.jpg)
+  cases.jsonl                   test cases, one JSON object per line
+  reference/solution.py         reference solutions (optional, any languages), used to compute expected outputs
   reference/solution.go
-  templates/solution.go         起始模板（可选，缺省时按签名生成）
+  templates/solution.go         starter code (optional; generated from the signature if missing)
   templates/solution.py
 ```
 
 ### problem.yaml
 
-| 字段 | 说明 |
+| Field | Meaning |
 |---|---|
-| `id` | 题号（字符串，可选），用于排序与引用 |
-| `slug` | 唯一标识，小写 kebab-case（必需） |
-| `title` | 标题（必需） |
-| `difficulty` | `easy` / `medium` / `hard` |
-| `tags` | 标签列表 |
-| `kind` | `function`（函数题）或 `class`（设计题） |
-| `function` | 函数题签名：`name`、`params[{name,type}]`、`returns` |
-| `class` | 设计题签名：`name`、`constructor[{name,type}]`、`methods[{name,params,returns}]` |
-| `judge.compare` | 比较方式，见下表，默认 `exact` |
-| `judge.tolerance` | 浮点容差；返回 `double` 时默认 `1e-5`（绝对或相对误差满足其一即可） |
-| `judge.output` | 原地修改类题目：返回 `void`，判题比较调用后该参数的值 |
-| `judge.time_limit` | 整次运行的时限，如 `5s`，默认取 hc.yaml 的 `timeout` |
-| `source` | `site`、`url`，来源信息 |
+| `id` | Problem number (a string, optional), used for sorting and lookup |
+| `slug` | Unique identifier in lowercase kebab-case (required) |
+| `title` | Title (required) |
+| `difficulty` | `easy`, `medium` or `hard` |
+| `tags` | List of tags |
+| `kind` | `function` (one function) or `class` (a design problem) |
+| `function` | Signature of a function problem: `name`, `params[{name,type}]`, `returns` |
+| `class` | Signature of a design problem: `name`, `constructor[{name,type}]`, `methods[{name,params,returns}]` |
+| `judge.compare` | How outputs are compared (see below). Default `exact` |
+| `judge.tolerance` | Floating-point tolerance. Defaults to `1e-5` when returning `double`; either the absolute or the relative error must be within it |
+| `judge.output` | For in-place problems: the function returns `void`, and the judge compares this parameter's value after the call |
+| `judge.time_limit` | Time limit for a whole run, e.g. `5s`. Defaults to `timeout` in hc.yaml |
+| `source` | Where the problem comes from: `site`, `url` |
 
-比较方式：
+Comparison modes:
 
-| `compare` | 语义 | 例题 |
+| `compare` | Meaning | Examples |
 |---|---|---|
-| `exact` | JSON 值完全相等（数字按数值比较） | 大多数题 |
-| `unordered` | 最外层数组视为多重集合，忽略顺序 | 两数之和、全排列 |
-| `unordered_deep` | 每一层数组都忽略顺序 | 字母异位词分组、子集 |
-| `any_of` | `expected` 是所有可接受答案组成的数组 | 答案集合较小的多解题 |
+| `exact` | The JSON values are equal (numbers compare by value) | Most problems |
+| `unordered` | The outermost array is a multiset; order is ignored | Two Sum, Permutations |
+| `unordered_deep` | Order is ignored at every array level | Group Anagrams, Subsets |
+| `any_of` | `expected` is an array of all acceptable answers | Problems with a small set of valid answers |
 
-### 类型系统
+### Types
 
-沿用 LeetCode `metaData` 的类型名，从 LeetCode 拉取的题目无需转换：
+Type names are LeetCode's `metaData` names, so problems fetched from LeetCode need no translation:
 
-| 类型 | JSON 表示 | Go | Python |
+| Type | JSON | Go | Python |
 |---|---|---|---|
-| `integer` / `long` | 数字 | `int` / `int64` | `int` |
-| `double` | 数字 | `float64` | `float` |
-| `boolean` | `true/false` | `bool` | `bool` |
-| `string` | 字符串 | `string` | `str` |
-| `character` | 单字符字符串 `"a"` | `byte` | `str` |
-| `ListNode` | 数组 `[1,2,3]` | `*ListNode` | `Optional[ListNode]` |
-| `TreeNode` | 层序数组 `[3,9,20,null,null,15,7]` | `*TreeNode` | `Optional[TreeNode]` |
-| `T[]` | 数组，最多 3 层；节点数组 1 层 | `[]T` | `List[T]` |
-| `void` | 仅作返回值 | — | `None` |
+| `integer` / `long` | number | `int` / `int64` | `int` |
+| `double` | number | `float64` | `float` |
+| `boolean` | `true` / `false` | `bool` | `bool` |
+| `string` | string | `string` | `str` |
+| `character` | one-character string `"a"` | `byte` | `str` |
+| `ListNode` | array `[1,2,3]` | `*ListNode` | `Optional[ListNode]` |
+| `TreeNode` | level-order array `[3,9,20,null,null,15,7]` | `*TreeNode` | `Optional[TreeNode]` |
+| `T[]` | array, up to 3 levels; 1 level for node arrays | `[]T` | `List[T]` |
+| `void` | return type only | — | `None` |
 
-`list<T>` 会被规范化为 `T[]`。暂不支持 `Node`（图/N 叉树/带 random 指针链表）、`NestedInteger` 等特殊类型。
+`list<T>` is normalized to `T[]`. Special types such as `Node` (graphs, N-ary trees, lists with random pointers) and `NestedInteger` are not supported yet.
 
 ### cases.jsonl
 
-每行一个用例：
+One case per line:
 
 ```json
 {"input": {"nums": [2,7,11,15], "target": 9}, "expected": [0,1], "example": true}
 {"input": {"nums": [-1,-2,-3,-4,-5], "target": -8}, "expected": [2,4], "note": "negative numbers"}
 ```
 
-- `input`：函数题为 参数名 → 值；设计题为 `{"ops": [...], "args": [[...], ...]}`，`ops[0]` 必须是类名（构造函数）。
-- `expected`：期望输出。设计题为每个操作的返回值数组，构造函数与 `void` 方法为 `null`。缺省时可由 `hc cases build` 用参考解计算。
-- `example`：题面示例，`hc test` 默认只跑这些。
-- `note`：用例说明。
-- 空行和 `//` 开头的行会被忽略。用例编号为有效行的 1-based 序号。
+- `input`: for function problems, parameter name → value. For design problems, `{"ops": [...], "args": [[...], ...]}`; `ops[0]` must be the class name (the constructor).
+- `expected`: the expected output. For design problems, an array with each operation's return value, using `null` for the constructor and `void` methods. If missing, `hc cases build` computes it with the reference solution.
+- `example`: the case is an example from the statement. `hc test` runs only these by default.
+- `note`: a description of the case.
+- Blank lines and lines starting with `//` are ignored. Cases are numbered from 1, counting only the lines that hold a case.
 
-### 校验
+### Validation
 
 ```
-hc validate <slug>          # 协议检查
-hc validate <slug> --run    # 另外用参考解跑全部用例，必须全部通过
+hc validate <slug>          # check against the protocol
+hc validate <slug> --run    # also run the reference solution on every case; all must pass
 ```
 
 ---
 
-## 2. 驱动协议（扩展新语言）
+## 2. Driver protocol (adding a language)
 
-每种语言实现 `internal/lang.Language` 接口，并在 `internal/app.Languages` 中注册：
+A language implements the `internal/lang.Language` interface and is registered in `internal/app.Languages`:
 
 ```go
 type Language interface {
-    ID() string                       // "go"，用于路径和 --lang
+    ID() string                       // "go"; used in paths and --lang
     Name() string
     Aliases() []string
-    SolutionFile() string             // 用户编辑的文件名，如 solution.go
-    Starter(p *problem.Problem) (string, error)            // 起始代码
-    Prepare(dir string, p *problem.Problem) error          // 写入驱动/运行时文件（每次运行前调用，需幂等）
-    Build(ctx context.Context, dir, binDir string) error   // 编译或语法检查，失败返回 *lang.CompileError
+    SolutionFile() string             // the file the user edits, e.g. solution.go
+    Starter(p *problem.Problem) (string, error)            // starter code
+    Prepare(dir string, p *problem.Problem) error          // writes driver/runtime files (called before every run; must be idempotent)
+    Build(ctx context.Context, dir, binDir string) error   // compiles or checks syntax; returns *lang.CompileError on failure
     Command(ctx context.Context, dir, binDir string) *exec.Cmd
     DebugCommand(dir, binDir string, p *problem.Problem, opts lang.DebugOptions) (*exec.Cmd, error)
-    Check() error                     // 工具链是否可用
+    Check() error                     // whether the toolchain is available
 }
 ```
 
-驱动程序只负责 **解码输入 → 调用用户代码 → 编码输出**，不做任何判题；判题统一在 Go 侧（`internal/judge`）完成，因此新语言无需重复实现比较逻辑。
+A driver only **decodes the input, calls the user's code and encodes the output**. It never judges. All judging happens in Go (`internal/judge`), so a new language doesn't reimplement comparison.
 
-- 环境变量 `HC_CASES`：一个 JSON 文件，内容为 `[{"id": 1, "input": {...}}, ...]`。
-- 环境变量 `HC_OUT`：驱动按 JSON Lines 写入结果，每个用例一行：
+- `HC_CASES` names a JSON file containing `[{"id": 1, "input": {...}}, ...]`.
+- `HC_OUT` names a file the driver appends results to, as JSON Lines, one per case:
 
   ```json
   {"id": 1, "output": [0,1], "error": "", "elapsed_ns": 1234}
   ```
 
-  `error` 非空表示运行时错误（建议只保留用户代码中的调用栈）；`elapsed_ns` 只统计用户代码耗时。
-- 用户代码的 stdout/stderr 直接透传到终端，方便 printf 调试。
-- 驱动进程崩溃或超时时，未写出结果的用例分别判为 Runtime Error / Time Limit Exceeded。
+  A non-empty `error` means a runtime error; keep only the stack frames from the user's code if you can. `elapsed_ns` covers only the time spent in the user's code.
+- The user's stdout and stderr go straight to the terminal, so print debugging works.
+- If the driver crashes or times out, cases without a result line are judged Runtime Error or Time Limit Exceeded respectively.
 
-现有实现可作为参考：`internal/lang/golang`（代码生成 + 静态运行时）与 `internal/lang/python`（动态运行时 + 内嵌签名）。
+The existing drivers are good references: `internal/lang/golang` (generated code plus a static runtime) and `internal/lang/python` (a dynamic runtime with the signature embedded).
