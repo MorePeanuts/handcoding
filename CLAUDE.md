@@ -60,3 +60,10 @@ Rebuild or reinstall `hc` afterwards; the samples are embedded at compile time.
 - Versioning: SemVer tags with a `v` prefix. Pre-releases look like `v0.1.0-alpha.N`. Pushing a `v*` tag runs `.github/workflows/release.yml` (GoReleaser; `prerelease: auto` marks `-alpha` tags). `hc --version` falls back to the module build-info version for `go install …@vX` builds.
 - Commit messages use Conventional Commits (`feat:`, `fix:`, `ci:`, `docs:` …). GoReleaser groups the changelog by these prefixes.
 - Imports are grouped std / third-party / `github.com/MorePeanuts/handcoding` (goimports `local-prefixes`).
+
+## Workflow
+
+- Bug reports and feature requests arrive either as GitHub issues or in conversation. Never pick up issues on your own. Work on an issue only when the user names it.
+- Before writing code, judge whether the request holds up: confirm the bug reproduces and isn't intended behavior, and check that the feature fits the design and the roadmap. If it doesn't, say so and discuss; don't implement it as written. Issues labeled `needs-discussion` always need this step.
+- The roadmap is the GitHub milestones, one per `v0.N.0`. Each description holds the goal, scope and exit criteria, and its issues track the work. Keep no roadmap or TODO files in the repo.
+- GitHub content (issues, milestones, PRs, templates) is written in English.

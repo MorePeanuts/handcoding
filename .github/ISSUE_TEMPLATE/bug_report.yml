@@ -1,0 +1,45 @@
+name: Bug report
+description: hc does not behave as expected
+labels: [bug, needs-discussion]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include terminal output or a screenshot if you can.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. hc fetch two-sum
+        2. hc test two-sum
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: hc version
+      description: Output of `hc --version`
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS, terminal, solution language and its version
+      placeholder: macOS 15 / Ghostty / Go 1.26
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Problem files (problem.yaml, cases.jsonl), your solution, logs
