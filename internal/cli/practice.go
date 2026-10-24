@@ -16,6 +16,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
+	"github.com/MorePeanuts/handcoding/internal/termimg"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 )
 
@@ -117,7 +118,8 @@ func newShowCmd(root *rootOptions) *cobra.Command {
 				fmt.Println(desc)
 				return nil
 			}
-			out := ui.NewMarkdown(ui.DetectTheme(a.WS.Config.Theme)).Render(desc, 100)
+			images := termimg.New(termimg.Detect(a.WS.Config.Images, true), os.Stdout)
+			out := ui.NewMarkdown(ui.DetectTheme(a.WS.Config.Theme), images).Render(desc, p.Dir, 100)
 			fmt.Println("  " + meta)
 			fmt.Print(out)
 			if doPause {

@@ -14,6 +14,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/store"
+	"github.com/MorePeanuts/handcoding/internal/termimg"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 )
 
@@ -41,6 +43,8 @@ type Options struct {
 	Lang lang.Language
 	// Theme is "dark" or "light"; empty means detect from the terminal.
 	Theme string
+	// Images draws statement images; nil means configure from hc.yaml.
+	Images *termimg.Renderer
 }
 
 type screen int
@@ -65,8 +69,10 @@ type model struct {
 	lang lang.Language
 	md   *ui.Markdown
 
-	// copy writes to the clipboard; replaced in tests.
+	// copy writes to the clipboard and open shows files in the desktop's
+	// viewer; replaced in tests.
 	copy func(string) error
+	open func([]string) error
 
 	width, height int
 	stack         []screen
@@ -84,8 +90,9 @@ type model struct {
 	searching bool
 
 	// current is the problem shown by the detail, result and history screens.
-	current *problem.Problem
-	detail  viewport.Model
+	current      *problem.Problem
+	detail       viewport.Model
+	detailImages []string // local images of the current statement
 
 	// result screen
 	run     *runState
@@ -106,6 +113,9 @@ func Run(ctx context.Context, a *app.App, opts Options) error {
 		// Must happen before bubbletea owns the terminal (see ui.DetectTheme).
 		opts.Theme = ui.DetectTheme(a.WS.Config.Theme)
 	}
+	if opts.Images == nil {
+		opts.Images = termimg.New(termimg.Detect(a.WS.Config.Images, true), os.Stdout)
+	}
 	m, err := newModel(ctx, a, opts)
 	if err != nil {
 		return err
@@ -123,9 +133,10 @@ func newModel(ctx context.Context, a *app.App, opts Options) (*model, error) {
 		app:   a,
 		opts:  opts,
 		lang:  opts.Lang,
-		md:    ui.NewMarkdown(opts.Theme),
+		md:    ui.NewMarkdown(opts.Theme, opts.Images),
 		stack: []screen{screenList},
 		copy:  clipboard.WriteAll,
+		open:  openFiles,
 	}
 	m.search = textinput.New()
 	m.search.Prompt = "/"
@@ -205,7 +216,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.message = ui.Red.Render(msg.err.Error())
 		}
+		// The program may have cleared the terminal's images.
+		m.opts.Images.Forget()
 		m.refresh()
+		m.layout()
 		return m, nil
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {

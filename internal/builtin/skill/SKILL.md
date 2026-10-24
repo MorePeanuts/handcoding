@@ -16,6 +16,7 @@ asked to diagnose a reported failure — and never change them.**
 problems/0001-two-sum/
   problem.yaml       metadata + signature + judge options
   description.md     statement
+  assets/            optional images used by the statement: ![](assets/x.png)
   cases.jsonl        test cases, one JSON object per line
   reference/         reference solutions (solution.py and/or solution.go)
   templates/         optional starter code (solution.go, solution.py)

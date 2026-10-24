@@ -2,6 +2,10 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -35,8 +39,9 @@ func (m *model) renderDetail() {
 	if desc == "" {
 		desc = "_No description._"
 	}
+	m.detailImages = localImages(p.Dir, desc)
 	width := min(max(m.width-2, 20), 120)
-	m.detail.SetContent(m.md.Render(desc, width))
+	m.detail.SetContent(m.md.Render(desc, p.Dir, width))
 }
 
 func (m *model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -44,6 +49,9 @@ func (m *model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch key := msg.String(); key {
 	case "esc", "q":
 		m.pop()
+		return m, nil
+	case "o":
+		m.openImages()
 		return m, nil
 	case "enter":
 		// Back to the latest result, if there is one for this problem.
@@ -95,8 +103,64 @@ func clipLeft(s string, width int) string {
 func (m *model) viewDetail() string {
 	p := m.current
 	keys := []string{"↑↓ scroll", "t test", "s submit", "d debug", "e edit", "h history", "y copy-path", "L lang", "r reset", "D discard", "esc back"}
+	if len(m.detailImages) > 0 {
+		keys = append([]string{"o open-images"}, keys...)
+	}
 	if m.run != nil && m.run.slug == p.Slug {
 		keys = append([]string{"enter last-result"}, keys...)
 	}
 	return m.frame(m.problemTitle(p), m.solutionLine(p), m.detail.View(), keys...)
+}
+
+// localImages lists the image files a statement in dir refers to.
+func localImages(dir, desc string) []string {
+	var paths []string
+	problem.ReplaceImages(desc, func(_, src string) string {
+		if !strings.Contains(src, "://") {
+			path := filepath.Join(dir, filepath.FromSlash(src))
+			if _, err := os.Stat(path); err == nil {
+				paths = append(paths, path)
+			}
+		}
+		return ""
+	})
+	return paths
+}
+
+// openImages shows the statement's images in the system image viewer, at
+// full resolution (terminals without kitty graphics get a rough preview).
+func (m *model) openImages() {
+	if len(m.detailImages) == 0 {
+		m.message = "this statement has no images"
+		return
+	}
+	if err := m.open(m.detailImages); err != nil {
+		m.message = ui.Red.Render(err.Error())
+		return
+	}
+	m.message = "opened " + plural(len(m.detailImages), "image")
+}
+
+// openFiles opens files with the desktop's default application.
+func openFiles(paths []string) error {
+	var cmds []*exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmds = append(cmds, exec.Command("open", paths...))
+	case "windows":
+		for _, p := range paths {
+			cmds = append(cmds, exec.Command("cmd", "/c", "start", "", p))
+		}
+	default:
+		for _, p := range paths {
+			cmds = append(cmds, exec.Command("xdg-open", p))
+		}
+	}
+	for _, c := range cmds {
+		if err := c.Start(); err != nil {
+			return fmt.Errorf("open images: %w", err)
+		}
+		go func() { _ = c.Wait() }() // reap it; its exit status does not matter
+	}
+	return nil
 }

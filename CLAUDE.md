@@ -40,6 +40,8 @@ Request flow: `internal/cli` (cobra) or `internal/tui` (bubbletea) → `internal
 
 **TUI** (`internal/tui`): a screen stack (`list → detail → result`, `history → submission`). Test and submit run in a background `tea.Cmd`. Only the editor and the debugger take over the terminal (`tea.ExecProcess` / `clearScreenCmd`). The markdown theme must be detected before `tea.NewProgram` starts (`ui.DetectTheme`). Once bubbletea owns stdin, the terminal's background-color reply is swallowed and every render stalls until timeout. `ui.Markdown` caches renderers and output.
 
+**Statement images** (`internal/termimg`): `hc fetch` downloads images into the problem's `assets/`. `ui.Markdown` swaps each `![](...)` for a token, lets glamour render, then replaces the token line with the image drawn as plain text lines. Because the image is ordinary lines of text, it scrolls inside a viewport. With kitty (kitty, Ghostty) those lines are Unicode placeholder cells for an image uploaded once with `q=2`; a reply would arrive as keystrokes. With blocks, they are mosaic block characters. After the editor or debugger has used the terminal, `Renderer.Forget` forces a re-upload. Never query the terminal for graphics support once the TUI is running.
+
 ## Built-in sample problems
 
 `internal/builtin/_problems/` is embedded into the binary. The leading underscore keeps the Go tool from compiling the `reference/*.go` files inside it. `TestBuiltinReferences` requires every case to have an expected output, and requires both the Python and the Go reference to pass. After changing those cases, regenerate expected outputs through a scratch workspace that symlinks the directory:

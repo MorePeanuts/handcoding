@@ -6,6 +6,7 @@
 //	<dir>/
 //	  problem.yaml      metadata, signature and judge options
 //	  description.md    statement (Markdown)
+//	  assets/           optional images referenced by the statement (![](assets/x.png))
 //	  cases.jsonl       test cases, one JSON object per line
 //	  templates/        optional starter code per language (solution.go, solution.py, ...)
 //	  reference/        optional reference solutions used to compute expected outputs
@@ -29,6 +30,7 @@ const (
 	CasesFile       = "cases.jsonl"
 	TemplatesDir    = "templates"
 	ReferenceDir    = "reference"
+	AssetsDir       = "assets"
 )
 
 // Kind is the shape of a problem.

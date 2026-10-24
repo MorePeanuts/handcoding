@@ -177,7 +177,7 @@ func (m *model) renderSubmission() {
 			fmt.Sprintf(" · %d/%d passed", s.Passed, s.Total) + "\n" +
 			ui.Faint.Render("(per-case details were not recorded for this submission)") + "\n")
 	}
-	code := m.md.Render("```"+s.Lang+"\n"+strings.TrimRight(s.Code, "\n")+"\n```\n", width)
+	code := m.md.Render("```"+s.Lang+"\n"+strings.TrimRight(s.Code, "\n")+"\n```\n", "", width)
 	m.subView.SetContent(wrap(b.String(), m.width) + "\n" + code)
 }
 

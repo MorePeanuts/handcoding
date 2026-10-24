@@ -15,6 +15,7 @@
 problems/0001-two-sum/          目录名：<4 位编号>-<slug>，无编号时为 <slug>
   problem.yaml                  元数据、函数签名、判题选项（必需）
   description.md                题面，Markdown
+  assets/rev1ex1.jpg            题面引用的图片（可选），写作 ![](assets/rev1ex1.jpg)
   cases.jsonl                   测试用例，每行一个 JSON 对象
   reference/solution.py         参考解（可选，可多语言），用于计算期望输出
   reference/solution.go

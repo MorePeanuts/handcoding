@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -147,6 +149,35 @@ func TestEnterOpensDetailAndCopiesPath(t *testing.T) {
 	h.press("esc")
 	if h.m.top() != screenList || h.m.statuses[p.Slug] != app.StatusAttempted {
 		t.Fatalf("after esc: screen %v, status %v", h.m.top(), h.m.statuses[p.Slug])
+	}
+}
+
+func TestDetailOpensStatementImages(t *testing.T) {
+	h := newHarness(t)
+	var opened []string
+	h.m.open = func(paths []string) error { opened = paths; return nil }
+	p, err := h.m.app.WS.Problem("reverse-linked-list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.m.openDetail(p)
+	view := h.view()
+	// No image protocol in tests: the images show as labels.
+	for _, want := range []string{"[image: rev1ex1.jpg]", "o open-images"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("detail view missing %q", want)
+		}
+	}
+	h.press("o")
+	want := []string{filepath.Join(p.Dir, "assets", "rev1ex1.jpg"), filepath.Join(p.Dir, "assets", "rev1ex2.jpg")}
+	if !slices.Equal(opened, want) {
+		t.Errorf("opened %q, want %q", opened, want)
+	}
+
+	h.press("esc")
+	h.m.openDetail(h.m.probs[0]) // two-sum has no images
+	if strings.Contains(h.view(), "open-images") {
+		t.Error("open-images offered for a statement without images")
 	}
 }
 

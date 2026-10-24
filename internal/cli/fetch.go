@@ -21,9 +21,10 @@ func newFetchCmd(root *rootOptions) *cobra.Command {
 		Use:     "fetch <slug|id|url>...",
 		Aliases: []string{"pull"},
 		Short:   "Import problems from LeetCode",
-		Long: `Download problems from LeetCode's public API into the bank: statement,
-signature, Go/Python templates and the examples (with expected outputs when
-they can be parsed from the statement). Premium problems are not available.
+		Long: `Download problems from LeetCode's public API into the bank: statement
+(with its images, for offline use), signature, Go/Python templates and the
+examples (with expected outputs when they can be parsed from the statement).
+Premium problems are not available.
 
 Afterwards run ` + "`hc gen <slug>`" + ` to let an agent write the full test suite.
 
@@ -90,6 +91,7 @@ func fetchOne(cmd *cobra.Command, a *app.App, client *leetcode.Client, ref strin
 		}
 		return err
 	}
+	client.DownloadImages(ctx, conv)
 	// Only drop the old copy once the new one is ready to be written.
 	if existing != nil {
 		if err := os.RemoveAll(existing.Dir); err != nil {

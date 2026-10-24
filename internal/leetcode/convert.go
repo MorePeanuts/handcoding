@@ -52,6 +52,9 @@ type Converted struct {
 	Description string
 	Cases       []problem.Case
 	Templates   map[string]string // file name -> code
+	// Assets are files referenced by the description (path in the problem
+	// directory -> content), filled by Client.DownloadImages.
+	Assets map[string][]byte
 	// Warnings explain what could not be converted automatically.
 	Warnings []string
 }
@@ -238,6 +241,15 @@ func (c *Converted) Save(dir string) error {
 	}
 	if err := os.WriteFile(filepath.Join(dir, problem.DescriptionFile), []byte(c.Description), 0o644); err != nil {
 		return err
+	}
+	for rel, data := range c.Assets {
+		target := filepath.Join(dir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(target, data, 0o644); err != nil {
+			return err
+		}
 	}
 	if len(c.Templates) > 0 {
 		if err := os.MkdirAll(filepath.Join(dir, problem.TemplatesDir), 0o755); err != nil {

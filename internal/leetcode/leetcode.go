@@ -40,6 +40,8 @@ func SiteByName(name string) (Site, error) {
 	return Site{}, fmt.Errorf("unknown LeetCode site %q (com or cn)", name)
 }
 
+const userAgent = "handcoding/1 (+https://github.com/MorePeanuts/handcoding)"
+
 // Client talks to LeetCode's public GraphQL API. No login is needed for free
 // problems.
 type Client struct {
@@ -101,7 +103,7 @@ func (c *Client) Question(ctx context.Context, slug string) (*Question, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Referer", c.Site.Base+"/problems/"+slug+"/")
-	req.Header.Set("User-Agent", "handcoding/1 (+https://github.com/MorePeanuts/handcoding)")
+	req.Header.Set("User-Agent", userAgent)
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
 		return nil, err
@@ -182,7 +184,7 @@ func (c *Client) problemList(ctx context.Context) ([]listEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "handcoding/1 (+https://github.com/MorePeanuts/handcoding)")
+	req.Header.Set("User-Agent", userAgent)
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
 		return nil, err

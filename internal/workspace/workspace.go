@@ -41,6 +41,9 @@ type Config struct {
 	Editor string `yaml:"editor,omitempty"`
 	// Theme is the color theme for rendered statements: auto, dark or light.
 	Theme string `yaml:"theme,omitempty"`
+	// Images selects how statement images are drawn: auto, kitty, blocks or
+	// none (see package termimg).
+	Images string `yaml:"images,omitempty"`
 	// Timeout is the wall clock limit for a run.
 	Timeout string `yaml:"timeout,omitempty"`
 	// Python configures the Python language.
@@ -76,6 +79,7 @@ func DefaultConfig() Config {
 	return Config{
 		Language: "go",
 		Theme:    "auto",
+		Images:   "auto",
 		Timeout:  "10s",
 		Python:   PythonConfig{Interpreter: "python3"},
 		Agent:    AgentConfig{Name: "claude"},
@@ -167,7 +171,7 @@ func Create(dir string) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	header := "# handcoding workspace configuration\n# agent.name: claude | codex   (or set agent.command for a custom agent)\n# leetcode.site: com | cn\n# theme: auto | dark | light   (set it if statements look wrong in your terminal)\n"
+	header := "# handcoding workspace configuration\n# agent.name: claude | codex   (or set agent.command for a custom agent)\n# leetcode.site: com | cn\n# theme: auto | dark | light   (set it if statements look wrong in your terminal)\n# images: auto | kitty | blocks | none   (kitty: kitty/Ghostty; blocks: any truecolor terminal)\n"
 	if err := os.WriteFile(filepath.Join(abs, ConfigFile), append([]byte(header), data...), 0o644); err != nil {
 		return nil, err
 	}
