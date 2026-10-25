@@ -66,6 +66,9 @@ hc                      # open the problem list
 
 Press `enter` on a problem. `hc` shows the statement, creates `solution.go` from the template and copies its path to the clipboard. Open it in your editor next door, then press `t` to test and `s` to submit.
 
+> [!TIP]
+> Statement images are shown at full resolution in kitty and Ghostty, and in [herdr](https://herdr.dev) when the terminal around it supports kitty graphics. If images inside herdr come out blank, your terminal lacks kitty graphics: set `images: blocks` in `hc.yaml`. See [statement images](docs/how-to-use.md#configuration).
+
 Every action also has a command:
 
 ```sh

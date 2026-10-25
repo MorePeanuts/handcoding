@@ -175,7 +175,11 @@ leetcode:
   site: com           # com | cn
 ```
 
-`images: auto` picks `kitty` in kitty and Ghostty, `blocks` in other truecolor terminals, and `none` otherwise. Inside tmux, auto never picks kitty. If the outer terminal supports it, set `images: kitty` and enable tmux's `allow-passthrough`.
+`images: auto` picks `kitty` in kitty, Ghostty and [herdr](https://herdr.dev), `blocks` in other truecolor terminals, and `none` otherwise.
+
+- **herdr** draws kitty graphics itself, so images show whenever the terminal around herdr supports kitty graphics: kitty, Ghostty, or WezTerm with `enable_kitty_graphics = true`. In other terminals the image area stays blank; set `images: blocks`, and press `o` to see the original.
+- **tmux**: auto never picks kitty. If the outer terminal supports Unicode placeholders (kitty, Ghostty), set `images: kitty` and enable tmux's `allow-passthrough`.
+- **WezTerm** supports kitty graphics but not Unicode placeholders, so `images: kitty` shows garbled characters there. Keep `blocks` when running WezTerm directly.
 
 ## Current limitations
 

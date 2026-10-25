@@ -125,6 +125,15 @@ func TestDetect(t *testing.T) {
 	if p := Detect("auto", true); p != Kitty {
 		t.Errorf("ghostty: %s", p)
 	}
+	t.Setenv("TERM_PROGRAM", "herdr")
+	if p := Detect("auto", true); p != Kitty {
+		t.Errorf("herdr: %s", p)
+	}
+	t.Setenv("TERM_PROGRAM", "WezTerm")
+	if p := Detect("auto", true); p != Blocks {
+		t.Errorf("wezterm: %s", p)
+	}
+	t.Setenv("TERM_PROGRAM", "ghostty")
 	if p := Detect("auto", false); p != None {
 		t.Errorf("not a terminal: %s", p)
 	}

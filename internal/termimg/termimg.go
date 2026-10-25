@@ -44,8 +44,15 @@ const (
 )
 
 // Detect resolves a configured protocol. "auto" (or empty) picks kitty in
-// terminals known to support Unicode placeholders, blocks in other truecolor
-// terminals, and none otherwise or when output is not a terminal.
+// terminals known to support Unicode placeholders and inside herdr, blocks in
+// other truecolor terminals, and none otherwise or when output is not a
+// terminal.
+//
+// herdr renders kitty graphics itself and re-emits them to the outer
+// terminal, so kitty works there whenever the outer terminal supports kitty
+// graphics, even without Unicode placeholders. herdr answers graphics
+// queries on its own behalf, so the outer terminal cannot be probed; in
+// terminals without kitty graphics the images stay blank.
 func Detect(configured string, tty bool) Protocol {
 	switch p := Protocol(configured); p {
 	case Kitty, Blocks, None:
@@ -58,7 +65,7 @@ func Detect(configured string, tty bool) Protocol {
 	// Inside tmux the outer terminal is unknown and passthrough may be off;
 	// kitty must be chosen explicitly there.
 	if os.Getenv("TMUX") == "" && (os.Getenv("KITTY_WINDOW_ID") != "" || term == "xterm-kitty" ||
-		program == "ghostty" || term == "xterm-ghostty") {
+		program == "ghostty" || term == "xterm-ghostty" || program == "herdr") {
 		return Kitty
 	}
 	switch os.Getenv("COLORTERM") {
