@@ -23,13 +23,17 @@ type Agent struct {
 	Argv []string
 }
 
-// Presets maps agent names to their headless command lines. The tool
-// allowlists keep the agents on files and hc/python/go commands.
+// Presets maps agent names to their headless command lines. Both keep writes
+// inside the workspace. Claude: Write/Edit are left out of the allowlist so
+// acceptEdits approves them only in the working directory, and the sandbox
+// confines what Bash commands (python3, go) can write. Codex: --full-auto
+// runs in its workspace-write sandbox.
 var Presets = map[string][]string{
 	"claude": {
 		"claude", "-p", "{prompt}",
 		"--permission-mode", "acceptEdits",
-		"--allowedTools", "Read,Write,Edit,Glob,Grep,Bash(hc:*),Bash(python3:*),Bash(go:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(wc:*)",
+		"--allowedTools", "Read,Glob,Grep,Bash(hc:*),Bash(python3:*),Bash(go:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(wc:*)",
+		"--settings", `{"sandbox":{"enabled":true,"autoAllowBashIfSandboxed":true,"allowUnsandboxedCommands":false}}`,
 	},
 	"codex": {"codex", "exec", "--full-auto", "{prompt}"},
 }
