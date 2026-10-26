@@ -18,6 +18,8 @@ class:
         - {name: key, type: integer}
         - {name: value, type: integer}
       returns: void
+judge:
+  compare: exact
 source:
   site: builtin
   url: https://leetcode.com/problems/lru-cache/

@@ -45,6 +45,8 @@ function:
     - name: nums
       type: integer[]
   returns: long
+judge:
+  compare: exact
 ```
 
 ```json
@@ -87,6 +89,8 @@ class:
     - name: getMin
       params: []
       returns: integer
+judge:
+  compare: exact
 ```
 
 ```json
@@ -131,22 +135,25 @@ problems/0001-two-sum/          目录名：id 是数字时为 <4 位编号>-<sl
 | 字段 | 含义 |
 |---|---|
 | `id` | 题目编号（字符串，可选），用于排序和查找（`hc test 9001`）。在题库中必须唯一。是数字时也会作为目录名前缀 |
-| `slug` | 唯一标识，小写短横线格式（必需） |
+| `slug` | 唯一标识，短横线格式：字母、数字和单个短横线，建议全部小写（必需） |
 | `title` | 标题（必需） |
 | `difficulty` | `easy`、`medium` 或 `hard` |
 | `tags` | 标签列表 |
 | `kind` | `function`（单个函数）或 `class`（设计题）。缺省时，有 `class` 段则为 `class`，否则为 `function` |
 | `function` | 函数题的签名：`name`、`params`（`{name, type}` 列表）、`returns`（缺省为 `void`） |
 | `class` | 设计题的签名：`name`、`constructor`（`{name, type}` 列表）、`methods`（`{name, params, returns}` 列表） |
-| `judge.compare` | 输出的比较方式（见下文），默认 `exact` |
+| `judge.compare` | 输出的比较方式（见下文）。没有默认值：不写就表示题目*未就绪*（见下文） |
 | `judge.tolerance` | 浮点误差。返回 `double` 时默认为 `1e-5`；绝对误差或相对误差满足其一即可 |
-| `judge.output` | 原地修改类题目：函数返回 `void`，调用结束后比较这个参数的值 |
+| `judge.output` | 原地修改类题目：调用结束后比较这个参数的值，而不是返回值 |
+| `judge.output_length` | `return`：只判 `judge.output` 的前 k 个元素，k 是函数返回的整数。用于 LeetCode 的"删除重复项"这类题 |
 | `judge.time_limit` | 整次运行的时限，写成 `5s`、`500ms` 这样的时长。默认取 hc.yaml 中的 `timeout` |
 | `source` | 题目来源：`site`、`url` |
 
 不认识的字段会报错，所以 `judgee:`、`parms:` 这类拼写错误会被指出来，而不是悄悄退回默认值。
 
 > **YAML 的坑。** 在紧凑的 `{...}` / `[...]` 写法里，`[]` 本身是 YAML 语法，所以数组类型必须加引号：`{name: nums, type: "integer[]"}`。用块状写法（像上面的例子那样把 `type: integer[]` 单独写一行）时，引号可加可不加。
+
+**未就绪。** `judge.compare` 必须显式写出，即使是 `exact` 也要写。没写的题目，判题规则就是未确定的：`hc submit` 会拒绝提交，`hc test` 只把输出和期望输出并排列出，不给结论（显示 "Not Judged"），`hc validate` 会给出警告。`hc fetch` 拉取的题目有意处于这个状态，因为 LeetCode 不公开判题方式；由 `hc gen` 根据题面决定判题规则，或者由你手动设置。
 
 原地修改类题目返回 `void`，并指明要判哪个参数：
 
@@ -161,6 +168,21 @@ function:
   returns: void
 judge:
   output: nums      # expected 是调用结束后 nums 的值
+```
+
+如果函数返回长度 k，并且只有前 k 个元素有意义（"前 k 个元素之后的内容不重要"）：
+
+```yaml
+function:
+  name: removeDuplicates
+  params:
+    - name: nums
+      type: integer[]
+  returns: integer
+judge:
+  compare: exact
+  output: nums
+  output_length: return   # 判 nums[:k]，k 是返回值
 ```
 
 比较方式：
@@ -229,11 +251,11 @@ hc validate <slug> --run    # 同时在每个用例上运行每一份参考解�
 
 `hc validate` 会报告以下错误，并指出用例编号和字段：
 
-- `problem.yaml`：语法错误（带行号和列号）、不认识的字段、不合法的 slug、缺少标题、不支持的类型、`judge.output` 不是参数、`void` 函数没写 `judge.output`、不认识的 `judge.compare`、不合法的 `judge.time_limit`；
+- `problem.yaml`：语法错误（带行号和列号）、不认识的字段、不合法的 slug、缺少标题、不支持的类型、`judge.output` 不是参数、`void` 函数没写 `judge.output`、`judge.output_length` 用法不对、不认识的 `judge.compare`、不合法的 `judge.time_limit`；
 - `cases.jsonl`：JSON 不合法、不认识的字段、缺少或多出的输入、值与声明的类型不符（`input "nums": [1]: must be integer, got string "x"`）、设计题中参数个数不对或方法不存在、`expected` 的形状不对；
 - 加上 `--run` 时：参考解无法编译、运行出错，或与 `expected` 不一致（会同时显示两个值）。
 
-以下情况会给出警告：有用例缺少 `expected`、没有标记示例用例、没有参考解、题面引用的图片不存在、编号与其他题目重复。
+以下情况会给出警告：判题规则未确定（没有 `judge.compare`）、有用例缺少 `expected`、没有标记示例用例、没有参考解、题面引用的图片不存在、编号与其他题目重复。
 
 ---
 

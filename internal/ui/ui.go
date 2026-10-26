@@ -41,7 +41,7 @@ func VerdictStyle(v runner.Verdict) lipgloss.Style {
 	switch v {
 	case runner.Accepted:
 		return Green.Bold(true)
-	case runner.NoExpected:
+	case runner.NoExpected, runner.NotJudged:
 		return Yellow.Bold(true)
 	}
 	return Red.Bold(true)
@@ -74,7 +74,7 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 		switch c.Verdict {
 		case runner.Accepted:
 			mark = "✔"
-		case runner.NoExpected:
+		case runner.NoExpected, runner.NotJudged:
 			mark = "?"
 		}
 		line := fmt.Sprintf("%s Case %-3d", style.Render(mark), c.Index)
@@ -90,11 +90,11 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 		fmt.Fprintln(w, line)
 		// Show details for failures (all of them when verbose, otherwise the
 		// first one, like LeetCode) and for cases without expected output.
-		detail := o.Verbose || c.Verdict == runner.NoExpected || (c.Verdict != runner.Accepted && !shownFailure)
+		detail := o.Verbose || c.Verdict.Unjudged() || (c.Verdict != runner.Accepted && !shownFailure)
 		if !detail {
 			continue
 		}
-		if c.Verdict != runner.Accepted && c.Verdict != runner.NoExpected {
+		if c.Verdict != runner.Accepted && !c.Verdict.Unjudged() {
 			shownFailure = true
 		}
 		field := func(name, value string) {
@@ -122,6 +122,12 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 	if rep.Stderr != "" {
 		fmt.Fprintln(w, Faint.Render("  stderr (tail):"))
 		fmt.Fprintln(w, indent(strings.TrimSpace(rep.Stderr), "    "))
+	}
+	if rep.Verdict == runner.NotJudged {
+		summary := fmt.Sprintf("%s · %d case(s) ran · %s", VerdictStyle(rep.Verdict).Render(string(rep.Verdict)), rep.Total, FormatDuration(rep.Elapsed))
+		fmt.Fprintln(w, "\n"+summary)
+		fmt.Fprintln(w, Faint.Render("Compare your output with the expected one yourself; "+p.NotReadyHint()+"."))
+		return
 	}
 	summary := fmt.Sprintf("%s · %d/%d passed · %s", VerdictStyle(rep.Verdict).Render(string(rep.Verdict)), rep.Passed, rep.Total, FormatDuration(rep.Elapsed))
 	fmt.Fprintln(w, "\n"+summary)

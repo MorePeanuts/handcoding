@@ -31,6 +31,9 @@ const (
 	CompileError Verdict = "Compile Error"
 	// NoExpected means the case ran but has no expected output to compare to.
 	NoExpected Verdict = "No Expected Output"
+	// NotJudged means the case ran, but the problem's judge rule is not
+	// decided yet (problem.Ready), so the output is shown without a verdict.
+	NotJudged Verdict = "Not Judged"
 )
 
 // Selected is a case chosen for a run, with its 1-based index in cases.jsonl.
@@ -38,6 +41,10 @@ type Selected struct {
 	Index int
 	Case  problem.Case
 }
+
+// Unjudged reports whether a case ran without being judged: it has no
+// expected output, or the judge rule is not decided.
+func (v Verdict) Unjudged() bool { return v == NoExpected || v == NotJudged }
 
 // CaseResult is the result of one case.
 type CaseResult struct {
@@ -157,6 +164,9 @@ func judgeCase(p *problem.Problem, c problem.Case, out json.RawMessage, cr *Case
 	if !c.HasExpected() {
 		return NoExpected
 	}
+	if !p.Ready() {
+		return NotJudged
+	}
 	ok, err := judge.Equal(judge.OptionsFor(p), c.Expected, out)
 	if err != nil {
 		cr.JudgeErr = err
@@ -169,21 +179,28 @@ func judgeCase(p *problem.Problem, c problem.Case, out json.RawMessage, cr *Case
 }
 
 // overall picks the first failing verdict in case order, as LeetCode does.
+// Without any failure, a run in which no case was judged is NotJudged or
+// NoExpected rather than Accepted.
 func overall(rep *Report) Verdict {
-	allNoExpected := len(rep.Cases) > 0
+	judged, notJudged := false, false
 	for _, c := range rep.Cases {
 		switch c.Verdict {
 		case Accepted:
-			allNoExpected = false
+			judged = true
+		case NotJudged:
+			notJudged = true
 		case NoExpected:
 		default:
 			return c.Verdict
 		}
 	}
-	if allNoExpected {
-		return NoExpected
+	switch {
+	case judged || len(rep.Cases) == 0:
+		return Accepted
+	case notJudged:
+		return NotJudged
 	}
-	return Accepted
+	return NoExpected
 }
 
 type driverCase struct {

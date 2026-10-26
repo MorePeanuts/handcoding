@@ -39,7 +39,7 @@ Command-line clients bring your editor back, but they still send your code to th
 - **Real debuggers.** `hc debug` starts Delve or pdb stopped at your function. `--headless` serves DAP for nvim-dap or VS Code.
 - **Interactive TUI.** A problem list in the style of rustlings, with the statement, its images, test results and submission history in one place. Your editor stays in the next pane.
 - **LeetCode import.** `hc fetch 146` downloads the statement, its images, the signature, starter code and the examples.
-- **Agent-written test cases.** `hc gen` has Claude Code or Codex write a reference solution and test inputs. Expected outputs come from running the reference, not from the model's guess. `hc fix` repairs a wrong case.
+- **Agent-written test cases.** `hc gen` has Claude Code or Codex decide how a problem is judged (any order? several valid answers?) and write a reference solution and test inputs. Expected outputs come from running the reference, not from the model's guess. `hc fix` repairs a wrong case.
 - **Open problem format.** Problems are plain directories: YAML, Markdown and JSON Lines. Write your own and share them.
 - **History.** Every submission keeps its code and judge report, so you can review, restore or delete it.
 
@@ -73,6 +73,7 @@ Every action also has a command:
 
 ```sh
 hc fetch 206            # import a problem from LeetCode
+hc gen 206              # let a coding agent write its test cases and judge rule
 hc test two-sum         # run the examples
 hc submit two-sum       # judge on all cases and record the submission
 hc debug two-sum -c 4   # debug case 4

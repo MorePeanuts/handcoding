@@ -45,6 +45,8 @@ function:
     - name: nums
       type: integer[]
   returns: long
+judge:
+  compare: exact
 ```
 
 ```json
@@ -87,6 +89,8 @@ class:
     - name: getMin
       params: []
       returns: integer
+judge:
+  compare: exact
 ```
 
 ```json
@@ -131,22 +135,25 @@ problems/0001-two-sum/          directory name: <4-digit number>-<slug> when id 
 | Field | Meaning |
 |---|---|
 | `id` | Problem ID (a string, optional), used for sorting and lookup (`hc test 9001`). Must be unique in the bank. A number also prefixes the directory name |
-| `slug` | Unique identifier in lowercase kebab-case (required) |
+| `slug` | Unique identifier in kebab-case: letters, digits and single hyphens, preferably lower case (required) |
 | `title` | Title (required) |
 | `difficulty` | `easy`, `medium` or `hard` |
 | `tags` | List of tags |
 | `kind` | `function` (one function) or `class` (a design problem). Defaults to `class` when there is a `class` section, otherwise `function` |
 | `function` | Signature of a function problem: `name`, `params` (a list of `{name, type}`), `returns` (defaults to `void`) |
 | `class` | Signature of a design problem: `name`, `constructor` (a list of `{name, type}`), `methods` (a list of `{name, params, returns}`) |
-| `judge.compare` | How outputs are compared (see below). Default `exact` |
+| `judge.compare` | How outputs are compared (see below). No default: a problem without it is *not ready* (see below) |
 | `judge.tolerance` | Floating-point tolerance. Defaults to `1e-5` when returning `double`; either the absolute or the relative error must be within it |
-| `judge.output` | For in-place problems: the function returns `void`, and the judge compares this parameter's value after the call |
+| `judge.output` | For in-place problems: the judge compares this parameter's value after the call instead of the return value |
+| `judge.output_length` | `return`: judge only the first k elements of `judge.output`, k being the (integer) return value. LeetCode's "remove duplicates" problems |
 | `judge.time_limit` | Time limit for a whole run, as a duration such as `5s` or `500ms`. Defaults to `timeout` in hc.yaml |
 | `source` | Where the problem comes from: `site`, `url` |
 
 Unknown fields are errors, so a typo such as `judgee:` or `parms:` is reported instead of silently falling back to the defaults.
 
 > **YAML pitfall.** Inside the compact `{...}` / `[...]` syntax, `[]` is YAML syntax, so array types must be quoted there: `{name: nums, type: "integer[]"}`. In block style (`type: integer[]` on its own line, as in the examples above) quotes are optional.
+
+**Not ready.** `judge.compare` must be written out, even for `exact`. A problem without it has no decided judge rule: `hc submit` refuses it, `hc test` shows the outputs next to the expected ones without a verdict ("Not Judged"), and `hc validate` warns. `hc fetch` leaves problems in this state on purpose, because LeetCode does not publish how answers are judged; `hc gen` decides the rule from the statement, or you set it by hand.
 
 An in-place problem returns `void` and names the parameter to judge:
 
@@ -161,6 +168,21 @@ function:
   returns: void
 judge:
   output: nums      # expected is the value of nums after the call
+```
+
+When the function returns a length k and only the first k elements count ("the elements after the first k do not matter"):
+
+```yaml
+function:
+  name: removeDuplicates
+  params:
+    - name: nums
+      type: integer[]
+  returns: integer
+judge:
+  compare: exact
+  output: nums
+  output_length: return   # judge nums[:k], where k is the return value
 ```
 
 Comparison modes:
@@ -229,11 +251,11 @@ hc validate <slug> --run    # also run every reference solution on every case; a
 
 `hc validate` reports, with the case number and field:
 
-- `problem.yaml`: syntax errors (with line and column), unknown fields, invalid slug, missing title, unsupported types, a `judge.output` that is not a parameter, a `void` function without `judge.output`, unknown `judge.compare`, an invalid `judge.time_limit`;
+- `problem.yaml`: syntax errors (with line and column), unknown fields, invalid slug, missing title, unsupported types, a `judge.output` that is not a parameter, a `void` function without `judge.output`, a misused `judge.output_length`, unknown `judge.compare`, an invalid `judge.time_limit`;
 - `cases.jsonl`: invalid JSON, unknown fields, missing or unknown inputs, values that don't match their declared type (`input "nums": [1]: must be integer, got string "x"`), wrong argument counts and unknown methods in design problems, and an `expected` of the wrong shape;
 - with `--run`: reference solutions that don't compile, crash, or disagree with `expected` (both values are shown).
 
-It warns about cases without `expected`, no case marked as an example, no reference solution, missing statement images and an ID used by another problem.
+It warns about an undecided judge rule (no `judge.compare`), cases without `expected`, no case marked as an example, no reference solution, missing statement images and an ID used by another problem.
 
 ---
 

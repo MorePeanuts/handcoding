@@ -162,7 +162,7 @@ func (m *model) debugCase(p *problem.Problem) int {
 		return 1
 	}
 	for _, c := range m.run.report.Cases {
-		if c.Verdict != runner.Accepted && c.Verdict != runner.NoExpected {
+		if c.Verdict != runner.Accepted && !c.Verdict.Unjudged() {
 			return c.Index
 		}
 	}

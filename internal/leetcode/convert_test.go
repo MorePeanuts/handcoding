@@ -1,6 +1,7 @@
 package leetcode
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -35,7 +36,9 @@ func TestConvertFunction(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := c.Problem
-	if p.Kind != problem.KindFunction || p.Function.Name != "twoSum" || p.Judge.Compare != problem.CompareUnordered {
+	// The judge rule is left for hc gen even though the statement says
+	// "in any order".
+	if p.Kind != problem.KindFunction || p.Function.Name != "twoSum" || p.Ready() {
 		t.Fatalf("unexpected problem: %+v", p)
 	}
 	if len(c.Cases) != 2 {
@@ -58,7 +61,7 @@ func TestConvertFunction(t *testing.T) {
 func TestConvertClassAndInPlace(t *testing.T) {
 	q := &Question{
 		QuestionFrontendID: "146", Title: "LRU Cache", TitleSlug: "lru-cache", Difficulty: "Medium",
-		Content: "<pre><strong>Input</strong>\n[...]\n<strong>Output</strong>\n[null, null, 1]\n</pre>",
+		Content: "<pre><strong>Input</strong>\n[...]\n<strong>Output</strong>\n[null, -1]\n</pre>",
 		MetaData: `{"classname":"LRUCache","constructor":{"params":[{"type":"integer","name":"capacity"}]},
 			"methods":[{"params":[{"type":"integer","name":"key"}],"name":"get","return":{"type":"integer"}}],
 			"return":{"type":"boolean"},"systemdesign":true}`,
@@ -68,7 +71,7 @@ func TestConvertClassAndInPlace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Problem.Kind != problem.KindClass || len(c.Cases) != 1 || string(c.Cases[0].Expected) != "[null,null,1]" {
+	if c.Problem.Kind != problem.KindClass || len(c.Cases) != 1 || string(c.Cases[0].Expected) != "[null,-1]" {
 		t.Fatalf("class: %+v %+v", c.Problem, c.Cases)
 	}
 
@@ -85,12 +88,124 @@ func TestConvertClassAndInPlace(t *testing.T) {
 	}
 }
 
+func goSnippet(code string) []struct {
+	LangSlug string `json:"langSlug"`
+	Code     string `json:"code"`
+} {
+	return []struct {
+		LangSlug string `json:"langSlug"`
+		Code     string `json:"code"`
+	}{{"golang", code}}
+}
+
 func TestConvertUnsupported(t *testing.T) {
-	q := &Question{
-		QuestionFrontendID: "133", Title: "Clone Graph", TitleSlug: "clone-graph",
-		MetaData: `{"name":"cloneGraph","params":[{"name":"node","type":"Node"}],"return":{"type":"Node"}}`,
+	tests := []struct {
+		name string
+		q    *Question
+		want string
+	}{
+		{"unsupported type", &Question{
+			QuestionFrontendID: "341", TitleSlug: "flatten-nested-list-iterator",
+			MetaData: `{"name":"","params":[{"name":"nestedList","type":"list<NestedInteger>"}],"return":{"type":"integer"},"manual":true}`,
+		}, "uses the type NestedInteger[]"},
+		// LeetCode's metadata for Clone Graph describes its own test data,
+		// not the function the user writes.
+		{"custom judge, different signature", &Question{
+			QuestionFrontendID: "133", TitleSlug: "clone-graph",
+			MetaData:     `{"name":"cloneGraph","params":[{"name":"edges","type":"integer[][]"}],"return":{"type":"boolean"},"manual":true}`,
+			CodeSnippets: goSnippet("/**\n * type Node struct {...}\n */\n\nfunc cloneGraph(node *Node) *Node {\n\n}"),
+		}, "real signature cloneGraph(node *Node)"},
+		{"custom judge, fewer parameters", &Question{
+			QuestionFrontendID: "237", TitleSlug: "delete-node-in-a-linked-list",
+			MetaData:     `{"name":"deleteNode","params":[{"name":"head","type":"ListNode"},{"name":"node","type":"integer"}],"return":{"type":"void"},"manual":true}`,
+			CodeSnippets: goSnippet("func deleteNode(node *ListNode) {\n\n}"),
+		}, "real signature deleteNode(node *ListNode)"},
 	}
-	if _, err := Convert(q, SiteCom, false); err == nil {
-		t.Fatal("expected an error for unsupported types")
+	for _, tt := range tests {
+		_, err := Convert(tt.q, SiteCom, false)
+		if !errors.Is(err, ErrUnsupported) || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("%s: error = %v, want ErrUnsupported with %q", tt.name, err, tt.want)
+		}
+	}
+}
+
+func TestConvertOutputLength(t *testing.T) {
+	q := &Question{
+		QuestionFrontendID: "26", Title: "Remove Duplicates", TitleSlug: "remove-duplicates-from-sorted-array",
+		MetaData:         `{"name":"removeDuplicates","params":[{"name":"nums","type":"integer[]"}],"return":{"type":"integer"},"output":{"paramindex":0,"size":"ret"}}`,
+		Content:          "<pre><strong>Output:</strong> 2, nums = [1,2,_]\n</pre>",
+		ExampleTestcases: "[1,1,2]",
+	}
+	c, err := Convert(q, SiteCom, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if j := c.Problem.Judge; j.Output != "nums" || j.OutputLength != problem.OutputLengthReturn {
+		t.Fatalf("judge = %+v", j)
+	}
+}
+
+func TestConvertChineseOnly(t *testing.T) {
+	q := &Question{
+		QuestionFrontendID: "LCR 141", Title: "训练计划 III", TitleSlug: "fan-zhuan-lian-biao-lcof",
+		Content:           "<p>English description is not available for the problem. Please switch to Chinese.</p>",
+		TranslatedContent: "<p>反转链表。</p><pre><strong>输入：</strong>head = [1,2]\n<strong>输出：</strong>[2,1]\n</pre>",
+		MetaData:          `{"name":"trainningPlan","params":[{"name":"head","type":"ListNode"}],"return":{"type":"ListNode"}}`,
+		ExampleTestcases:  "[1,2]",
+	}
+	c, err := Convert(q, SiteCN, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(c.Description, "反转链表") {
+		t.Errorf("description should fall back to Chinese:\n%s", c.Description)
+	}
+	if len(c.Cases) != 1 || string(c.Cases[0].Expected) != "[2,1]" {
+		t.Errorf("cases = %+v", c.Cases)
+	}
+}
+
+func TestConvertDropsMismatchedExpected(t *testing.T) {
+	q := &Question{
+		QuestionFrontendID: "70", Title: "Climbing Stairs", TitleSlug: "climbing-stairs",
+		MetaData:         `{"name":"climbStairs","params":[{"name":"n","type":"integer"}],"return":{"type":"integer"}}`,
+		Content:          "<pre><strong>Output:</strong> [2]\n</pre>",
+		ExampleTestcases: "2",
+	}
+	c, err := Convert(q, SiteCom, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.Cases) != 1 || c.Cases[0].HasExpected() || len(c.Warnings) == 0 {
+		t.Errorf("cases = %+v, warnings = %q", c.Cases, c.Warnings)
+	}
+}
+
+func TestParseURL(t *testing.T) {
+	tests := []struct {
+		ref, site, slug string
+	}{
+		{"https://leetcode.com/problems/two-sum/", "com", "two-sum"},
+		{"https://leetcode.com/problems/two-sum/description/", "com", "two-sum"},
+		{"https://leetcode.com/problems/two-sum/description/?envType=study-plan-v2&envId=top-interview-150", "com", "two-sum"},
+		{"leetcode.cn/problems/two-sum", "cn", "two-sum"},
+		{"https://leetcode.cn/problems/xoh6Oh/solutions/", "cn", "xoh6Oh"},
+		{"https://www.leetcode.com/problems/two-sum#x", "com", "two-sum"},
+	}
+	for _, tt := range tests {
+		site, slug, ok := ParseURL(tt.ref)
+		if !ok || site.Name != tt.site || slug != tt.slug {
+			t.Errorf("ParseURL(%q) = %s, %q, %v", tt.ref, site.Name, slug, ok)
+		}
+	}
+	for _, ref := range []string{"two-sum", "146", "https://example.com/problems/x", "https://leetcode.com/contest/"} {
+		if _, _, ok := ParseURL(ref); ok {
+			t.Errorf("ParseURL(%q) should not match", ref)
+		}
+	}
+	for ref, want := range map[string]bool{"146": true, "LCR 001": true, "lcp 01": true, "two-sum": false, "3sum": false} {
+		if idRE.MatchString(ref) != want {
+			t.Errorf("idRE(%q) = %v", ref, !want)
+		}
 	}
 }

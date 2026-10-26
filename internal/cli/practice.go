@@ -179,7 +179,7 @@ the problem has one.`,
 					return err
 				}
 				ui.PrintReport(os.Stdout, p, rep, ui.ReportOptions{Verbose: o.verbose})
-				if rep.Verdict != runner.Accepted && rep.Verdict != runner.NoExpected {
+				if rep.Verdict != runner.Accepted && !rep.Verdict.Unjudged() {
 					return errSilent
 				}
 				return nil
@@ -251,6 +251,9 @@ func newSubmitCmd(root *rootOptions) *cobra.Command {
 				defer pause()
 			}
 			return root.withProblem(args[0], langName, func(a *app.App, p *problem.Problem, l lang.Language) error {
+				if !p.Ready() {
+					return errors.New("cannot submit: " + p.NotReadyHint() + "; `hc test` shows your output meanwhile")
+				}
 				ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 				defer stop()
 				fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Submitting %s [%s]…", p.Slug, l.Name())))

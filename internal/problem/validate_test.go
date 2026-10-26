@@ -146,3 +146,29 @@ func TestNormalizeType(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateOutputLength(t *testing.T) {
+	mk := func(returns, output, outType string) *Problem {
+		p := &Problem{Slug: "x", Title: "X", Kind: KindFunction, Function: &Function{
+			Name: "f", Params: []Param{{Name: "nums", Type: outType}}, Returns: returns,
+		}}
+		p.Judge.Output, p.Judge.OutputLength = output, OutputLengthReturn
+		p.Normalize()
+		return p
+	}
+	if err := mk(TypeInteger, "nums", "integer[]").Validate(); err != nil {
+		t.Errorf("valid output_length: %v", err)
+	}
+	for _, tt := range []struct {
+		p    *Problem
+		want string
+	}{
+		{mk(TypeInteger, "", "integer[]"), "needs judge.output"},
+		{mk(TypeVoid, "nums", "integer[]"), "needs an integer return value"},
+		{mk(TypeInteger, "nums", TypeInteger), "needs an array judge.output parameter"},
+	} {
+		if err := tt.p.Validate(); err == nil || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("error = %v, want %q", err, tt.want)
+		}
+	}
+}
