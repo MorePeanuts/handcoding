@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -47,11 +49,12 @@ func (p *Problem) LoadCases() ([]Case, error) {
 		return nil, err
 	}
 	defer f.Close()
-	return ParseCases(f, f.Name())
+	return ParseCases(f, filepath.Join(filepath.Base(p.Dir), CasesFile))
 }
 
 // ParseCases parses JSON Lines; blank lines and lines starting with // are
-// ignored.
+// ignored. Unknown fields are rejected so that typos such as "expect" do not
+// silently drop data.
 func ParseCases(r interface{ Read([]byte) (int, error) }, name string) ([]Case, error) {
 	var cases []Case
 	sc := bufio.NewScanner(r)
@@ -63,13 +66,47 @@ func ParseCases(r interface{ Read([]byte) (int, error) }, name string) ([]Case, 
 		if text == "" || strings.HasPrefix(text, "//") {
 			continue
 		}
-		var c Case
-		if err := json.Unmarshal([]byte(text), &c); err != nil {
+		c, err := parseCase([]byte(text))
+		if err != nil {
 			return nil, fmt.Errorf("%s:%d: %w", name, line, err)
 		}
 		cases = append(cases, c)
 	}
 	return cases, sc.Err()
+}
+
+func parseCase(line []byte) (Case, error) {
+	var c Case
+	dec := json.NewDecoder(bytes.NewReader(line))
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&c)
+	if err == nil && dec.More() {
+		err = errors.New("more than one JSON value on the line")
+	}
+	if te, ok := errors.AsType[*json.UnmarshalTypeError](err); ok {
+		switch te.Field {
+		case "input":
+			return c, errors.New(`"input" must be an object mapping parameter names to values`)
+		case "example":
+			return c, errors.New(`"example" must be true or false`)
+		case "note":
+			return c, errors.New(`"note" must be a string`)
+		case "":
+			return c, errors.New("a case must be a JSON object with an \"input\" field")
+		}
+	}
+	switch {
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		return c, errors.New("incomplete JSON (missing a closing bracket or brace?)")
+	case err != nil && strings.HasPrefix(err.Error(), "json: unknown field"):
+		return c, fmt.Errorf("%s (a case has input, expected, example and note)", strings.TrimPrefix(err.Error(), "json: "))
+	case err != nil:
+		return c, err
+	}
+	if c.Input == nil {
+		return c, errors.New(`missing "input"`)
+	}
+	return c, nil
 }
 
 // SaveCases writes cases.jsonl atomically.
@@ -131,36 +168,102 @@ func (p *Problem) InputKeys() []string {
 	return keys
 }
 
-// ValidateCase checks that a case provides every input of the signature.
+// ValidateCase checks a case against the signature: every input is present,
+// there are no unknown inputs, values match their declared types, and the
+// expected output (if any) has the shape the judge will compare against.
 func (p *Problem) ValidateCase(c Case) error {
-	for _, k := range p.InputKeys() {
+	keys := p.InputKeys()
+	for _, k := range keys {
 		if _, ok := c.Input[k]; !ok {
 			return fmt.Errorf("missing input %q", k)
 		}
 	}
+	for k := range c.Input {
+		if !slices.Contains(keys, k) {
+			return fmt.Errorf("unknown input %q (expected %s)", k, strings.Join(keys, ", "))
+		}
+	}
 	if p.Kind == KindClass {
-		var ops []string
-		var args []json.RawMessage
-		if err := json.Unmarshal(c.Input["ops"], &ops); err != nil {
-			return fmt.Errorf("ops: %w", err)
+		return p.validateClassCase(c)
+	}
+	for _, prm := range p.Function.Params {
+		if err := CheckValue(prm.Type, c.Input[prm.Name]); err != nil {
+			return fmt.Errorf("input %q: %w", prm.Name, err)
 		}
-		if err := json.Unmarshal(c.Input["args"], &args); err != nil {
-			return fmt.Errorf("args: %w", err)
+	}
+	if !c.HasExpected() {
+		return nil
+	}
+	want := p.judgedType()
+	if p.Judge.Compare == CompareAnyOf {
+		want += "[]"
+	}
+	if err := CheckValue(want, c.Expected); err != nil {
+		if p.Judge.Compare == CompareAnyOf {
+			return fmt.Errorf("expected (any_of: an array of acceptable answers): %w", err)
 		}
-		if len(ops) != len(args) {
-			return fmt.Errorf("ops has %d entries but args has %d", len(ops), len(args))
+		return fmt.Errorf("expected: %w", err)
+	}
+	return nil
+}
+
+func (p *Problem) validateClassCase(c Case) error {
+	var ops []string
+	var args [][]json.RawMessage
+	if err := json.Unmarshal(c.Input["ops"], &ops); err != nil {
+		return errors.New(`"ops" must be an array of method names`)
+	}
+	if err := json.Unmarshal(c.Input["args"], &args); err != nil {
+		return errors.New(`"args" must be an array of argument arrays, one per op`)
+	}
+	if len(ops) != len(args) {
+		return fmt.Errorf("ops has %d entries but args has %d", len(ops), len(args))
+	}
+	if len(ops) == 0 || ops[0] != p.Class.Name {
+		return fmt.Errorf("first op must be the constructor %q", p.Class.Name)
+	}
+	methods := map[string]Method{}
+	for _, m := range p.Class.Methods {
+		methods[m.Name] = m
+	}
+	sigs := make([]Method, len(ops))
+	sigs[0] = Method{Name: p.Class.Name, Params: p.Class.Constructor, Returns: TypeVoid}
+	for i, op := range ops[1:] {
+		m, ok := methods[op]
+		if !ok {
+			return fmt.Errorf("op %d: unknown method %q", i+2, op)
 		}
-		if len(ops) == 0 || ops[0] != p.Class.Name {
-			return fmt.Errorf("first op must be the constructor %q", p.Class.Name)
+		sigs[i+1] = m
+	}
+	for i, m := range sigs {
+		if len(args[i]) != len(m.Params) {
+			return fmt.Errorf("op %d (%s): takes %d argument(s), got %d", i+1, m.Name, len(m.Params), len(args[i]))
 		}
-		known := map[string]bool{}
-		for _, m := range p.Class.Methods {
-			known[m.Name] = true
-		}
-		for _, op := range ops[1:] {
-			if !known[op] {
-				return fmt.Errorf("unknown method %q", op)
+		for j, prm := range m.Params {
+			if err := CheckValue(prm.Type, args[i][j]); err != nil {
+				return fmt.Errorf("op %d (%s) argument %q: %w", i+1, m.Name, prm.Name, err)
 			}
+		}
+	}
+	if !c.HasExpected() {
+		return nil
+	}
+	var expected []json.RawMessage
+	if err := json.Unmarshal(c.Expected, &expected); err != nil {
+		return errors.New("expected: must be an array with one return value per op")
+	}
+	if len(expected) != len(ops) {
+		return fmt.Errorf("expected has %d entries but there are %d ops", len(expected), len(ops))
+	}
+	for i, m := range sigs {
+		if m.Returns == TypeVoid {
+			if string(bytes.TrimSpace(expected[i])) != "null" {
+				return fmt.Errorf("expected[%d] (%s): must be null for the constructor and void methods", i, m.Name)
+			}
+			continue
+		}
+		if err := CheckValue(m.Returns, expected[i]); err != nil {
+			return fmt.Errorf("expected[%d] (%s): %w", i, m.Name, err)
 		}
 	}
 	return nil

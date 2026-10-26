@@ -226,6 +226,7 @@ func writeClassCall(b *strings.Builder, c *problem.Class) error {
 	b.WriteString("\tif len(ops) == 0 || len(ops) != len(args) {\n\t\tpanic(hcInputError{\"ops and args must be non-empty and of equal length\"})\n\t}\n")
 	b.WriteString("\tout := make([]any, len(ops))\n")
 	b.WriteString("\thcStart()\n")
+	fmt.Fprintf(b, "\thcArity(%q, args[0], %d)\n", c.Name, len(c.Constructor))
 	ctorArgs, err := argList(c.Constructor, "args[0]")
 	if err != nil {
 		return err
@@ -238,7 +239,7 @@ func writeClassCall(b *strings.Builder, c *problem.Class) error {
 			return err
 		}
 		call := fmt.Sprintf("obj.%s(%s)", exported(m.Name), al)
-		fmt.Fprintf(b, "\t\tcase %q:\n", m.Name)
+		fmt.Fprintf(b, "\t\tcase %q:\n\t\t\thcArity(%q, a, %d)\n", m.Name, m.Name, len(m.Params))
 		if m.Returns == problem.TypeVoid {
 			fmt.Fprintf(b, "\t\t\t%s\n", call)
 		} else {

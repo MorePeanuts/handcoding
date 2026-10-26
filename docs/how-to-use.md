@@ -1,5 +1,7 @@
 # Using handcoding
 
+English · [简体中文](how-to-use_zh.md)
+
 - [Workspace](#workspace)
 - [The interactive list](#the-interactive-list)
 - [Commands](#commands)
@@ -92,14 +94,16 @@ hc fetch --site cn 1        # from leetcode.cn (Chinese statement by default)
 ### Your own problems
 
 ```sh
-hc new my-problem --kind function   # scaffold a problem
+hc new my-problem --kind function   # scaffold a problem (--kind class for a design problem)
 $EDITOR ~/handcoding/problems/my-problem/problem.yaml
-hc validate my-problem
-hc gen my-problem                   # have an agent write a reference and cases
+hc validate my-problem              # check the signature and the cases as you go
+hc gen my-problem                   # have an agent write a reference and cases, or write them yourself:
+hc cases build my-problem           #   expected outputs from reference/solution.*
+hc validate my-problem --run        #   every reference must pass every case
 hc import ./my-problems/            # import problem directories shared by others
 ```
 
-The format is described in the [problem protocol](protocol.md).
+The [problem protocol](protocol.md#writing-a-problem-by-hand) walks through a complete function problem and a design problem, and shows how to write the reference solution. `hc import` copies only the files the protocol defines, and refuses problems whose slug or ID is already in the bank (`--force` replaces a problem with the same slug).
 
 ### Test cases
 
@@ -123,7 +127,7 @@ hc fix two-sum -c 5 -m "answers in a different order should pass"
 1. writes a reference solution, `reference/solution.py`, and a brute-force one to cross-check when that helps;
 2. writes test **inputs** to `cases.jsonl`, covering edge cases, special structures and large inputs;
 3. runs `hc cases build`, so expected outputs come from running the reference, not from the model;
-4. runs `hc validate --run` until it passes.
+4. runs `hc validate --run` until every reference passes.
 
 After `hc skill install --global`, you can also ask any Claude Code session to "generate cases for this hc problem".
 

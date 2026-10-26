@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/builtin"
+	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/ui"
@@ -113,11 +115,17 @@ empty cases.jsonl. Edit them, then run ` + "`hc validate <slug>`" + ` and
 			if _, err := a.WS.Problem(p.Slug); err == nil {
 				return fmt.Errorf("problem %s already exists", p.Slug)
 			}
+			if other := duplicateID(a, p); other != "" {
+				return fmt.Errorf("id %s is already used by %s", p.ID, other)
+			}
 			p.Dir = a.WS.NewProblemDir(p)
 			if err := p.Save(); err != nil {
 				return err
 			}
 			desc := fmt.Sprintf("# %s\n\nDescribe the problem here.\n\n**Example 1:**\n\n```\nInput: nums = [1,2,3]\nOutput: 6\n```\n\n**Constraints:**\n\n- `1 <= nums.length <= 10^5`\n", p.Title)
+			if p.Kind == problem.KindClass {
+				desc = fmt.Sprintf("# %s\n\nDescribe the class here.\n\nImplement the `%s` class:\n\n- `%s()` initializes the object.\n- `void add(int x)` adds `x`.\n\n**Example 1:**\n\n```\nInput\n[\"%s\", \"add\", \"add\"]\n[[], [1], [2]]\nOutput\n[null, null, null]\n```\n\n**Constraints:**\n\n- At most `10^4` calls will be made to `add`.\n", p.Title, p.Class.Name, p.Class.Name, p.Class.Name)
+			}
 			if err := os.WriteFile(filepath.Join(p.Dir, problem.DescriptionFile), []byte(desc), 0o644); err != nil {
 				return err
 			}
@@ -131,7 +139,7 @@ empty cases.jsonl. Edit them, then run ` + "`hc validate <slug>`" + ` and
 	}
 	cmd.Flags().StringVar(&title, "title", "", "problem title")
 	cmd.Flags().StringVar(&kind, "kind", "function", "function or class")
-	cmd.Flags().StringVar(&id, "id", "", "optional numeric ID")
+	cmd.Flags().StringVar(&id, "id", "", "optional problem ID; a number also prefixes the directory name (9001-<slug>)")
 	return cmd
 }
 
@@ -172,7 +180,7 @@ docs/protocol.md for the format.`,
 			var failed int
 			for _, dir := range dirs {
 				if err := importProblem(a, dir, force); err != nil {
-					fmt.Fprintf(os.Stderr, "%s %s: %v\n", ui.Red.Render("skip"), dir, err)
+					fmt.Fprintf(os.Stderr, "%s %s:\n     %s\n", ui.Red.Render("skip"), dir, indentRest(err.Error(), "     "))
 					failed++
 				}
 			}
@@ -184,6 +192,14 @@ docs/protocol.md for the format.`,
 	}
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "overwrite existing problems")
 	return cmd
+}
+
+// importEntries are the files and directories of the problem protocol;
+// anything else in an imported directory (editor files, solutions, ...) is
+// left behind.
+var importEntries = []string{
+	problem.MetaFile, problem.DescriptionFile, problem.CasesFile,
+	problem.AssetsDir, problem.ReferenceDir, problem.TemplatesDir,
 }
 
 func importProblem(a *app.App, dir string, force bool) error {
@@ -198,10 +214,17 @@ func importProblem(a *app.App, dir string, force bool) error {
 	if err != nil {
 		return err
 	}
+	missing := 0
 	for i, c := range cases {
 		if err := p.ValidateCase(c); err != nil {
 			return fmt.Errorf("case %d: %w", i+1, err)
 		}
+		if !c.HasExpected() {
+			missing++
+		}
+	}
+	if other := duplicateID(a, p); other != "" {
+		return fmt.Errorf("id %s is already used by %s", p.ID, other)
 	}
 	target := a.WS.NewProblemDir(p)
 	if existing, err := a.WS.Problem(p.Slug); err == nil {
@@ -212,11 +235,43 @@ func importProblem(a *app.App, dir string, force bool) error {
 			return err
 		}
 	}
-	if err := os.CopyFS(target, os.DirFS(dir)); err != nil {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
 		return err
 	}
+	var ignored []string
+	for _, e := range entries {
+		name := e.Name()
+		if !slices.Contains(importEntries, name) {
+			ignored = append(ignored, name)
+			continue
+		}
+		src, dst := filepath.Join(dir, name), filepath.Join(target, name)
+		if e.IsDir() {
+			err = os.CopyFS(dst, os.DirFS(src))
+		} else {
+			err = copyFile(src, dst)
+		}
+		if err != nil {
+			return err
+		}
+	}
 	fmt.Printf("%s %s (%d cases)\n", ui.Green.Render("imported"), p.Slug, len(cases))
+	if len(ignored) > 0 {
+		fmt.Println(ui.Faint.Render("     not part of the problem format, left behind: " + strings.Join(ignored, ", ")))
+	}
+	if missing > 0 {
+		fmt.Printf("     %d case(s) without expected output; run `hc cases build %s`\n", missing, p.Slug)
+	}
 	return nil
+}
+
+func copyFile(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return writeFile(dst, string(data))
 }
 
 func newCasesCmd(root *rootOptions) *cobra.Command {
@@ -349,7 +404,7 @@ recompute all expected outputs and report which ones changed.`,
 		},
 	}
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "recompute every expected output")
-	langFlag(cmd, &langName)
+	cmd.Flags().StringVarP(&langName, "lang", "l", "", "reference to run (go, python); default: the first one found, Go before Python")
 	return cmd
 }
 
@@ -517,15 +572,19 @@ func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run boo
 	if err := p.Validate(); err != nil {
 		errs = append(errs, strings.Split(err.Error(), "\n")...)
 	}
-	cases, err := p.LoadCases()
-	if err != nil {
-		errs = append(errs, err.Error())
+	cases, casesErr := p.LoadCases()
+	if casesErr != nil {
+		errs = append(errs, casesErr.Error())
 	}
 	missing, examples := 0, 0
-	for i, c := range cases {
-		if err := p.ValidateCase(c); err != nil {
-			errs = append(errs, fmt.Sprintf("case %d: %v", i+1, err))
+	if len(errs) == 0 {
+		for i, c := range cases {
+			if err := p.ValidateCase(c); err != nil {
+				errs = append(errs, fmt.Sprintf("case %d: %v", i+1, err))
+			}
 		}
+	}
+	for _, c := range cases {
 		if !c.HasExpected() {
 			missing++
 		}
@@ -540,7 +599,7 @@ func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run boo
 			}
 		}
 	}
-	if len(cases) == 0 {
+	if len(cases) == 0 && casesErr == nil {
 		warns = append(warns, "no test cases (hc gen "+p.Slug+")")
 	}
 	if missing > 0 {
@@ -549,24 +608,22 @@ func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run boo
 	if len(cases) > 0 && examples == 0 {
 		warns = append(warns, "no case marked as example; hc test runs the first 3")
 	}
-	if _, _, err := a.ReferenceLang(p, ""); err != nil {
+	warns = append(warns, imageWarnings(p)...)
+	if other := duplicateID(a, p); other != "" {
+		warns = append(warns, fmt.Sprintf("id %s is also used by %s; looking it up by ID is ambiguous", p.ID, other))
+	}
+	refs := a.ReferenceLangs(p)
+	if len(refs) == 0 {
 		warns = append(warns, "no reference solution")
 	} else if run && len(errs) == 0 && len(cases) > 0 {
 		sel, _ := app.Select(cases, nil, true)
-		rep, l, err := a.RunReference(cmd.Context(), p, "", sel, app.RunOptions{Stderr: os.Stderr})
-		switch {
-		case err != nil:
-			errs = append(errs, "reference: "+err.Error())
-		case rep.Verdict == runner.CompileError:
-			errs = append(errs, "reference does not compile: "+rep.CompileError)
-		default:
-			for _, c := range rep.Cases {
-				switch c.Verdict {
-				case runner.Accepted, runner.NoExpected:
-				default:
-					errs = append(errs, fmt.Sprintf("reference (%s) case %d: %s %s", l.ID(), c.Index, c.Verdict, c.Error))
-				}
+		for _, l := range refs {
+			if err := l.Check(); err != nil {
+				warns = append(warns, fmt.Sprintf("%s reference not run: %v", l.Name(), err))
+				continue
 			}
+			e, w := checkReference(cmd, a, p, l, sel)
+			errs, warns = append(errs, e...), append(warns, w...)
 		}
 	}
 	status := ui.Green.Render("ok  ")
@@ -577,15 +634,76 @@ func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run boo
 	}
 	fmt.Printf("%s %s %s\n", status, p.Slug, ui.Faint.Render(fmt.Sprintf("(%d cases)", len(cases))))
 	for _, e := range errs {
-		fmt.Printf("     %s %s\n", ui.Red.Render("error:"), e)
+		fmt.Printf("     %s %s\n", ui.Red.Render("error:"), indentRest(e, "            "))
 	}
 	for _, w := range warns {
-		fmt.Printf("     %s %s\n", ui.Yellow.Render("warn:"), w)
+		fmt.Printf("     %s %s\n", ui.Yellow.Render("warn:"), indentRest(w, "           "))
 	}
 	if len(errs) > 0 {
 		return errors.New(p.Slug + " is invalid")
 	}
 	return nil
+}
+
+// checkReference runs one reference solution on every case. Cases without an
+// expected output only have to run.
+func checkReference(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.Language, sel []runner.Selected) (errs, warns []string) {
+	rep, _, err := a.RunReference(cmd.Context(), p, l.ID(), sel, app.RunOptions{Stderr: os.Stderr})
+	switch {
+	case err != nil:
+		return []string{fmt.Sprintf("%s reference: %v", l.Name(), err)}, nil
+	case rep.Verdict == runner.CompileError:
+		return []string{fmt.Sprintf("%s reference does not compile:\n%s", l.Name(), strings.TrimRight(rep.CompileError, "\n"))}, nil
+	}
+	for _, c := range rep.Cases {
+		switch c.Verdict {
+		case runner.Accepted, runner.NoExpected:
+		case runner.WrongAnswer:
+			errs = append(errs, fmt.Sprintf("%s reference, case %d: Wrong Answer\noutput   %s\nexpected %s",
+				l.Name(), c.Index, clip(string(c.Output), 120), clip(string(c.Case.Expected), 120)))
+		default:
+			errs = append(errs, fmt.Sprintf("%s reference, case %d: %s %s", l.Name(), c.Index, c.Verdict, c.Error))
+		}
+	}
+	return errs, nil
+}
+
+// imageWarnings reports local images in the statement that do not exist.
+func imageWarnings(p *problem.Problem) []string {
+	desc, err := p.Description()
+	if err != nil {
+		return []string{err.Error()}
+	}
+	var warns []string
+	problem.ReplaceImages(desc, func(_, src string) string {
+		if strings.Contains(src, "://") || strings.HasPrefix(src, "data:") {
+			return ""
+		}
+		if _, err := os.Stat(filepath.Join(p.Dir, filepath.FromSlash(src))); err != nil {
+			warns = append(warns, fmt.Sprintf("%s: image %s not found", problem.DescriptionFile, src))
+		}
+		return ""
+	})
+	return warns
+}
+
+// duplicateID returns the slug of another problem with the same ID, if any.
+func duplicateID(a *app.App, p *problem.Problem) string {
+	if p.ID == "" {
+		return ""
+	}
+	probs, _ := a.WS.Problems()
+	for _, o := range probs {
+		if o.ID == p.ID && o.Slug != p.Slug {
+			return o.Slug
+		}
+	}
+	return ""
+}
+
+// indentRest indents every line of s but the first.
+func indentRest(s, indent string) string {
+	return strings.ReplaceAll(s, "\n", "\n"+indent)
 }
 
 func titleFromSlug(slug string) string {

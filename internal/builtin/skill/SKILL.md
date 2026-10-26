@@ -57,6 +57,8 @@ class:
 
 Types: `integer long double boolean string character ListNode TreeNode void`,
 arrays with `[]` suffix (up to 3 levels, node arrays 1 level).
+Quote array types inside `{...}` / `[...]` (`type: "integer[]"`): unquoted,
+`[]` is YAML syntax. Unknown fields are errors.
 
 ### cases.jsonl
 
@@ -70,6 +72,9 @@ One object per line: `{"input": {...}, "expected": <json>, "example": true, "not
 - `expected` may be omitted; `hc cases build` fills it from the reference solution.
 - `any_of` mode: `expected` is an array of all acceptable answers.
 - `example: true` marks the statement examples (run by `hc test`); `hc submit` runs all.
+- `hc validate` checks every value against its declared type, rejects unknown
+  inputs or case fields, requires each op's exact argument count, and checks
+  the shape of `expected`.
 
 ## Workflow: generate test cases
 
@@ -91,12 +96,14 @@ One object per line: `{"input": {...}, "expected": <json>, "example": true, "not
    - boundary values (min/max values, negative numbers, duplicates)
    - tricky structures (skewed trees, single node, all equal, sorted/reverse sorted)
    - a few large inputs near the constraint limits to catch O(n²) solutions —
-     generate them with a throwaway script; keep cases.jsonl under ~2 MB
+     generate them with a throwaway script inside the workspace (you cannot
+     write outside it), and delete the script afterwards; keep cases.jsonl
+     under ~2 MB
    Every input must satisfy the stated constraints and guarantees. Use
    `note` to say what each non-example case targets.
 4. Run `hc cases build <slug>` to compute `expected` with the reference.
-5. Run `hc validate <slug> --run` — it must report no errors and the reference
-   must pass every case.
+5. Run `hc validate <slug> --run` — it must report no errors, and every
+   reference solution (Python and Go, if both exist) must pass every case.
 6. Summarize what you added (count by category).
 
 For problems with several valid answers, choose the right `judge.compare`

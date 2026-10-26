@@ -168,7 +168,7 @@ def _call_class(solution, meta, inp):
     cls = getattr(solution, cls_meta["name"])
 
     def conv(params, raw):
-        if len(raw) < len(params):
+        if len(raw) != len(params):
             raise InputError("expected %d arguments, got %r" % (len(params), raw))
         return [decode(p["type"], a) for p, a in zip(params, raw)]
 
