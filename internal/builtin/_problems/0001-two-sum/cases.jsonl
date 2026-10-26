@@ -4,4 +4,4 @@
 {"input":{"nums":[-1,-2,-3,-4,-5],"target":-8},"expected":[2,4],"note":"negative numbers"}
 {"input":{"nums":[0,4,3,0],"target":0},"expected":[0,3],"note":"zeros"}
 {"input":{"nums":[1000000000,-1000000000,5],"target":0},"expected":[0,1],"note":"extreme values"}
-{"input":{"nums":[1,5,9,13,2,8],"target":10},"expected":[0,2]}
+{"input":{"nums":[1,5,9,13,2,8],"target":22},"expected":[2,3]}
