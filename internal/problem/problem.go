@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/goccy/go-yaml"
 )
@@ -123,7 +124,12 @@ type Problem struct {
 	Dir string `yaml:"-"`
 }
 
-var slugRE = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+var (
+	slugRE = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+	// flowArrayTypeRE spots an unquoted array type inside YAML flow syntax,
+	// where "[]" is read as a sequence: {name: nums, type: integer[]}.
+	flowArrayTypeRE = regexp.MustCompile(`\{[^}\n]*type:\s*[A-Za-z<>]+\[\]`)
+)
 
 // DirName is the canonical directory name for the problem, e.g. "0001-two-sum".
 func (p *Problem) DirName() string {
@@ -265,11 +271,39 @@ func (p *Problem) Validate() error {
 		errs = append(errs, fmt.Errorf("unknown kind %q", p.Kind))
 	}
 	switch p.Judge.Compare {
-	case CompareExact, CompareUnordered, CompareUnorderedDeep, CompareAnyOf:
+	case CompareExact, CompareAnyOf:
+	case CompareUnordered, CompareUnorderedDeep:
+		if t := p.judgedType(); p.Kind == KindFunction && t != "" {
+			if _, depth := SplitArray(t); depth == 0 {
+				errs = append(errs, fmt.Errorf("judge.compare %s needs an array result, but the judged value is %s", p.Judge.Compare, t))
+			}
+		}
 	default:
-		errs = append(errs, fmt.Errorf("unknown judge.compare %q", p.Judge.Compare))
+		errs = append(errs, fmt.Errorf("unknown judge.compare %q (exact, unordered, unordered_deep or any_of)", p.Judge.Compare))
+	}
+	if tl := p.Judge.TimeLimit; tl != "" {
+		if d, err := time.ParseDuration(tl); err != nil || d <= 0 {
+			errs = append(errs, fmt.Errorf("judge.time_limit %q must be a positive duration such as \"5s\" or \"500ms\"", tl))
+		}
 	}
 	return errors.Join(errs...)
+}
+
+// judgedType is the type of the value a function problem is judged on: the
+// return type, or the judge.output parameter's type for in-place problems.
+func (p *Problem) judgedType() string {
+	if p.Function == nil {
+		return ""
+	}
+	if p.Judge.Output != "" {
+		for _, prm := range p.Function.Params {
+			if prm.Name == p.Judge.Output {
+				return prm.Type
+			}
+		}
+		return ""
+	}
+	return p.Function.Returns
 }
 
 // EntryName is the name of the function or class the user implements.
@@ -290,8 +324,14 @@ func Load(dir string) (*Problem, error) {
 		return nil, err
 	}
 	var p Problem
-	if err := yaml.Unmarshal(data, &p); err != nil {
-		return nil, fmt.Errorf("%s: %w", filepath.Join(dir, MetaFile), err)
+	// Unknown fields are errors: a typo such as "judgee" would otherwise fall
+	// back to the defaults without a word.
+	if err := yaml.UnmarshalWithOptions(data, &p, yaml.DisallowUnknownField()); err != nil {
+		name := filepath.Join(filepath.Base(dir), MetaFile)
+		if flowArrayTypeRE.Match(data) {
+			return nil, fmt.Errorf("%s: %w\nhint: inside {...} or [...] quote array types, e.g. type: \"integer[]\"", name, err)
+		}
+		return nil, fmt.Errorf("%s: %w", name, err)
 	}
 	p.Dir = dir
 	p.Normalize()

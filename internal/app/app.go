@@ -267,6 +267,18 @@ func (a *App) ReferenceLang(p *problem.Problem, name string) (lang.Language, str
 	return nil, "", fmt.Errorf("%s has no reference solution in %s/", p.Slug, filepath.Join(p.Dir, problem.ReferenceDir))
 }
 
+// ReferenceLangs returns every language the problem has a reference solution
+// in, in registry order.
+func (a *App) ReferenceLangs(p *problem.Problem) []lang.Language {
+	var out []lang.Language
+	for _, l := range a.Langs.All() {
+		if _, ok := p.Reference(l.SolutionFile()); ok {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
 // RunReference runs the reference solution in a scratch directory.
 func (a *App) RunReference(ctx context.Context, p *problem.Problem, langName string, sel []runner.Selected, o RunOptions) (*runner.Report, lang.Language, error) {
 	l, path, err := a.ReferenceLang(p, langName)
@@ -309,11 +321,18 @@ func (a *App) BuildCases(ctx context.Context, p *problem.Problem, langName strin
 	}
 	var sel []runner.Selected
 	for i, c := range cases {
+		if force {
+			// The old expected output is about to be replaced, so a
+			// malformed one must not block the rebuild.
+			c.Expected = nil
+		}
 		if err := p.ValidateCase(c); err != nil {
+			if c.HasExpected() && p.ValidateCase(problem.Case{Input: c.Input}) == nil {
+				return nil, fmt.Errorf("case %d: %w (rerun with --force to recompute it)", i+1, err)
+			}
 			return nil, fmt.Errorf("case %d: %w", i+1, err)
 		}
-		if force || !c.HasExpected() {
-			c.Expected = nil
+		if !c.HasExpected() {
 			sel = append(sel, runner.Selected{Index: i + 1, Case: c})
 		}
 	}

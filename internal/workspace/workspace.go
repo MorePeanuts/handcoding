@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -193,27 +194,50 @@ func (w *Workspace) SolutionDir(p *problem.Problem, langID string) string {
 	return filepath.Join(w.Root, SolutionsDir, langID, filepath.Base(p.Dir))
 }
 
+// LoadError is a problem directory whose problem.yaml could not be loaded.
+type LoadError struct {
+	Dir string
+	Err error
+}
+
+func (e *LoadError) Error() string { return e.Err.Error() }
+func (e *LoadError) Unwrap() error { return e.Err }
+
 // Problems loads every problem in the bank, sorted by numeric ID then slug.
-// Problems that fail to load are returned as errors alongside the rest.
+// Problems that fail to load are returned as *LoadError values joined into
+// the error, alongside the rest.
 func (w *Workspace) Problems() ([]*problem.Problem, error) {
-	entries, err := os.ReadDir(w.ProblemsPath())
+	probs, failed, err := w.loadProblems()
 	if err != nil {
 		return nil, err
 	}
+	errs := make([]error, len(failed))
+	for i, f := range failed {
+		errs[i] = f
+	}
+	return probs, errors.Join(errs...)
+}
+
+func (w *Workspace) loadProblems() ([]*problem.Problem, []*LoadError, error) {
+	entries, err := os.ReadDir(w.ProblemsPath())
+	if err != nil {
+		return nil, nil, err
+	}
 	var (
-		probs []*problem.Problem
-		errs  []error
+		probs  []*problem.Problem
+		failed []*LoadError
 	)
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
 		}
-		p, err := problem.Load(filepath.Join(w.ProblemsPath(), e.Name()))
+		dir := filepath.Join(w.ProblemsPath(), e.Name())
+		p, err := problem.Load(dir)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
 		if err != nil {
-			errs = append(errs, err)
+			failed = append(failed, &LoadError{Dir: dir, Err: err})
 			continue
 		}
 		probs = append(probs, p)
@@ -231,14 +255,28 @@ func (w *Workspace) Problems() ([]*problem.Problem, error) {
 		}
 		return strings.Compare(a.Slug, b.Slug)
 	})
-	return probs, errors.Join(errs...)
+	return probs, failed, nil
 }
 
-// Problem finds a problem by slug, ID or directory name.
+var dirIDRE = regexp.MustCompile(`^(\d+)-(.+)$`)
+
+// dirMatches reports whether a problem directory name such as
+// "0001-two-sum" is what ref ("0001-two-sum", "two-sum" or "1") refers to.
+func dirMatches(base, ref string) bool {
+	if base == ref {
+		return true
+	}
+	m := dirIDRE.FindStringSubmatch(base)
+	return m != nil && (m[2] == ref || strings.TrimLeft(m[1], "0") == strings.TrimLeft(ref, "0"))
+}
+
+// Problem finds a problem by slug, ID or directory name. If the reference
+// names a directory whose problem.yaml is broken, the load error is returned
+// rather than "not found".
 func (w *Workspace) Problem(ref string) (*problem.Problem, error) {
 	ref = strings.TrimSpace(ref)
-	probs, err := w.Problems()
-	if len(probs) == 0 && err != nil {
+	probs, failed, err := w.loadProblems()
+	if err != nil {
 		return nil, err
 	}
 	var prefix []*problem.Problem
@@ -250,6 +288,11 @@ func (w *Workspace) Problem(ref string) (*problem.Problem, error) {
 			prefix = append(prefix, p)
 		}
 	}
+	for _, f := range failed {
+		if dirMatches(filepath.Base(f.Dir), ref) {
+			return nil, f
+		}
+	}
 	if len(prefix) == 1 {
 		return prefix[0], nil
 	}
@@ -259,6 +302,9 @@ func (w *Workspace) Problem(ref string) (*problem.Problem, error) {
 			names[i] = p.Slug
 		}
 		return nil, fmt.Errorf("%q is ambiguous: %s", ref, strings.Join(names, ", "))
+	}
+	if len(failed) > 0 {
+		return nil, fmt.Errorf("problem %q not found (%d problem(s) failed to load; run `hc validate` to see why)", ref, len(failed))
 	}
 	return nil, fmt.Errorf("problem %q not found", ref)
 }

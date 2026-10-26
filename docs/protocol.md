@@ -1,5 +1,7 @@
 # handcoding protocols
 
+English · [简体中文](protocol_zh.md)
+
 This document defines two protocols:
 
 1. **Problem protocol**: how a problem in the bank is laid out on disk. Use it to write your own problems (`hc new`, `hc import`).
@@ -9,10 +11,109 @@ This document defines two protocols:
 
 ## 1. Problem protocol
 
+### Writing a problem by hand
+
+```sh
+hc new sum-array --id 9001            # scaffold problems/9001-sum-array/ (--kind class for a design problem)
+# edit problem.yaml and description.md, write cases.jsonl inputs and reference/solution.py
+hc cases build sum-array              # compute "expected" by running the reference
+hc validate sum-array --run           # check everything; every reference must pass every case
+hc test sum-array                     # now solve it like any other problem
+```
+
+A complete function problem looks like this:
+
+```
+problems/9001-sum-array/
+  problem.yaml
+  description.md
+  cases.jsonl
+  reference/solution.py
+```
+
+```yaml
+# problem.yaml
+id: "9001"
+slug: sum-array
+title: Sum Array
+difficulty: easy
+tags: [array]
+kind: function
+function:
+  name: sumArray
+  params:
+    - name: nums
+      type: integer[]
+  returns: long
+```
+
+```json
+{"input": {"nums": [1,2,3]}, "example": true}
+{"input": {"nums": [-5]}, "note": "single negative"}
+{"input": {"nums": [1000000000,1000000000,1000000000]}, "note": "overflows int32"}
+```
+
+```python
+# reference/solution.py
+from typing import List
+
+
+class Solution:
+    def sumArray(self, nums: List[int]) -> int:
+        return sum(nums)
+```
+
+`hc cases build sum-array` then adds `"expected": 6`, `-5` and `3000000000` to the three lines. You can also write `expected` yourself; `hc validate --run` checks it against the reference either way.
+
+A class (design) problem replaces `function` with `class`. Each case is a sequence of operations:
+
+```yaml
+id: "9003"
+slug: min-stack-lite
+title: Min Stack Lite
+kind: class
+class:
+  name: MinStack
+  constructor: []
+  methods:
+    - name: push
+      params:
+        - name: val
+          type: integer
+      returns: void
+    - name: pop
+      params: []
+      returns: void
+    - name: getMin
+      params: []
+      returns: integer
+```
+
+```json
+{"input": {"ops": ["MinStack","push","push","getMin","pop","getMin"], "args": [[],[-2],[-3],[],[],[]]}, "expected": [null,null,null,-3,null,-2], "example": true}
+```
+
+```python
+# reference/solution.py
+class MinStack:
+    def __init__(self):
+        self.stack = []
+
+    def push(self, val: int) -> None:
+        low = min(val, self.stack[-1][1]) if self.stack else val
+        self.stack.append((val, low))
+
+    def pop(self) -> None:
+        self.stack.pop()
+
+    def getMin(self) -> int:
+        return self.stack[-1][1]
+```
+
 ### Layout
 
 ```
-problems/0001-two-sum/          directory name: <4-digit number>-<slug>, or <slug> without a number
+problems/0001-two-sum/          directory name: <4-digit number>-<slug> when id is a number, otherwise <slug>
   problem.yaml                  metadata, signature and judge options (required)
   description.md                statement, in Markdown
   assets/rev1ex1.jpg            images used by the statement (optional), written as ![](assets/rev1ex1.jpg)
@@ -23,23 +124,44 @@ problems/0001-two-sum/          directory name: <4-digit number>-<slug>, or <slu
   templates/solution.py
 ```
 
+`hc import` copies only these entries; anything else in the directory (editor files, a `solutions/` folder, ...) is left behind.
+
 ### problem.yaml
 
 | Field | Meaning |
 |---|---|
-| `id` | Problem number (a string, optional), used for sorting and lookup |
+| `id` | Problem ID (a string, optional), used for sorting and lookup (`hc test 9001`). Must be unique in the bank. A number also prefixes the directory name |
 | `slug` | Unique identifier in lowercase kebab-case (required) |
 | `title` | Title (required) |
 | `difficulty` | `easy`, `medium` or `hard` |
 | `tags` | List of tags |
-| `kind` | `function` (one function) or `class` (a design problem) |
-| `function` | Signature of a function problem: `name`, `params[{name,type}]`, `returns` |
-| `class` | Signature of a design problem: `name`, `constructor[{name,type}]`, `methods[{name,params,returns}]` |
+| `kind` | `function` (one function) or `class` (a design problem). Defaults to `class` when there is a `class` section, otherwise `function` |
+| `function` | Signature of a function problem: `name`, `params` (a list of `{name, type}`), `returns` (defaults to `void`) |
+| `class` | Signature of a design problem: `name`, `constructor` (a list of `{name, type}`), `methods` (a list of `{name, params, returns}`) |
 | `judge.compare` | How outputs are compared (see below). Default `exact` |
 | `judge.tolerance` | Floating-point tolerance. Defaults to `1e-5` when returning `double`; either the absolute or the relative error must be within it |
 | `judge.output` | For in-place problems: the function returns `void`, and the judge compares this parameter's value after the call |
-| `judge.time_limit` | Time limit for a whole run, e.g. `5s`. Defaults to `timeout` in hc.yaml |
+| `judge.time_limit` | Time limit for a whole run, as a duration such as `5s` or `500ms`. Defaults to `timeout` in hc.yaml |
 | `source` | Where the problem comes from: `site`, `url` |
+
+Unknown fields are errors, so a typo such as `judgee:` or `parms:` is reported instead of silently falling back to the defaults.
+
+> **YAML pitfall.** Inside the compact `{...}` / `[...]` syntax, `[]` is YAML syntax, so array types must be quoted there: `{name: nums, type: "integer[]"}`. In block style (`type: integer[]` on its own line, as in the examples above) quotes are optional.
+
+An in-place problem returns `void` and names the parameter to judge:
+
+```yaml
+function:
+  name: rotate
+  params:
+    - name: nums
+      type: integer[]
+    - name: k
+      type: integer
+  returns: void
+judge:
+  output: nums      # expected is the value of nums after the call
+```
 
 Comparison modes:
 
@@ -50,13 +172,15 @@ Comparison modes:
 | `unordered_deep` | Order is ignored at every array level | Group Anagrams, Subsets |
 | `any_of` | `expected` is an array of all acceptable answers | Problems with a small set of valid answers |
 
+`unordered` and `unordered_deep` need an array result.
+
 ### Types
 
 Type names are LeetCode's `metaData` names, so problems fetched from LeetCode need no translation:
 
 | Type | JSON | Go | Python |
 |---|---|---|---|
-| `integer` / `long` | number | `int` / `int64` | `int` |
+| `integer` / `long` | whole number | `int` / `int64` | `int` |
 | `double` | number | `float64` | `float` |
 | `boolean` | `true` / `false` | `bool` | `bool` |
 | `string` | string | `string` | `str` |
@@ -66,7 +190,7 @@ Type names are LeetCode's `metaData` names, so problems fetched from LeetCode ne
 | `T[]` | array, up to 3 levels; 1 level for node arrays | `[]T` | `List[T]` |
 | `void` | return type only | — | `None` |
 
-`list<T>` is normalized to `T[]`. Special types such as `Node` (graphs, N-ary trees, lists with random pointers) and `NestedInteger` are not supported yet.
+`list<T>` is normalized to `T[]`, and `int`, `bool`, `char` and `float` to `integer`, `boolean`, `character` and `double`. Special types such as `Node` (graphs, N-ary trees, lists with random pointers) and `NestedInteger` are not supported yet.
 
 ### cases.jsonl
 
@@ -77,18 +201,39 @@ One case per line:
 {"input": {"nums": [-1,-2,-3,-4,-5], "target": -8}, "expected": [2,4], "note": "negative numbers"}
 ```
 
-- `input`: for function problems, parameter name → value. For design problems, `{"ops": [...], "args": [[...], ...]}`; `ops[0]` must be the class name (the constructor).
-- `expected`: the expected output. For design problems, an array with each operation's return value, using `null` for the constructor and `void` methods. If missing, `hc cases build` computes it with the reference solution.
-- `example`: the case is an example from the statement. `hc test` runs only these by default.
+- `input`: for function problems, an object with exactly one value per parameter, keyed by name. For design problems, `{"ops": [...], "args": [[...], ...]}`; `ops[0]` must be the class name (the constructor), and each `args` entry holds exactly the arguments of its op.
+- `expected`: the expected output. For design problems, an array with each operation's return value, using `null` for the constructor and `void` methods. For `any_of`, an array of acceptable answers. If missing, `hc cases build` computes it with the reference solution.
+- `example`: the case is an example from the statement. `hc test` runs only these by default (the first 3 cases if none is marked).
 - `note`: a description of the case.
-- Blank lines and lines starting with `//` are ignored. Cases are numbered from 1, counting only the lines that hold a case.
+- No other fields are allowed. Blank lines and lines starting with `//` are ignored. Cases are numbered from 1, counting only the lines that hold a case.
+
+### Reference solutions and templates
+
+A reference solution is written exactly like a user's solution, in `reference/solution.py` or `reference/solution.go`. `hc start` shows the expected shape: the generated starter is a reference with the body missing.
+
+| | Function problem | Class problem |
+|---|---|---|
+| Python | `class Solution` with a method named `function.name`, or a module-level function of that name | A class named `class.name`; `__init__` takes the constructor parameters; methods have the names in `methods` |
+| Go | `package main`; `func <function.name>(...)` with the Go types from the table above | `type <Name> struct`, `func Constructor(...) <Name>`, and methods with pointer receivers whose names start with an upper-case letter (`getMin` → `GetMin`) |
+
+- `ListNode` and `TreeNode` are provided: in Python, `from hc_runtime import ListNode, TreeNode`; in Go they are predefined (`Val`, `Next`, `Left`, `Right`), so don't declare them.
+- With both references present, `hc cases build` uses Go, then Python; pick one with `-l python`. `hc validate --run` runs every reference.
+- `templates/solution.go` and `templates/solution.py` replace the generated starter code. They must keep the signature, because the driver calls it.
 
 ### Validation
 
 ```
 hc validate <slug>          # check against the protocol
-hc validate <slug> --run    # also run the reference solution on every case; all must pass
+hc validate <slug> --run    # also run every reference solution on every case; all must pass
 ```
+
+`hc validate` reports, with the case number and field:
+
+- `problem.yaml`: syntax errors (with line and column), unknown fields, invalid slug, missing title, unsupported types, a `judge.output` that is not a parameter, a `void` function without `judge.output`, unknown `judge.compare`, an invalid `judge.time_limit`;
+- `cases.jsonl`: invalid JSON, unknown fields, missing or unknown inputs, values that don't match their declared type (`input "nums": [1]: must be integer, got string "x"`), wrong argument counts and unknown methods in design problems, and an `expected` of the wrong shape;
+- with `--run`: reference solutions that don't compile, crash, or disagree with `expected` (both values are shown).
+
+It warns about cases without `expected`, no case marked as an example, no reference solution, missing statement images and an ID used by another problem.
 
 ---
 

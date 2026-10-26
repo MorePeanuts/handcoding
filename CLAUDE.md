@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-`hc` (handcoding) is a Go CLI/TUI that judges LeetCode-style problems locally: users write solutions in their own editor, and `hc` builds, runs and judges them offline, debugs them with Delve/pdb, fetches problems from LeetCode, and delegates test-case authoring to coding agents (Claude Code / Codex). User-facing docs are in English (`README.md`, `docs/`, `CONTRIBUTING.md`); `README_zh.md` mirrors the README in Chinese.
+`hc` (handcoding) is a Go CLI/TUI that judges LeetCode-style problems locally: users write solutions in their own editor, and `hc` builds, runs and judges them offline, debugs them with Delve/pdb, fetches problems from LeetCode, and delegates test-case authoring to coding agents (Claude Code / Codex). User-facing docs are in English (`README.md`, `docs/`, `CONTRIBUTING.md`); `README_zh.md`, `docs/how-to-use_zh.md` and `docs/protocol_zh.md` mirror them in Chinese; update both languages together.
 
 ## Commands
 

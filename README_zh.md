@@ -67,7 +67,7 @@ hc                      # 打开题目列表
 在列表里选一道题按 `enter`：hc 会显示题面，按模板生成 `solution.go`，并把文件路径复制到剪贴板。在旁边的编辑器里打开它，写完后按 `t` 测试、按 `s` 提交。
 
 > [!TIP]
-> 题面图片在 kitty、Ghostty 中以原图显示。在 [herdr](https://herdr.dev) 中，只要 herdr 外层的终端支持 kitty 图片协议，也会显示原图。如果在 herdr 中图片区域显示为空白，说明外层终端不支持 kitty 图片协议，请在 `hc.yaml` 中设置 `images: blocks`。详见[使用指南](docs/how-to-use.md#configuration)。
+> 题面图片在 kitty、Ghostty 中以原图显示。在 [herdr](https://herdr.dev) 中，只要 herdr 外层的终端支持 kitty 图片协议，也会显示原图。如果在 herdr 中图片区域显示为空白，说明外层终端不支持 kitty 图片协议，请在 `hc.yaml` 中设置 `images: blocks`。详见[使用指南](docs/how-to-use_zh.md#配置)。
 
 界面里的每个操作也都有对应的命令：
 
@@ -82,8 +82,8 @@ hc debug two-sum -c 4   # 调试第 4 个用例
 
 文档目前只有英文版：
 
-- [使用指南](docs/how-to-use.md)：交互界面、全部命令、配置、调试和智能体
-- [题目协议](docs/protocol.md)：如何编写自己的题目，以及如何扩展新语言
+- [使用指南](docs/how-to-use_zh.md)：交互界面、全部命令、配置、调试和智能体
+- [题目协议](docs/protocol_zh.md)：如何编写自己的题目，以及如何扩展新语言
 
 ## 路线图
 

@@ -158,6 +158,12 @@ func hcAt(args []json.RawMessage, i int) json.RawMessage {
 	return args[i]
 }
 
+func hcArity(op string, args []json.RawMessage, n int) {
+	if len(args) != n {
+		panic(hcInputError{fmt.Sprintf("%s takes %d argument(s), got %d", op, n, len(args))})
+	}
+}
+
 func hcJSON[T any](raw json.RawMessage) T {
 	var v T
 	if err := json.Unmarshal(raw, &v); err != nil {
