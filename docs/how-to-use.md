@@ -87,9 +87,16 @@ Run `hc <command> --help` for every flag.
 ```sh
 hc fetch 3 146 lru-cache    # by number, slug or URL, from leetcode.com
 hc fetch --site cn 1        # from leetcode.cn (Chinese statement by default)
+hc fetch https://leetcode.cn/problems/two-sum/description/   # any problem URL; the URL picks the site
+hc fetch --site cn "LCR 001"                                  # leetcode.cn IDs such as LCR/LCP
+hc gen 146                  # make it ready: test cases and the judge rule
 ```
 
-`hc fetch` downloads the statement and its images, the signature, the Go and Python starter code, and the examples. Expected outputs are included when they can be parsed from the statement. LeetCode only publishes the examples, so the full test suite comes from `hc gen`. Premium problems are not available.
+`hc fetch` downloads the statement and its images, the signature, the Go and Python starter code, and the examples. Expected outputs are included when they can be parsed from the statement.
+
+A fetched problem is **not ready to submit** yet. LeetCode only publishes the examples, and not how answers are judged: whether order matters, whether several answers are valid. Until that is decided, `hc test` shows your output next to the example's answer without a verdict, and `hc submit` refuses. `hc gen` writes the full test suite and decides the judge rule from the statement; you can also set `judge.compare` yourself (see the [problem protocol](protocol.md#problemyaml)). The list marks such problems as "not ready".
+
+Premium problems are not available. Neither are problems whose signature uses types hc does not support yet (graphs with `Node`, `NestedInteger`, ...); `hc fetch` says so.
 
 ### Your own problems
 
@@ -190,3 +197,4 @@ leetcode:
 - Some signatures are not supported yet: `Node` (graphs, N-ary trees, lists with random pointers), `NestedInteger`, linked lists with cycles given as input. Problems that need a special judge (checker) aren't supported either.
 - Run time is measured, but memory is not limited.
 - LeetCode premium problems cannot be fetched.
+- Problems with many valid answers that cannot all be listed ("return any valid answer") need a custom checker, which is not supported yet; `hc gen` says so when it meets one.

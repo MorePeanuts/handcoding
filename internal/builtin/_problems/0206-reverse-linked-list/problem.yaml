@@ -9,6 +9,8 @@ function:
   params:
     - {name: head, type: ListNode}
   returns: ListNode
+judge:
+  compare: exact
 source:
   site: builtin
   url: https://leetcode.com/problems/reverse-linked-list/

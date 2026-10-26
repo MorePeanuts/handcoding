@@ -74,7 +74,11 @@ func runList(cmd *cobra.Command, root *rootOptions, o listOptions) error {
 		case app.StatusAttempted:
 			status = "attempted"
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", status, p.ID, p.Slug, p.Title, p.Difficulty, strings.Join(p.Tags, ","))
+		tags := strings.Join(p.Tags, ",")
+		if !p.Ready() {
+			tags = "[not ready: hc gen] " + tags
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", status, p.ID, p.Slug, p.Title, p.Difficulty, tags)
 	}
 	return tw.Flush()
 }

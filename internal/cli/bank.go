@@ -108,6 +108,7 @@ empty cases.jsonl. Edit them, then run ` + "`hc validate <slug>`" + ` and
 				return fmt.Errorf("--kind must be function or class")
 			}
 			p.Source = problem.Source{Site: "custom"}
+			p.Judge.Compare = problem.CompareExact
 			p.Normalize()
 			if err := p.Validate(); err != nil {
 				return err
@@ -354,7 +355,11 @@ func newCasesListCmd(root *rootOptions) *cobra.Command {
 					fmt.Printf("  %s %s\n", ui.Faint.Render("Expected"), exp)
 				}
 				fmt.Println()
-				fmt.Println(ui.Faint.Render(fmt.Sprintf("%d case(s), compare mode %s", len(cases), p.Judge.Compare)))
+				mode := p.Judge.Compare
+				if !p.Ready() {
+					mode = "not decided yet (hc gen " + p.Slug + ")"
+				}
+				fmt.Println(ui.Faint.Render(fmt.Sprintf("%d case(s), compare mode %s", len(cases), mode)))
 				return nil
 			})
 		},
@@ -608,6 +613,9 @@ func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run boo
 	if len(cases) > 0 && examples == 0 {
 		warns = append(warns, "no case marked as example; hc test runs the first 3")
 	}
+	if !p.Ready() {
+		warns = append(warns, "judge rule not decided (judge.compare): run `hc gen "+p.Slug+"`, or set it by hand")
+	}
 	warns = append(warns, imageWarnings(p)...)
 	if other := duplicateID(a, p); other != "" {
 		warns = append(warns, fmt.Sprintf("id %s is also used by %s; looking it up by ID is ambiguous", p.ID, other))
@@ -657,7 +665,7 @@ func checkReference(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.L
 	}
 	for _, c := range rep.Cases {
 		switch c.Verdict {
-		case runner.Accepted, runner.NoExpected:
+		case runner.Accepted, runner.NoExpected, runner.NotJudged:
 		case runner.WrongAnswer:
 			errs = append(errs, fmt.Sprintf("%s reference, case %d: Wrong Answer\noutput   %s\nexpected %s",
 				l.Name(), c.Index, clip(string(c.Output), 120), clip(string(c.Case.Expected), 120)))

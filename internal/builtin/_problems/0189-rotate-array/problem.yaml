@@ -11,6 +11,7 @@ function:
     - {name: k, type: integer}
   returns: void
 judge:
+  compare: exact
   output: nums
 source:
   site: builtin

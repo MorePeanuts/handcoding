@@ -10,6 +10,8 @@ function:
     - {name: nums1, type: "integer[]"}
     - {name: nums2, type: "integer[]"}
   returns: double
+judge:
+  compare: exact
 source:
   site: builtin
   url: https://leetcode.com/problems/median-of-two-sorted-arrays/

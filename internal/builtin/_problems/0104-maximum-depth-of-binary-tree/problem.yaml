@@ -9,6 +9,8 @@ function:
   params:
     - {name: root, type: TreeNode}
   returns: integer
+judge:
+  compare: exact
 source:
   site: builtin
   url: https://leetcode.com/problems/maximum-depth-of-binary-tree/

@@ -87,9 +87,16 @@ hc discard two-sum          # 删除解答及其全部提交记录
 ```sh
 hc fetch 3 146 lru-cache    # 按编号、slug 或 URL，从 leetcode.com 获取
 hc fetch --site cn 1        # 从 leetcode.cn 获取（默认中文题面）
+hc fetch https://leetcode.cn/problems/two-sum/description/   # 任意题目 URL，站点由 URL 决定
+hc fetch --site cn "LCR 001"                                  # leetcode.cn 的 LCR/LCP 等编号
+hc gen 146                  # 让题目就绪：生成测试用例并决定判题规则
 ```
 
-`hc fetch` 会下载题面及其图片、函数签名、Go 和 Python 的初始代码，以及示例用例。能从题面中解析出期望输出时，也会一并写入。LeetCode 只公开示例用例，完整的测试用例需要用 `hc gen` 生成。会员题目无法获取。
+`hc fetch` 会下载题面及其图片、函数签名、Go 和 Python 的初始代码，以及示例用例。能从题面中解析出期望输出时，也会一并写入。
+
+刚拉取的题目**还不能提交**。LeetCode 只公开示例，也不公开判题方式：顺序是否重要、是否有多个正确答案。在判题规则确定之前，`hc test` 会把你的输出和示例答案并排列出，但不给结论；`hc submit` 会拒绝提交。`hc gen` 会生成完整的测试用例，并根据题面决定判题规则；你也可以自己设置 `judge.compare`（见[题目协议](protocol_zh.md#problemyaml)）。题目列表会把这类题目标记为"not ready"。
+
+会员题目无法获取。签名中使用了 hc 暂不支持的类型（带 `Node` 的图、`NestedInteger` 等）的题目也无法获取，`hc fetch` 会说明原因。
 
 ### 自己出题
 
@@ -190,3 +197,4 @@ leetcode:
 - 部分签名暂不支持：`Node`（图、N 叉树、带随机指针的链表）、`NestedInteger`、以带环链表作为输入。需要特殊判题器（checker）的题目也不支持。
 - 会统计运行时间，但不限制内存。
 - 无法获取 LeetCode 会员题目。
+- 合法答案很多、无法全部列出的题目（"返回任意一个合法答案"）需要自定义判题器，目前还不支持；`hc gen` 遇到这类题目时会说明。

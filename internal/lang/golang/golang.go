@@ -208,6 +208,9 @@ func writeFunctionCall(b *strings.Builder, p *problem.Problem) error {
 	call := fmt.Sprintf("%s(%s)", f.Name, strings.Join(args, ", "))
 	b.WriteString("\thcStart()\n")
 	switch {
+	case outIdx >= 0 && p.Judge.OutputLength == problem.OutputLengthReturn:
+		fmt.Fprintf(b, "\tret := %s\n\thcStop()\n", call)
+		fmt.Fprintf(b, "\treturn %s\n", encodeExpr(f.Params[outIdx].Type, fmt.Sprintf("hcPrefix(%s, int(ret))", args[outIdx])))
 	case outIdx >= 0:
 		fmt.Fprintf(b, "\t%s\n\thcStop()\n", call)
 		fmt.Fprintf(b, "\treturn %s\n", encodeExpr(f.Params[outIdx].Type, args[outIdx]))

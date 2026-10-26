@@ -168,8 +168,16 @@ func (m *model) viewList() string {
 		case app.StatusAttempted:
 			mark = ui.Yellow.Render("●")
 		}
-		tags := fit(strings.Join(p.Tags, ", "), tagsW)
-		row := fmt.Sprintf("%s %-6s %s %s %s", mark, p.ID, fit(p.Title, titleW), padRight(ui.Difficulty(p.Difficulty), 8), ui.Faint.Render(tags))
+		tags := ui.Faint.Render(fit(strings.Join(p.Tags, ", "), tagsW))
+		if !p.Ready() {
+			const notReady = "not ready · "
+			if tagsW <= len(notReady) {
+				tags = ui.Yellow.Render(fit(notReady, tagsW))
+			} else {
+				tags = ui.Yellow.Render(notReady) + ui.Faint.Render(fit(strings.Join(p.Tags, ", "), tagsW-len(notReady)))
+			}
+		}
+		row := fmt.Sprintf("%s %-6s %s %s %s", mark, p.ID, fit(p.Title, titleW), padRight(ui.Difficulty(p.Difficulty), 8), tags)
 		if i == m.cursor {
 			row = cursorStyle.Render("▸") + " " + row
 		} else {

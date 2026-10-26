@@ -208,6 +208,9 @@ func (a *App) runnerOpts(p *problem.Problem, o RunOptions) runner.Options {
 
 // Submit runs all cases and records the submission.
 func (a *App) Submit(ctx context.Context, p *problem.Problem, l lang.Language, o RunOptions) (*runner.Report, *store.Submission, error) {
+	if !p.Ready() {
+		return nil, nil, errors.New("cannot submit: " + p.NotReadyHint() + "; `hc test` shows your output meanwhile")
+	}
 	cases, err := p.LoadCases()
 	if err != nil {
 		return nil, nil, err

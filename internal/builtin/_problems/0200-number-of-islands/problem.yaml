@@ -9,6 +9,8 @@ function:
   params:
     - {name: grid, type: "character[][]"}
   returns: integer
+judge:
+  compare: exact
 source:
   site: builtin
   url: https://leetcode.com/problems/number-of-islands/

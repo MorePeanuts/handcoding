@@ -31,6 +31,9 @@ type metaData struct {
 	Return metaReturn  `json:"return"`
 	Output *struct {
 		ParamIndex int `json:"paramindex"`
+		// Size limits the judged output: "ret" means the first
+		// return-value elements.
+		Size any `json:"size"`
 	} `json:"output"`
 	// class problems
 	ClassName   string `json:"classname"`
@@ -59,8 +62,20 @@ type Converted struct {
 	Warnings []string
 }
 
+// ErrUnsupported marks problems hc cannot drive yet.
+var ErrUnsupported = errors.New("not supported by hc yet")
+
+// englishPlaceholder is what leetcode.cn returns as the English statement of
+// problems that only exist in Chinese (LCR, LCP, ...).
+const englishPlaceholder = "English description is not available"
+
 // Convert maps a question to the problem protocol. preferTranslated selects
 // the translated title/statement (leetcode.cn).
+//
+// Convert records only what LeetCode states for certain: the signature, the
+// in-place output and its length. It leaves judge.compare unset, because
+// whether several answers are acceptable can only be read from the
+// statement; hc gen decides it.
 func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) {
 	if q.IsPaidOnly && q.Content == "" && q.TranslatedContent == "" {
 		return nil, fmt.Errorf("%s is a premium problem; its content is not available without a subscription", q.TitleSlug)
@@ -68,6 +83,10 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 	var md metaData
 	if err := json.Unmarshal([]byte(q.MetaData), &md); err != nil {
 		return nil, fmt.Errorf("parse metaData: %w", err)
+	}
+	english := q.Content
+	if strings.Contains(english, englishPlaceholder) {
+		english = ""
 	}
 	p := &problem.Problem{
 		ID:         q.QuestionFrontendID,
@@ -80,8 +99,13 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 		p.Tags = append(p.Tags, t.Slug)
 	}
 	conv := &Converted{Problem: p, Templates: map[string]string{}}
-	if md.Manual {
-		conv.Warnings = append(conv.Warnings, "LeetCode marks this problem as using a custom judge; generated cases may need care")
+	for _, s := range q.CodeSnippets {
+		switch s.LangSlug {
+		case "golang":
+			conv.Templates["solution.go"] = s.Code
+		case "python3":
+			conv.Templates["solution.py"] = s.Code
+		}
 	}
 	params := func(ps []metaParam) []problem.Param {
 		out := make([]problem.Param, len(ps))
@@ -102,50 +126,146 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 		p.Function = &problem.Function{Name: md.Name, Params: params(md.Params), Returns: md.Return.Type}
 		if md.Output != nil && md.Output.ParamIndex >= 0 && md.Output.ParamIndex < len(md.Params) {
 			p.Judge.Output = md.Params[md.Output.ParamIndex].Name
+			switch md.Output.Size {
+			case nil:
+			case "ret":
+				p.Judge.OutputLength = problem.OutputLengthReturn
+			default:
+				return nil, fmt.Errorf("%s judges an output of length %v: %w", p.Slug, md.Output.Size, ErrUnsupported)
+			}
 		}
 	}
-	content := q.Content
-	if preferTranslated && q.TranslatedContent != "" {
+	p.Normalize()
+	if t := unsupportedType(p); t != "" {
+		return nil, fmt.Errorf("%s uses the type %s: %w", p.Slug, t, ErrUnsupported)
+	}
+	if md.Manual {
+		// For custom-judge problems the metadata may describe LeetCode's
+		// serialized test data rather than the code the user writes
+		// (Clone Graph: edges integer[][] -> boolean, but the template
+		// takes a *Node). Trust it only if the template agrees.
+		if sig, ok := goSignatureMatches(p, conv.Templates["solution.go"]); !ok {
+			return nil, fmt.Errorf("%s is judged by LeetCode's own checker, and its real signature %s cannot be driven by hc: %w", p.Slug, sig, ErrUnsupported)
+		}
+		conv.Warnings = append(conv.Warnings, "LeetCode judges this problem with its own checker; hc gen has to work out how to judge it")
+	}
+	if err := p.Validate(); err != nil {
+		return nil, fmt.Errorf("%s cannot be judged by hc: %w", p.Slug, err)
+	}
+
+	content := english
+	if (preferTranslated || content == "") && q.TranslatedContent != "" {
 		content = q.TranslatedContent
 		if q.TranslatedTitle != "" {
 			p.Title = q.TranslatedTitle
 		}
+		if !preferTranslated {
+			conv.Warnings = append(conv.Warnings, "no English statement on LeetCode; using the Chinese one")
+		}
 	}
-	if anyOrder(q.Content + q.TranslatedContent) {
-		p.Judge.Compare = problem.CompareUnordered
-		conv.Warnings = append(conv.Warnings, "statement says the answer may be in any order: judge.compare set to unordered (check whether unordered_deep is needed)")
-	}
-	p.Normalize()
-	if err := p.Validate(); err != nil {
-		return conv, fmt.Errorf("%s cannot be judged by hc yet: %w", p.Slug, err)
-	}
-
 	desc, err := toMarkdown(content)
 	if err != nil {
 		return nil, err
 	}
 	conv.Description = fmt.Sprintf("# %s. %s\n\n%s\n", p.ID, p.Title, strings.TrimSpace(desc))
 
-	for _, s := range q.CodeSnippets {
-		switch s.LangSlug {
-		case "golang":
-			conv.Templates["solution.go"] = s.Code
-		case "python3":
-			conv.Templates["solution.py"] = s.Code
-		}
+	cases, warn := examples(p, q, english)
+	if warn != "" {
+		conv.Warnings = append(conv.Warnings, warn)
 	}
-
-	cases, warn := examples(p, q)
-	conv.Cases = cases
+	conv.Cases, warn = checkExamples(p, cases)
 	if warn != "" {
 		conv.Warnings = append(conv.Warnings, warn)
 	}
 	return conv, nil
 }
 
-var anyOrderRE = regexp.MustCompile(`(?i)in any order|任意顺序|任何顺序`)
+// checkExamples validates the examples against the signature: an expected
+// output scraped with the wrong shape is dropped, and so is a case whose
+// input does not fit.
+func checkExamples(p *problem.Problem, cases []problem.Case) ([]problem.Case, string) {
+	var kept []problem.Case
+	cleared, dropped := 0, 0
+	for _, c := range cases {
+		if p.ValidateCase(c) == nil {
+			kept = append(kept, c)
+			continue
+		}
+		c.Expected = nil
+		if p.ValidateCase(c) == nil {
+			kept = append(kept, c)
+			cleared++
+			continue
+		}
+		dropped++
+	}
+	var notes []string
+	if cleared > 0 {
+		notes = append(notes, fmt.Sprintf("%d example output(s) do not match the signature and were left empty", cleared))
+	}
+	if dropped > 0 {
+		notes = append(notes, fmt.Sprintf("%d example(s) do not match the signature and were dropped", dropped))
+	}
+	return kept, strings.Join(notes, "; ")
+}
 
-func anyOrder(content string) bool { return anyOrderRE.MatchString(content) }
+// unsupportedType returns the first type in the signature hc cannot handle.
+func unsupportedType(p *problem.Problem) string {
+	var params []problem.Param
+	var returns []string
+	if f := p.Function; f != nil {
+		params, returns = f.Params, []string{f.Returns}
+	}
+	if c := p.Class; c != nil {
+		params = append(params, c.Constructor...)
+		for _, m := range c.Methods {
+			params = append(params, m.Params...)
+			returns = append(returns, m.Returns)
+		}
+	}
+	for _, prm := range params {
+		if problem.ValidateType(prm.Type, false) != nil {
+			return prm.Type
+		}
+	}
+	for _, r := range returns {
+		if problem.ValidateType(r, true) != nil {
+			return r
+		}
+	}
+	return ""
+}
+
+var goFuncRE = regexp.MustCompile(`(?m)^func\s+(\w+)\(([^)]*)\)`)
+
+// goSignatureMatches compares a function problem's signature with the
+// parameter names of LeetCode's Go template. On a mismatch it returns the
+// template's signature and false.
+func goSignatureMatches(p *problem.Problem, template string) (string, bool) {
+	if p.Kind != problem.KindFunction || template == "" {
+		return "", true
+	}
+	m := goFuncRE.FindStringSubmatch(template)
+	if m == nil {
+		return "", true
+	}
+	sig := fmt.Sprintf("%s(%s)", m[1], strings.TrimSpace(m[2]))
+	var names []string
+	for _, part := range strings.Split(m[2], ",") {
+		if fields := strings.Fields(part); len(fields) > 0 {
+			names = append(names, fields[0])
+		}
+	}
+	if m[1] != p.Function.Name || len(names) != len(p.Function.Params) {
+		return sig, false
+	}
+	for i, prm := range p.Function.Params {
+		if names[i] != prm.Name {
+			return sig, false
+		}
+	}
+	return sig, true
+}
 
 var supRE = regexp.MustCompile(`<sup>(.*?)</sup>`)
 
@@ -163,7 +283,7 @@ var (
 
 // examples builds the statement examples: inputs from exampleTestcases,
 // expected outputs scraped from the statement when they parse as JSON.
-func examples(p *problem.Problem, q *Question) ([]problem.Case, string) {
+func examples(p *problem.Problem, q *Question, english string) ([]problem.Case, string) {
 	lines := strings.Split(strings.TrimSpace(q.ExampleTestcases), "\n")
 	if len(lines) == 1 && lines[0] == "" {
 		return nil, "no example test cases provided by LeetCode"
@@ -189,7 +309,7 @@ func examples(p *problem.Problem, q *Question) ([]problem.Case, string) {
 		cases = append(cases, c)
 	}
 
-	src := q.Content
+	src := english
 	if src == "" {
 		src = q.TranslatedContent
 	}

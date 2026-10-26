@@ -132,11 +132,13 @@ type meta struct {
 	Function *problem.Function `json:"function,omitempty"`
 	Class    *problem.Class    `json:"class,omitempty"`
 	Output   string            `json:"output,omitempty"`
+	// OutputLength mirrors judge.output_length.
+	OutputLength string `json:"output_length,omitempty"`
 }
 
 // Prepare writes hc_runtime.py and _hc_runner.py.
 func (Language) Prepare(dir string, p *problem.Problem) error {
-	m, err := json.Marshal(meta{Kind: p.Kind, Function: p.Function, Class: p.Class, Output: p.Judge.Output})
+	m, err := json.Marshal(meta{Kind: p.Kind, Function: p.Function, Class: p.Class, Output: p.Judge.Output, OutputLength: p.Judge.OutputLength})
 	if err != nil {
 		return err
 	}

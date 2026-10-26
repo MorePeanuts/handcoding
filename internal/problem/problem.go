@@ -89,7 +89,9 @@ const (
 
 // Judge holds judging options.
 type Judge struct {
-	// Compare is one of the Compare* modes; defaults to exact.
+	// Compare is one of the Compare* modes. It has no default: an empty value
+	// means the judge rule has not been decided yet (see Ready), as for a
+	// freshly fetched problem.
 	Compare string `yaml:"compare,omitempty" json:"compare,omitempty"`
 	// Tolerance is the absolute/relative tolerance for floating point numbers.
 	// Defaults to 1e-5 when the return type contains double.
@@ -97,9 +99,16 @@ type Judge struct {
 	// Output names a parameter whose value after the call is the answer, for
 	// problems that modify their input in place (e.g. "rotate the array").
 	Output string `yaml:"output,omitempty" json:"output,omitempty"`
+	// OutputLength limits the judged Output to a prefix. The only value is
+	// OutputLengthReturn: the function returns k, and only the first k
+	// elements of Output are judged (LeetCode's "remove duplicates" style).
+	OutputLength string `yaml:"output_length,omitempty" json:"output_length,omitempty"`
 	// TimeLimit is the wall clock limit for a whole run, e.g. "10s".
 	TimeLimit string `yaml:"time_limit,omitempty" json:"time_limit,omitempty"`
 }
+
+// OutputLengthReturn judges Output[:k], where k is the return value.
+const OutputLengthReturn = "return"
 
 // Source records where a problem came from.
 type Source struct {
@@ -125,7 +134,9 @@ type Problem struct {
 }
 
 var (
-	slugRE = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+	// slugRE allows upper case because some leetcode.cn slugs use it
+	// ("xoh6Oh"); the protocol recommends lower case.
+	slugRE = regexp.MustCompile(`^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$`)
 	// flowArrayTypeRE spots an unquoted array type inside YAML flow syntax,
 	// where "[]" is read as a sequence: {name: nums, type: integer[]}.
 	flowArrayTypeRE = regexp.MustCompile(`\{[^}\n]*type:\s*[A-Za-z<>]+\[\]`)
@@ -171,9 +182,6 @@ func (p *Problem) Normalize() {
 			}
 		}
 	}
-	if p.Judge.Compare == "" {
-		p.Judge.Compare = CompareExact
-	}
 	if p.Judge.Tolerance == 0 && p.usesDouble() {
 		p.Judge.Tolerance = 1e-5
 	}
@@ -198,7 +206,7 @@ func (p *Problem) usesDouble() bool {
 func (p *Problem) Validate() error {
 	var errs []error
 	if !slugRE.MatchString(p.Slug) {
-		errs = append(errs, fmt.Errorf("slug %q must be lowercase kebab-case", p.Slug))
+		errs = append(errs, fmt.Errorf("slug %q must be kebab-case: letters, digits and single hyphens", p.Slug))
 	}
 	if p.Title == "" {
 		errs = append(errs, errors.New("title is required"))
@@ -248,6 +256,21 @@ func (p *Problem) Validate() error {
 		} else if f.Returns == TypeVoid {
 			errs = append(errs, errors.New("void functions need judge.output to name the modified parameter"))
 		}
+		switch p.Judge.OutputLength {
+		case "":
+		case OutputLengthReturn:
+			_, depth := SplitArray(p.judgedType())
+			switch {
+			case p.Judge.Output == "":
+				errs = append(errs, errors.New("judge.output_length needs judge.output"))
+			case f.Returns != TypeInteger && f.Returns != TypeLong:
+				errs = append(errs, fmt.Errorf("judge.output_length return needs an integer return value, not %s", f.Returns))
+			case depth == 0:
+				errs = append(errs, errors.New("judge.output_length needs an array judge.output parameter"))
+			}
+		default:
+			errs = append(errs, fmt.Errorf("unknown judge.output_length %q (only \"return\")", p.Judge.OutputLength))
+		}
 	case KindClass:
 		c := p.Class
 		if c == nil {
@@ -271,7 +294,7 @@ func (p *Problem) Validate() error {
 		errs = append(errs, fmt.Errorf("unknown kind %q", p.Kind))
 	}
 	switch p.Judge.Compare {
-	case CompareExact, CompareAnyOf:
+	case "", CompareExact, CompareAnyOf:
 	case CompareUnordered, CompareUnorderedDeep:
 		if t := p.judgedType(); p.Kind == KindFunction && t != "" {
 			if _, depth := SplitArray(t); depth == 0 {
@@ -304,6 +327,16 @@ func (p *Problem) judgedType() string {
 		return ""
 	}
 	return p.Function.Returns
+}
+
+// Ready reports whether the judge rule has been decided, i.e. whether
+// outputs can be judged at all. hc fetch leaves it undecided for hc gen (or
+// the author) to settle.
+func (p *Problem) Ready() bool { return p.Judge.Compare != "" }
+
+// NotReadyHint tells the user how to make an undecided problem judgeable.
+func (p *Problem) NotReadyHint() string {
+	return fmt.Sprintf("the judge rule of %s is not decided yet: run `hc gen %s`, or set judge.compare in problem.yaml", p.Slug, p.Slug)
 }
 
 // EntryName is the name of the function or class the user implements.

@@ -13,6 +13,7 @@ import (
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/builtin"
+	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
@@ -276,5 +277,43 @@ func TestResetAsksFirst(t *testing.T) {
 	h.press("r", "y")
 	if data, _ := os.ReadFile(path); strings.Contains(string(data), "// mine") {
 		t.Fatal("reset did not restore the template")
+	}
+}
+
+// TestNotReadyProblem: a problem without a decided judge rule is marked in
+// the list, test shows outputs without a verdict, and submit is refused.
+func TestNotReadyProblem(t *testing.T) {
+	requireGo(t)
+	h := newHarness(t)
+	p := h.m.selected()
+	meta := filepath.Join(p.Dir, problem.MetaFile)
+	data, err := os.ReadFile(meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stripped := strings.Replace(string(data), "  compare: unordered\n", "", 1)
+	if stripped == string(data) {
+		t.Fatal("two-sum no longer sets compare: unordered; update the test")
+	}
+	if err := os.WriteFile(meta, []byte(stripped), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.m.refresh()
+	if !strings.Contains(h.view(), "not ready") {
+		t.Fatalf("list does not mark the problem:\n%s", h.view())
+	}
+
+	h.press("enter")
+	l, _ := h.m.app.Lang("go")
+	if err := os.WriteFile(h.m.app.SolutionPath(h.m.current, l), []byte(twoSumGo), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.press("t")
+	if v := h.m.run.report.Verdict; v != runner.NotJudged || !strings.Contains(h.view(), "hc gen two-sum") {
+		t.Fatalf("test: verdict %s\n%s", v, h.view())
+	}
+	h.press("s")
+	if h.m.run.err == nil || h.m.run.subID != 0 {
+		t.Fatalf("submit should be refused: %+v", h.m.run)
 	}
 }

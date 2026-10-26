@@ -155,6 +155,10 @@ def _call_function(solution, meta, inp):
     if output_param:
         for p, a in zip(fn_meta["params"], args):
             if p["name"] == output_param:
+                if meta.get("output_length") == "return":
+                    if not isinstance(ret, int) or not 0 <= ret <= len(a):
+                        raise RuntimeError("returned length %r is outside [0, %d]" % (ret, len(a)))
+                    a = a[:ret]
                 return encode(p["type"], a), elapsed
     return encode(fn_meta["returns"], ret), elapsed
 

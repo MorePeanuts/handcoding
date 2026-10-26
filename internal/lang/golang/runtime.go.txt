@@ -158,6 +158,15 @@ func hcAt(args []json.RawMessage, i int) json.RawMessage {
 	return args[i]
 }
 
+// hcPrefix cuts an in-place output to the length the solution returned
+// (judge.output_length: return).
+func hcPrefix[T any](s []T, n int) []T {
+	if n < 0 || n > len(s) {
+		panic(fmt.Sprintf("returned length %d is outside [0, %d]", n, len(s)))
+	}
+	return s[:n]
+}
+
 func hcArity(op string, args []json.RawMessage, n int) {
 	if len(args) != n {
 		panic(hcInputError{fmt.Sprintf("%s takes %d argument(s), got %d", op, n, len(args))})

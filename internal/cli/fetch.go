@@ -26,10 +26,16 @@ func newFetchCmd(root *rootOptions) *cobra.Command {
 examples (with expected outputs when they can be parsed from the statement).
 Premium problems are not available.
 
-Afterwards run ` + "`hc gen <slug>`" + ` to let an agent write the full test suite.
+The problem is not ready to submit yet: LeetCode publishes only the examples
+and not how answers are judged (any order? several valid answers?).
+` + "`hc test`" + ` shows your output next to the examples meanwhile. Run
+` + "`hc gen <slug>`" + ` to let an agent write the full test suite and decide the
+judge rule, or set judge.compare by hand.
 
   hc fetch two-sum 3 146
-  hc fetch --site cn --translated lru-cache`,
+  hc fetch --site cn --translated lru-cache
+  hc fetch https://leetcode.cn/problems/two-sum/description/
+  hc fetch --site cn "LCR 001"`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, err := root.openApp()
@@ -44,13 +50,24 @@ Afterwards run ` + "`hc gen <slug>`" + ` to let an agent write the full test sui
 			if err != nil {
 				return err
 			}
-			if !cmd.Flags().Changed("translated") {
-				translated = site == leetcode.SiteCN
-			}
-			client := leetcode.NewClient(site, a.WS.StatePath())
+			clients := map[string]*leetcode.Client{}
 			var failed int
 			for _, ref := range args {
-				if err := fetchOne(cmd, a, client, ref, translated, force); err != nil {
+				// A URL names its own site.
+				refSite := site
+				if s, slug, ok := leetcode.ParseURL(ref); ok {
+					refSite, ref = s, slug
+				}
+				tr := translated
+				if !cmd.Flags().Changed("translated") {
+					tr = refSite == leetcode.SiteCN
+				}
+				client := clients[refSite.Name]
+				if client == nil {
+					client = leetcode.NewClient(refSite, a.WS.StatePath())
+					clients[refSite.Name] = client
+				}
+				if err := fetchOne(cmd, a, client, ref, tr, force); err != nil {
 					fmt.Fprintf(os.Stderr, "%s %s: %v\n", ui.Red.Render("error"), ref, err)
 					failed++
 				}
@@ -73,22 +90,20 @@ func fetchOne(cmd *cobra.Command, a *app.App, client *leetcode.Client, ref strin
 	if err != nil {
 		return err
 	}
-	existing, err := a.WS.Problem(slug)
-	if err != nil || existing.Slug != slug {
+	q, err := client.Question(ctx, slug)
+	if err != nil {
+		return err
+	}
+	// LeetCode accepts slugs in any case; compare with its canonical one.
+	existing, err := a.WS.Problem(q.TitleSlug)
+	if err != nil || existing.Slug != q.TitleSlug {
 		existing = nil
 	}
 	if existing != nil && !force {
 		return fmt.Errorf("already in the bank at %s (use --force to replace)", existing.Dir)
 	}
-	q, err := client.Question(ctx, slug)
-	if err != nil {
-		return err
-	}
 	conv, err := leetcode.Convert(q, client.Site, translated)
 	if err != nil {
-		if conv != nil {
-			return fmt.Errorf("%w\n  (unsupported signatures such as Node/NestedInteger are not implemented yet)", err)
-		}
 		return err
 	}
 	client.DownloadImages(ctx, conv)
@@ -113,8 +128,6 @@ func fetchOne(cmd *cobra.Command, a *app.App, client *leetcode.Client, ref strin
 	for _, w := range conv.Warnings {
 		fmt.Printf("    %s %s\n", ui.Yellow.Render("note:"), w)
 	}
-	if len(conv.Cases) == 0 || withExpected < len(conv.Cases) {
-		fmt.Printf("    next: hc gen %s\n", conv.Problem.Slug)
-	}
+	fmt.Printf("    next: hc gen %s — writes the test cases and decides how answers are judged\n", conv.Problem.Slug)
 	return nil
 }

@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -149,18 +151,51 @@ type listEntry struct {
 	Slug string `json:"slug"`
 }
 
-// ResolveSlug turns a frontend ID (e.g. "146") into a slug; anything that is
-// not a number is returned as is.
+// ParseURL recognizes a problem URL on either site, with or without the
+// scheme and with any trailing path, query or fragment
+// ("leetcode.cn/problems/two-sum/description/?envType=..."). It returns the
+// site and the slug; ok is false when ref is not a LeetCode problem URL.
+func ParseURL(ref string) (site Site, slug string, ok bool) {
+	s := strings.TrimSpace(ref)
+	if !strings.Contains(s, "://") {
+		s = "https://" + s
+	}
+	u, err := url.Parse(s)
+	if err != nil {
+		return Site{}, "", false
+	}
+	switch strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.") {
+	case "leetcode.com":
+		site = SiteCom
+	case "leetcode.cn":
+		site = SiteCN
+	default:
+		return Site{}, "", false
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) < 2 || parts[0] != "problems" || parts[1] == "" {
+		return Site{}, "", false
+	}
+	return site, parts[1], true
+}
+
+// idRE matches what looks like a frontend ID rather than a slug: "146",
+// "LCR 001", "LCP 01".
+var idRE = regexp.MustCompile(`^(\d+|[A-Za-z]+ +\d+)$`)
+
+// ResolveSlug turns a frontend ID (e.g. "146", or "LCR 001" on leetcode.cn)
+// into a slug; anything else is taken as a slug.
 func (c *Client) ResolveSlug(ctx context.Context, ref string) (string, error) {
-	if _, err := strconv.Atoi(ref); err != nil {
-		return strings.TrimSuffix(strings.TrimPrefix(ref, c.Site.Base+"/problems/"), "/"), nil
+	ref = strings.TrimSpace(ref)
+	if !idRE.MatchString(ref) {
+		return ref, nil
 	}
 	entries, err := c.problemList(ctx)
 	if err != nil {
 		return "", err
 	}
 	for _, e := range entries {
-		if e.ID == ref {
+		if strings.EqualFold(e.ID, ref) {
 			return e.Slug, nil
 		}
 	}
