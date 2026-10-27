@@ -204,7 +204,7 @@ leetcode:
 ## Current limitations
 
 - Interactive problems aren't supported yet.
-- Problems with [structure inputs](protocol.md#structure-inputs) (a list with a cycle, intersecting lists, node references such as Lowest Common Ancestor) can be judged, but `hc fetch` cannot import them correctly yet; write their `problem.yaml` by hand. The samples 141, 142, 160, 236, 237 and 1379 show how.
+- `hc fetch` imports problems with [structure inputs](protocol.md#structure-inputs) (a list with a cycle, intersecting lists, node references such as Lowest Common Ancestor), working out the structures from the difference between LeetCode's test data and its template. Example outputs that are not plain JSON, such as 142's "tail connects to node index 1", are left to `hc gen`. The samples 141, 142, 160, 236, 237 and 1379 show these problems.
 - `hc fetch` imports problems with [LeetCode's `Node` types](protocol.md#leetcodes-node-types), `NestedInteger` and `Employee`, reading their signature from LeetCode's Go template. `returns_copy` (Clone Graph) is left to `hc gen`, and so are the examples of iterator problems such as Flatten Nested List Iterator, which LeetCode gives without the calls.
 - Problems that encode a value and decode it back (297, 449, 535) are judged as [round trips](protocol.md#round-trip-problems): only the decoded value is compared, so requirements on the encoding itself (449: "as compact as possible") are not checked. `hc fetch` imports them, reading the encoder, the decoder and whether they share an instance from the harness in LeetCode's template comment. The samples 297 and 535 show both kinds.
 - Run time is measured, but memory is not limited.

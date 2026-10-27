@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -153,11 +154,11 @@ func TestConvertUnsupported(t *testing.T) {
 			QuestionFrontendID: "341", TitleSlug: "flatten-nested-list-iterator",
 			MetaData: `{"name":"","params":[{"name":"nestedList","type":"list<NestedInteger>"}],"return":{"type":"integer"},"manual":true}`,
 		}, "names no function or class"},
-		{"custom judge, fewer parameters", &Question{
-			QuestionFrontendID: "237", TitleSlug: "delete-node-in-a-linked-list",
-			MetaData:     `{"name":"deleteNode","params":[{"name":"head","type":"ListNode"},{"name":"node","type":"integer"}],"return":{"type":"void"},"manual":true}`,
-			CodeSnippets: goSnippet("func deleteNode(node *ListNode) {\n\n}"),
-		}, "real signature deleteNode(node *ListNode)"},
+		{"custom judge, another function", &Question{
+			QuestionFrontendID: "1", TitleSlug: "x",
+			MetaData:     `{"name":"f","params":[{"name":"n","type":"integer"}],"return":{"type":"integer"},"manual":true}`,
+			CodeSnippets: goSnippet("func g(n int) int {\n\n}"),
+		}, "real signature g(n int) cannot be driven by hc: the template defines g, not f"},
 	}
 	for _, tt := range tests {
 		_, err := Convert(tt.q, SiteCom, false)
@@ -423,5 +424,94 @@ func TestConvertRoundTripFunction(t *testing.T) {
 		CodeSnippets: goSnippet("func f(s string) string {\n\n}\n\n/**\n * data := c.encode(s)\n * ans := c.decode(data)\n */")}
 	if _, err := Convert(q, SiteCom, false); err == nil || !strings.Contains(err.Error(), "judge.round_trip is for class problems only") {
 		t.Errorf("error = %v", err)
+	}
+}
+
+// For custom-judged problems that pass linked structures, the template's
+// signature differs from metaData, which describes LeetCode's test data; the
+// difference becomes structure inputs. The signatures must be those of the
+// built-in samples.
+func TestConvertStructureInputs(t *testing.T) {
+	tests := []struct {
+		slug    string
+		builtin string // the sample with the expected signature
+		// want is the expected signature, as JSON, without a sample.
+		want, output string
+		examples     int // examples kept
+		expected     int // of which with an expected output
+		first        string
+	}{
+		{slug: "linked-list-cycle", builtin: "0141-linked-list-cycle", examples: 3, expected: 3,
+			first: `{"head":[3,2,0,-4],"pos":1}`},
+		// "tail connects to node index 1" is not JSON.
+		{slug: "linked-list-cycle-ii", builtin: "0142-linked-list-cycle-ii", examples: 3,
+			first: `{"head":[3,2,0,-4],"pos":1}`},
+		// intersectVal is dropped; listA and listB are the template's heads.
+		{slug: "intersection-of-two-linked-lists", builtin: "0160-intersection-of-two-linked-lists", examples: 3,
+			first: `{"headA":[4,1,8,4,5],"headB":[5,6,1,8,4,5],"skipA":2,"skipB":3}`},
+		{slug: "delete-node-in-a-linked-list", builtin: "0237-delete-node-in-a-linked-list", examples: 2, expected: 2,
+			first: `{"head":[4,5,1,9],"node":5}`},
+		{slug: "lowest-common-ancestor-of-a-binary-tree", builtin: "0236-lowest-common-ancestor-of-a-binary-tree", examples: 3, expected: 3,
+			first: `{"p":5,"q":1,"root":[3,5,1,6,2,0,8,null,null,7,4]}`},
+		{slug: "all-nodes-distance-k-in-binary-tree", examples: 2, expected: 2,
+			want:  `{"name":"distanceK","params":[{"name":"root","type":"TreeNode"},{"name":"target","type":"TreeNode","ref":"root"},{"name":"k","type":"integer"}],"returns":"integer[]"}`,
+			first: `{"k":2,"root":[3,5,1,6,2,0,8,null,null,7,4],"target":5}`},
+		// Only a Python template; metaData calls original tree.
+		{slug: "find-a-corresponding-node-of-a-binary-tree-in-a-clone-of-that-tree", builtin: "1379-find-a-corresponding-node-of-a-binary-tree-in-a-clone-of-that-tree", examples: 3, expected: 3,
+			first: `{"original":[7,4,3,null,null,6,19],"target":3}`},
+	}
+	for _, tt := range tests {
+		c, err := Convert(loadQuestion(t, tt.slug), SiteCom, false)
+		if err != nil {
+			t.Errorf("%s: %v", tt.slug, err)
+			continue
+		}
+		p := c.Problem
+		want, output := tt.want, tt.output
+		if tt.builtin != "" {
+			b, err := problem.Load(filepath.Join("..", "builtin", "_problems", tt.builtin))
+			if err != nil {
+				t.Fatal(err)
+			}
+			w, _ := json.Marshal(b.Function)
+			want, output = string(w), b.Judge.Output
+		}
+		if got, _ := json.Marshal(p.Function); string(got) != want {
+			t.Errorf("%s: signature\n%s\nwant\n%s", tt.slug, got, want)
+		}
+		if p.Judge.Output != output || p.Ready() {
+			t.Errorf("%s: judge %+v, want output %q and no compare", tt.slug, p.Judge, output)
+		}
+		if !slices.ContainsFunc(c.Warnings, func(w string) bool { return strings.Contains(w, "own checker") }) {
+			t.Errorf("%s: no warning about LeetCode's checker in %q", tt.slug, c.Warnings)
+		}
+		withExpected := 0
+		for _, cs := range c.Cases {
+			if cs.HasExpected() {
+				withExpected++
+			}
+		}
+		if len(c.Cases) != tt.examples || withExpected != tt.expected {
+			t.Errorf("%s: %d examples, %d with expected; want %d, %d (warnings %q)", tt.slug, len(c.Cases), withExpected, tt.examples, tt.expected, c.Warnings)
+			continue
+		}
+		if in, _ := json.Marshal(c.Cases[0].Input); string(in) != tt.first {
+			t.Errorf("%s: first example %s, want %s", tt.slug, in, tt.first)
+		}
+	}
+}
+
+// Test data the template's structures cannot explain is rejected:
+// interactive problems pass an API, not a structure.
+func TestConvertStructureInputsUnsupported(t *testing.T) {
+	tests := []struct{ slug, want string }{
+		{"first-bad-version", "real signature firstBadVersion(n int) cannot be driven by hc: LeetCode's test data has bad, which the template does not take"},
+		{"find-in-mountain-array", "the template's mountainArr is *MountainArray, which hc does not support"},
+	}
+	for _, tt := range tests {
+		_, err := Convert(loadQuestion(t, tt.slug), SiteCom, false)
+		if !errors.Is(err, ErrUnsupported) || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("%s: error = %v, want ErrUnsupported with %q", tt.slug, err, tt.want)
+		}
 	}
 }

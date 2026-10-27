@@ -24,7 +24,7 @@ var (
 	goTypeRE     = regexp.MustCompile(`(?m)^type\s+(\w+)\s+struct\b`)
 	goMethodRE   = regexp.MustCompile(`(?m)^func\s+\(\s*\w+\s+\*?(\w+)\s*\)\s*(\w+)\(([^)]*)\)\s*([^{\n]*)\{`)
 	goFuncSigRE  = regexp.MustCompile(`(?m)^func\s+(\w+)\(([^)]*)\)\s*([^{\n]*)\{`)
-	pyDefRE      = regexp.MustCompile(`(?m)^\s*def\s+(\w+)\(self,?([^)]*)\)`)
+	pyDefRE      = regexp.MustCompile(`(?m)^\s*def\s+(\w+)\(self,?([^)]*)\)\s*(?:->\s*([^:\n]+?))?\s*:`)
 )
 
 // nodeFields maps the field names of each Node variant, sorted, to its type.
@@ -66,27 +66,13 @@ func templateSignature(p *problem.Problem, goTemplate, pyTemplate string) error 
 		return "", fmt.Errorf("%s uses the Go type %s: %w", p.Slug, goType, ErrUnsupported)
 	}
 	params := func(list string) ([]problem.Param, error) {
-		var out []problem.Param
-		pending := 0 // names waiting for the type of a later one: "a, b int"
-		for _, part := range strings.Split(list, ",") {
-			f := strings.Fields(part)
-			switch len(f) {
-			case 0:
-				continue
-			case 1:
-				out = append(out, problem.Param{Name: f[0]})
-				pending++
-				continue
-			}
-			t, err := conv(strings.Join(f[1:], ""))
+		out := goParams(list)
+		for i := range out {
+			t, err := conv(out[i].Type)
 			if err != nil {
 				return nil, err
 			}
-			out = append(out, problem.Param{Name: f[0], Type: t})
-			for i := len(out) - 1 - pending; i < len(out)-1; i++ {
-				out[i].Type = t
-			}
-			pending = 0
+			out[i].Type = t
 		}
 		return out, nil
 	}
@@ -187,14 +173,52 @@ func protocolType(goType, node string) (string, bool) {
 	return base + strings.Repeat("[]", depth), true
 }
 
+// goParams splits a Go parameter list into names and Go types, giving
+// grouped names their type ("a, b int").
+func goParams(list string) []problem.Param {
+	var out []problem.Param
+	pending := 0 // names waiting for the type of a later one
+	for _, part := range strings.Split(list, ",") {
+		f := strings.Fields(part)
+		switch len(f) {
+		case 0:
+			continue
+		case 1:
+			out = append(out, problem.Param{Name: f[0]})
+			pending++
+			continue
+		}
+		t := strings.Join(f[1:], "")
+		out = append(out, problem.Param{Name: f[0], Type: t})
+		for i := len(out) - 1 - pending; i < len(out)-1; i++ {
+			out[i].Type = t
+		}
+		pending = 0
+	}
+	return out
+}
+
 // pyParams returns the parameter names of the Python template's method
 // name, or nil.
 func pyParams(template, name string) []string {
+	params, _, ok := pySignature(template, name)
+	if !ok {
+		return nil
+	}
+	names := make([]string, len(params))
+	for i, prm := range params {
+		names[i] = prm.Name
+	}
+	return names
+}
+
+// pySignature returns the parameters of the Python template's method name,
+// with their annotations as Type ("" for none), and its return annotation.
+func pySignature(template, name string) (params []problem.Param, returns string, ok bool) {
 	for _, m := range pyDefRE.FindAllStringSubmatch(template, -1) {
 		if m[1] != name {
 			continue
 		}
-		var names []string
 		depth, start := 0, 0
 		list := m[2] + ","
 		for i, r := range list {
@@ -205,16 +229,17 @@ func pyParams(template, name string) []string {
 				depth--
 			case ',':
 				if depth == 0 {
-					if n := strings.TrimSpace(strings.SplitN(list[start:i], ":", 2)[0]); n != "" {
-						names = append(names, n)
+					n, ann, _ := strings.Cut(list[start:i], ":")
+					if n = strings.TrimSpace(n); n != "" {
+						params = append(params, problem.Param{Name: n, Type: strings.TrimSpace(ann)})
 					}
 					start = i + 1
 				}
 			}
 		}
-		return names
+		return params, strings.TrimSpace(m[3]), true
 	}
-	return nil
+	return nil, "", false
 }
 
 // unexported turns a Go method name back into LeetCode's (HasNext: hasNext).

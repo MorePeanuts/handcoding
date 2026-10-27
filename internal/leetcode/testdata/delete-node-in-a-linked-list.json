@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "237",
+  "title": "Delete Node in a Linked List",
+  "titleSlug": "delete-node-in-a-linked-list",
+  "difficulty": "Medium",
+  "content": "<p><strong class=\"example\">Example 1:</strong></p>\n\n<pre>\n<strong>Input:</strong> head = [4,5,1,9], node = 5\n<strong>Output:</strong> [4,1,9]\n<strong>Explanation: </strong>You are given the second node with value 5, the linked list should become 4 -&gt; 1 -&gt; 9 after calling your function.\n</pre>\n\n<p><strong class=\"example\">Example 2:</strong></p>\n\n<pre>\n<strong>Input:</strong> head = [4,5,1,9], node = 1\n<strong>Output:</strong> [4,5,9]\n<strong>Explanation: </strong>You are given the third node with value 1, the linked list should become 4 -&gt; 5 -&gt; 9 after calling your function.\n</pre>\n\n<p>&nbsp;</p>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "# Definition for singly-linked list.\n# class ListNode:\n#     def __init__(self, x):\n#         self.val = x\n#         self.next = None\n\nclass Solution:\n    def deleteNode(self, node):\n        \"\"\"\n        :type node: ListNode\n        :rtype: void Do not return anything, modify node in-place instead.\n        \"\"\"\n        "
+    },
+    {
+      "langSlug": "golang",
+      "code": "/**\n * Definition for singly-linked list.\n * type ListNode struct {\n *     Val int\n *     Next *ListNode\n * }\n */\nfunc deleteNode(node *ListNode) {\n    \n}"
+    }
+  ],
+  "metaData": "{\"name\": \"deleteNode\", \"params\": [{\"name\": \"head\", \"type\": \"ListNode\"}, {\"name\": \"node\", \"type\": \"integer\"}], \"return\": {\"type\": \"void\"}, \"output\": {\"paramindex\": 0}, \"manual\": true}",
+  "exampleTestcases": "[4,5,1,9]\n5\n[4,5,1,9]\n1"
+}

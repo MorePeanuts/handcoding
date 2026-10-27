@@ -449,6 +449,8 @@ function:
 
 Rules: `cycle`, `skip` and `at` name integer hidden inputs; `join.list` names another plain `ListNode` parameter; `ref` and `returns_ref` name a parameter or hidden input of the same node type that holds a whole structure (not a `ref`); `copy` names a plain parameter of the same type; every hidden input must be used; `judge.output` cannot name a list with a cycle. None of this is available in design problems.
 
+`hc fetch` sets these attributes from the difference between LeetCode's metadata, which describes its test data, and the template, which is the real signature: test data the template does not take becomes a hidden input, a value the template takes as a node becomes a `ref`, a node parameter missing from the test data becomes a `copy`, a `pos` makes a `cycle`, 160's `skipA` and `skipB` make a `join`, and a returned node gets `returns_ref`. The examples are mapped onto the new inputs; `judge.compare` is left to `hc gen` as usual.
+
 ### cases.jsonl
 
 One case per line:

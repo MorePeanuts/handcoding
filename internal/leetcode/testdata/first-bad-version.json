@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "278",
+  "title": "First Bad Version",
+  "titleSlug": "first-bad-version",
+  "difficulty": "Easy",
+  "content": "<p><strong class=\"example\">Example 1:</strong></p>\n\n<pre>\n<strong>Input:</strong> n = 5, bad = 4\n<strong>Output:</strong> 4\n<strong>Explanation:</strong>\ncall isBadVersion(3) -&gt; false\ncall isBadVersion(5)&nbsp;-&gt; true\ncall isBadVersion(4)&nbsp;-&gt; true\nThen 4 is the first bad version.\n</pre>\n\n<p><strong class=\"example\">Example 2:</strong></p>\n\n<pre>\n<strong>Input:</strong> n = 1, bad = 1\n<strong>Output:</strong> 1\n</pre>\n\n<p>&nbsp;</p>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "# The isBadVersion API is already defined for you.\n# def isBadVersion(version: int) -> bool:\n\nclass Solution:\n    def firstBadVersion(self, n: int) -> int:\n        "
+    },
+    {
+      "langSlug": "golang",
+      "code": "/** \n * Forward declaration of isBadVersion API.\n * @param   version   your guess about first bad version\n * @return \t \t      true if current version is bad \n *\t\t\t          false if current version is good\n * func isBadVersion(version int) bool;\n */\n\nfunc firstBadVersion(n int) int {\n    \n}"
+    }
+  ],
+  "metaData": "{\"name\": \"firstBadVersion\", \"params\": [{\"name\": \"n\", \"type\": \"integer\"}, {\"name\": \"bad\", \"type\": \"integer\"}], \"return\": {\"type\": \"integer\"}, \"manual\": true}",
+  "exampleTestcases": "5\n4\n1\n1"
+}

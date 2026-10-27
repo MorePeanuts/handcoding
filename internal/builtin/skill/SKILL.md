@@ -143,10 +143,13 @@ function:
 `params` must match LeetCode's template (the solution's real signature);
 hidden inputs never reach the solution. Keep the input names the statement
 uses (`pos`, `skipA`, `skipB`), and drop inputs the driver does not need
-(160's `intersectVal`). A fetched problem may declare such inputs as plain
-parameters (236: `p` and `q` as `integer`, while `templates/solution.go`
-takes `*TreeNode`); fix `problem.yaml` to the template's signature with
-these attributes. Design problems cannot use them.
+(160's `intersectVal`). Design problems cannot use them.
+
+`hc fetch` derives these attributes by comparing LeetCode's test data with
+the template (141, 142, 160, 235, 236, 237, 863, 1379), and maps the
+examples onto them. Keep them; check that `params` match
+`templates/solution.*`, fill the example outputs it could not parse in the
+`returns_ref` encoding (142, 160), and still decide `judge.compare`.
 
 ### LeetCode's Node types
 
