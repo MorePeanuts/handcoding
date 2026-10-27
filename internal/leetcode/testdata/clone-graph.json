@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "133",
+  "title": "Clone Graph",
+  "titleSlug": "clone-graph",
+  "difficulty": "Medium",
+  "content": "<pre>\nclass Node {\n    public int val;\n    public List&lt;Node&gt; neighbors;\n}\n</pre>\n<pre>\n<strong>Input:</strong> adjList = [[2,4],[1,3],[2,4],[1,3]]\n<strong>Output:</strong> [[2,4],[1,3],[2,4],[1,3]]\n<strong>Explanation:</strong> There are 4 nodes in the graph.\n1st node (val = 1)&#39;s neighbors are 2nd node (val = 2) and 4th node (val = 4).\n2nd node (val = 2)&#39;s neighbors are 1st node (val = 1) and 3rd node (val = 3).\n3rd node (val = 3)&#39;s neighbors are 2nd node (val = 2) and 4th node (val = 4).\n4th node (val = 4)&#39;s neighbors are 1st node (val = 1) and 3rd node (val = 3).\n</pre>\n<pre>\n<strong>Input:</strong> adjList = [[]]\n<strong>Output:</strong> [[]]\n<strong>Explanation:</strong> Note that the input contains one empty list. The graph consists of only one node with val = 1 and it does not have any neighbors.\n</pre>\n<pre>\n<strong>Input:</strong> adjList = []\n<strong>Output:</strong> []\n<strong>Explanation:</strong> This an empty graph, it does not have any nodes.\n</pre>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "\"\"\"\n# Definition for a Node.\nclass Node:\n    def __init__(self, val = 0, neighbors = None):\n        self.val = val\n        self.neighbors = neighbors if neighbors is not None else []\n\"\"\"\n\nfrom typing import Optional\nclass Solution:\n    def cloneGraph(self, node: Optional['Node']) -> Optional['Node']:\n        "
+    },
+    {
+      "langSlug": "golang",
+      "code": "/**\n * Definition for a Node.\n * type Node struct {\n *     Val int\n *     Neighbors []*Node\n * }\n */\n\nfunc cloneGraph(node *Node) *Node {\n    \n}"
+    }
+  ],
+  "metaData": "{\n  \"name\": \"cloneGraph\",\n  \"params\": [\n    {\n      \"name\": \"edges\",\n      \"type\": \"integer[][]\"\n    }\n  ],\n  \"return\": {\n    \"type\": \"boolean\"\n  },\n  \"languages\": [\n    \"cpp\",\n    \"java\",\n    \"python\",\n    \"csharp\",\n    \"javascript\",\n    \"python3\",\n    \"golang\",\n    \"swift\",\n    \"kotlin\",\n    \"ruby\",\n    \"c\",\n    \"scala\",\n    \"php\",\n    \"typescript\"\n  ],\n  \"manual\": true,\n    \"typescriptCustomType\" : \"class _Node {\\n    val: number\\n    neighbors: _Node[]\\n\\n    constructor(val?: number, neighbors?: _Node[]) {\\n        this.val = (val===undefined ? 0 : val)\\n        this.neighbors = (neighbors===undefined ? [] : neighbors)\\n    }\\n}\\n\"\n\n}",
+  "exampleTestcases": "[[2,4],[1,3],[2,4],[1,3]]\n[[]]\n[]"
+}

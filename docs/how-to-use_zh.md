@@ -204,7 +204,8 @@ leetcode:
 ## 目前的限制
 
 - 需要特殊判题器（checker）的题目和交互题暂不支持。
-- 带[结构输入](protocol_zh.md#结构输入)的题目（带环链表、相交链表、二叉树的最近公共祖先这类节点引用）或使用 [LeetCode 的 `Node` 类型](protocol_zh.md#leetcode-的-node-类型)（图、N 叉树、带随机指针的链表等）、`NestedInteger`、`Employee` 的题目可以判题，但 `hc fetch` 还不能正确导入，需要手写 `problem.yaml`，可参考示例题 117、133、138、141、142、160、236、237、341、427、430、589、690 和 1379。
+- 带[结构输入](protocol_zh.md#结构输入)的题目（带环链表、相交链表、二叉树的最近公共祖先这类节点引用）可以判题，但 `hc fetch` 还不能正确导入，需要手写 `problem.yaml`，可参考示例题 141、142、160、236、237 和 1379。
+- `hc fetch` 可以导入使用 [LeetCode 的 `Node` 类型](protocol_zh.md#leetcode-的-node-类型)、`NestedInteger`、`Employee` 的题目，签名取自 LeetCode 的 Go 初始代码。`returns_copy`（克隆图）留给 `hc gen` 设置；扁平化嵌套列表迭代器这类迭代器题目的示例只给出输入、没有给出调用序列，也留给 `hc gen` 补写。
 - 会统计运行时间，但不限制内存。
 - 无法获取 LeetCode 会员题目。
 - 合法答案很多、无法全部列出的题目（"返回任意一个合法答案"）需要自定义判题器，目前还不支持；`hc gen` 遇到这类题目时会说明。

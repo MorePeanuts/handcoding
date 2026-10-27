@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "341",
+  "title": "Flatten Nested List Iterator",
+  "titleSlug": "flatten-nested-list-iterator",
+  "difficulty": "Medium",
+  "content": "<pre>\ninitialize iterator with nestedList\nres = []\nwhile iterator.hasNext()\n    append iterator.next() to the end of res\nreturn res\n</pre>\n<pre>\n<strong>Input:</strong> nestedList = [[1,1],2,[1,1]]\n<strong>Output:</strong> [1,1,2,1,1]\n<strong>Explanation:</strong> By calling next repeatedly until hasNext returns false, the order of elements returned by next should be: [1,1,2,1,1].\n</pre>\n<pre>\n<strong>Input:</strong> nestedList = [1,[4,[6]]]\n<strong>Output:</strong> [1,4,6]\n<strong>Explanation:</strong> By calling next repeatedly until hasNext returns false, the order of elements returned by next should be: [1,4,6].\n</pre>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "# \"\"\"\n# This is the interface that allows for creating nested lists.\n# You should not implement it, or speculate about its implementation\n# \"\"\"\n#class NestedInteger:\n#    def isInteger(self) -> bool:\n#        \"\"\"\n#        @return True if this NestedInteger holds a single integer, rather than a nested list.\n#        \"\"\"\n#\n#    def getInteger(self) -> int:\n#        \"\"\"\n#        @return the single integer that this NestedInteger holds, if it holds a single integer\n#        Return None if this NestedInteger holds a nested list\n#        \"\"\"\n#\n#    def getList(self) -> [NestedInteger]:\n#        \"\"\"\n#        @return the nested list that this NestedInteger holds, if it holds a nested list\n#        Return None if this NestedInteger holds a single integer\n#        \"\"\"\n\nclass NestedIterator:\n    def __init__(self, nestedList: [NestedInteger]):\n        \n    \n    def next(self) -> int:\n        \n    \n    def hasNext(self) -> bool:\n         \n\n# Your NestedIterator object will be instantiated and called as such:\n# i, v = NestedIterator(nestedList), []\n# while i.hasNext(): v.append(i.next())"
+    },
+    {
+      "langSlug": "golang",
+      "code": "/**\n * // This is the interface that allows for creating nested lists.\n * // You should not implement it, or speculate about its implementation\n * type NestedInteger struct {\n * }\n *\n * // Return true if this NestedInteger holds a single integer, rather than a nested list.\n * func (this NestedInteger) IsInteger() bool {}\n *\n * // Return the single integer that this NestedInteger holds, if it holds a single integer\n * // The result is undefined if this NestedInteger holds a nested list\n * // So before calling this method, you should have a check\n * func (this NestedInteger) GetInteger() int {}\n *\n * // Set this NestedInteger to hold a single integer.\n * func (n *NestedInteger) SetInteger(value int) {}\n *\n * // Set this NestedInteger to hold a nested list and adds a nested integer to it.\n * func (this *NestedInteger) Add(elem NestedInteger) {}\n *\n * // Return the nested list that this NestedInteger holds, if it holds a nested list\n * // The list length is zero if this NestedInteger holds a single integer\n * // You can access NestedInteger's List element directly if you want to modify it\n * func (this NestedInteger) GetList() []*NestedInteger {}\n */\n\ntype NestedIterator struct {\n    \n}\n\nfunc Constructor(nestedList []*NestedInteger) *NestedIterator {\n    \n}\n\nfunc (this *NestedIterator) Next() int {\n    \n}\n\nfunc (this *NestedIterator) HasNext() bool {\n    \n}"
+    }
+  ],
+  "metaData": "{\n  \"name\": \"\",\n  \"params\": [\n    {\n      \"name\": \"nestedList\",\n      \"type\": \"list<NestedInteger>\"\n    }\n  ],\n  \"return\": {\n    \"type\": \"integer\"\n  },\n  \"manual\": true\n}",
+  "exampleTestcases": "[[1,1],2,[1,1]]\n[1,[4,[6]]]"
+}

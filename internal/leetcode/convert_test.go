@@ -1,7 +1,11 @@
 package leetcode
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -149,13 +153,6 @@ func TestConvertUnsupported(t *testing.T) {
 			QuestionFrontendID: "341", TitleSlug: "flatten-nested-list-iterator",
 			MetaData: `{"name":"","params":[{"name":"nestedList","type":"list<NestedInteger>"}],"return":{"type":"integer"},"manual":true}`,
 		}, "names no function or class"},
-		// LeetCode's metadata for Clone Graph describes its own test data,
-		// not the function the user writes.
-		{"custom judge, different signature", &Question{
-			QuestionFrontendID: "133", TitleSlug: "clone-graph",
-			MetaData:     `{"name":"cloneGraph","params":[{"name":"edges","type":"integer[][]"}],"return":{"type":"boolean"},"manual":true}`,
-			CodeSnippets: goSnippet("/**\n * type Node struct {...}\n */\n\nfunc cloneGraph(node *Node) *Node {\n\n}"),
-		}, "real signature cloneGraph(node *Node)"},
 		{"custom judge, fewer parameters", &Question{
 			QuestionFrontendID: "237", TitleSlug: "delete-node-in-a-linked-list",
 			MetaData:     `{"name":"deleteNode","params":[{"name":"head","type":"ListNode"},{"name":"node","type":"integer"}],"return":{"type":"void"},"manual":true}`,
@@ -247,6 +244,102 @@ func TestParseURL(t *testing.T) {
 	for ref, want := range map[string]bool{"146": true, "LCR 001": true, "lcp 01": true, "two-sum": false, "3sum": false} {
 		if idRE.MatchString(ref) != want {
 			t.Errorf("idRE(%q) = %v", ref, !want)
+		}
+	}
+}
+
+func loadQuestion(t *testing.T, slug string) *Question {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", slug+".json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var q Question
+	if err := json.Unmarshal(data, &q); err != nil {
+		t.Fatal(err)
+	}
+	return &q
+}
+
+// For judge-defined types the signature comes from the Go template, since
+// metaData describes LeetCode's test data. The fixtures are LeetCode's
+// questions with the statement cut down to the examples.
+func TestConvertJudgeDefinedTypes(t *testing.T) {
+	tests := []struct {
+		slug, signature string
+		examples        int // examples kept
+		expected        int // of which with an expected output
+	}{
+		{"clone-graph", "cloneGraph(node GraphNode) GraphNode", 3, 3},
+		{"copy-list-with-random-pointer", "copyRandomList(head RandomListNode) RandomListNode", 3, 3},
+		{"n-ary-tree-preorder-traversal", "preorder(root NaryNode) integer[]", 2, 2},
+		// LeetCode writes the levels as [1,#,2,3,#,4,5,7,#].
+		{"populating-next-right-pointers-in-each-node-ii", "connect(root NextTreeNode) NextTreeNode", 2, 1},
+		{"construct-quad-tree", "construct(grid integer[][]) QuadNode", 2, 2},
+		// The Go template calls the parameter root; Python and the
+		// statement call it head.
+		{"flatten-a-multilevel-doubly-linked-list", "flatten(head MultilevelNode) MultilevelNode", 3, 3},
+		{"mini-parser", "deserialize(s string) NestedInteger", 2, 2},
+		{"employee-importance", "getImportance(employees Employee[], id integer) integer", 2, 2},
+		// The examples give the constructor's input but no operations.
+		{"flatten-nested-list-iterator", "NestedIterator(nestedList NestedInteger[]); next() integer; hasNext() boolean", 0, 0},
+	}
+	for _, tt := range tests {
+		c, err := Convert(loadQuestion(t, tt.slug), SiteCom, false)
+		if err != nil {
+			t.Errorf("%s: %v", tt.slug, err)
+			continue
+		}
+		if got := signature(c.Problem); got != tt.signature {
+			t.Errorf("%s: signature %s, want %s", tt.slug, got, tt.signature)
+		}
+		withExpected := 0
+		for _, cs := range c.Cases {
+			if cs.HasExpected() {
+				withExpected++
+			}
+		}
+		if len(c.Cases) != tt.examples || withExpected != tt.expected {
+			t.Errorf("%s: %d examples, %d with expected; want %d, %d (warnings %q)", tt.slug, len(c.Cases), withExpected, tt.examples, tt.expected, c.Warnings)
+		}
+	}
+}
+
+func signature(p *problem.Problem) string {
+	params := func(ps []problem.Param) string {
+		var parts []string
+		for _, prm := range ps {
+			parts = append(parts, prm.Name+" "+prm.Type)
+		}
+		return strings.Join(parts, ", ")
+	}
+	if p.Kind == problem.KindClass {
+		parts := []string{fmt.Sprintf("%s(%s)", p.Class.Name, params(p.Class.Constructor))}
+		for _, m := range p.Class.Methods {
+			parts = append(parts, fmt.Sprintf("%s(%s) %s", m.Name, params(m.Params), m.Returns))
+		}
+		return strings.Join(parts, "; ")
+	}
+	return fmt.Sprintf("%s(%s) %s", p.Function.Name, params(p.Function.Params), p.Function.Returns)
+}
+
+// Templates using a Node hc does not know, or a type it cannot drive
+// besides a judge-defined one, are rejected.
+func TestConvertUnsupportedTemplates(t *testing.T) {
+	tests := []struct {
+		name, template, want string
+	}{
+		{"Node with a parent", "/**\n * type Node struct {\n *     Val int\n *     Left *Node\n *     Right *Node\n *     Parent *Node\n * }\n */\n\nfunc lowestCommonAncestor(p *Node, q *Node) *Node {\n\n}",
+			"uses a Node with the fields Left, Parent, Right, Val"},
+		{"other judge type", "/**\n * type Node struct {\n *     Val int\n *     Children []*Node\n * }\n */\n\nfunc f(root *Node, m *MountainArray) int {\n\n}",
+			"uses the Go type *MountainArray"},
+	}
+	for _, tt := range tests {
+		q := &Question{QuestionFrontendID: "1", TitleSlug: "x", MetaData: `{"name":"f","params":[{"name":"root","type":"integer"}],"return":{"type":"integer"},"manual":true}`,
+			CodeSnippets: goSnippet(tt.template)}
+		_, err := Convert(q, SiteCom, false)
+		if !errors.Is(err, ErrUnsupported) || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("%s: error = %v, want ErrUnsupported with %q", tt.name, err, tt.want)
 		}
 	}
 }

@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "385",
+  "title": "Mini Parser",
+  "titleSlug": "mini-parser",
+  "difficulty": "Medium",
+  "content": "<pre>\n<strong>Input:</strong> s = &quot;324&quot;\n<strong>Output:</strong> 324\n<strong>Explanation:</strong> You should return a NestedInteger object which contains a single integer 324.\n</pre>\n<pre>\n<strong>Input:</strong> s = &quot;[123,[456,[789]]]&quot;\n<strong>Output:</strong> [123,[456,[789]]]\n<strong>Explanation:</strong> Return a NestedInteger object containing a nested list with 2 elements:\n1. An integer containing value 123.\n2. A nested list containing two elements:\n    i.  An integer containing value 456.\n    ii. A nested list with one element:\n         a. An integer containing value 789\n</pre>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "# \"\"\"\n# This is the interface that allows for creating nested lists.\n# You should not implement it, or speculate about its implementation\n# \"\"\"\n#class NestedInteger:\n#    def __init__(self, value=None):\n#        \"\"\"\n#        If value is not specified, initializes an empty list.\n#        Otherwise initializes a single integer equal to value.\n#        \"\"\"\n#\n#    def isInteger(self):\n#        \"\"\"\n#        @return True if this NestedInteger holds a single integer, rather than a nested list.\n#        :rtype bool\n#        \"\"\"\n#\n#    def add(self, elem):\n#        \"\"\"\n#        Set this NestedInteger to hold a nested list and adds a nested integer elem to it.\n#        :rtype void\n#        \"\"\"\n#\n#    def setInteger(self, value):\n#        \"\"\"\n#        Set this NestedInteger to hold a single integer equal to value.\n#        :rtype void\n#        \"\"\"\n#\n#    def getInteger(self):\n#        \"\"\"\n#        @return the single integer that this NestedInteger holds, if it holds a single integer\n#        The result is undefined if this NestedInteger holds a nested list\n#        :rtype int\n#        \"\"\"\n#\n#    def getList(self):\n#        \"\"\"\n#        @return the nested list that this NestedInteger holds, if it holds a nested list\n#        The result is undefined if this NestedInteger holds a single integer\n#        :rtype List[NestedInteger]\n#        \"\"\"\n\nclass Solution:\n    def deserialize(self, s: str) -> NestedInteger:\n        "
+    },
+    {
+      "langSlug": "golang",
+      "code": "/**\n * // This is the interface that allows for creating nested lists.\n * // You should not implement it, or speculate about its implementation\n * type NestedInteger struct {\n * }\n *\n * // Return true if this NestedInteger holds a single integer, rather than a nested list.\n * func (n NestedInteger) IsInteger() bool {}\n *\n * // Return the single integer that this NestedInteger holds, if it holds a single integer\n * // The result is undefined if this NestedInteger holds a nested list\n * // So before calling this method, you should have a check\n * func (n NestedInteger) GetInteger() int {}\n *\n * // Set this NestedInteger to hold a single integer.\n * func (n *NestedInteger) SetInteger(value int) {}\n *\n * // Set this NestedInteger to hold a nested list and adds a nested integer to it.\n * func (n *NestedInteger) Add(elem NestedInteger) {}\n *\n * // Return the nested list that this NestedInteger holds, if it holds a nested list\n * // The list length is zero if this NestedInteger holds a single integer\n * // You can access NestedInteger's List element directly if you want to modify it\n * func (n NestedInteger) GetList() []*NestedInteger {}\n */\nfunc deserialize(s string) *NestedInteger {\n    \n}"
+    }
+  ],
+  "metaData": "{\n  \"name\": \"deserialize\",\n  \"params\": [\n    {\n      \"name\": \"s\",\n      \"type\": \"string\"\n    }\n  ],\n  \"return\": {\n    \"type\": \"NestedInteger\"\n  },\n  \"manual\": false\n}",
+  "exampleTestcases": "\"324\"\n\"[123,[456,[789]]]\""
+}
