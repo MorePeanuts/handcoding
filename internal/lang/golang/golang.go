@@ -190,6 +190,32 @@ var typeComments = map[string]string{
 //     Next  *Node
 //     Child *Node
 // }`,
+	problem.TypeNestedInteger: `// The interface for creating nested lists (provided by hc, do not redeclare).
+// type NestedInteger struct {
+// }
+//
+// // Return true if this NestedInteger holds a single integer, rather than a nested list.
+// func (n NestedInteger) IsInteger() bool {}
+//
+// // Return the single integer that this NestedInteger holds, if it holds a single integer.
+// // The result is undefined if this NestedInteger holds a nested list.
+// func (n NestedInteger) GetInteger() int {}
+//
+// // Set this NestedInteger to hold a single integer.
+// func (n *NestedInteger) SetInteger(value int) {}
+//
+// // Set this NestedInteger to hold a nested list and add a nested integer to it.
+// func (n *NestedInteger) Add(elem NestedInteger) {}
+//
+// // Return the nested list that this NestedInteger holds, if it holds a nested list.
+// // The list length is zero if this NestedInteger holds a single integer.
+// func (n NestedInteger) GetList() []*NestedInteger {}`,
+	problem.TypeEmployee: `// Definition for Employee (provided by hc, do not redeclare).
+// type Employee struct {
+//     Id           int
+//     Importance   int
+//     Subordinates []int
+// }`,
 }
 
 func nodeComment(p *problem.Problem) string {

@@ -48,6 +48,19 @@ func TestCheckNodeVariants(t *testing.T) {
 		{TypeMultilevelNode, `[]`, ""},
 		{TypeMultilevelNode, `[1,2,null,null,null,3]`, `[5]: starts a child level under node 3 of the level above, which has 2 nodes`},
 		{TypeMultilevelNode, `[null,1]`, `[0]: must be the value of the first node`},
+
+		{TypeNestedInteger, `324`, ""},
+		{TypeNestedInteger, `[123,[456,[789]],[]]`, ""},
+		{TypeNestedInteger, `[1,[2,"x"]]`, `[1][1]: must be an integer or an array of NestedInteger values`},
+		{TypeNestedInteger, `null`, `must be an integer or an array`},
+		{TypeNestedInteger + "[]", `[[1,1],2,[1,1]]`, ""},
+		{TypeNestedInteger + "[]", `5`, `must be NestedInteger[] (an array)`},
+
+		{TypeEmployee + "[]", `[[1,5,[2,3]],[2,3,[]],[3,3,[]]]`, ""},
+		{TypeEmployee + "[]", `[[1,5,[2]]]`, `[0][2][0]: subordinate 2 is not an employee`},
+		{TypeEmployee + "[]", `[[1,5,[]],[1,3,[]]]`, `[1]: id 1 is used twice`},
+		{TypeEmployee + "[]", `[[1,5]]`, `[0]: must be an employee, [id, importance, [subordinate ids]]`},
+		{TypeEmployee + "[]", `[[1,5,[1.5]]]`, `[0][2][0]: must be a whole number`},
 	}
 	for _, tt := range tests {
 		err := CheckValue(tt.typ, json.RawMessage(tt.value))
@@ -93,6 +106,7 @@ func TestValidateNodeVariants(t *testing.T) {
 		p    *Problem
 		want string
 	}{
+		{"nested arrays", fn([]Param{{Name: "lists", Type: "NestedInteger[][]"}}, TypeInteger, ""), `unsupported type "NestedInteger[][]": NestedInteger arrays deeper than 1`},
 		{"array of Node", fn([]Param{{Name: "nodes", Type: "GraphNode[]"}}, TypeInteger, ""), `unsupported type "GraphNode[]": arrays of GraphNode`},
 		{"two variants", fn([]Param{graph}, TypeNaryNode, ""), "uses GraphNode and NaryNode: solution code calls each of them Node"},
 		{"copy of a missing param", fn([]Param{graph}, TypeGraphNode, "root"), `function.returns_copy "root" is not a parameter`},

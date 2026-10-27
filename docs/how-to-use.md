@@ -105,7 +105,7 @@ hc gen 146                  # make it ready: test cases and the judge rule
 
 A fetched problem is **not ready to submit** yet. LeetCode only publishes the examples, and not how answers are judged: whether order matters, whether several answers are valid. Until that is decided, `hc test` shows your output next to the example's answer without a verdict, and `hc submit` refuses. `hc gen` writes the full test suite and decides the judge rule from the statement; you can also set `judge.compare` yourself (see the [problem protocol](protocol.md#problemyaml)). The list marks such problems as "not ready".
 
-Premium problems are not available. Neither are problems whose signature uses types hc does not support yet (`NestedInteger`, ...); `hc fetch` says so.
+Premium problems are not available. Neither are problems whose signature uses types hc does not support yet (such as `MountainArray` in interactive problems); `hc fetch` says so.
 
 ### Your own problems
 
@@ -203,8 +203,8 @@ leetcode:
 
 ## Current limitations
 
-- Some signatures are not supported yet: `NestedInteger`, `Employee`. Problems that need a special judge (checker) aren't supported either.
-- Problems with [structure inputs](protocol.md#structure-inputs) (a list with a cycle, intersecting lists, node references such as Lowest Common Ancestor) or [LeetCode's `Node` types](protocol.md#leetcodes-node-types) (graphs, N-ary trees, lists with random pointers, ...) can be judged, but `hc fetch` cannot import them correctly yet; write their `problem.yaml` by hand. The samples 117, 133, 138, 141, 142, 160, 236, 237, 427, 430, 589 and 1379 show how.
+- Problems that need a special judge (checker) aren't supported yet, nor are interactive problems.
+- Problems with [structure inputs](protocol.md#structure-inputs) (a list with a cycle, intersecting lists, node references such as Lowest Common Ancestor) or [LeetCode's `Node` types](protocol.md#leetcodes-node-types) (graphs, N-ary trees, lists with random pointers, ...), `NestedInteger` and `Employee` can be judged, but `hc fetch` cannot import them correctly yet; write their `problem.yaml` by hand. The samples 117, 133, 138, 141, 142, 160, 236, 237, 341, 427, 430, 589, 690 and 1379 show how.
 - Run time is measured, but memory is not limited.
 - LeetCode premium problems cannot be fetched.
 - Problems with many valid answers that cannot all be listed ("return any valid answer") need a custom checker, which is not supported yet; `hc gen` says so when it meets one.

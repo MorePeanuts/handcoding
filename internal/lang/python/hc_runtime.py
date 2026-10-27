@@ -104,6 +104,48 @@ class MultilevelNode:
         return "Node(%r)" % (self.val,)
 
 
+class NestedInteger:
+    """A single integer or a list of NestedIntegers, with LeetCode's
+    interface. Without a value it is an empty list."""
+
+    def __init__(self, value=None):
+        self._value = value
+        self._list = [] if value is None else None
+
+    def isInteger(self):
+        return self._list is None
+
+    def getInteger(self):
+        """The integer, or None if this holds a list."""
+        return self._value
+
+    def setInteger(self, value):
+        self._value, self._list = value, None
+
+    def add(self, elem):
+        """Make this hold a list, if it held an integer, and append elem."""
+        if self._list is None:
+            self._value, self._list = None, []
+        self._list.append(elem)
+
+    def getList(self):
+        """The list, or None if this holds an integer."""
+        return self._list
+
+    def __repr__(self):
+        return "NestedInteger(%r)" % (_enc_nested(self),)
+
+
+class Employee:
+    def __init__(self, id=0, importance=0, subordinates=None):
+        self.id = id
+        self.importance = importance
+        self.subordinates = subordinates if subordinates is not None else []
+
+    def __repr__(self):
+        return "Employee(%r, %r, %r)" % (self.id, self.importance, self.subordinates)
+
+
 _MAX_NODES = 1000000
 
 
@@ -138,7 +180,7 @@ def decode(t, v):
     if base == "TreeNode":
         return _build_tree(v or [])
     if base in _DECODERS:
-        return _DECODERS[base](v or [])
+        return _DECODERS[base](v)
     if base == "double":
         return float(v)
     return v
@@ -481,13 +523,45 @@ def _enc_multilevel(head):
     return out
 
 
+def _dec_nested(v):
+    if isinstance(v, list):
+        n = NestedInteger()
+        for x in v:
+            n.add(_dec_nested(x))
+        return n
+    return NestedInteger(v)
+
+
+def _enc_nested(n):
+    if n is None:
+        return None
+    if n.isInteger():
+        return n.getInteger()
+    return [_enc_nested(x) for x in n.getList() or []]
+
+
+def _dec_employee(v):
+    if not isinstance(v, list) or len(v) != 3:
+        raise InputError("an employee must be [id, importance, [subordinate ids]], got %r" % (v,))
+    return Employee(v[0], v[1], list(v[2]))
+
+
+def _enc_employee(e):
+    if e is None:
+        return None
+    return [e.id, e.importance, list(e.subordinates or [])]
+
+
+# The Node decoders read null as no node.
 _DECODERS = {
-    "GraphNode": _dec_graph,
-    "NaryNode": _dec_nary,
-    "RandomListNode": _dec_random_list,
-    "NextTreeNode": lambda vals: _build_tree(vals, NextTreeNode),
-    "QuadNode": _dec_quad,
-    "MultilevelNode": _dec_multilevel,
+    "GraphNode": lambda v: _dec_graph(v or []),
+    "NaryNode": lambda v: _dec_nary(v or []),
+    "RandomListNode": lambda v: _dec_random_list(v or []),
+    "NextTreeNode": lambda v: _build_tree(v or [], NextTreeNode),
+    "QuadNode": lambda v: _dec_quad(v or []),
+    "MultilevelNode": lambda v: _dec_multilevel(v or []),
+    "NestedInteger": _dec_nested,
+    "Employee": _dec_employee,
 }
 
 _ENCODERS = {
@@ -497,6 +571,8 @@ _ENCODERS = {
     "NextTreeNode": _enc_next_tree,
     "QuadNode": _enc_quad,
     "MultilevelNode": _enc_multilevel,
+    "NestedInteger": _enc_nested,
+    "Employee": _enc_employee,
 }
 
 

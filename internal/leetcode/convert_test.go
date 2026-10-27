@@ -142,9 +142,13 @@ func TestConvertUnsupported(t *testing.T) {
 		want string
 	}{
 		{"unsupported type", &Question{
+			QuestionFrontendID: "1095", TitleSlug: "find-in-mountain-array",
+			MetaData: `{"name":"findInMountainArray","params":[{"name":"target","type":"integer"},{"name":"mountainArr","type":"MountainArray"}],"return":{"type":"integer"},"manual":true}`,
+		}, "uses the type MountainArray"},
+		{"no name", &Question{
 			QuestionFrontendID: "341", TitleSlug: "flatten-nested-list-iterator",
 			MetaData: `{"name":"","params":[{"name":"nestedList","type":"list<NestedInteger>"}],"return":{"type":"integer"},"manual":true}`,
-		}, "uses the type NestedInteger[]"},
+		}, "names no function or class"},
 		// LeetCode's metadata for Clone Graph describes its own test data,
 		// not the function the user writes.
 		{"custom judge, different signature", &Question{

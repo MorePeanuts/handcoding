@@ -25,6 +25,9 @@ var goBase = map[string]string{
 	problem.TypeNextTreeNode:   "*Node",
 	problem.TypeQuadNode:       "*Node",
 	problem.TypeMultilevelNode: "*Node",
+
+	problem.TypeNestedInteger: "*NestedInteger",
+	problem.TypeEmployee:      "*Employee",
 }
 
 // special types need dedicated codecs because their JSON form differs from
@@ -40,6 +43,9 @@ var special = map[string]string{
 	problem.TypeNextTreeNode:   "Node",
 	problem.TypeQuadNode:       "Node",
 	problem.TypeMultilevelNode: "Node",
+
+	problem.TypeNestedInteger: "Nested",
+	problem.TypeEmployee:      "Employee",
 }
 
 func goType(t string) (string, error) {

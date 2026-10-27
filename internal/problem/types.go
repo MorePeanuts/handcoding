@@ -43,6 +43,9 @@ var baseTypes = map[string]bool{
 	TypeNextTreeNode:   true,
 	TypeQuadNode:       true,
 	TypeMultilevelNode: true,
+
+	TypeNestedInteger: true,
+	TypeEmployee:      true,
 }
 
 // NormalizeType converts LeetCode style type names (e.g. "list<list<integer>>")
@@ -95,6 +98,9 @@ func ValidateType(t string, allowVoid bool) error {
 	if IsNodeVariant(base) && depth > 0 {
 		return fmt.Errorf("unsupported type %q: arrays of %s", t, base)
 	}
+	if (base == TypeNestedInteger || base == TypeEmployee) && depth > 1 {
+		return fmt.Errorf("unsupported type %q: %s arrays deeper than 1", t, base)
+	}
 	if depth > 3 {
 		return fmt.Errorf("unsupported type %q: array depth > 3", t)
 	}
@@ -104,7 +110,7 @@ func ValidateType(t string, allowVoid bool) error {
 // CheckValue reports whether raw is a valid JSON value of type t, using the
 // same conventions as the drivers: ListNode and TreeNode are arrays (null is
 // read as empty), a character is a one-byte string and integers are whole
-// numbers; the Node variants have the forms described with their types.
+// numbers; the judge-defined types have the forms described with them.
 // The error names the offending element, e.g. `[2]: must be integer, got
 // string "x"`.
 func CheckValue(t string, raw json.RawMessage) error {
@@ -132,6 +138,9 @@ func checkValue(t string, v any, path string) error {
 			if err := checkValue(elem, x, fmt.Sprintf("%s[%d]", path, i)); err != nil {
 				return err
 			}
+		}
+		if elem == TypeEmployee {
+			return checkEmployees(arr, path)
 		}
 		return nil
 	}
@@ -169,6 +178,10 @@ func checkValue(t string, v any, path string) error {
 		}
 	case TypeGraphNode, TypeNaryNode, TypeRandomListNode, TypeNextTreeNode, TypeQuadNode, TypeMultilevelNode:
 		return checkNodeVariant(base, v, path)
+	case TypeNestedInteger:
+		return checkNestedInteger(v, path)
+	case TypeEmployee:
+		return checkEmployee(v, path)
 	case TypeListNode, TypeTreeNode:
 		if v == nil {
 			return nil

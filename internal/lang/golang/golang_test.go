@@ -107,3 +107,20 @@ func TestNodeVariant(t *testing.T) {
 		t.Error("driver defines Node for a problem without it")
 	}
 }
+
+func TestStarterEmployee(t *testing.T) {
+	p := &problem.Problem{Slug: "f", Kind: problem.KindFunction, Function: &problem.Function{
+		Name:    "getImportance",
+		Params:  []problem.Param{{Name: "employees", Type: "Employee[]"}, {Name: "id", Type: problem.TypeInteger}},
+		Returns: problem.TypeInteger,
+	}}
+	got, err := Language{}.Starter(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"//     Subordinates []int\n", "func getImportance(employees []*Employee, id int) int {"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("starter does not contain %q:\n%s", want, got)
+		}
+	}
+}

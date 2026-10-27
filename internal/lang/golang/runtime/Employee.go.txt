@@ -1,0 +1,39 @@
+// Employee is an employee record (Employee in problem.yaml).
+type Employee struct {
+	Id           int
+	Importance   int
+	Subordinates []int
+}
+
+// hcDecEmployee0 reads [id, importance, [subordinate ids]].
+func hcDecEmployee0(raw json.RawMessage) *Employee {
+	parts := hcJSON[[]json.RawMessage](raw)
+	if len(parts) != 3 {
+		panic(hcInputError{fmt.Sprintf("an employee must be [id, importance, [subordinate ids]], got %s", raw)})
+	}
+	return &Employee{Id: hcJSON[int](parts[0]), Importance: hcJSON[int](parts[1]), Subordinates: hcJSON[[]int](parts[2])}
+}
+
+func hcDecEmployee1(raw json.RawMessage) []*Employee {
+	parts := hcJSON[[]json.RawMessage](raw)
+	out := make([]*Employee, len(parts))
+	for i, p := range parts {
+		out[i] = hcDecEmployee0(p)
+	}
+	return out
+}
+
+func hcEncEmployee0(e *Employee) any {
+	if e == nil {
+		return nil
+	}
+	return []any{e.Id, e.Importance, e.Subordinates}
+}
+
+func hcEncEmployee1(es []*Employee) any {
+	out := make([]any, len(es))
+	for i, e := range es {
+		out[i] = hcEncEmployee0(e)
+	}
+	return out
+}

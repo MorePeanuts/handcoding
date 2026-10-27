@@ -1,0 +1,69 @@
+// NestedInteger holds a single integer or a list of NestedIntegers, with
+// LeetCode's interface. The zero value is an empty list.
+type NestedInteger struct {
+	isInt bool
+	value int
+	list  []*NestedInteger
+}
+
+// IsInteger reports whether n holds a single integer rather than a list.
+func (n NestedInteger) IsInteger() bool { return n.isInt }
+
+// GetInteger returns the integer n holds, or 0 if it holds a list.
+func (n NestedInteger) GetInteger() int { return n.value }
+
+// SetInteger makes n hold the single integer value.
+func (n *NestedInteger) SetInteger(value int) { *n = NestedInteger{isInt: true, value: value} }
+
+// Add makes n hold a list, if it held an integer, and appends elem to it.
+func (n *NestedInteger) Add(elem NestedInteger) {
+	if n.isInt {
+		*n = NestedInteger{}
+	}
+	n.list = append(n.list, &elem)
+}
+
+// GetList returns the list n holds, which is empty if n holds an integer.
+func (n NestedInteger) GetList() []*NestedInteger { return n.list }
+
+func hcDecNested0(raw json.RawMessage) *NestedInteger {
+	if !strings.HasPrefix(strings.TrimSpace(string(raw)), "[") {
+		return &NestedInteger{isInt: true, value: hcJSON[int](raw)}
+	}
+	n := &NestedInteger{}
+	for _, x := range hcJSON[[]json.RawMessage](raw) {
+		n.list = append(n.list, hcDecNested0(x))
+	}
+	return n
+}
+
+func hcDecNested1(raw json.RawMessage) []*NestedInteger {
+	parts := hcJSON[[]json.RawMessage](raw)
+	out := make([]*NestedInteger, len(parts))
+	for i, p := range parts {
+		out[i] = hcDecNested0(p)
+	}
+	return out
+}
+
+func hcEncNested0(n *NestedInteger) any {
+	if n == nil {
+		return nil
+	}
+	if n.isInt {
+		return n.value
+	}
+	out := make([]any, len(n.list))
+	for i, x := range n.list {
+		out[i] = hcEncNested0(x)
+	}
+	return out
+}
+
+func hcEncNested1(ns []*NestedInteger) any {
+	out := make([]any, len(ns))
+	for i, n := range ns {
+		out[i] = hcEncNested0(n)
+	}
+	return out
+}

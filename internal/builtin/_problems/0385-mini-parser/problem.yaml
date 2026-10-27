@@ -1,0 +1,16 @@
+id: "385"
+slug: mini-parser
+title: Mini Parser
+difficulty: medium
+tags: [stack, depth-first-search, string]
+kind: function
+function:
+  name: deserialize
+  params:
+    - {name: s, type: string}
+  returns: NestedInteger
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/mini-parser/
