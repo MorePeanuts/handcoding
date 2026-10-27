@@ -128,8 +128,7 @@ func TestGoMinimumVersion(t *testing.T) {
 			if err := l.Prepare(dir, p); err != nil {
 				t.Fatal(err)
 			}
-			mod := "module solution\n\ngo " + golang.MinVersion + "\n"
-			if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(dir, "go.mod"), golang.GoMod(golang.MinVersion), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			cmd := exec.Command("go", "vet", ".")
