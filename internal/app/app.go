@@ -47,6 +47,16 @@ func Languages(ws *workspace.Workspace) *lang.Registry {
 	)
 }
 
+// LanguageID resolves a language ID or alias (e.g. "py") to the ID stored in
+// hc.yaml, before any workspace exists.
+func LanguageID(name string) (string, error) {
+	l, err := Languages(&workspace.Workspace{}).Get(name)
+	if err != nil {
+		return "", err
+	}
+	return l.ID(), nil
+}
+
 // pythonLanguage runs solutions with python.interpreter from hc.yaml if it
 // is set, and otherwise in a virtual environment in the workspace.
 func pythonLanguage(ws *workspace.Workspace) python.Language {

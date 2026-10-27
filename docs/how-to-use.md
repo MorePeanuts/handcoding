@@ -26,11 +26,13 @@ English · [简体中文](how-to-use_zh.md)
   pyrightconfig.json          points pyright at .hc/venv
 ```
 
+`hc init --lang python` makes Python the default solution language (`language` in `hc.yaml`; default `go`) and creates the Python environment described below right away. If that fails, for example because neither uv nor Python 3.10+ is installed, `hc init` warns and creates the workspace anyway.
+
 `hc` finds the workspace from `-w <dir>`, then `$HC_WORKSPACE`, then the nearest parent directory containing `hc.yaml`, then `~/handcoding`. You can run it from anywhere.
 
 Each Go problem is a standalone module, and the driver sits next to `solution.go`. So gopls, `go build` and Delve breakpoints all work on your real file. The generated files are rewritten before every run, so don't edit them. `go.mod` follows your Go: its `go` line is your toolchain's version (`go 1.27` for Go 1.27.2), so your solutions can use everything it supports. hc builds with `GOTOOLCHAIN=local` and never downloads another toolchain.
 
-Python solutions run in a virtual environment that hc manages in `.hc/venv`. hc creates it the first time a command needs Python (`hc start`, `test`, `submit`, `debug`, `cases build`, `validate --run`):
+Python solutions run in a virtual environment that hc manages in `.hc/venv`. hc creates it the first time a command needs Python (`hc init --lang python`, `hc start`, `test`, `submit`, `debug`, `cases build`, `validate --run`):
 
 1. with [uv](https://docs.astral.sh/uv/) if it is installed: `uv venv --python '>=3.10'`, which downloads a Python if none is installed;
 2. otherwise with the newest Python 3.10+ on PATH (`python3`, `python` or `python3.N`) and `-m venv`. On Debian and Ubuntu this needs the `python3-venv` package.

@@ -21,7 +21,10 @@ import (
 )
 
 func newInitCmd(_ *rootOptions) *cobra.Command {
-	var noSamples bool
+	var (
+		noSamples bool
+		langName  string
+	)
 	cmd := &cobra.Command{
 		Use:   "init [dir]",
 		Short: "Create a workspace (default ~/handcoding)",
@@ -29,7 +32,10 @@ func newInitCmd(_ *rootOptions) *cobra.Command {
 skill (.claude/skills/handcoding) and AGENTS.md for Codex.
 
 hc finds the workspace from $HC_WORKSPACE, the nearest parent directory with
-hc.yaml, or ~/handcoding — so using the default lets you run hc anywhere.`,
+hc.yaml, or ~/handcoding — so using the default lets you run hc anywhere.
+
+--lang sets the default solution language (language in hc.yaml). With
+python, hc also creates the workspace's Python virtual environment now.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := ""
@@ -42,7 +48,11 @@ hc.yaml, or ~/handcoding — so using the default lets you run hc anywhere.`,
 				}
 				dir = filepath.Join(home, "handcoding")
 			}
-			ws, err := workspace.Create(dir)
+			id, err := app.LanguageID(langName)
+			if err != nil {
+				return err
+			}
+			ws, err := workspace.Create(dir, id)
 			if err != nil {
 				return err
 			}
@@ -70,6 +80,7 @@ hc.yaml, or ~/handcoding — so using the default lets you run hc anywhere.`,
 		},
 	}
 	cmd.Flags().BoolVar(&noSamples, "no-samples", false, "do not install the sample problems")
+	cmd.Flags().StringVarP(&langName, "lang", "l", workspace.DefaultConfig().Language, "default solution language (go, python)")
 	return cmd
 }
 

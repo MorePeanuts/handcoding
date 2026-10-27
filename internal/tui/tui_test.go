@@ -26,7 +26,7 @@ type harness struct {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	ws, err := workspace.Create(t.TempDir())
+	ws, err := workspace.Create(t.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
