@@ -11,6 +11,9 @@
 // The driver must not judge anything; it only decodes inputs, calls the
 // solution, and encodes the result. Anything the solution prints goes to the
 // terminal untouched, which keeps printf-debugging usable.
+//
+// Problems with judge.compare: checker are judged by their checker.py, which
+// a Checker runs once per run over every case that produced an output.
 package lang
 
 import (
@@ -70,6 +73,16 @@ type Language interface {
 	// virtual environment, writing progress to w. It is called before
 	// running, and must be cheap once the environment is ready.
 	Setup(ctx context.Context, w io.Writer) error
+}
+
+// Checker runs a problem's checker.py (judge.compare: checker) for solutions
+// in every language. Python implements it.
+type Checker interface {
+	// CheckCommand writes the support files the checker needs into dir and
+	// returns the command that runs checker on items, a JSON file holding an
+	// array of judge.CheckerCase. The command writes one judge.CheckerResult
+	// per item as a JSON line to out.
+	CheckCommand(ctx context.Context, dir, checker, items, out string) (*exec.Cmd, error)
 }
 
 // Toolchain is the compiler or interpreter a language runs solutions with.

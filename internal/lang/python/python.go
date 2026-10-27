@@ -3,6 +3,10 @@
 // A problem directory holds solution.py (the user's code), hc_runtime.py
 // (ListNode/TreeNode, the judge-defined types, codecs, driver loop) and _hc_runner.py, a tiny entry
 // point embedding the problem signature.
+//
+// Python also runs the checkers of problems judged by one (judge.compare:
+// checker), for solutions in every language: hc_checker.py calls check from
+// the problem's checker.py on every case of a run.
 package python
 
 import (
@@ -29,10 +33,14 @@ import (
 //go:embed hc_runtime.py
 var runtimeSrc []byte
 
+//go:embed hc_checker.py
+var checkerSrc []byte
+
 const (
 	solutionFile = "solution.py"
 	runtimeFile  = "hc_runtime.py"
 	runnerFile   = "_hc_runner.py"
+	checkerFile  = "hc_checker.py"
 )
 
 // header is the import block of starters: typing names, ListNode and
@@ -61,7 +69,10 @@ type Language struct {
 	Venv *Venv
 }
 
-var _ lang.Language = Language{}
+var (
+	_ lang.Language = Language{}
+	_ lang.Checker  = Language{}
+)
 
 func (Language) ID() string           { return "python" }
 func (Language) Name() string         { return "Python 3" }
@@ -221,7 +232,11 @@ META = json.loads(%q)
 if __name__ == "__main__":
     hc_runtime.main(META)
 `, string(m))
-	files := map[string][]byte{runtimeFile: runtimeSrc, runnerFile: []byte(runner)}
+	return writeFiles(dir, map[string][]byte{runtimeFile: runtimeSrc, runnerFile: []byte(runner)})
+}
+
+// writeFiles writes generated files into dir, leaving unchanged ones alone.
+func writeFiles(dir string, files map[string][]byte) error {
 	for name, data := range files {
 		path := filepath.Join(dir, name)
 		if old, err := os.ReadFile(path); err == nil && bytes.Equal(old, data) {
@@ -232,6 +247,19 @@ if __name__ == "__main__":
 		}
 	}
 	return nil
+}
+
+// CheckCommand runs a problem's checker.py with hc_checker.py, next to
+// hc_runtime.py so that checkers can import its types and codecs.
+func (l Language) CheckCommand(ctx context.Context, dir, checker, items, out string) (*exec.Cmd, error) {
+	if err := writeFiles(dir, map[string][]byte{runtimeFile: runtimeSrc, checkerFile: checkerSrc}); err != nil {
+		return nil, err
+	}
+	cmd := exec.CommandContext(ctx, l.python(), checkerFile, checker, items, out)
+	cmd.Dir = dir
+	// Unbuffered, so that what a crashing checker printed is reported.
+	cmd.Env = append(os.Environ(), "PYTHONDONTWRITEBYTECODE=1", "PYTHONUNBUFFERED=1")
+	return cmd, nil
 }
 
 const syntaxCheck = `import sys, traceback

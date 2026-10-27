@@ -86,7 +86,7 @@ func (a *Agent) Run(ctx context.Context, dir, prompt string) error {
 func GeneratePrompt(slug, problemDir string, count int, extra string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Use the handcoding skill (.claude/skills/handcoding/SKILL.md; also summarized in AGENTS.md) to generate test cases for the hc problem %q in %s.\n\n", slug, problemDir)
-	fmt.Fprintf(&b, "Follow the \"generate test cases\" workflow: decide the judge rule (judge.compare) from the statement, write or check reference/solution.py (plus a second reference if several outputs are acceptable), add inputs to cases.jsonl without expected outputs, run `hc cases build %s --lang python`, then `hc validate %s --run` until it passes.\n", slug, slug)
+	fmt.Fprintf(&b, "Follow the \"generate test cases\" workflow: decide the judge rule (judge.compare, with checker.py when no built-in mode fits) from the statement, write or check reference/solution.py (plus a second reference if several outputs are acceptable), add inputs to cases.jsonl without expected outputs, run `hc cases build %s --lang python`, then `hc validate %s --run` until it passes.\n", slug, slug)
 	if count > 0 {
 		fmt.Fprintf(&b, "Target about %d cases in total.\n", count)
 	}

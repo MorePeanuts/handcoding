@@ -203,7 +203,7 @@ docs/protocol.md for the format.`,
 // left behind.
 var importEntries = []string{
 	problem.MetaFile, problem.DescriptionFile, problem.CasesFile,
-	problem.AssetsDir, problem.ReferenceDir, problem.TemplatesDir,
+	problem.AssetsDir, problem.ReferenceDir, problem.TemplatesDir, problem.CheckerFile,
 }
 
 func importProblem(a *app.App, dir string, force bool) error {
@@ -677,8 +677,12 @@ func checkReference(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.L
 		switch c.Verdict {
 		case runner.Accepted, runner.NoExpected, runner.NotJudged:
 		case runner.WrongAnswer:
-			errs = append(errs, fmt.Sprintf("%s reference, case %d: Wrong Answer\noutput   %s\nexpected %s",
-				l.Name(), c.Index, clip(string(c.Output), 120), clip(string(c.Case.Expected), 120)))
+			e := fmt.Sprintf("%s reference, case %d: Wrong Answer\noutput   %s\nexpected %s",
+				l.Name(), c.Index, clip(string(c.Output), 120), clip(string(c.Case.Expected), 120))
+			if c.Message != "" {
+				e += "\nchecker  " + c.Message
+			}
+			errs = append(errs, e)
 		default:
 			errs = append(errs, fmt.Sprintf("%s reference, case %d: %s %s", l.Name(), c.Index, c.Verdict, c.Error))
 		}

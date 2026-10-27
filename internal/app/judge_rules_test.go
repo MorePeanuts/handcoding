@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
+	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 )
@@ -357,6 +358,246 @@ func TestJudgeDefinedTypes(t *testing.T) {
 		c := rep.Cases[0]
 		if c.Verdict != tt.want || !strings.Contains(c.Error, tt.errSub) {
 			t.Errorf("%s %s %q: %s %q (output %s), want %s %q", tt.slug, tt.lang, tt.code, c.Verdict, c.Error, c.Output, tt.want, tt.errSub)
+		}
+	}
+}
+
+const anyIndexYAML = `slug: any-index
+title: Any Index
+function:
+  name: anyIndex
+  params:
+    - name: nums
+      type: integer[]
+    - name: target
+      type: integer
+  returns: integer
+judge:
+  compare: checker
+`
+
+const anyIndexChecker = `def check(input, output, expected):
+    nums, target = input["nums"], input["target"]
+    if expected == -1:
+        return output == -1 or "%s is not in nums, so the answer is -1" % target
+    if not isinstance(output, int) or not 0 <= output < len(nums):
+        return "index %r is outside nums" % (output,)
+    if nums[output] != target:
+        return "nums[%d] is %d, not %d" % (output, nums[output], target)
+`
+
+// addChecker writes checker.py into the problem's directory.
+func addChecker(t *testing.T, p *problem.Problem, code string) {
+	t.Helper()
+	if err := os.WriteFile(p.CheckerPath(), []byte(code), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// writeSolution starts p in langID and replaces the solution with code.
+func writeSolution(t *testing.T, a *app.App, p *problem.Problem, langID, code string) lang.Language {
+	t.Helper()
+	l := mustLang(t, a, langID)
+	path, _, err := a.Start(p, l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(code), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return l
+}
+
+// TestChecker checks problems judged by checker.py: solutions in both
+// languages are accepted for any valid answer, and rejected ones carry the
+// checker's message into the report and the submission history.
+func TestChecker(t *testing.T) {
+	requireTools(t, "go", "python3")
+	a := newWorkspace(t)
+	// The reference finds the first index; expected is one valid answer.
+	p := addProblem(t, a, "any-index", anyIndexYAML,
+		`{"input":{"nums":[1,2,1],"target":1}}`+"\n"+`{"input":{"nums":[5],"target":3}}`+"\n")
+	addChecker(t, p, anyIndexChecker)
+	if err := p.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	ref := "class Solution:\n    def anyIndex(self, nums, target):\n        return nums.index(target) if target in nums else -1\n"
+	if err := os.MkdirAll(filepath.Join(p.Dir, problem.ReferenceDir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(p.Dir, problem.ReferenceDir, "solution.py"), []byte(ref), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if _, err := a.BuildCases(ctx, p, "", false); err != nil {
+		t.Fatal(err)
+	}
+	cases, _ := p.LoadCases()
+	if string(cases[0].Expected) != "0" || string(cases[1].Expected) != "-1" {
+		t.Fatalf("built expected outputs: %s, %s", cases[0].Expected, cases[1].Expected)
+	}
+
+	tests := []struct {
+		lang, code string
+		want       runner.Verdict
+		message    string
+	}{
+		// The last index is as valid as the first.
+		{"go", "package main\n\nfunc anyIndex(nums []int, target int) int {\n\tfor i := len(nums) - 1; i >= 0; i-- {\n\t\tif nums[i] == target {\n\t\t\treturn i\n\t\t}\n\t}\n\treturn -1\n}\n", runner.Accepted, ""},
+		{"python", "class Solution:\n    def anyIndex(self, nums, target):\n        return len(nums) - 1 - nums[::-1].index(target) if target in nums else -1\n", runner.Accepted, ""},
+		{"go", "package main\n\nfunc anyIndex(nums []int, target int) int { return 1 }\n", runner.WrongAnswer, "nums[1] is 2, not 1"},
+		{"python", "class Solution:\n    def anyIndex(self, nums, target):\n        return 1\n", runner.WrongAnswer, "nums[1] is 2, not 1"},
+	}
+	for _, tt := range tests {
+		l := writeSolution(t, a, p, tt.lang, tt.code)
+		rep, sub, err := a.Submit(ctx, p, l, app.RunOptions{})
+		if err != nil {
+			t.Fatalf("%s %q: %v", tt.lang, tt.code, err)
+		}
+		if rep.Verdict != tt.want {
+			t.Errorf("%s %q: verdict %s, want %s (%+v)", tt.lang, tt.code, rep.Verdict, tt.want, rep.Cases)
+			continue
+		}
+		if tt.message == "" {
+			continue
+		}
+		if got := rep.Cases[0].Message; got != tt.message {
+			t.Errorf("%s %q: message %q, want %q", tt.lang, tt.code, got, tt.message)
+		}
+		// The second case (-1) is rejected without a message of the solution's making.
+		if c := rep.Cases[1]; c.Verdict != runner.WrongAnswer || c.Message != "3 is not in nums, so the answer is -1" {
+			t.Errorf("%s %q: case 2 %s %q", tt.lang, tt.code, c.Verdict, c.Message)
+		}
+		stored := app.DecodeReport(sub.Details)
+		if stored == nil || stored.Cases[0].Message != tt.message {
+			t.Errorf("%s %q: stored report %+v", tt.lang, tt.code, stored)
+		}
+	}
+
+	// A case that already failed is not sent to the checker; one without
+	// expected output is not judged.
+	l := writeSolution(t, a, p, "python", "class Solution:\n    def anyIndex(self, nums, target):\n        return 1 // (len(nums) - 1) * 2\n")
+	sel := []runner.Selected{{Index: 1, Case: cases[0]}, {Index: 2, Case: cases[1]}, {Index: 3, Case: problem.Case{Input: cases[0].Input}}}
+	rep, err := a.Run(ctx, p, l, sel, app.RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := []runner.Verdict{rep.Cases[0].Verdict, rep.Cases[1].Verdict, rep.Cases[2].Verdict}; v[0] != runner.Accepted || v[1] != runner.RuntimeError || v[2] != runner.NoExpected {
+		t.Errorf("verdicts %v", v)
+	}
+}
+
+// TestBrokenChecker checks that a checker that cannot be loaded, raises,
+// returns something else than a verdict or runs out of time fails the run
+// with an error naming checker.py and the case, rather than judging the
+// solution.
+func TestBrokenChecker(t *testing.T) {
+	requireTools(t, "go", "python3")
+	a := newWorkspace(t)
+	yaml := strings.Replace(anyIndexYAML, "  compare: checker\n", "  compare: checker\n  time_limit: 2s\n", 1)
+	p := addProblem(t, a, "any-index", yaml,
+		`{"input":{"nums":[1,2],"target":1},"expected":0}`+"\n"+`{"input":{"nums":[1,2],"target":2},"expected":1}`+"\n")
+	tests := []struct {
+		checker string
+		want    []string
+	}{
+		{"def check(input, output, expected)\n    pass\n", []string{"checker.py cannot be loaded", "SyntaxError"}},
+		{"def judge(input, output, expected):\n    pass\n", []string{"checker.py cannot be loaded", "must define check(input, output, expected)"}},
+		{"def check(input, output, expected):\n    if input[\"target\"] == 2:\n        raise ValueError(\"boom\")\n",
+			[]string{"checker.py failed on case 2", "not a verdict on your solution", `raise ValueError("boom")`, "ValueError: boom"}},
+		{"def check(input, output, expected):\n    return 1\n", []string{"checker.py failed on case 1", "check returned 1"}},
+		{"import os\n\ndef check(input, output, expected):\n    print('dying')\n    os._exit(3)\n", []string{"checker.py failed on case 1: exited without a result", "dying", "exit status 3"}},
+		{"def check(input, output, expected):\n    while input[\"target\"] == 2:\n        pass\n", []string{"checker.py failed on case 2: time limit of 2s exceeded"}},
+	}
+	cases, _ := p.LoadCases()
+	sel, _ := app.Select(cases, nil, true)
+	for _, langID := range []string{"go", "python"} {
+		l := writeSolution(t, a, p, langID, map[string]string{
+			"go":     "package main\n\nfunc anyIndex(nums []int, target int) int { return target - 1 }\n",
+			"python": "class Solution:\n    def anyIndex(self, nums, target):\n        return target - 1\n",
+		}[langID])
+		for _, tt := range tests {
+			addChecker(t, p, tt.checker)
+			_, err := a.Run(context.Background(), p, l, sel, app.RunOptions{})
+			if err == nil {
+				t.Errorf("%s %q: no error", langID, tt.checker)
+				continue
+			}
+			for _, w := range tt.want {
+				if !strings.Contains(err.Error(), w) {
+					t.Errorf("%s %q: error %q does not contain %q", langID, tt.checker, err, w)
+				}
+			}
+		}
+	}
+	if _, _, err := a.Submit(context.Background(), p, mustLang(t, a, "python"), app.RunOptions{}); err == nil {
+		t.Error("submit with a broken checker succeeded")
+	}
+	st, _ := a.Store()
+	if subs, _ := st.List(context.Background(), p.Slug); len(subs) != 0 {
+		t.Errorf("a broken checker recorded %d submission(s)", len(subs))
+	}
+}
+
+const pickerYAML = `slug: picker
+title: Picker
+kind: class
+class:
+  name: Picker
+  constructor:
+    - name: n
+      type: integer
+  methods:
+    - name: pick
+      params: []
+      returns: integer
+judge:
+  compare: checker
+`
+
+// pickerChecker reads a class problem's ops and args: every pick must be in
+// [0, n) and all of them must not be the same.
+const pickerChecker = `def check(input, output, expected):
+    n = input["args"][0][0]
+    picks = [v for op, v in zip(input["ops"], output) if op == "pick"]
+    if len(output) != len(input["ops"]):
+        return "expected %d results, got %d" % (len(input["ops"]), len(output))
+    for i, v in enumerate(picks):
+        if not 0 <= v < n:
+            return "pick %d returned %d, outside [0, %d)" % (i + 1, v, n)
+    if len(set(picks)) == 1:
+        return "every pick returned %d" % picks[0]
+`
+
+// TestCheckerClassProblem checks a design problem judged by a checker,
+// which sees the whole operation sequence.
+func TestCheckerClassProblem(t *testing.T) {
+	requireTools(t, "go", "python3")
+	a := newWorkspace(t)
+	ops := `["Picker"` + strings.Repeat(`,"pick"`, 50) + `]`
+	args := `[[4]` + strings.Repeat(`,[]`, 50) + `]`
+	p := addProblem(t, a, "picker", pickerYAML, `{"input":{"ops":`+ops+`,"args":`+args+`},"expected":[null`+strings.Repeat(`,0`, 50)+`]}`+"\n")
+	addChecker(t, p, pickerChecker)
+	tests := []struct {
+		lang, code string
+		want       runner.Verdict
+		message    string
+	}{
+		{"go", "package main\n\ntype Picker struct{ n, i int }\n\nfunc Constructor(n int) Picker { return Picker{n: n} }\n\nfunc (p *Picker) Pick() int { p.i++; return p.i % p.n }\n", runner.Accepted, ""},
+		{"python", "import random\n\n\nclass Picker:\n    def __init__(self, n):\n        self.n = n\n\n    def pick(self):\n        return random.randrange(self.n)\n", runner.Accepted, ""},
+		{"go", "package main\n\ntype Picker struct{ n int }\n\nfunc Constructor(n int) Picker { return Picker{n: n} }\n\nfunc (p *Picker) Pick() int { return p.n }\n", runner.WrongAnswer, "pick 1 returned 4, outside [0, 4)"},
+		{"python", "class Picker:\n    def __init__(self, n):\n        pass\n\n    def pick(self):\n        return 2\n", runner.WrongAnswer, "every pick returned 2"},
+	}
+	cases, _ := p.LoadCases()
+	sel, _ := app.Select(cases, nil, true)
+	for _, tt := range tests {
+		l := writeSolution(t, a, p, tt.lang, tt.code)
+		rep, err := a.Run(context.Background(), p, l, sel, app.RunOptions{})
+		if err != nil {
+			t.Fatalf("%s %q: %v", tt.lang, tt.code, err)
+		}
+		if c := rep.Cases[0]; c.Verdict != tt.want || c.Message != tt.message {
+			t.Errorf("%s %q: %s %q, want %s %q", tt.lang, tt.code, c.Verdict, c.Message, tt.want, tt.message)
 		}
 	}
 }

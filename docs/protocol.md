@@ -123,6 +123,7 @@ problems/0001-two-sum/          directory name: <4-digit number>-<slug> when id 
   reference/solution.go
   templates/solution.go         starter code (optional; generated from the signature if missing)
   templates/solution.py
+  checker.py                    the checker, with judge.compare: checker (see [Checkers](#checkers))
 ```
 
 `hc import` copies only these entries; anything else in the directory (editor files, a `solutions/` folder, ...) is left behind.
@@ -190,8 +191,42 @@ Comparison modes:
 | `unordered` | The outermost array is a multiset; order is ignored | Two Sum, Permutations |
 | `unordered_deep` | Order is ignored at every array level | Group Anagrams, Subsets |
 | `any_of` | `expected` is an array of all acceptable answers | Problems with a small set of valid answers |
+| `checker` | `checker.py` in the problem directory decides; `expected` is one valid answer | Many valid answers ("return any of them"), randomized output |
 
 `unordered` and `unordered_deep` need an array result.
+
+### Checkers
+
+When a case has too many valid answers to list, or the output is random, a program decides: `judge.compare: checker` and a `checker.py` next to `problem.yaml`. Checkers are written in Python whatever language the solution is in, so problems judged by one need Python 3.10 or later even for Go solutions; the virtual environment hc manages (`.hc/venv`) provides it.
+
+```python
+# checker.py
+def check(input, output, expected):
+    """Return None or True to accept; False or a message string to reject."""
+```
+
+- `input` is the case's input as decoded JSON: the object of parameters (and hidden inputs) for function problems, `{"ops": [...], "args": [...]}` for design problems.
+- `output` is the solution's output as decoded JSON, in the same form as `expected` (the value of `judge.output` for in-place problems, one result per operation for design problems).
+- `expected` is the case's expected output, computed by the reference solution with `hc cases build` as for any other problem. It is one valid answer, so a checker can compare a derived value instead of solving the problem again: the length of the longest palindrome, the size of a subset. A case without `expected` is not judged ("No Expected Output").
+- To rebuild a structure, import the codecs and types solutions use: `from hc_runtime import decode, TreeNode` and `decode("TreeNode", output)`.
+- A rejected case is a Wrong Answer, and the message is shown with it in `hc test`, `hc submit`, the TUI and the submission history. Write messages that say what is wrong: `"[1,2] is not a permutation of nums"`, `"length 2, but the longest palindrome has length 3"`.
+
+Longest Palindromic Substring (5), where `"bab"` and `"aba"` are both right:
+
+```python
+def check(input, output, expected):
+    s = input["s"]
+    if not isinstance(output, str) or output not in s:
+        return "%r is not a substring of s" % (output,)
+    if output != output[::-1]:
+        return "%r is not a palindrome" % output
+    if len(output) != len(expected):
+        return "%r has length %d, but the longest palindrome has length %d" % (output, len(output), len(expected))
+```
+
+hc runs the checker once per run, after the solution: a helper calls `check` on every case that produced an output (cases that already failed with a runtime error or time limit are not sent). It gets the same time limit as the solution (`judge.time_limit`). A checker that cannot be loaded, raises, returns anything but `None`, a bool or a string, or runs out of time is a broken problem rather than a wrong answer: the run fails with an error naming `checker.py`, the case and the traceback, and `hc submit` records nothing. What the checker prints is shown only then.
+
+**Randomized problems** (Shuffle an Array, Random Pick with Weight) are design problems whose cases make many calls, from hundreds to a few thousand. The checker checks that every output is valid and that their distribution is plausible: compare the observed frequencies with the expected ones with bounds generous enough that a correct solution essentially never fails (state the false-reject probability in the checker, e.g. below 1e-6 per case), while an obviously non-random solution (always the same pick, the identity shuffle) fails.
 
 ### Types
 
@@ -378,7 +413,7 @@ One case per line:
 ```
 
 - `input`: for function problems, an object with exactly one value per parameter and hidden input, keyed by name. A `ref` parameter takes the referenced node's value; a `copy` parameter is left out. For design problems, `{"ops": [...], "args": [[...], ...]}`; `ops[0]` must be the class name (the constructor), and each `args` entry holds exactly the arguments of its op.
-- `expected`: the expected output. For design problems, an array with each operation's return value, using `null` for the constructor and `void` methods. For `any_of`, an array of acceptable answers, written by hand: a reference solution finds only one answer, so `hc cases build` refuses to fill it. Otherwise, if missing, `hc cases build` computes it with the reference solution.
+- `expected`: the expected output. For design problems, an array with each operation's return value, using `null` for the constructor and `void` methods. For `any_of`, an array of acceptable answers, written by hand: a reference solution finds only one answer, so `hc cases build` refuses to fill it. For `checker`, one valid answer, passed to the checker. Otherwise, if missing, `hc cases build` computes it with the reference solution.
 - `example`: the case is an example from the statement. `hc test` runs only these by default (the first 3 cases if none is marked).
 - `note`: a description of the case.
 - No other fields are allowed. Blank lines and lines starting with `//` are ignored. Cases are numbered from 1, counting only the lines that hold a case.
@@ -407,6 +442,7 @@ These versions bind the code hc generates (drivers, starters) and the code a pro
 
 - `hc test`, `hc submit` and `hc debug` name the toolchain they run with (`[Python 3.12.9]`) and warn when it is older, but still run.
 - `hc cases build` and `hc validate --run` refuse to run references on an older toolchain, so expected outputs always come from a supported one.
+- Checkers always run on Python 3.10 or later, also for Go solutions.
 - Python 3.10 is needed for the `X | None` annotations in LeetCode's templates. hc runs Python in a virtual environment it creates in `.hc/venv` with Python 3.10 or later (with uv, which downloads one if needed), so an older system `python3` (macOS ships 3.9) does not matter. `python.interpreter` in `hc.yaml` replaces the environment with an interpreter of your choice.
 - Go 1.22 limits both the language and the standard library. To check Go code against it, put `go 1.22` in its `go.mod` and run `go vet`, whose `stdversion` check reports newer standard library symbols.
 
@@ -419,9 +455,9 @@ hc validate <slug> --run    # also run every reference solution on every case; a
 
 `hc validate` reports, with the case number and field:
 
-- `problem.yaml`: syntax errors (with line and column), unknown fields, invalid slug, missing title, unsupported types, a `judge.output` that is not a parameter or hidden input, a `void` function without `judge.output`, misused structure inputs (`hidden`, `cycle`, `join`, `ref`, `copy`, `returns_ref`), a misused `returns_copy`, more than one `Node` type, a misused `judge.output_length`, unknown `judge.compare`, an invalid `judge.time_limit`;
+- `problem.yaml`: syntax errors (with line and column), unknown fields, invalid slug, missing title, unsupported types, a `judge.output` that is not a parameter or hidden input, a `void` function without `judge.output`, misused structure inputs (`hidden`, `cycle`, `join`, `ref`, `copy`, `returns_ref`), a misused `returns_copy`, more than one `Node` type, a misused `judge.output_length`, unknown `judge.compare`, `judge.compare: checker` without `checker.py` and `checker.py` with another mode, an invalid `judge.time_limit`;
 - `cases.jsonl`: invalid JSON, unknown fields, missing or unknown inputs, values that don't match their declared type (`input "nums": [1]: must be integer, got string "x"`) or the form of a judge-defined type (a neighbor that is not a node, a random index outside the list, a misplaced `null`, an unknown subordinate), structure inputs that don't fit (a cycle position outside the list, joined lists whose tails differ, a referenced value that is missing or repeated), wrong argument counts and unknown methods in design problems, and an `expected` of the wrong shape;
-- with `--run`: reference solutions that don't compile, crash, or disagree with `expected` (both values are shown).
+- with `--run`: reference solutions that don't compile, crash, or disagree with `expected` (both values are shown, and the checker's message); with `checker`, every reference output goes through the checker, and a broken checker is an error.
 
 It warns about an undecided judge rule (no `judge.compare`), cases without `expected`, no case marked as an example, no reference solution, missing statement images and an ID used by another problem.
 
@@ -459,5 +495,6 @@ A driver only **decodes the input, calls the user's code and encodes the output*
   A non-empty `error` means a runtime error; keep only the stack frames from the user's code if you can. `elapsed_ns` covers only the time spent in the user's code.
 - The user's stdout and stderr go straight to the terminal, so print debugging works.
 - If the driver crashes or times out, cases without a result line are judged Runtime Error or Time Limit Exceeded respectively.
+- [Checkers](#checkers) are not the driver's business either: Python runs them for every language (`lang.Checker`), with `internal/judge` turning their results into verdicts.
 
 The existing drivers are good references: `internal/lang/golang` (generated code plus a static runtime) and `internal/lang/python` (a dynamic runtime with the signature embedded).

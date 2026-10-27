@@ -22,6 +22,8 @@ type storedCase struct {
 	Output   string `json:"output,omitempty"`
 	Expected string `json:"expected,omitempty"`
 	Error    string `json:"error,omitempty"`
+	// Message is the checker's reason for a Wrong Answer.
+	Message string `json:"message,omitempty"`
 }
 
 type storedReport struct {
@@ -47,6 +49,7 @@ func EncodeReport(p *problem.Problem, rep *runner.Report) string {
 			sc.Output = clipText(string(c.Output))
 			sc.Expected = clipText(string(c.Case.Expected))
 			sc.Error = clipText(c.Error)
+			sc.Message = clipText(c.Message)
 		}
 		sr.Cases = append(sr.Cases, sc)
 	}
@@ -74,7 +77,7 @@ func DecodeReport(s string) *runner.Report {
 	for _, sc := range sr.Cases {
 		cr := runner.CaseResult{
 			Index: sc.Index, Verdict: runner.Verdict(sc.Verdict), Elapsed: time.Duration(sc.ElapsedNs),
-			Error: sc.Error, InputText: sc.Input, Output: json.RawMessage(sc.Output),
+			Error: sc.Error, Message: sc.Message, InputText: sc.Input, Output: json.RawMessage(sc.Output),
 		}
 		cr.Case.Note = sc.Note
 		if sc.Expected != "" {

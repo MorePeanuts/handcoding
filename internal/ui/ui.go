@@ -119,8 +119,16 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 		default:
 			field("Output", string(c.Output))
 			if c.Case.HasExpected() {
-				field("Expected", string(c.Case.Expected))
+				if p.Judge.Compare == problem.CompareChecker {
+					// One valid answer among many, found by the reference.
+					field("Reference", string(c.Case.Expected))
+				} else {
+					field("Expected", string(c.Case.Expected))
+				}
 			}
+		}
+		if c.Message != "" {
+			field("Checker", c.Message)
 		}
 		if c.JudgeErr != nil {
 			field("Judge", c.JudgeErr.Error())

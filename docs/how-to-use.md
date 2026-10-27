@@ -103,7 +103,7 @@ hc gen 146                  # make it ready: test cases and the judge rule
 
 `hc fetch` downloads the statement and its images, the signature, the Go and Python starter code, and the examples. Expected outputs are included when they can be parsed from the statement.
 
-A fetched problem is **not ready to submit** yet. LeetCode only publishes the examples, and not how answers are judged: whether order matters, whether several answers are valid. Until that is decided, `hc test` shows your output next to the example's answer without a verdict, and `hc submit` refuses. `hc gen` writes the full test suite and decides the judge rule from the statement; you can also set `judge.compare` yourself (see the [problem protocol](protocol.md#problemyaml)). The list marks such problems as "not ready".
+A fetched problem is **not ready to submit** yet. LeetCode only publishes the examples, and not how answers are judged: whether order matters, whether several answers are valid. Until that is decided, `hc test` shows your output next to the example's answer without a verdict, and `hc submit` refuses. `hc gen` writes the full test suite and decides the judge rule from the statement, writing a checker when no built-in rule fits; you can also set `judge.compare` yourself (see the [problem protocol](protocol.md#problemyaml)). The list marks such problems as "not ready".
 
 Premium problems are not available. Neither are problems whose signature uses types hc does not support yet (such as `MountainArray` in interactive problems); `hc fetch` says so.
 
@@ -203,9 +203,9 @@ leetcode:
 
 ## Current limitations
 
-- Problems that need a special judge (checker) aren't supported yet, nor are interactive problems.
+- Interactive problems aren't supported yet.
 - Problems with [structure inputs](protocol.md#structure-inputs) (a list with a cycle, intersecting lists, node references such as Lowest Common Ancestor) can be judged, but `hc fetch` cannot import them correctly yet; write their `problem.yaml` by hand. The samples 141, 142, 160, 236, 237 and 1379 show how.
 - `hc fetch` imports problems with [LeetCode's `Node` types](protocol.md#leetcodes-node-types), `NestedInteger` and `Employee`, reading their signature from LeetCode's Go template. `returns_copy` (Clone Graph) is left to `hc gen`, and so are the examples of iterator problems such as Flatten Nested List Iterator, which LeetCode gives without the calls.
 - Run time is measured, but memory is not limited.
 - LeetCode premium problems cannot be fetched.
-- Problems with many valid answers that cannot all be listed ("return any valid answer") need a custom checker, which is not supported yet; `hc gen` says so when it meets one.
+- Problems with many valid answers that cannot all be listed ("return any valid answer") and randomized problems are judged by a [checker](protocol.md#checkers), which `hc gen` writes. Checkers are Python, so these problems need Python 3.10 or later even when you solve them in Go; the virtual environment hc manages provides it.

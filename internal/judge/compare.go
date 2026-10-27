@@ -2,11 +2,14 @@
 //
 // Comparison is done on decoded JSON values so that every language runner only
 // has to print its answer as JSON; the judging rules live in one place.
+// Problems with judge.compare: checker are decided by their checker.py
+// instead, whose results Checked interprets.
 package judge
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"slices"
@@ -54,6 +57,8 @@ func Equal(opts Options, expected, got json.RawMessage) (bool, error) {
 			}
 		}
 		return false, nil
+	case problem.CompareChecker:
+		return false, errors.New("checker problems are judged by their checker (see Checked)")
 	default:
 		return false, fmt.Errorf("unknown compare mode %q", opts.Mode)
 	}
