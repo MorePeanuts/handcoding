@@ -57,11 +57,8 @@ judge:
 
 ```python
 # reference/solution.py
-from typing import List
-
-
 class Solution:
-    def sumArray(self, nums: List[int]) -> int:
+    def sumArray(self, nums: list[int]) -> int:
         return sum(nums)
 ```
 
@@ -207,9 +204,9 @@ Type names are LeetCode's `metaData` names, so problems fetched from LeetCode ne
 | `boolean` | `true` / `false` | `bool` | `bool` |
 | `string` | string | `string` | `str` |
 | `character` | one-character string `"a"` | `byte` | `str` |
-| `ListNode` | array `[1,2,3]` | `*ListNode` | `Optional[ListNode]` |
-| `TreeNode` | level-order array `[3,9,20,null,null,15,7]` | `*TreeNode` | `Optional[TreeNode]` |
-| `T[]` | array, up to 3 levels; 1 level for node arrays | `[]T` | `List[T]` |
+| `ListNode` | array `[1,2,3]` | `*ListNode` | `ListNode \| None` |
+| `TreeNode` | level-order array `[3,9,20,null,null,15,7]` | `*TreeNode` | `TreeNode \| None` |
+| `T[]` | array, up to 3 levels; 1 level for node arrays | `[]T` | `list[T]` |
 | `void` | return type only | — | `None` |
 
 `list<T>` is normalized to `T[]`, and `int`, `bool`, `char` and `float` to `integer`, `boolean`, `character` and `double`. Special types such as `Node` (graphs, N-ary trees, lists with random pointers) and `NestedInteger` are not supported yet.
@@ -241,6 +238,20 @@ A reference solution is written exactly like a user's solution, in `reference/so
 - `ListNode` and `TreeNode` are provided: in Python, `from hc_runtime import ListNode, TreeNode`; in Go they are predefined (`Val`, `Next`, `Left`, `Right`), so don't declare them.
 - With both references present, `hc cases build` uses Go, then Python; pick one with `-l python`. `hc validate --run` runs every reference.
 - `templates/solution.go` and `templates/solution.py` replace the generated starter code. They must keep the signature, because the driver calls it.
+
+### Language versions
+
+| Language | Oldest supported version |
+|---|---|
+| Python | 3.10 |
+| Go | 1.22 |
+
+These versions bind the code hc generates (drivers, starters) and the code a problem ships: reference solutions and templates must work on them. Your own solutions may use anything your toolchain supports.
+
+- `hc test`, `hc submit` and `hc debug` name the toolchain they run with (`[Python 3.12.9]`) and warn when it is older, but still run.
+- `hc cases build` and `hc validate --run` refuse to run references on an older toolchain, so expected outputs always come from a supported one.
+- Python 3.10 is needed for the `X | None` annotations in LeetCode's templates. If `python3` is older (macOS ships 3.9), set `python.interpreter` in `hc.yaml`.
+- Go 1.22 limits both the language and the standard library. To check Go code against it, put `go 1.22` in its `go.mod` and run `go vet`, whose `stdversion` check reports newer standard library symbols.
 
 ### Validation
 
@@ -274,7 +285,7 @@ type Language interface {
     Build(ctx context.Context, dir, binDir string) error   // compiles or checks syntax; returns *lang.CompileError on failure
     Command(ctx context.Context, dir, binDir string) *exec.Cmd
     DebugCommand(dir, binDir string, p *problem.Problem, opts lang.DebugOptions) (*exec.Cmd, error)
-    Check() error                     // whether the toolchain is available
+    Toolchain() (lang.Toolchain, error) // detects the compiler or interpreter and its version; fails if missing
 }
 ```
 

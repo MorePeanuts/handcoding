@@ -179,7 +179,7 @@ theme: auto           # 题面配色：auto | dark | light
 images: auto          # 题面图片：auto | kitty | blocks | none
 timeout: 10s          # 每次运行的时限
 python:
-  interpreter: python3
+  interpreter: python3  # Python 3.10+，例如 python3.12 或完整路径
 agent:
   name: claude        # claude | codex，或者设置 command（见上文）
 leetcode:

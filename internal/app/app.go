@@ -190,10 +190,17 @@ func (a *App) Run(ctx context.Context, p *problem.Problem, l lang.Language, sel 
 	if !a.HasSolution(p, l) {
 		return nil, fmt.Errorf("no %s solution for %s yet; run `hc start %s -l %s`", l.Name(), p.Slug, p.Slug, l.ID())
 	}
-	if err := l.Check(); err != nil {
+	// The user's code may well run on an old toolchain; the report carries
+	// the toolchain so the front ends can warn.
+	tc, err := l.Toolchain()
+	if err != nil {
 		return nil, err
 	}
-	return runner.Run(ctx, l, p, filepath.Dir(a.SolutionPath(p, l)), sel, a.runnerOpts(p, o))
+	rep, err := runner.Run(ctx, l, p, filepath.Dir(a.SolutionPath(p, l)), sel, a.runnerOpts(p, o))
+	if rep != nil {
+		rep.Toolchain = tc
+	}
+	return rep, err
 }
 
 func (a *App) runnerOpts(p *problem.Problem, o RunOptions) runner.Options {
@@ -288,7 +295,13 @@ func (a *App) RunReference(ctx context.Context, p *problem.Problem, langName str
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := l.Check(); err != nil {
+	// Expected outputs and pack references must come from a toolchain the
+	// protocol supports.
+	tc, err := l.Toolchain()
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := tc.Err(); err != nil {
 		return nil, nil, err
 	}
 	dir, err := os.MkdirTemp("", "hc-ref-*")
@@ -304,6 +317,9 @@ func (a *App) RunReference(ctx context.Context, p *problem.Problem, langName str
 		return nil, nil, err
 	}
 	rep, err := runner.Run(ctx, l, p, dir, sel, a.runnerOpts(p, o))
+	if rep != nil {
+		rep.Toolchain = tc
+	}
 	return rep, l, err
 }
 

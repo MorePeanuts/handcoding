@@ -172,7 +172,11 @@ func (m *model) viewResult() string {
 	title := m.problemTitle(p)
 	sub := ""
 	if r != nil {
-		sub = ui.Cyan.Render(string(r.kind)) + "  " + ui.Faint.Render(r.langID)
+		label := r.langID
+		if r.report != nil && r.report.Toolchain.Version != "" {
+			label = r.report.Toolchain.String()
+		}
+		sub = ui.Cyan.Render(string(r.kind)) + "  " + ui.Faint.Render(label)
 		if r.running {
 			sub += "  " + m.spinner.View() + " running…"
 		}

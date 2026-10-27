@@ -63,6 +63,13 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 	if o.Verbose {
 		o.MaxLen = 1 << 30
 	}
+	// An old toolchain explains compile and runtime errors that would
+	// otherwise look like bugs in the solution or in hc.
+	if rep.Toolchain.Version != "" {
+		if err := rep.Toolchain.Err(); err != nil {
+			fmt.Fprintln(w, Yellow.Render("warning:")+" "+err.Error())
+		}
+	}
 	if rep.Verdict == runner.CompileError {
 		fmt.Fprintln(w, VerdictStyle(rep.Verdict).Render("✘ Compile Error"))
 		fmt.Fprintln(w, indent(rep.CompileError, "  "))

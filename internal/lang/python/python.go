@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -57,11 +58,33 @@ func (l Language) python() string {
 	return "python3"
 }
 
-func (l Language) Check() error {
-	if _, err := exec.LookPath(l.python()); err != nil {
-		return fmt.Errorf("%s not found in PATH", l.python())
+// MinVersion is the oldest Python the problem protocol supports. LeetCode's
+// templates annotate with `X | None`, which needs 3.10.
+const MinVersion = "3.10"
+
+// toolchains caches detection per interpreter for the life of the process.
+var toolchains sync.Map // interpreter -> func() (lang.Toolchain, error)
+
+func (l Language) Toolchain() (lang.Toolchain, error) {
+	py := l.python()
+	f, _ := toolchains.LoadOrStore(py, sync.OnceValues(func() (lang.Toolchain, error) { return detect(py) }))
+	return f.(func() (lang.Toolchain, error))()
+}
+
+func detect(py string) (lang.Toolchain, error) {
+	if _, err := exec.LookPath(py); err != nil {
+		return lang.Toolchain{}, fmt.Errorf("%s not found in PATH", py)
 	}
-	return nil
+	out, err := exec.Command(py, "-c", "import sys; print('.'.join(map(str, sys.version_info[:3])))").Output()
+	if err != nil {
+		return lang.Toolchain{}, fmt.Errorf("%s: cannot read its version: %w", py, err)
+	}
+	return lang.Toolchain{
+		Name:    "Python",
+		Version: strings.TrimSpace(string(out)),
+		Min:     MinVersion,
+		Upgrade: "set python.interpreter in hc.yaml to Python " + MinVersion + " or later",
+	}, nil
 }
 
 // Starter returns the problem's Python template (with hc's import header) or
@@ -114,7 +137,7 @@ func pyType(t string) string {
 	case problem.TypeListNode, problem.TypeTreeNode:
 		s = base
 		if depth == 0 {
-			return "Optional[" + s + "]"
+			return s + " | None"
 		}
 	case problem.TypeVoid:
 		return "None"
@@ -122,7 +145,7 @@ func pyType(t string) string {
 		s = "object"
 	}
 	for range depth {
-		s = "List[" + s + "]"
+		s = "list[" + s + "]"
 	}
 	return s
 }

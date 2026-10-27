@@ -179,7 +179,7 @@ theme: auto           # statement colors: auto | dark | light
 images: auto          # statement images: auto | kitty | blocks | none
 timeout: 10s          # wall-clock limit per run
 python:
-  interpreter: python3
+  interpreter: python3  # Python 3.10+; e.g. python3.12 or a full path
 agent:
   name: claude        # claude | codex, or set command (see above)
 leetcode:

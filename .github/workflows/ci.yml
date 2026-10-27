@@ -21,7 +21,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        # Solutions run on the oldest Python the problem protocol supports
+        # (python.MinVersion) and on the latest. The oldest Go is checked by
+        # TestGoMinimumVersion with the toolchain that builds hc.
+        include:
+          - { os: ubuntu-latest, python: "3.10" }
+          - { os: ubuntu-latest, python: "3.x" }
+          - { os: macos-latest, python: "3.x" }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -30,7 +36,7 @@ jobs:
           go-version-file: go.mod
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
       # go vet runs once, as part of golangci-lint in the lint job.
       - run: go test -race ./...
 

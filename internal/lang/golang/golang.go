@@ -16,8 +16,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -43,12 +45,34 @@ func (Language) Name() string         { return "Go" }
 func (Language) Aliases() []string    { return []string{"golang"} }
 func (Language) SolutionFile() string { return solutionFile }
 
-func (Language) Check() error {
+// MinVersion is the oldest Go the problem protocol supports.
+const MinVersion = "1.22"
+
+func (Language) Toolchain() (lang.Toolchain, error) { return detect() }
+
+var goVersionRE = regexp.MustCompile(`go(\d+(?:\.\d+)*)`)
+
+// detect runs `go env GOVERSION` once per process.
+var detect = sync.OnceValues(func() (lang.Toolchain, error) {
 	if _, err := exec.LookPath("go"); err != nil {
-		return errors.New("go toolchain not found in PATH")
+		return lang.Toolchain{}, errors.New("go toolchain not found in PATH")
 	}
-	return nil
-}
+	out, err := exec.Command("go", "env", "GOVERSION").Output()
+	if err != nil {
+		return lang.Toolchain{}, fmt.Errorf("go env GOVERSION: %w", err)
+	}
+	// "go1.27.2", or "devel go1.28-abcdef …" for a development build.
+	m := goVersionRE.FindStringSubmatch(string(out))
+	if m == nil {
+		return lang.Toolchain{}, fmt.Errorf("cannot read the Go version from %q", strings.TrimSpace(string(out)))
+	}
+	return lang.Toolchain{
+		Name:    "Go",
+		Version: m[1],
+		Min:     MinVersion,
+		Upgrade: "install Go " + MinVersion + " or later from https://go.dev/dl/",
+	}, nil
+})
 
 // Starter returns the problem's Go template if it has one, otherwise one
 // generated from the signature.

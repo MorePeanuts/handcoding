@@ -2,7 +2,7 @@
 #
 # Runtime support for solution.py: ListNode/TreeNode definitions, JSON codecs
 # and the test driver loop. Regenerated before every run.
-# Compatible with Python 3.8+.
+# Compatible with Python 3.10+, the minimum of the problem protocol.
 
 import json
 import os

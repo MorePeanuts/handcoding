@@ -57,11 +57,8 @@ judge:
 
 ```python
 # reference/solution.py
-from typing import List
-
-
 class Solution:
-    def sumArray(self, nums: List[int]) -> int:
+    def sumArray(self, nums: list[int]) -> int:
         return sum(nums)
 ```
 
@@ -207,9 +204,9 @@ judge:
 | `boolean` | `true` / `false` | `bool` | `bool` |
 | `string` | 字符串 | `string` | `str` |
 | `character` | 单字符字符串 `"a"` | `byte` | `str` |
-| `ListNode` | 数组 `[1,2,3]` | `*ListNode` | `Optional[ListNode]` |
-| `TreeNode` | 层序数组 `[3,9,20,null,null,15,7]` | `*TreeNode` | `Optional[TreeNode]` |
-| `T[]` | 数组，最多 3 层；节点数组只支持 1 层 | `[]T` | `List[T]` |
+| `ListNode` | 数组 `[1,2,3]` | `*ListNode` | `ListNode \| None` |
+| `TreeNode` | 层序数组 `[3,9,20,null,null,15,7]` | `*TreeNode` | `TreeNode \| None` |
+| `T[]` | 数组，最多 3 层；节点数组只支持 1 层 | `[]T` | `list[T]` |
 | `void` | 只能作返回类型 | — | `None` |
 
 `list<T>` 会规范化为 `T[]`；`int`、`bool`、`char`、`float` 会规范化为 `integer`、`boolean`、`character`、`double`。`Node`（图、N 叉树、带随机指针的链表）和 `NestedInteger` 等特殊类型暂不支持。
@@ -241,6 +238,20 @@ judge:
 - `ListNode` 和 `TreeNode` 已经提供：Python 中用 `from hc_runtime import ListNode, TreeNode` 导入；Go 中已预先定义（字段为 `Val`、`Next`、`Left`、`Right`），不要自己再声明。
 - 两份参考解都存在时，`hc cases build` 先用 Go，再用 Python；可以用 `-l python` 指定。`hc validate --run` 会运行每一份参考解。
 - `templates/solution.go` 和 `templates/solution.py` 会替换自动生成的初始代码。它们必须保持签名不变，因为驱动要按签名调用。
+
+### 语言版本
+
+| 语言 | 最低支持版本 |
+|---|---|
+| Python | 3.10 |
+| Go | 1.22 |
+
+这些版本约束 hc 生成的代码（驱动、初始代码）和题目自带的代码：参考解和模板必须能在这些版本上运行。你自己的解答可以使用本机工具链支持的任何特性。
+
+- `hc test`、`hc submit` 和 `hc debug` 会显示实际使用的工具链（`[Python 3.12.9]`），版本过低时给出警告，但仍然运行。
+- `hc cases build` 和 `hc validate --run` 拒绝在版本过低的工具链上运行参考解，保证期望输出总是来自受支持的版本。
+- LeetCode 模板中的 `X | None` 注解需要 Python 3.10。如果 `python3` 版本较低（macOS 自带 3.9），请在 `hc.yaml` 中设置 `python.interpreter`。
+- Go 1.22 同时限制语言特性和标准库。要按这个版本检查 Go 代码，在它的 `go.mod` 中写 `go 1.22` 并运行 `go vet`，其中的 `stdversion` 检查会报告更新的标准库符号。
 
 ### 校验
 
@@ -274,7 +285,7 @@ type Language interface {
     Build(ctx context.Context, dir, binDir string) error   // 编译或检查语法；失败时返回 *lang.CompileError
     Command(ctx context.Context, dir, binDir string) *exec.Cmd
     DebugCommand(dir, binDir string, p *problem.Problem, opts lang.DebugOptions) (*exec.Cmd, error)
-    Check() error                     // 工具链是否可用
+    Toolchain() (lang.Toolchain, error) // 检测编译器或解释器及其版本；找不到时返回错误
 }
 ```
 

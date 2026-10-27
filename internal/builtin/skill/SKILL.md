@@ -102,10 +102,10 @@ One object per line: `{"input": {...}, "expected": <json>, "example": true, "not
    answers, or a randomized problem), leave `judge.compare` unset, still
    write the reference and cases, and say in your summary that the problem
    needs a custom checker, which hc does not support yet.
-3. Write a **reference solution** in `reference/solution.py` (Python 3.8
-   compatible; same shape as LeetCode: `class Solution` with the method, or
-   the design class). Start the file with
-   `from typing import List, Optional` and, if needed,
+3. Write a **reference solution** in `reference/solution.py` (it must run on
+   Python 3.10, the oldest version hc supports; same shape as LeetCode:
+   `class Solution` with the method, or the design class). Annotate with
+   `list[int]` and `TreeNode | None`, and if needed start the file with
    `from hc_runtime import ListNode, TreeNode`.
    Prefer a simple, obviously correct algorithm. If it is too slow for the
    largest inputs, also write a brute force and cross-check both on small
@@ -115,7 +115,9 @@ One object per line: `{"input": {...}, "expected": <json>, "example": true, "not
    the Python one wherever the rule allows (another order, another valid
    answer). `hc validate --run` runs both against the same expected outputs,
    so a rule that is too strict fails there. A Go reference starts with
-   `package main` (LeetCode's template in `templates/solution.go` omits it).
+   `package main` (LeetCode's template in `templates/solution.go` omits it)
+   and must build with Go 1.22: no newer language features or standard
+   library functions (e.g. `slices.Sorted`, `maps.Keys`).
 5. Add inputs to `cases.jsonl` **without** `expected`. Keep existing lines
    (do not drop `example: true` cases). Aim for 15–40 cases covering:
    - every statement example (`"example": true`)

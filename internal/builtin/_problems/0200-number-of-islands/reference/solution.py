@@ -1,8 +1,5 @@
-from typing import List
-
-
 class Solution:
-    def numIslands(self, grid: List[List[str]]) -> int:
+    def numIslands(self, grid: list[list[str]]) -> int:
         m, n = len(grid), len(grid[0])
         count = 0
         for i in range(m):
