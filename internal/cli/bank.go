@@ -366,7 +366,7 @@ func newCasesListCmd(root *rootOptions) *cobra.Command {
 					if s.Case.HasExpected() {
 						exp = clip(string(s.Case.Expected), maxLen)
 					}
-					fmt.Printf("  %s %s\n", ui.Faint.Render("Expected"), exp)
+					fmt.Printf("  %s %s\n", ui.Faint.Render(fmt.Sprintf("%-8s", ui.ExpectedLabel(p))), exp)
 				}
 				fmt.Println()
 				mode := p.Judge.Compare
@@ -688,10 +688,11 @@ func checkReference(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.L
 		switch c.Verdict {
 		case runner.Accepted, runner.NoExpected, runner.NotJudged:
 		case runner.WrongAnswer:
-			e := fmt.Sprintf("%s reference, case %d: Wrong Answer\noutput   %s\nexpected %s",
-				l.Name(), c.Index, clip(string(c.Output), 120), clip(string(c.Case.Expected), 120))
+			e := fmt.Sprintf("%s reference, case %d: Wrong Answer\n%-9s %s\n%-9s %s",
+				l.Name(), c.Index, "output", clip(string(c.Output), 120),
+				strings.ToLower(ui.ExpectedLabel(p)), clip(string(c.Case.Expected), 120))
 			if c.Message != "" {
-				e += "\nchecker  " + c.Message
+				e += fmt.Sprintf("\n%-9s %s", "checker", c.Message)
 			}
 			errs = append(errs, e)
 		default:
