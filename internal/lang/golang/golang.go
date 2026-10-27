@@ -32,7 +32,6 @@ const (
 	solutionFile = "solution.go"
 	driverFile   = "zz_hc_driver.go"
 	binName      = "prog"
-	goModContent = "module solution\n\ngo 1.23\n"
 )
 
 // Language is the Go implementation of lang.Language.
@@ -175,22 +174,44 @@ func signature(params []problem.Param) (string, error) {
 	return strings.Join(parts, ", "), nil
 }
 
-// Prepare writes go.mod (if missing) and the driver.
+// Prepare writes go.mod and the driver.
 func (Language) Prepare(dir string, p *problem.Problem) error {
-	if _, err := os.Stat(filepath.Join(dir, "go.mod")); errors.Is(err, os.ErrNotExist) {
-		if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goModContent), 0o644); err != nil {
-			return err
-		}
+	// The go directive sets the language version. Following the local
+	// toolchain lets solutions use all of its features, and with
+	// GOTOOLCHAIN=local a go.mod never asks for a toolchain to download.
+	// Without a Go to ask, the minimum is as good as anything: nothing can
+	// build until one is installed, and the next run rewrites the file.
+	version := MinVersion
+	if tc, err := detect(); err == nil {
+		version = modVersion(tc.Version)
+	}
+	if err := writeIfChanged(filepath.Join(dir, "go.mod"), GoMod(version)); err != nil {
+		return err
 	}
 	src, err := Driver(p)
 	if err != nil {
 		return err
 	}
-	path := filepath.Join(dir, driverFile)
-	if old, err := os.ReadFile(path); err == nil && bytes.Equal(old, src) {
+	return writeIfChanged(filepath.Join(dir, driverFile), src)
+}
+
+// GoMod returns the go.mod of a solution module for the Go language version.
+func GoMod(version string) []byte {
+	return []byte("module solution\n\ngo " + version + "\n")
+}
+
+// modVersion turns a toolchain version into the language version of a go
+// directive: "1.27.2" becomes "1.27".
+func modVersion(version string) string {
+	parts := strings.SplitN(version, ".", 3)
+	return strings.Join(parts[:min(2, len(parts))], ".")
+}
+
+func writeIfChanged(path string, data []byte) error {
+	if old, err := os.ReadFile(path); err == nil && bytes.Equal(old, data) {
 		return nil
 	}
-	return os.WriteFile(path, src, 0o644)
+	return os.WriteFile(path, data, 0o644)
 }
 
 // Driver generates the driver source for p.
@@ -293,6 +314,7 @@ func argList(params []problem.Param, slice string) (string, error) {
 func (Language) Build(ctx context.Context, dir, binDir string) error {
 	cmd := exec.CommandContext(ctx, "go", "build", "-o", filepath.Join(binDir, binName), ".")
 	cmd.Dir = dir
+	cmd.Env = localToolchain()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		if _, ok := errors.AsType[*exec.ExitError](err); ok {
@@ -332,5 +354,12 @@ func (Language) DebugCommand(dir, binDir string, p *problem.Problem, opts lang.D
 	}
 	cmd := exec.Command("dlv", args...)
 	cmd.Dir = dir
+	cmd.Env = localToolchain()
 	return cmd, nil
+}
+
+// localToolchain is the environment for go commands: always the installed
+// toolchain, never one downloaded on demand, so hc stays offline.
+func localToolchain() []string {
+	return append(os.Environ(), "GOTOOLCHAIN=local")
 }
