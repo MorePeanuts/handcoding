@@ -119,14 +119,20 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 		}
 		return out
 	}
-	if md.ClassName != "" || md.SystemDesign {
+	fromTemplate := usesJudgeTypes(conv.Templates["solution.go"])
+	switch {
+	case fromTemplate:
+		if err := templateSignature(p, conv.Templates["solution.go"], conv.Templates["solution.py"]); err != nil {
+			return nil, err
+		}
+	case md.ClassName != "" || md.SystemDesign:
 		p.Kind = problem.KindClass
 		c := &problem.Class{Name: md.ClassName, Constructor: params(md.Constructor.Params)}
 		for _, m := range md.Methods {
 			c.Methods = append(c.Methods, problem.Method{Name: m.Name, Params: params(m.Params), Returns: m.Return.Type})
 		}
 		p.Class = c
-	} else {
+	default:
 		if md.Name == "" {
 			return nil, fmt.Errorf("LeetCode's metadata for %s names no function or class: %w", q.TitleSlug, ErrUnsupported)
 		}
@@ -150,9 +156,9 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 	if md.Manual {
 		// For custom-judge problems the metadata may describe LeetCode's
 		// serialized test data rather than the code the user writes
-		// (Clone Graph: edges integer[][] -> boolean, but the template
-		// takes a *Node). Trust it only if the template agrees.
-		if sig, ok := goSignatureMatches(p, conv.Templates["solution.go"]); !ok {
+		// (Delete Node in a Linked List: head and node, but the template
+		// takes only the node). Trust it only if the template agrees.
+		if sig, ok := goSignatureMatches(p, conv.Templates["solution.go"]); !fromTemplate && !ok {
 			return nil, fmt.Errorf("%s is judged by LeetCode's own checker, and its real signature %s cannot be driven by hc: %w", p.Slug, sig, ErrUnsupported)
 		}
 		conv.Warnings = append(conv.Warnings, "LeetCode judges this problem with its own checker; hc gen has to work out how to judge it")

@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "589",
+  "title": "N-ary Tree Preorder Traversal",
+  "titleSlug": "n-ary-tree-preorder-traversal",
+  "difficulty": "Easy",
+  "content": "<pre>\n<strong>Input:</strong> root = [1,null,3,2,4,null,5,6]\n<strong>Output:</strong> [1,3,5,6,2,4]\n</pre>\n<pre>\n<strong>Input:</strong> root = [1,null,2,3,4,5,null,null,6,7,null,8,null,9,10,null,null,11,null,12,null,13,null,null,14]\n<strong>Output:</strong> [1,2,3,6,7,11,14,4,8,12,5,9,13,10]\n</pre>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "\"\"\"\n# Definition for a Node.\nclass Node:\n    def __init__(self, val: Optional[int] = None, children: Optional[List['Node']] = None):\n        self.val = val\n        self.children = children\n\"\"\"\n\nclass Solution:\n    def preorder(self, root: 'Node') -> List[int]:\n        "
+    },
+    {
+      "langSlug": "golang",
+      "code": "/**\n * Definition for a Node.\n * type Node struct {\n *     Val int\n *     Children []*Node\n * }\n */\n\nfunc preorder(root *Node) []int {\n    \n}"
+    }
+  ],
+  "metaData": "{\n  \"name\": \"preorder\",\n  \"params\": [\n    {\n      \"name\": \"root\",\n      \"type\": \"integer\"\n    }\n  ],\n  \"return\": {\n    \"type\": \"list<integer>\"\n  },\n  \"languages\": [\n    \"cpp\",\n    \"java\",\n    \"python\",\n    \"csharp\",\n    \"javascript\",\n    \"python3\",\n    \"golang\",\n    \"ruby\",\n    \"c\",\n    \"kotlin\",\n    \"scala\",\n    \"php\",\n    \"swift\",\n    \"typescript\"\n  ],\n  \"manual\": true, \"typescriptCustomType\" : \"class _Node {\\n    val: number\\n    children: _Node[]\\n\\n    constructor(val?: number, children?: _Node[]) {\\n        this.val = (val===undefined ? 0 : val)\\n        this.children = (children===undefined ? [] : children)\\n    }\\n}\\n\"\n\n}",
+  "exampleTestcases": "[1,null,3,2,4,null,5,6]\n[1,null,2,3,4,5,null,null,6,7,null,8,null,9,10,null,null,11,null,12,null,13,null,null,14]"
+}

@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "430",
+  "title": "Flatten a Multilevel Doubly Linked List",
+  "titleSlug": "flatten-a-multilevel-doubly-linked-list",
+  "difficulty": "Medium",
+  "content": "<pre>\n<strong>Input:</strong> head = [1,2,3,4,5,6,null,null,null,7,8,9,10,null,null,11,12]\n<strong>Output:</strong> [1,2,3,7,8,11,12,9,10,4,5,6]\n<strong>Explanation:</strong> The multilevel linked list in the input is shown.\nAfter flattening the multilevel linked list it becomes:\n<img src=\"https://assets.leetcode.com/uploads/2021/11/09/flatten12.jpg\" style=\"width: 1000px; height: 69px;\" />\n</pre>\n<pre>\n<strong>Input:</strong> head = [1,2,null,3]\n<strong>Output:</strong> [1,3,2]\n<strong>Explanation:</strong> The multilevel linked list in the input is shown.\nAfter flattening the multilevel linked list it becomes:\n<img src=\"https://assets.leetcode.com/uploads/2021/11/24/list.jpg\" style=\"width: 300px; height: 87px;\" />\n</pre>\n<pre>\n<strong>Input:</strong> head = []\n<strong>Output:</strong> []\n<strong>Explanation:</strong> There could be empty list in the input.\n</pre>\n<pre>\n 1---2---3---4---5---6--NULL\n         |\n         7---8---9---10--NULL\n             |\n             11--12--NULL</pre>\n<pre>\n[1,2,3,4,5,6,null]\n[7,8,9,10,null]\n[11,12,null]\n</pre>\n<pre>\n[1,    2,    3, 4, 5, 6, null]\n             |\n[null, null, 7,    8, 9, 10, null]\n                   |\n[            null, 11, 12, null]\n</pre>\n<pre>\n[1,2,3,4,5,6,null,null,null,7,8,9,10,null,null,11,12]\n</pre>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "\"\"\"\n# Definition for a Node.\nclass Node:\n    def __init__(self, val, prev, next, child):\n        self.val = val\n        self.prev = prev\n        self.next = next\n        self.child = child\n\"\"\"\n\nclass Solution:\n    def flatten(self, head: 'Optional[Node]') -> 'Optional[Node]':\n        "
+    },
+    {
+      "langSlug": "golang",
+      "code": "/**\n * Definition for a Node.\n * type Node struct {\n *     Val int\n *     Prev *Node\n *     Next *Node\n *     Child *Node\n * }\n */\n\nfunc flatten(root *Node) *Node {\n    \n}"
+    }
+  ],
+  "metaData": "{\n  \"name\": \"flatten\",\n  \"params\": [\n    {\n      \"name\": \"head\",\n      \"type\": \"ListNode\"\n    }\n  ],\n  \"return\": {\n    \"type\": \"ListNode\"\n  },\n  \"languages\": [\n    \"cpp\",\n    \"java\",\n    \"python\",\n    \"csharp\",\n    \"javascript\",\n    \"python3\",\n    \"kotlin\",\n    \"ruby\",\n    \"scala\",\n    \"golang\",\n    \"swift\",\n    \"php\",\n    \"typescript\"\n  ],\n  \"manual\": true, \"typescriptCustomType\" : \"class _Node {\\n    val: number\\n    prev: _Node | null\\n    next: _Node | null\\n    child: _Node | null\\n    \\n    constructor(val?: number, prev? : _Node, next? : _Node, child? : _Node) {\\n        this.val = (val===undefined ? 0 : val);\\n        this.prev = (prev===undefined ? null : prev);\\n        this.next = (next===undefined ? null : next);\\n        this.child = (child===undefined ? null : child);\\n    }\\n}\\n\"\n\n}",
+  "exampleTestcases": "[1,2,3,4,5,6,null,null,null,7,8,9,10,null,null,11,12]\n[1,2,null,3]\n[]"
+}

@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "427",
+  "title": "Construct Quad Tree",
+  "titleSlug": "construct-quad-tree",
+  "difficulty": "Medium",
+  "content": "<pre>\nclass Node {\n    public boolean val;\n    public boolean isLeaf;\n    public Node topLeft;\n    public Node topRight;\n    public Node bottomLeft;\n    public Node bottomRight;\n}</pre>\n<pre>\n<strong>Input:</strong> grid = [[0,1],[1,0]]\n<strong>Output:</strong> [[0,1],[1,0],[1,1],[1,1],[1,0]]\n<strong>Explanation:</strong> The explanation of this example is shown below:\nNotice that 0 represents False and 1 represents True in the photo representing the Quad-Tree.\n<img alt=\"\" src=\"https://assets.leetcode.com/uploads/2020/02/12/e1tree.png\" style=\"width: 777px; height: 186px;\" />\n</pre>\n<pre>\n<strong>Input:</strong> grid = [[1,1,1,1,0,0,0,0],[1,1,1,1,0,0,0,0],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[1,1,1,1,0,0,0,0],[1,1,1,1,0,0,0,0],[1,1,1,1,0,0,0,0],[1,1,1,1,0,0,0,0]]\n<strong>Output:</strong> [[0,1],[1,1],[0,1],[1,1],[1,0],null,null,null,null,[1,0],[1,0],[1,1],[1,1]]\n<strong>Explanation:</strong> All values in the grid are not the same. We divide the grid into four sub-grids.\nThe topLeft, bottomLeft and bottomRight each has the same value.\nThe topRight have different values so we divide it into 4 sub-grids where each has the same value.\nExplanation is shown in the photo below:\n<img alt=\"\" src=\"https://assets.leetcode.com/uploads/2020/02/12/e2tree.png\" style=\"width: 777px; height: 328px;\" />\n</pre>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "\"\"\"\n# Definition for a QuadTree node.\nclass Node:\n    def __init__(self, val, isLeaf, topLeft, topRight, bottomLeft, bottomRight):\n        self.val = val\n        self.isLeaf = isLeaf\n        self.topLeft = topLeft\n        self.topRight = topRight\n        self.bottomLeft = bottomLeft\n        self.bottomRight = bottomRight\n\"\"\"\n\nclass Solution:\n    def construct(self, grid: List[List[int]]) -> 'Node':\n        "
+    },
+    {
+      "langSlug": "golang",
+      "code": "/**\n * Definition for a QuadTree node.\n * type Node struct {\n *     Val bool\n *     IsLeaf bool\n *     TopLeft *Node\n *     TopRight *Node\n *     BottomLeft *Node\n *     BottomRight *Node\n * }\n */\n\nfunc construct(grid [][]int) *Node {\n    \n}"
+    }
+  ],
+  "metaData": "{\n  \"name\": \"construct\",\n  \"params\": [\n    {\n      \"name\": \"grid\",\n      \"type\": \"integer[][]\"\n    }\n  ],\n  \"return\": {\n    \"type\": \"list<list<integer>>\"\n  },\n  \"languages\": [\n    \"cpp\",\n    \"java\",\n    \"python\",\n    \"csharp\",\n    \"javascript\",\n    \"python3\",\n    \"kotlin\",\n    \"ruby\",\n    \"scala\",\n    \"swift\",\n    \"golang\",\n    \"php\",\n    \"typescript\"\n  ],\n  \"manual\": true, \"typescriptCustomType\" : \"class _Node {\\n    val: boolean\\n    isLeaf: boolean\\n    topLeft: _Node | null\\n\\ttopRight: _Node | null\\n\\tbottomLeft: _Node | null\\n\\tbottomRight: _Node | null\\n\\tconstructor(val?: boolean, isLeaf?: boolean, topLeft?: _Node, topRight?: _Node, bottomLeft?: _Node, bottomRight?: _Node) {\\n        this.val = (val===undefined ? false : val)\\n        this.isLeaf = (isLeaf===undefined ? false : isLeaf)\\n        this.topLeft = (topLeft===undefined ? null : topLeft)\\n        this.topRight = (topRight===undefined ? null : topRight)\\n        this.bottomLeft = (bottomLeft===undefined ? null : bottomLeft)\\n        this.bottomRight = (bottomRight===undefined ? null : bottomRight)\\n  }\\n}\\n\"\n\n}",
+  "exampleTestcases": "[[0,1],[1,0]]\n[[1,1,1,1,0,0,0,0],[1,1,1,1,0,0,0,0],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[1,1,1,1,0,0,0,0],[1,1,1,1,0,0,0,0],[1,1,1,1,0,0,0,0],[1,1,1,1,0,0,0,0]]"
+}

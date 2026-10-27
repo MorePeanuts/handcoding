@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "690",
+  "title": "Employee Importance",
+  "titleSlug": "employee-importance",
+  "difficulty": "Medium",
+  "content": "<pre>\n<strong>Input:</strong> employees = [[1,5,[2,3]],[2,3,[]],[3,3,[]]], id = 1\n<strong>Output:</strong> 11\n<strong>Explanation:</strong> Employee 1 has an importance value of 5 and has two direct subordinates: employee 2 and employee 3.\nThey both have an importance value of 3.\nThus, the total importance value of employee 1 is 5 + 3 + 3 = 11.\n</pre>\n<pre>\n<strong>Input:</strong> employees = [[1,2,[5]],[5,-3,[]]], id = 5\n<strong>Output:</strong> -3\n<strong>Explanation:</strong> Employee 5 has an importance value of -3 and has no direct subordinates.\nThus, the total importance value of employee 5 is -3.\n</pre>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "\"\"\"\n# Definition for Employee.\nclass Employee:\n    def __init__(self, id: int, importance: int, subordinates: List[int]):\n        self.id = id\n        self.importance = importance\n        self.subordinates = subordinates\n\"\"\"\n\nclass Solution:\n    def getImportance(self, employees: List['Employee'], id: int) -> int:\n        "
+    },
+    {
+      "langSlug": "golang",
+      "code": "/**\n * Definition for Employee.\n * type Employee struct {\n *     Id int\n *     Importance int\n *     Subordinates []int\n * }\n */\n\nfunc getImportance(employees []*Employee, id int) int {\n    \n}"
+    }
+  ],
+  "metaData": "{\n  \"name\": \"getImportance\",\n  \"params\": [\n    {\n      \"name\": \"employees\",\n      \"type\": \"list<string>\"\n    },\n    {\n      \"name\": \"id\",\n      \"type\": \"integer\"\n    }\n  ],\n  \"return\": {\n    \"type\": \"integer\"\n  },\n  \"languages\": [\n    \"cpp\",\n    \"java\",\n    \"python\",\n    \"ruby\",\n    \"python3\",\n    \"kotlin\",\n    \"scala\",\n    \"csharp\",\n    \"javascript\",\n    \"swift\",\n    \"golang\",\n    \"php\",\n    \"typescript\"\n  ],\n  \"manual\": true,\n  \"typescriptCustomType\":\"class Employee {\\n    id: number;\\n    importance: number;\\n    subordinates: number[];\\n    constructor(id: number, importance: number, subordinates: number[]) {\\n        this.id = (id === undefined) ? 0 : id;\\n        this.importance = (importance === undefined) ? 0 : importance;\\n        this.subordinates = (subordinates === undefined) ? [] : subordinates;\\n    }\\n}\"\n  \n}",
+  "exampleTestcases": "[[1,5,[2,3]],[2,3,[]],[3,3,[]]]\n1\n[[1,2,[5]],[5,-3,[]]]\n5"
+}

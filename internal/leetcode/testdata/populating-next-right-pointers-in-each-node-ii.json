@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "117",
+  "title": "Populating Next Right Pointers in Each Node II",
+  "titleSlug": "populating-next-right-pointers-in-each-node-ii",
+  "difficulty": "Medium",
+  "content": "<pre>\nstruct Node {\n  int val;\n  Node *left;\n  Node *right;\n  Node *next;\n}\n</pre>\n<pre>\n<strong>Input:</strong> root = [1,2,3,4,5,null,7]\n<strong>Output:</strong> [1,#,2,3,#,4,5,7,#]\n<strong>Explanation: </strong>Given the above binary tree (Figure A), your function should populate each next pointer to point to its next right node, just like in Figure B. The serialized output is in level order as connected by the next pointers, with &#39;#&#39; signifying the end of each level.\n</pre>\n<pre>\n<strong>Input:</strong> root = []\n<strong>Output:</strong> []\n</pre>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "\"\"\"\n# Definition for a Node.\nclass Node:\n    def __init__(self, val: int = 0, left: 'Node' = None, right: 'Node' = None, next: 'Node' = None):\n        self.val = val\n        self.left = left\n        self.right = right\n        self.next = next\n\"\"\"\n\nclass Solution:\n    def connect(self, root: 'Node') -> 'Node':\n        "
+    },
+    {
+      "langSlug": "golang",
+      "code": "/**\n * Definition for a Node.\n * type Node struct {\n *     Val int\n *     Left *Node\n *     Right *Node\n *     Next *Node\n * }\n */\n\nfunc connect(root *Node) *Node {\n\t\n}"
+    }
+  ],
+  "metaData": "{\n  \"name\": \"connect\",\n  \"params\": [\n    {\n      \"name\": \"root\",\n      \"type\": \"TreeNode\"\n    }\n  ],\n  \"return\": {\n    \"type\": \"TreeNode\"\n  },\n  \"languages\": [\n    \"cpp\",\n    \"java\",\n    \"python\",\n    \"csharp\",\n    \"javascript\",\n    \"python3\",\n    \"golang\",\n    \"swift\",\n    \"kotlin\",\n    \"ruby\",\n    \"c\",\n    \"scala\",\n    \"php\",\n    \"typescript\"\n  ],\n  \"manual\": true,\n      \"typescriptCustomType\" : \"class _Node {\\n    val: number\\n    left: _Node | null\\n    right: _Node | null\\n    next: _Node | null\\n\\n    constructor(val?: number, left?: _Node, right?: _Node, next?: _Node) {\\n        this.val = (val===undefined ? 0 : val)\\n        this.left = (left===undefined ? null : left)\\n        this.right = (right===undefined ? null : right)\\n        this.next = (next===undefined ? null : next)\\n    }\\n}\\n\"\n\n}",
+  "exampleTestcases": "[1,2,3,4,5,null,7]\n[]"
+}

@@ -128,9 +128,8 @@ Case values and `expected` use these forms:
 Let `hc cases build` compute `expected` for these as for any other type.
 When the function returns a deep copy of a parameter (133 Clone Graph, 138
 Copy List with Random Pointer), add `returns_copy: <param>` to `function`:
-returning any original node is then a runtime error. Fetched problems may
-declare such parameters with LeetCode's test-data types (589 `root:
-integer`, 138 `head: ListNode`); fix them to the template's `*Node`.
+returning any original node is then a runtime error; `hc fetch` never sets
+it.
 
 ### NestedInteger and Employee
 
@@ -142,7 +141,8 @@ Also judge-defined, under LeetCode's names (Python references import them:
   `[[1,1],2,[1,1]]`). A function may return one (385: `"expected":
   [123,[456,[789]]]` or `324`). Iterator problems (341) are class problems:
   write `ops` as the statement's test loop, `hasNext` then `next` until
-  `hasNext` is false.
+  `hasNext` is false. `hc fetch` drops their examples, which give only the
+  constructor's input; write them as `example: true` cases.
 - `Employee`: `[id, importance, [subordinate ids]]`; `"Employee[]"` needs
   distinct ids and known subordinates (690).
 

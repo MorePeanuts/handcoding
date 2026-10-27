@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "138",
+  "title": "Copy List with Random Pointer",
+  "titleSlug": "copy-list-with-random-pointer",
+  "difficulty": "Medium",
+  "content": "<pre>\n<strong>Input:</strong> head = [[7,null],[13,0],[11,4],[10,2],[1,0]]\n<strong>Output:</strong> [[7,null],[13,0],[11,4],[10,2],[1,0]]\n</pre>\n<pre>\n<strong>Input:</strong> head = [[1,1],[2,1]]\n<strong>Output:</strong> [[1,1],[2,1]]\n</pre>\n<pre>\n<strong>Input:</strong> head = [[3,null],[3,0],[3,null]]\n<strong>Output:</strong> [[3,null],[3,0],[3,null]]\n</pre>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "\"\"\"\n# Definition for a Node.\nclass Node:\n    def __init__(self, x: int, next: 'Node' = None, random: 'Node' = None):\n        self.val = int(x)\n        self.next = next\n        self.random = random\n\"\"\"\n\nclass Solution:\n    def copyRandomList(self, head: 'Optional[Node]') -> 'Optional[Node]':\n        "
+    },
+    {
+      "langSlug": "golang",
+      "code": "/**\n * Definition for a Node.\n * type Node struct {\n *     Val int\n *     Next *Node\n *     Random *Node\n * }\n */\n\nfunc copyRandomList(head *Node) *Node {\n    \n}"
+    }
+  ],
+  "metaData": "{\n  \"name\": \"copyRandomList\",\n  \"params\": [\n    {\n      \"name\": \"head\",\n      \"type\": \"ListNode\"\n    }\n  ],\n  \"return\": {\n    \"type\": \"ListNode\"\n  },\n  \"languages\": [\n    \"cpp\",\n    \"java\",\n    \"python\",\n    \"csharp\",\n    \"javascript\",\n    \"python3\",\n    \"golang\",\n    \"swift\",\n    \"kotlin\",\n    \"ruby\",\n    \"c\",\n    \"scala\",\n    \"php\",\n    \"typescript\"\n  ],\n  \"manual\": true,\n\"typescriptCustomType\" : \"class _Node {\\n    val: number\\n    next: _Node | null\\n    random: _Node | null\\n\\n    constructor(val?: number, next?: _Node, random?: _Node) {\\n        this.val = (val===undefined ? 0 : val)\\n        this.next = (next===undefined ? null : next)\\n        this.random = (random===undefined ? null : random)\\n    }\\n}\\n\"\n\n}",
+  "exampleTestcases": "[[7,null],[13,0],[11,4],[10,2],[1,0]]\n[[1,1],[2,1]]\n[[3,null],[3,0],[3,null]]"
+}
