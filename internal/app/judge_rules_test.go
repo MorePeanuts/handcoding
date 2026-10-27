@@ -184,6 +184,48 @@ func TestInPlaceBoard(t *testing.T) {
 	}
 }
 
+const echoYAML = `slug: echo
+title: Echo
+function:
+  name: echo
+  params:
+    - name: s
+      type: string
+  returns: string
+judge:
+  compare: exact
+`
+
+// TestNonASCIIOutput checks that both drivers write text outputs as UTF-8,
+// not as \u escapes, so reports show what the solution returned.
+func TestNonASCIIOutput(t *testing.T) {
+	requireTools(t, "go", "python3")
+	a := newWorkspace(t)
+	p := addProblem(t, a, "echo", echoYAML, `{"input":{"s":"你好&<>"},"expected":"你好&<>!"}`+"\n")
+	cases, _ := p.LoadCases()
+	sel, _ := app.Select(cases, nil, true)
+	tests := []struct {
+		lang, code, output string
+		want               runner.Verdict
+	}{
+		{"go", "package main\n\nfunc echo(s string) string { return s + \"!\" }\n", `"你好&<>!"`, runner.Accepted},
+		{"python", "class Solution:\n    def echo(self, s):\n        return s + '!'\n", `"你好&<>!"`, runner.Accepted},
+		// A lone surrogate cannot be written as UTF-8; it stays an escape.
+		{"python", "class Solution:\n    def echo(self, s):\n        return s + '\\udc80'\n", `"你好&<>\udc80"`, runner.WrongAnswer},
+	}
+	for _, tt := range tests {
+		l := writeSolution(t, a, p, tt.lang, tt.code)
+		rep, err := a.Run(context.Background(), p, l, sel, app.RunOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := rep.Cases[0]
+		if got := string(c.Output); got != tt.output || c.Verdict != tt.want {
+			t.Errorf("%s %q: output %s (%s), want %s (%s): %s", tt.lang, tt.code, got, c.Verdict, tt.output, tt.want, c.Error)
+		}
+	}
+}
+
 // TestStructureInputs checks how both drivers build structure inputs and
 // judge returned nodes beyond what the references exercise: a returned node
 // that belongs to another structure is a runtime error, a wrong node is a

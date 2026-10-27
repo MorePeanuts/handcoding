@@ -267,7 +267,7 @@ func (l Language) CheckCommand(ctx context.Context, dir, checker, items, out str
 const syntaxCheck = `import sys, traceback
 path = sys.argv[1]
 try:
-    compile(open(path).read(), path, "exec")
+    compile(open(path, "rb").read(), path, "exec")
 except SyntaxError:
     sys.stderr.write("".join(traceback.format_exc(limit=0)))
     sys.exit(1)

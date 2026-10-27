@@ -773,7 +773,10 @@ def main(meta):
         sys.path.insert(0, here)
     import solution  # noqa: E402
 
-    with open(os.environ["HC_CASES"]) as f:
+    # hc reads and writes UTF-8 whatever the locale. Outputs keep non-ASCII
+    # text as it is, like the Go driver, rather than as \u escapes; a lone
+    # surrogate a solution returns is written as an escape.
+    with open(os.environ["HC_CASES"], encoding="utf-8") as f:
         cases = json.load(f)
     if meta.get("round_trip"):
         call = _call_round_trip
@@ -781,7 +784,7 @@ def main(meta):
         call = _call_class
     else:
         call = _call_function
-    with open(os.environ["HC_OUT"], "w") as out:
+    with open(os.environ["HC_OUT"], "w", encoding="utf-8", errors="backslashreplace") as out:
         for c in cases:
             res = {"id": c["id"], "output": None, "elapsed_ns": 0}
             try:
@@ -796,5 +799,5 @@ def main(meta):
             except Exception as e:  # noqa: BLE001
                 res["output"] = None
                 res["error"] = _user_traceback(e)
-            out.write(json.dumps(res) + "\n")
+            out.write(json.dumps(res, ensure_ascii=False) + "\n")
             out.flush()

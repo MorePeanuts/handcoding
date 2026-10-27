@@ -54,12 +54,12 @@ def _decide(verdict):
 def main():
     path, items_path, out_path = sys.argv[1:4]
     path = os.path.abspath(path)
-    with open(items_path) as f:
+    with open(items_path, encoding="utf-8") as f:
         items = json.load(f)
-    with open(out_path, "w") as out:
+    with open(out_path, "w", encoding="utf-8", errors="backslashreplace") as out:
 
         def emit(res):
-            out.write(json.dumps(res) + "\n")
+            out.write(json.dumps(res, ensure_ascii=False) + "\n")
             out.flush()
 
         try:
