@@ -235,7 +235,7 @@ For each case the driver decodes the input, constructs an instance and calls `en
 
 Both instances live in the same process, as on LeetCode. An `encode` that does not return a string is a runtime error. The run time covers both calls. Other methods of the class are never called, and a requirement such as 449's "as compact as possible" is not judged.
 
-The built-in samples 297 (`separate`) and 535 (`same`) show both kinds.
+The built-in samples 297 (`separate`) and 535 (`same`) show both kinds. `hc fetch` sets `round_trip` for these problems from the harness in the comment of LeetCode's templates (`ans = deser.deserialize(ser.serialize(root))`, or the same calls through a variable), and reads the signature from the templates; it leaves `judge.compare` to `hc gen` as usual.
 
 Rules: `round_trip` is only for design problems; `encode` and `decode` name two different methods of the class; `encode` takes exactly one parameter and returns `string`; `decode` takes exactly one `string` parameter and returns the type of `encode`'s parameter; the constructor takes no parameters; `instances` is `separate` or `same`.
 

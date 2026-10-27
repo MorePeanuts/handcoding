@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "535",
+  "title": "Encode and Decode TinyURL",
+  "titleSlug": "encode-and-decode-tinyurl",
+  "difficulty": "Medium",
+  "content": "<p><strong class=\"example\">Example 1:</strong></p>\n\n<pre>\n<strong>Input:</strong> url = &quot;https://leetcode.com/problems/design-tinyurl&quot;\n<strong>Output:</strong> &quot;https://leetcode.com/problems/design-tinyurl&quot;\n\n<strong>Explanation:</strong>\nSolution obj = new Solution();\nstring tiny = obj.encode(url); // returns the encoded tiny url.\nstring ans = obj.decode(tiny); // returns the original url after decoding it.\n</pre>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "class Codec:\n\n    def encode(self, longUrl: str) -> str:\n        \"\"\"Encodes a URL to a shortened URL.\n        \"\"\"\n        \n\n    def decode(self, shortUrl: str) -> str:\n        \"\"\"Decodes a shortened URL to its original URL.\n        \"\"\"\n        \n\n# Your Codec object will be instantiated and called as such:\n# codec = Codec()\n# codec.decode(codec.encode(url))"
+    },
+    {
+      "langSlug": "golang",
+      "code": "type Codec struct {\n    \n}\n\n\nfunc Constructor() Codec {\n    \n}\n\n// Encodes a URL to a shortened URL.\nfunc (this *Codec) encode(longUrl string) string {\n\t\n}\n\n// Decodes a shortened URL to its original URL.\nfunc (this *Codec) decode(shortUrl string) string {\n    \n}\n\n\n/**\n * Your Codec object will be instantiated and called as such:\n * obj := Constructor();\n * url := obj.encode(longUrl);\n * ans := obj.decode(url);\n */\n"
+    }
+  ],
+  "metaData": "{\n  \"name\": \"CodecDriver\",\n  \"params\": [\n    {\n      \"name\": \"url\",\n      \"type\": \"string\"\n    }\n  ],\n  \"return\": {\n    \"type\": \"string\"\n  },\n  \"manual\": true\n}",
+  "exampleTestcases": "\"https://leetcode.com/problems/design-tinyurl\""
+}

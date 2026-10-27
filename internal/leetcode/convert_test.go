@@ -343,3 +343,85 @@ func TestConvertUnsupportedTemplates(t *testing.T) {
 		}
 	}
 }
+
+// Encoders judged by decoding are imported as round trips: the class from
+// the templates (metaData names one function), encode and decode from the
+// harness in their comments, examples as encode's parameter.
+func TestConvertRoundTrip(t *testing.T) {
+	tests := []struct {
+		slug, signature, input, expected string
+		rt                               problem.RoundTrip
+	}{
+		{"serialize-and-deserialize-binary-tree", "Codec(); serialize(root TreeNode) string; deserialize(data string) TreeNode",
+			`{"root":[1,2,3,null,null,4,5]}`, `[1,2,3,null,null,4,5]`, problem.RoundTrip{Encode: "serialize", Decode: "deserialize", Instances: problem.InstancesSeparate}},
+		// The harness keeps the encoded tree in a variable.
+		{"serialize-and-deserialize-bst", "Codec(); serialize(root TreeNode) string; deserialize(data string) TreeNode",
+			`{"root":[2,1,3]}`, `[2,1,3]`, problem.RoundTrip{Encode: "serialize", Decode: "deserialize", Instances: problem.InstancesSeparate}},
+		{"encode-and-decode-tinyurl", "Codec(); encode(longUrl string) string; decode(shortUrl string) string",
+			`{"longUrl":"https://leetcode.com/problems/design-tinyurl"}`, `"https://leetcode.com/problems/design-tinyurl"`, problem.RoundTrip{Encode: "encode", Decode: "decode", Instances: problem.InstancesSame}},
+	}
+	for _, tt := range tests {
+		c, err := Convert(loadQuestion(t, tt.slug), SiteCom, false)
+		if err != nil {
+			t.Errorf("%s: %v", tt.slug, err)
+			continue
+		}
+		p := c.Problem
+		if got := signature(p); got != tt.signature {
+			t.Errorf("%s: signature %s, want %s", tt.slug, got, tt.signature)
+		}
+		if p.Judge.RoundTrip == nil || *p.Judge.RoundTrip != tt.rt {
+			t.Errorf("%s: round trip %+v, want %+v", tt.slug, p.Judge.RoundTrip, tt.rt)
+		}
+		if p.Ready() {
+			t.Errorf("%s: judge.compare %q, want it left for hc gen", tt.slug, p.Judge.Compare)
+		}
+		if len(c.Cases) == 0 {
+			t.Errorf("%s: no examples (warnings %q)", tt.slug, c.Warnings)
+			continue
+		}
+		in, _ := json.Marshal(c.Cases[0].Input)
+		if string(in) != tt.input || string(c.Cases[0].Expected) != tt.expected {
+			t.Errorf("%s: first example %s -> %s, want %s -> %s", tt.slug, in, c.Cases[0].Expected, tt.input, tt.expected)
+		}
+		for _, w := range c.Warnings {
+			if strings.Contains(w, "own checker") {
+				t.Errorf("%s: warning %q", tt.slug, w)
+			}
+		}
+	}
+}
+
+func TestHarnessRoundTrip(t *testing.T) {
+	tests := []struct {
+		comment string
+		want    *problem.RoundTrip
+	}{
+		{"ser = Codec()\ndeser = Codec()\nans = deser.deserialize(ser.serialize(root))",
+			&problem.RoundTrip{Encode: "serialize", Decode: "deserialize", Instances: problem.InstancesSeparate}},
+		{"codec = Codec()\ncodec.decode(codec.encode(url))",
+			&problem.RoundTrip{Encode: "encode", Decode: "decode", Instances: problem.InstancesSame}},
+		{"ser := Constructor();\ndeser := Constructor();\ndata := ser.serialize(root);\nans := deser.deserialize(data);",
+			&problem.RoundTrip{Encode: "serialize", Decode: "deserialize", Instances: problem.InstancesSeparate}},
+		{"obj := Constructor();\nurl := obj.encode(longUrl);\nans := obj.decode(url);",
+			&problem.RoundTrip{Encode: "encode", Decode: "decode", Instances: problem.InstancesSame}},
+		// A design problem's calls do not feed each other.
+		{"obj := Constructor(capacity);\nparam_1 := obj.Get(key);\nobj.Put(key,value);", nil},
+		{"", nil},
+	}
+	for _, tt := range tests {
+		got := harnessRoundTrip(tt.comment)
+		if (got == nil) != (tt.want == nil) || got != nil && *got != *tt.want {
+			t.Errorf("%q: %+v, want %+v", tt.comment, got, tt.want)
+		}
+	}
+}
+
+// A harness over a function template cannot be driven as a round trip.
+func TestConvertRoundTripFunction(t *testing.T) {
+	q := &Question{QuestionFrontendID: "1", Title: "X", TitleSlug: "x", MetaData: `{"name":"f","params":[{"name":"s","type":"string"}],"return":{"type":"string"},"manual":true}`,
+		CodeSnippets: goSnippet("func f(s string) string {\n\n}\n\n/**\n * data := c.encode(s)\n * ans := c.decode(data)\n */")}
+	if _, err := Convert(q, SiteCom, false); err == nil || !strings.Contains(err.Error(), "judge.round_trip is for class problems only") {
+		t.Errorf("error = %v", err)
+	}
+}

@@ -235,7 +235,7 @@ judge:
 
 两个实例在同一个进程中，和 LeetCode 一样。`encode` 返回的不是字符串时判为运行错误。运行时间包括两次调用。类的其他方法不会被调用，449 的"尽可能紧凑"这类要求也不评判。
 
-内置示例题 297（`separate`）和 535（`same`）分别展示了这两种情况。
+内置示例题 297（`separate`）和 535（`same`）分别展示了这两种情况。`hc fetch` 会根据 LeetCode 初始代码注释中的调用方式（`ans = deser.deserialize(ser.serialize(root))`，或经过一个变量的同样调用）为这类题目设置 `round_trip`，签名也取自初始代码；`judge.compare` 和平常一样留给 `hc gen` 决定。
 
 规则：`round_trip` 只用于设计题；`encode` 和 `decode` 是类中两个不同的方法；`encode` 恰好有一个参数并返回 `string`；`decode` 恰好有一个 `string` 参数，返回 `encode` 参数的类型；构造函数没有参数；`instances` 是 `separate` 或 `same`。
 

@@ -119,7 +119,13 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 		}
 		return out
 	}
-	fromTemplate := usesJudgeTypes(conv.Templates["solution.go"])
+	// Encoders judged by decoding (297, 449, 535) are custom-judged, and
+	// their metaData names a single function; the templates hold the class.
+	var roundTrip *problem.RoundTrip
+	if md.Manual {
+		roundTrip = templateRoundTrip(conv.Templates["solution.py"], conv.Templates["solution.go"])
+	}
+	fromTemplate := usesJudgeTypes(conv.Templates["solution.go"]) || roundTrip != nil
 	switch {
 	case fromTemplate:
 		if err := templateSignature(p, conv.Templates["solution.go"], conv.Templates["solution.py"]); err != nil {
@@ -149,6 +155,9 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 			}
 		}
 	}
+	// The round trip is part of the signature: without it the cases would
+	// be ops and args.
+	p.Judge.RoundTrip = roundTrip
 	p.Normalize()
 	if t := unsupportedType(p); t != "" {
 		return nil, fmt.Errorf("%s uses the type %s: %w", p.Slug, t, ErrUnsupported)
@@ -161,7 +170,9 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 		if sig, ok := goSignatureMatches(p, conv.Templates["solution.go"]); !fromTemplate && !ok {
 			return nil, fmt.Errorf("%s is judged by LeetCode's own checker, and its real signature %s cannot be driven by hc: %w", p.Slug, sig, ErrUnsupported)
 		}
-		conv.Warnings = append(conv.Warnings, "LeetCode judges this problem with its own checker; hc gen has to work out how to judge it")
+		if roundTrip == nil {
+			conv.Warnings = append(conv.Warnings, "LeetCode judges this problem with its own checker; hc gen has to work out how to judge it")
+		}
 	}
 	if err := p.Validate(); err != nil {
 		return nil, fmt.Errorf("%s cannot be judged by hc: %w", p.Slug, err)
@@ -303,7 +314,10 @@ func examples(p *problem.Problem, q *Question, english string) ([]problem.Case, 
 		return nil, "no example test cases provided by LeetCode"
 	}
 	perCase := 2
-	if p.Kind == problem.KindFunction {
+	switch {
+	case p.Judge.RoundTrip != nil:
+		perCase = 1 // the value to encode
+	case p.Kind == problem.KindFunction:
 		perCase = len(p.Function.Params)
 	}
 	if perCase == 0 || len(lines)%perCase != 0 {

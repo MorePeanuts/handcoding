@@ -94,6 +94,11 @@ judge:
   say so in your summary rather than inventing a check.
 - The constructor takes no parameters, encode takes one value and returns
   `string`, decode takes that `string` and returns the value's type.
+- `hc fetch` sets `round_trip` from the template's comment; keep it, and
+  still decide `judge.compare`.
+- If you also write `reference/solution.go`, give it another encoding
+  (preorder instead of level order, a hash instead of a counter), so that
+  the cases do not depend on one format.
 
 ### Structure inputs (function problems only)
 
@@ -270,7 +275,9 @@ deterministic calls with it (`reset`).
      fits;
    - in-place problems: `judge.output` (and `output_length: return` when only
      the first k elements count) come from LeetCode's metadata — keep them;
-     they combine with any mode, `checker` included.
+     they combine with any mode, `checker` included;
+   - round trips (`judge.round_trip`) → `exact`: the decoded value must equal
+     the input.
 3. Write a **reference solution** in `reference/solution.py` (it must run on
    Python 3.10, the oldest version hc supports; same shape as LeetCode:
    `class Solution` with the method, or the design class). Annotate with

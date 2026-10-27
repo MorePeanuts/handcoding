@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "449",
+  "title": "Serialize and Deserialize BST",
+  "titleSlug": "serialize-and-deserialize-bst",
+  "difficulty": "Medium",
+  "content": "<p><strong class=\"example\">Example 1:</strong></p>\n<pre><strong>Input:</strong> root = [2,1,3]\n<strong>Output:</strong> [2,1,3]\n</pre><p><strong class=\"example\">Example 2:</strong></p>\n<pre><strong>Input:</strong> root = []\n<strong>Output:</strong> []\n</pre>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "# Definition for a binary tree node.\n# class TreeNode:\n#     def __init__(self, x):\n#         self.val = x\n#         self.left = None\n#         self.right = None\n\nclass Codec:\n\n    def serialize(self, root: Optional[TreeNode]) -> str:\n        \"\"\"Encodes a tree to a single string.\n        \"\"\"\n        \n\n    def deserialize(self, data: str) -> Optional[TreeNode]:\n        \"\"\"Decodes your encoded data to tree.\n        \"\"\"\n        \n\n# Your Codec object will be instantiated and called as such:\n# Your Codec object will be instantiated and called as such:\n# ser = Codec()\n# deser = Codec()\n# tree = ser.serialize(root)\n# ans = deser.deserialize(tree)\n# return ans"
+    },
+    {
+      "langSlug": "golang",
+      "code": "/**\n * Definition for a binary tree node.\n * type TreeNode struct {\n *     Val int\n *     Left *TreeNode\n *     Right *TreeNode\n * }\n */\n\ntype Codec struct {\n    \n}\n\nfunc Constructor() Codec {\n    \n}\n\n// Serializes a tree to a single string.\nfunc (this *Codec) serialize(root *TreeNode) string {\n    \n}\n\n// Deserializes your encoded data to tree.\nfunc (this *Codec) deserialize(data string) *TreeNode {    \n    \n}\n\n\n/**\n * Your Codec object will be instantiated and called as such:\n * ser := Constructor()\n * deser := Constructor()\n * tree := ser.serialize(root)\n * ans := deser.deserialize(tree)\n * return ans\n */"
+    }
+  ],
+  "metaData": "{\n  \"name\": \"CodecDriver\",\n  \"params\": [\n    {\n      \"name\": \"root\",\n      \"type\": \"TreeNode\"\n    }\n  ],\n  \"return\": {\n    \"type\": \"TreeNode\"\n  },\n  \"manual\": true\n}",
+  "exampleTestcases": "[2,1,3]\n[]"
+}
