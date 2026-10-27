@@ -131,31 +131,55 @@ func (p *Problem) SaveCases(cases []Case) error {
 }
 
 // MarshalCase encodes a case as a single compact JSON line with input keys in
-// signature order.
+// sorted order. Values are re-encoded so that cases.jsonl stays readable
+// whoever wrote them: strings hold & < > and non-ASCII characters as they
+// are, not as \u escapes (Go's encoder escapes the former, Python's the
+// latter), and numbers keep their literal text.
 func MarshalCase(c Case) ([]byte, error) {
 	type out struct {
-		Input    json.RawMessage `json:"input"`
-		Expected json.RawMessage `json:"expected,omitempty"`
-		Example  bool            `json:"example,omitempty"`
-		Note     string          `json:"note,omitempty"`
+		Input    map[string]any `json:"input"`
+		Expected any            `json:"expected,omitempty"`
+		Example  bool           `json:"example,omitempty"`
+		Note     string         `json:"note,omitempty"`
 	}
-	in, err := json.Marshal(c.Input)
-	if err != nil {
-		return nil, err
+	o := out{Input: make(map[string]any, len(c.Input)), Example: c.Example, Note: c.Note}
+	for k, v := range c.Input {
+		d, err := decodeValue(v)
+		if err != nil {
+			return nil, fmt.Errorf("input %q: %w", k, err)
+		}
+		o.Input[k] = d
+	}
+	if c.HasExpected() {
+		d, err := decodeValue(c.Expected)
+		if err != nil {
+			return nil, fmt.Errorf("expected: %w", err)
+		}
+		// A literal null stays: it is a known expected output.
+		o.Expected = json.RawMessage("null")
+		if d != nil {
+			o.Expected = d
+		}
 	}
 	var b bytes.Buffer
-	if err := json.Compact(&b, in); err != nil {
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(o); err != nil {
 		return nil, err
 	}
-	o := out{Input: b.Bytes(), Example: c.Example, Note: c.Note}
-	if c.Expected != nil {
-		var e bytes.Buffer
-		if err := json.Compact(&e, c.Expected); err != nil {
-			return nil, err
-		}
-		o.Expected = e.Bytes()
+	return bytes.TrimSuffix(b.Bytes(), []byte("\n")), nil
+}
+
+// decodeValue decodes a JSON value, keeping numbers as json.Number so that
+// re-encoding them yields the same text.
+func decodeValue(raw json.RawMessage) (any, error) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var v any
+	if err := dec.Decode(&v); err != nil {
+		return nil, err
 	}
-	return json.Marshal(o)
+	return v, nil
 }
 
 // InputKeys are the keys a case input must provide: for function problems

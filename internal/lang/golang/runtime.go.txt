@@ -69,6 +69,7 @@ func main() {
 	}
 	defer out.Close()
 	enc := json.NewEncoder(out)
+	enc.SetEscapeHTML(false)
 	for _, c := range cases {
 		if err := enc.Encode(hcRun(c)); err != nil {
 			fmt.Fprintln(os.Stderr, "hc driver:", err)
@@ -94,12 +95,15 @@ func hcRun(c hcCase) (res hcResult) {
 	}()
 	hcElapsed = 0
 	v := hcNorm(reflect.ValueOf(hcCall(c.Input)))
-	b, err := json.Marshal(v)
-	if err != nil {
+	var b strings.Builder
+	enc := json.NewEncoder(&b)
+	// Write & < > as they are, as Python's json module does.
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
 		res.Error = "encode output: " + err.Error()
 		return res
 	}
-	res.Output = b
+	res.Output = json.RawMessage(strings.TrimSuffix(b.String(), "\n"))
 	res.ElapsedNs = hcElapsed.Nanoseconds()
 	return res
 }
