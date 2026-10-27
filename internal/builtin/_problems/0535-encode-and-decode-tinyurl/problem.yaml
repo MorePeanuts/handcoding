@@ -1,0 +1,27 @@
+id: "535"
+slug: encode-and-decode-tinyurl
+title: Encode and Decode TinyURL
+difficulty: medium
+tags: [hash-table, string, design, hash-function]
+kind: class
+class:
+  name: Codec
+  constructor: []
+  methods:
+    - name: encode
+      params:
+        - {name: longUrl, type: string}
+      returns: string
+    - name: decode
+      params:
+        - {name: shortUrl, type: string}
+      returns: string
+judge:
+  compare: exact
+  round_trip:
+    encode: encode
+    decode: decode
+    instances: same
+source:
+  site: builtin
+  url: https://leetcode.com/problems/encode-and-decode-tinyurl/
