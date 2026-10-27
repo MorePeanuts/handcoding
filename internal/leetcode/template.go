@@ -225,3 +225,56 @@ func unexported(name string) string {
 	}
 	return string(r)
 }
+
+// Round-trip problems (297, 449, 535) state LeetCode's harness in a comment
+// of their templates, in one of two forms:
+//
+//	ans = deser.deserialize(ser.serialize(root))
+//	url := obj.encode(longUrl); ans := obj.decode(url)
+var (
+	// nestedCallRE matches decoder.decode(encoder.encode(value)).
+	nestedCallRE = regexp.MustCompile(`(\w+)\.(\w+)\(\s*(\w+)\.(\w+)\(\s*\w+\s*\)\s*\)`)
+	// assignCallRE matches v = encoder.encode(value), or v := ...
+	assignCallRE = regexp.MustCompile(`(\w+)\s*:?=\s*(\w+)\.(\w+)\(\s*\w+\s*\)`)
+	// commentLineRE matches a comment line of a Python or Go template.
+	commentLineRE = regexp.MustCompile(`(?m)^\s*(?:#|//|/?\*+)(.*)$`)
+)
+
+// templateRoundTrip reads the encoder, the decoder and their instances from
+// the harness in the Python or the Go template's comments, or returns nil
+// when neither template states one.
+func templateRoundTrip(pyTemplate, goTemplate string) *problem.RoundTrip {
+	for _, t := range []string{pyTemplate, goTemplate} {
+		var b strings.Builder
+		for _, m := range commentLineRE.FindAllStringSubmatch(t, -1) {
+			b.WriteString(m[1] + "\n")
+		}
+		if rt := harnessRoundTrip(b.String()); rt != nil {
+			return rt
+		}
+	}
+	return nil
+}
+
+// harnessRoundTrip finds a call whose argument is what another call
+// returned, directly or through a variable.
+func harnessRoundTrip(comment string) *problem.RoundTrip {
+	mk := func(encRecv, enc, decRecv, dec string) *problem.RoundTrip {
+		rt := &problem.RoundTrip{Encode: enc, Decode: dec, Instances: problem.InstancesSeparate}
+		if encRecv == decRecv {
+			rt.Instances = problem.InstancesSame
+		}
+		return rt
+	}
+	if m := nestedCallRE.FindStringSubmatch(comment); m != nil {
+		return mk(m[3], m[4], m[1], m[2])
+	}
+	for _, a := range assignCallRE.FindAllStringSubmatchIndex(comment, -1) {
+		v, recv, enc := comment[a[2]:a[3]], comment[a[4]:a[5]], comment[a[6]:a[7]]
+		use := regexp.MustCompile(`(\w+)\.(\w+)\(\s*` + regexp.QuoteMeta(v) + `\s*\)`)
+		if m := use.FindStringSubmatch(comment[a[1]:]); m != nil {
+			return mk(recv, enc, m[1], m[2])
+		}
+	}
+	return nil
+}
