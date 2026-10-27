@@ -1,0 +1,15 @@
+{
+  "questionFrontendId": "1379",
+  "title": "Find a Corresponding Node of a Binary Tree in a Clone of That Tree",
+  "titleSlug": "find-a-corresponding-node-of-a-binary-tree-in-a-clone-of-that-tree",
+  "difficulty": "Easy",
+  "content": "<p><strong class=\"example\">Example 1:</strong></p>\n\n<pre>\n<strong>Input:</strong> tree = [7,4,3,null,null,6,19], target = 3\n<strong>Output:</strong> 3\n<strong>Explanation:</strong> In all examples the original and cloned trees are shown. The target node is a green node from the original tree. The answer is the yellow node from the cloned tree.\n</pre>\n\n<p><strong class=\"example\">Example 2:</strong></p>\n\n<pre>\n<strong>Input:</strong> tree = [7], target =  7\n<strong>Output:</strong> 7\n</pre>\n\n<p><strong class=\"example\">Example 3:</strong></p>\n\n<pre>\n<strong>Input:</strong> tree = [8,null,6,null,5,null,4,null,3,null,2,null,1], target = 4\n<strong>Output:</strong> 4\n</pre>\n\n<p>&nbsp;</p>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "# Definition for a binary tree node.\n# class TreeNode:\n#     def __init__(self, x):\n#         self.val = x\n#         self.left = None\n#         self.right = None\n\nclass Solution:\n    def getTargetCopy(self, original: TreeNode, cloned: TreeNode, target: TreeNode) -> TreeNode:\n        "
+    }
+  ],
+  "metaData": "{\"name\": \"getTargetCopy\", \"params\": [{\"name\": \"tree\", \"type\": \"TreeNode\"}, {\"type\": \"integer\", \"name\": \"target\"}], \"return\": {\"type\": \"TreeNode\"}, \"manual\": true}",
+  "exampleTestcases": "[7,4,3,null,null,6,19]\n3\n[7]\n7\n[8,null,6,null,5,null,4,null,3,null,2,null,1]\n4"
+}

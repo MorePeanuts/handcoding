@@ -126,6 +126,9 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 		roundTrip = templateRoundTrip(conv.Templates["solution.py"], conv.Templates["solution.go"])
 	}
 	fromTemplate := usesJudgeTypes(conv.Templates["solution.go"]) || roundTrip != nil
+	// exampleKeys name the case input of each value of an example, when
+	// they are not the signature's inputs in order.
+	var exampleKeys []string
 	switch {
 	case fromTemplate:
 		if err := templateSignature(p, conv.Templates["solution.go"], conv.Templates["solution.py"]); err != nil {
@@ -154,6 +157,22 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 				return nil, fmt.Errorf("%s judges an output of length %v: %w", p.Slug, md.Output.Size, ErrUnsupported)
 			}
 		}
+		// For custom-judge problems the metadata may describe LeetCode's
+		// test data rather than the code the user writes (Linked List
+		// Cycle: head and pos, but the template takes only head). Trust it
+		// only if the template agrees, and map the rest onto structure
+		// inputs otherwise.
+		if !md.Manual {
+			break
+		}
+		t := templateFunction(conv.Templates["solution.go"], conv.Templates["solution.py"], md.Name)
+		if t == nil || !t.differs(p.Function) {
+			break
+		}
+		var err error
+		if exampleKeys, err = structureInputs(p, t); err != nil {
+			return nil, fmt.Errorf("%s is judged by LeetCode's own checker, and its real signature %s cannot be driven by hc: %w: %w", p.Slug, t.sig, err, ErrUnsupported)
+		}
 	}
 	// The round trip is part of the signature: without it the cases would
 	// be ops and args.
@@ -162,17 +181,8 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 	if t := unsupportedType(p); t != "" {
 		return nil, fmt.Errorf("%s uses the type %s: %w", p.Slug, t, ErrUnsupported)
 	}
-	if md.Manual {
-		// For custom-judge problems the metadata may describe LeetCode's
-		// serialized test data rather than the code the user writes
-		// (Delete Node in a Linked List: head and node, but the template
-		// takes only the node). Trust it only if the template agrees.
-		if sig, ok := goSignatureMatches(p, conv.Templates["solution.go"]); !fromTemplate && !ok {
-			return nil, fmt.Errorf("%s is judged by LeetCode's own checker, and its real signature %s cannot be driven by hc: %w", p.Slug, sig, ErrUnsupported)
-		}
-		if roundTrip == nil {
-			conv.Warnings = append(conv.Warnings, "LeetCode judges this problem with its own checker; hc gen has to work out how to judge it")
-		}
+	if md.Manual && roundTrip == nil {
+		conv.Warnings = append(conv.Warnings, "LeetCode judges this problem with its own checker; hc gen has to work out how to judge it")
 	}
 	if err := p.Validate(); err != nil {
 		return nil, fmt.Errorf("%s cannot be judged by hc: %w", p.Slug, err)
@@ -194,7 +204,7 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 	}
 	conv.Description = fmt.Sprintf("# %s. %s\n\n%s\n", p.ID, p.Title, strings.TrimSpace(desc))
 
-	cases, warn := examples(p, q, english)
+	cases, warn := examples(p, q, english, exampleKeys)
 	if warn != "" {
 		conv.Warnings = append(conv.Warnings, warn)
 	}
@@ -261,37 +271,6 @@ func unsupportedType(p *problem.Problem) string {
 	return ""
 }
 
-var goFuncRE = regexp.MustCompile(`(?m)^func\s+(\w+)\(([^)]*)\)`)
-
-// goSignatureMatches compares a function problem's signature with the
-// parameter names of LeetCode's Go template. On a mismatch it returns the
-// template's signature and false.
-func goSignatureMatches(p *problem.Problem, template string) (string, bool) {
-	if p.Kind != problem.KindFunction || template == "" {
-		return "", true
-	}
-	m := goFuncRE.FindStringSubmatch(template)
-	if m == nil {
-		return "", true
-	}
-	sig := fmt.Sprintf("%s(%s)", m[1], strings.TrimSpace(m[2]))
-	var names []string
-	for _, part := range strings.Split(m[2], ",") {
-		if fields := strings.Fields(part); len(fields) > 0 {
-			names = append(names, fields[0])
-		}
-	}
-	if m[1] != p.Function.Name || len(names) != len(p.Function.Params) {
-		return sig, false
-	}
-	for i, prm := range p.Function.Params {
-		if names[i] != prm.Name {
-			return sig, false
-		}
-	}
-	return sig, true
-}
-
 var supRE = regexp.MustCompile(`<sup>(.*?)</sup>`)
 
 func toMarkdown(content string) (string, error) {
@@ -308,13 +287,17 @@ var (
 
 // examples builds the statement examples: inputs from exampleTestcases,
 // expected outputs scraped from the statement when they parse as JSON.
-func examples(p *problem.Problem, q *Question, english string) ([]problem.Case, string) {
+// keys, when given, name the input of each value of an example ("" to drop
+// it); otherwise the values are the signature's inputs in order.
+func examples(p *problem.Problem, q *Question, english string, keys []string) ([]problem.Case, string) {
 	lines := strings.Split(strings.TrimSpace(q.ExampleTestcases), "\n")
 	if len(lines) == 1 && lines[0] == "" {
 		return nil, "no example test cases provided by LeetCode"
 	}
 	perCase := 2
 	switch {
+	case keys != nil:
+		perCase = len(keys)
 	case p.Judge.RoundTrip != nil:
 		perCase = 1 // the value to encode
 	case p.Kind == problem.KindFunction:
@@ -323,7 +306,9 @@ func examples(p *problem.Problem, q *Question, english string) ([]problem.Case, 
 	if perCase == 0 || len(lines)%perCase != 0 {
 		return nil, "could not split the example test cases; run hc gen"
 	}
-	keys := p.InputKeys()
+	if keys == nil {
+		keys = p.InputKeys()
+	}
 	var cases []problem.Case
 	for i := 0; i < len(lines); i += perCase {
 		c := problem.Case{Input: map[string]json.RawMessage{}, Example: true}
@@ -332,7 +317,9 @@ func examples(p *problem.Problem, q *Question, english string) ([]problem.Case, 
 			if !json.Valid([]byte(v)) {
 				return nil, fmt.Sprintf("example input %q is not JSON; run hc gen", v)
 			}
-			c.Input[k] = json.RawMessage(v)
+			if k != "" {
+				c.Input[k] = json.RawMessage(v)
+			}
 		}
 		cases = append(cases, c)
 	}

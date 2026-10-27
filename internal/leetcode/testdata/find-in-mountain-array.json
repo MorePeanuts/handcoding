@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "1095",
+  "title": "Find in Mountain Array",
+  "titleSlug": "find-in-mountain-array",
+  "difficulty": "Hard",
+  "content": "<p><strong class=\"example\">Example 1:</strong></p>\n\n<pre>\n<strong>Input:</strong> mountainArr = [1,2,3,4,5,3,1], target = 3\n<strong>Output:</strong> 2\n<strong>Explanation:</strong> 3 exists in the array, at index=2 and index=5. Return the minimum index, which is 2.</pre>\n\n<p><strong class=\"example\">Example 2:</strong></p>\n\n<pre>\n<strong>Input:</strong> mountainArr = [0,1,2,4,2,1], target = 3\n<strong>Output:</strong> -1\n<strong>Explanation:</strong> 3 does not exist in <code>the array,</code> so we return -1.\n</pre>\n\n<p>&nbsp;</p>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "# \"\"\"\n# This is MountainArray's API interface.\n# You should not implement it, or speculate about its implementation\n# \"\"\"\n#class MountainArray:\n#    def get(self, index: int) -> int:\n#    def length(self) -> int:\n\nclass Solution:\n    def findInMountainArray(self, target: int, mountainArr: 'MountainArray') -> int:\n        "
+    },
+    {
+      "langSlug": "golang",
+      "code": "/**\n * // This is the MountainArray's API interface.\n * // You should not implement it, or speculate about its implementation\n * type MountainArray struct {\n * }\n *\n * func (this *MountainArray) get(index int) int {}\n * func (this *MountainArray) length() int {}\n */\n\nfunc findInMountainArray(target int, mountainArr *MountainArray) int {\n    \n}"
+    }
+  ],
+  "metaData": "{\"name\": \"findInMountainArray\", \"params\": [{\"name\": \"mountainArr\", \"type\": \"integer[]\"}, {\"name\": \"target\", \"type\": \"integer\"}], \"return\": {\"type\": \"integer\"}, \"manual\": true, \"typescriptCustomType\": \"class MountainArray {\\n    __secret: number[];\\n    __N: number;\\n    __guesses: number;\\n    constructor(secret: number[]) {\\n        this.__secret = secret;\\n        this.__N = secret.length;\\n        this.__guesses = 100;\\n    }\\n\\n    get(index: number): number {\\n        this.__guesses -= 1;\\n        return this.__secret[index];\\n    }\\n\\n    getGuesses(): number {\\n        return this.__guesses;\\n    }\\n        \\n    length(): number {\\n        return this.__N;\\n    }\\n};\\n\"}",
+  "exampleTestcases": "[1,2,3,4,5,3,1]\n3\n[0,1,2,4,2,1]\n3"
+}

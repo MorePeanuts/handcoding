@@ -449,6 +449,8 @@ function:
 
 规则：`cycle`、`skip`、`at` 指向整数隐藏输入；`join.list` 指向另一个普通的 `ListNode` 参数；`ref` 和 `returns_ref` 指向同一节点类型、持有整个结构（不是 `ref`）的参数或隐藏输入；`copy` 指向同类型的普通参数；每个隐藏输入都必须被用到；`judge.output` 不能是带环的链表。设计题不支持这些属性。
 
+`hc fetch` 根据 LeetCode 元数据（描述的是它的测试数据）与初始代码（真正的签名）之间的差异设置这些属性：初始代码不接收的测试数据成为隐藏输入，初始代码以节点接收的值成为 `ref`，测试数据中没有的节点参数成为 `copy`，`pos` 生成 `cycle`，160 的 `skipA` 和 `skipB` 生成 `join`，返回节点的函数得到 `returns_ref`。示例会映射到新的输入上；`judge.compare` 和平常一样留给 `hc gen` 决定。
+
 ### cases.jsonl
 
 每行一个用例：

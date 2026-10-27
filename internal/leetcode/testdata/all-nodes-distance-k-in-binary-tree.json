@@ -1,0 +1,19 @@
+{
+  "questionFrontendId": "863",
+  "title": "All Nodes Distance K in Binary Tree",
+  "titleSlug": "all-nodes-distance-k-in-binary-tree",
+  "difficulty": "Medium",
+  "content": "<p><strong class=\"example\">Example 1:</strong></p>\n\n<pre>\n<strong>Input:</strong> root = [3,5,1,6,2,0,8,null,null,7,4], target = 5, k = 2\n<strong>Output:</strong> [7,4,1]\nExplanation: The nodes that are a distance 2 from the target node (with value 5) have values 7, 4, and 1.\n</pre>\n\n<p><strong class=\"example\">Example 2:</strong></p>\n\n<pre>\n<strong>Input:</strong> root = [1], target = 1, k = 3\n<strong>Output:</strong> []\n</pre>\n\n<p>&nbsp;</p>",
+  "codeSnippets": [
+    {
+      "langSlug": "python3",
+      "code": "# Definition for a binary tree node.\n# class TreeNode:\n#     def __init__(self, x):\n#         self.val = x\n#         self.left = None\n#         self.right = None\n\nclass Solution:\n    def distanceK(self, root: TreeNode, target: TreeNode, k: int) -> List[int]:\n        "
+    },
+    {
+      "langSlug": "golang",
+      "code": "/**\n * Definition for a binary tree node.\n * type TreeNode struct {\n *     Val int\n *     Left *TreeNode\n *     Right *TreeNode\n * }\n */\nfunc distanceK(root *TreeNode, target *TreeNode, k int) []int {\n    \n}"
+    }
+  ],
+  "metaData": "{\"name\": \"distanceK\", \"params\": [{\"name\": \"root\", \"type\": \"TreeNode\"}, {\"name\": \"target\", \"type\": \"integer\"}, {\"name\": \"k\", \"type\": \"integer\"}], \"return\": {\"type\": \"list<integer>\"}, \"manual\": true}",
+  "exampleTestcases": "[3,5,1,6,2,0,8,null,null,7,4]\n5\n2\n[1]\n1\n3"
+}
