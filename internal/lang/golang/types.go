@@ -18,6 +18,13 @@ var goBase = map[string]string{
 	problem.TypeCharacter: "byte",
 	problem.TypeListNode:  "*ListNode",
 	problem.TypeTreeNode:  "*TreeNode",
+
+	problem.TypeGraphNode:      "*Node",
+	problem.TypeNaryNode:       "*Node",
+	problem.TypeRandomListNode: "*Node",
+	problem.TypeNextTreeNode:   "*Node",
+	problem.TypeQuadNode:       "*Node",
+	problem.TypeMultilevelNode: "*Node",
 }
 
 // special types need dedicated codecs because their JSON form differs from
@@ -26,6 +33,13 @@ var special = map[string]string{
 	problem.TypeCharacter: "Char",
 	problem.TypeListNode:  "List",
 	problem.TypeTreeNode:  "Tree",
+
+	problem.TypeGraphNode:      "Node",
+	problem.TypeNaryNode:       "Node",
+	problem.TypeRandomListNode: "Node",
+	problem.TypeNextTreeNode:   "Node",
+	problem.TypeQuadNode:       "Node",
+	problem.TypeMultilevelNode: "Node",
 }
 
 func goType(t string) (string, error) {

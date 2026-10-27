@@ -47,3 +47,21 @@ func TestStarterStructureInputs(t *testing.T) {
 		t.Errorf("starter does not contain %q:\n%s", want, got)
 	}
 }
+
+// A Node variant is imported under the name solution code knows it by.
+func TestStarterNodeVariant(t *testing.T) {
+	p := &problem.Problem{Slug: "f", Kind: problem.KindFunction, Function: &problem.Function{
+		Name:    "flatten",
+		Params:  []problem.Param{{Name: "head", Type: problem.TypeMultilevelNode}},
+		Returns: problem.TypeMultilevelNode,
+	}}
+	got, err := Language{}.Starter(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"from hc_runtime import MultilevelNode as Node", "def flatten(self, head: Node | None) -> Node | None:"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("starter does not contain %q:\n%s", want, got)
+		}
+	}
+}

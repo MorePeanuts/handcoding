@@ -1,0 +1,62 @@
+// Node is a node of an N-ary tree (NaryNode in problem.yaml).
+type Node struct {
+	Val      int
+	Children []*Node
+}
+
+func hcNodeLinks(n *Node) []*Node { return n.Children }
+
+// hcDecNode0 reads LeetCode's level order: the root, null, then the
+// children of each node in level order, each group followed by null.
+func hcDecNode0(raw json.RawMessage) *Node {
+	vals := hcJSON[[]*int](raw)
+	if len(vals) == 0 {
+		return nil
+	}
+	if vals[0] == nil || len(vals) > 1 && vals[1] != nil {
+		panic(hcInputError{"an N-ary tree starts with the root's value and null"})
+	}
+	root := &Node{Val: *vals[0]}
+	queue := []*Node{root}
+	for i := 2; i < len(vals); i++ {
+		if len(queue) == 0 {
+			panic(hcInputError{"more groups of children than nodes"})
+		}
+		parent := queue[0]
+		queue = queue[1:]
+		for ; i < len(vals) && vals[i] != nil; i++ {
+			c := &Node{Val: *vals[i]}
+			parent.Children = append(parent.Children, c)
+			queue = append(queue, c)
+		}
+	}
+	return root
+}
+
+func hcEncNode0(root *Node) any {
+	out := []any{}
+	if root == nil {
+		return out
+	}
+	out = append(out, root.Val, nil)
+	queue := []*Node{root}
+	for len(queue) > 0 {
+		n := queue[0]
+		queue = queue[1:]
+		for _, c := range n.Children {
+			if c == nil {
+				panic(fmt.Sprintf("a child of node %d is nil", n.Val))
+			}
+			if len(out) >= hcMaxNodes {
+				panic("tree too large (cycle?)")
+			}
+			out = append(out, c.Val)
+			queue = append(queue, c)
+		}
+		out = append(out, nil)
+	}
+	for len(out) > 0 && out[len(out)-1] == nil {
+		out = out[:len(out)-1]
+	}
+	return out
+}

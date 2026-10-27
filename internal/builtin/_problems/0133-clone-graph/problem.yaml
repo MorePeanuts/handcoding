@@ -1,0 +1,17 @@
+id: "133"
+slug: clone-graph
+title: Clone Graph
+difficulty: medium
+tags: [depth-first-search, breadth-first-search, graph, hash-table]
+kind: function
+function:
+  name: cloneGraph
+  params:
+    - {name: node, type: GraphNode}
+  returns: GraphNode
+  returns_copy: node
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/clone-graph/

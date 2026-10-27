@@ -1,0 +1,16 @@
+id: "117"
+slug: populating-next-right-pointers-in-each-node-ii
+title: Populating Next Right Pointers in Each Node II
+difficulty: medium
+tags: [tree, depth-first-search, breadth-first-search, linked-list, binary-tree]
+kind: function
+function:
+  name: connect
+  params:
+    - {name: root, type: NextTreeNode}
+  returns: NextTreeNode
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/populating-next-right-pointers-in-each-node-ii/

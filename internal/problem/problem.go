@@ -104,6 +104,9 @@ type Function struct {
 	// belongs to. The output is the node's index in that list, or its value
 	// in that tree, and null for no node.
 	ReturnsRef string `yaml:"returns_ref,omitempty" json:"returns_ref,omitempty"`
+	// ReturnsCopy names the parameter the function deep-copies (Clone
+	// Graph): the returned structure must not share a node with it.
+	ReturnsCopy string `yaml:"returns_copy,omitempty" json:"returns_copy,omitempty"`
 }
 
 // Input returns the parameter or hidden input with the given name.
@@ -321,6 +324,7 @@ func (p *Problem) Validate() error {
 			errs = append(errs, fmt.Errorf("function.returns: %w", err))
 		}
 		errs = append(errs, p.validateStructures()...)
+		errs = append(errs, p.validateReturnsCopy()...)
 		if p.Judge.Output != "" {
 			if prm, ok := f.Input(p.Judge.Output); !ok {
 				errs = append(errs, fmt.Errorf("judge.output %q is not a parameter or hidden input", p.Judge.Output))
@@ -368,6 +372,15 @@ func (p *Problem) Validate() error {
 		}
 	default:
 		errs = append(errs, fmt.Errorf("unknown kind %q", p.Kind))
+	}
+	var variants []string
+	for _, t := range p.BaseTypes() {
+		if IsNodeVariant(t) {
+			variants = append(variants, t)
+		}
+	}
+	if len(variants) > 1 {
+		errs = append(errs, fmt.Errorf("the signature uses %s: solution code calls each of them Node, so a problem can use only one", strings.Join(variants, " and ")))
 	}
 	switch p.Judge.Compare {
 	case "", CompareExact, CompareAnyOf:

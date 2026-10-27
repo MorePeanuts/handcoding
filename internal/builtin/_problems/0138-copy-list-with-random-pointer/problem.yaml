@@ -1,0 +1,17 @@
+id: "138"
+slug: copy-list-with-random-pointer
+title: Copy List with Random Pointer
+difficulty: medium
+tags: [hash-table, linked-list]
+kind: function
+function:
+  name: copyRandomList
+  params:
+    - {name: head, type: RandomListNode}
+  returns: RandomListNode
+  returns_copy: head
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/copy-list-with-random-pointer/

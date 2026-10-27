@@ -137,7 +137,7 @@ problems/0001-two-sum/          目录名：id 是数字时为 <4 位编号>-<sl
 | `difficulty` | `easy`、`medium` 或 `hard` |
 | `tags` | 标签列表 |
 | `kind` | `function`（单个函数）或 `class`（设计题）。缺省时，有 `class` 段则为 `class`，否则为 `function` |
-| `function` | 函数题的签名：`name`、`params`（`{name, type}` 列表，每项最多带 `cycle`、`join`、`ref`、`copy` 之一）、`hidden`（不传给解答的输入）、`returns`（缺省为 `void`）、`returns_ref`。见[结构输入](#结构输入) |
+| `function` | 函数题的签名：`name`、`params`（`{name, type}` 列表，每项最多带 `cycle`、`join`、`ref`、`copy` 之一）、`hidden`（不传给解答的输入）、`returns`（缺省为 `void`）、`returns_ref`、`returns_copy`。见[结构输入](#结构输入)和 [`returns_copy`](#returns_copy) |
 | `class` | 设计题的签名：`name`、`constructor`（`{name, type}` 列表）、`methods`（`{name, params, returns}` 列表） |
 | `judge.compare` | 输出的比较方式（见下文）。没有默认值：不写就表示题目*未就绪*（见下文） |
 | `judge.tolerance` | 浮点误差。返回 `double` 时默认为 `1e-5`；绝对误差或相对误差满足其一即可 |
@@ -206,10 +206,47 @@ judge:
 | `character` | 单字符字符串 `"a"` | `byte` | `str` |
 | `ListNode` | 数组 `[1,2,3]` | `*ListNode` | `ListNode \| None` |
 | `TreeNode` | 层序数组 `[3,9,20,null,null,15,7]` | `*TreeNode` | `TreeNode \| None` |
+| `GraphNode`、`NaryNode`、`RandomListNode`、`NextTreeNode`、`QuadNode`、`MultilevelNode` | 见 [LeetCode 的 Node 类型](#leetcode-的-node-类型) | `*Node` | `Node \| None` |
 | `T[]` | 数组，最多 3 层；节点数组只支持 1 层 | `[]T` | `list[T]` |
 | `void` | 只能作返回类型 | — | `None` |
 
-`list<T>` 会规范化为 `T[]`；`int`、`bool`、`char`、`float` 会规范化为 `integer`、`boolean`、`character`、`double`。`Node`（图、N 叉树、带随机指针的链表）和 `NestedInteger` 等特殊类型暂不支持。
+`list<T>` 会规范化为 `T[]`；`int`、`bool`、`char`、`float` 会规范化为 `integer`、`boolean`、`character`、`double`。`NestedInteger` 暂不支持。
+
+### LeetCode 的 Node 类型
+
+LeetCode 把六种不同的结构都叫作 `Node`。hc 给每种结构各起一个类型名；在解答代码里它们仍然都是名为 `Node` 的类型（Go）或类（Python），字段名与 LeetCode 一致，所以一道题只能用其中一种。它们不能组成数组，[结构输入](#结构输入)也只支持 `ListNode` 和 `TreeNode`。
+
+| 类型 | 字段（Go；Python 用小写开头的同名字段） | JSON（用例输入和期望输出） | 题目 |
+|---|---|---|---|
+| `GraphNode` | `Val int`、`Neighbors []*Node` | 邻接表：第 i 项列出节点 i+1 的邻居，节点 i+1 的值就是 i+1。参数是节点 1。`[[2,4],[1,3],[2,4],[1,3]]`；`[[]]` 是单个节点，`[]` 表示没有节点 | 133 |
+| `NaryNode` | `Val int`、`Children []*Node` | 层序：根、`null`，然后按层序依次写出每个节点的子节点，每组后面跟一个 `null`（去掉末尾的 `null`）：`[1,null,3,2,4,null,5,6]` | 429、559、589、590 |
+| `RandomListNode` | `Val int`、`Next *Node`、`Random *Node` | `[[val, randomIndex], ...]`，`randomIndex` 是随机指针所指节点的下标（从 0 开始），或 `null`：`[[7,null],[13,0],[11,4],[10,2],[1,0]]` | 138 |
+| `NextTreeNode` | `Val int`、`Left *Node`、`Right *Node`、`Next *Node` | 输入：和 `TreeNode` 一样的层序，所有 next 指针都为空。输出：从每层最左边的节点出发沿 next 指针读出的各层，`[[1],[2,3],[4,5,7]]`（LeetCode 写作 `[1,#,2,3,#,4,5,7,#]`，这不是 JSON） | 116、117 |
+| `QuadNode` | `Val bool`、`IsLeaf bool`、`TopLeft`、`TopRight`、`BottomLeft`、`BottomRight *Node`（Python：`val`、`isLeaf`、`topLeft`……） | 层序，每个节点都有四个子节点位置（没有时为 `null`），每个节点写成 `[isLeaf, val]`，取 0 或 1，去掉末尾的 `null`：`[[0,1],[1,0],[1,1],[1,1],[1,0]]` | 427、558 |
+| `MultilevelNode` | `Val int`、`Prev *Node`、`Next *Node`、`Child *Node` | LeetCode 的序列化：各层依次写出，每层以 `null` 结束；子层前面再加若干个 `null`，个数等于其父节点在上一层中的下标（从 0 开始）：`[1,2,3,4,5,6,null,null,null,7,8,9,10,null,null,11,12]` | 430 |
+
+- Go 中，题目用到哪种 `Node`，驱动程序就定义哪种，不要自己声明。Python 中从 `hc_runtime` 以 `Node` 这个名字导入，初始代码已经写好：`from hc_runtime import GraphNode as Node`。Python 构造函数的参数与 LeetCode 一致，且都可省略：`Node(val, neighbors)`、`Node(val, children)`、`Node(x, next, random)`、`Node(val, left, right, next)`、`Node(val, isLeaf, topLeft, topRight, bottomLeft, bottomRight)`、`Node(val, prev, next, child)`。
+- 解答可以自己创建节点（克隆题就需要）。返回的结构按同样的 JSON 形式输出，以下情况算运行错误：`GraphNode` 的结果不是一个值为 1 到 n 的图中的节点 1；随机指针指向返回链表之外的节点；`MultilevelNode` 的 `prev` 没有指向前一个节点（或者某层第一个节点的 `prev` 不为空），以及同一层有两个节点带子链表，这种结构无法序列化。
+- 非叶子的 `QuadNode` 取哪个值都可以，所以输出时一律写成 `[0,1]`。
+
+#### `returns_copy`
+
+`function` 中的 `returns_copy: <参数>` 表示函数返回某个参数的深拷贝（克隆图、随机链表的复制）。如果返回的结构与该参数的结构共享任何节点，该用例算运行错误。这个参数的类型必须与返回类型相同，并且是 `ListNode`、`TreeNode` 或某种 `Node` 类型；`returns_copy` 不能与 `returns_ref` 或 `judge.output` 同时使用。
+
+```yaml
+function:
+  name: cloneGraph
+  params:
+    - {name: node, type: GraphNode}
+  returns: GraphNode
+  returns_copy: node
+judge:
+  compare: exact
+```
+
+```json
+{"input": {"node": [[2,4],[1,3],[2,4],[1,3]]}, "expected": [[2,4],[1,3],[2,4],[1,3]]}
+```
 
 ### 结构输入
 
@@ -344,7 +381,7 @@ function:
 | Python | `class Solution`，其中有名为 `function.name` 的方法；也可以是同名的模块级函数 | 名为 `class.name` 的类；`__init__` 接收构造函数参数；方法名与 `methods` 中一致 |
 | Go | `package main`；`func <function.name>(...)`，参数类型见上面的类型表 | `type <Name> struct`、`func Constructor(...) <Name>`，以及指针接收者的方法，方法名首字母大写（`getMin` → `GetMin`） |
 
-- `ListNode` 和 `TreeNode` 已经提供：Python 中用 `from hc_runtime import ListNode, TreeNode` 导入；Go 中已预先定义（字段为 `Val`、`Next`、`Left`、`Right`），不要自己再声明。
+- `ListNode` 和 `TreeNode` 已经提供：Python 中用 `from hc_runtime import ListNode, TreeNode` 导入；Go 中已预先定义（字段为 `Val`、`Next`、`Left`、`Right`），不要自己再声明。题目用到的 [`Node`](#leetcode-的-node-类型) 也一样：Python 中写 `from hc_runtime import GraphNode as Node`，Go 中已预先定义。
 - 两份参考解都存在时，`hc cases build` 先用 Go，再用 Python；可以用 `-l python` 指定。`hc validate --run` 会运行每一份参考解。
 - `templates/solution.go` 和 `templates/solution.py` 会替换自动生成的初始代码。它们必须保持签名不变，因为驱动要按签名调用。
 
@@ -371,8 +408,8 @@ hc validate <slug> --run    # 同时在每个用例上运行每一份参考解�
 
 `hc validate` 会报告以下错误，并指出用例编号和字段：
 
-- `problem.yaml`：语法错误（带行号和列号）、不认识的字段、不合法的 slug、缺少标题、不支持的类型、`judge.output` 不是参数或隐藏输入、`void` 函数没写 `judge.output`、结构输入用法不对（`hidden`、`cycle`、`join`、`ref`、`copy`、`returns_ref`）、`judge.output_length` 用法不对、不认识的 `judge.compare`、不合法的 `judge.time_limit`；
-- `cases.jsonl`：JSON 不合法、不认识的字段、缺少或多出的输入、值与声明的类型不符（`input "nums": [1]: must be integer, got string "x"`）、结构输入对不上（环的位置超出链表、相交链表的尾部不同、被引用的值不存在或重复）、设计题中参数个数不对或方法不存在、`expected` 的形状不对；
+- `problem.yaml`：语法错误（带行号和列号）、不认识的字段、不合法的 slug、缺少标题、不支持的类型、`judge.output` 不是参数或隐藏输入、`void` 函数没写 `judge.output`、结构输入用法不对（`hidden`、`cycle`、`join`、`ref`、`copy`、`returns_ref`）、`returns_copy` 用法不对、用了多种 `Node` 类型、`judge.output_length` 用法不对、不认识的 `judge.compare`、不合法的 `judge.time_limit`；
+- `cases.jsonl`：JSON 不合法、不认识的字段、缺少或多出的输入、值与声明的类型或 `Node` 的形式不符（`input "nums": [1]: must be integer, got string "x"`；邻居不是图中的节点、随机下标超出链表、`null` 的位置不对）、结构输入对不上（环的位置超出链表、相交链表的尾部不同、被引用的值不存在或重复）、设计题中参数个数不对或方法不存在、`expected` 的形状不对；
 - 加上 `--run` 时：参考解无法编译、运行出错，或与 `expected` 不一致（会同时显示两个值）。
 
 以下情况会给出警告：判题规则未确定（没有 `judge.compare`）、有用例缺少 `expected`、没有标记示例用例、没有参考解、题面引用的图片不存在、编号与其他题目重复。
@@ -399,7 +436,7 @@ type Language interface {
 }
 ```
 
-驱动只负责**解码输入、调用用户代码、编码输出**，从不判题。所有判题都在 Go 中完成（`internal/judge`），所以新语言不需要重新实现比较逻辑。解码包括构建[结构输入](#结构输入)，编码包括 `returns_ref`；与结构对不上的输入报告为以 `invalid input:` 开头的错误。
+驱动只负责**解码输入、调用用户代码、编码输出**，从不判题。所有判题都在 Go 中完成（`internal/judge`），所以新语言不需要重新实现比较逻辑。解码包括构建[结构输入](#结构输入)和 [`Node` 结构](#leetcode-的-node-类型)，编码包括 `returns_ref` 和 `returns_copy` 检查；与结构对不上的输入报告为以 `invalid input:` 开头的错误。
 
 - `HC_CASES` 指向一个 JSON 文件，内容为 `[{"id": 1, "input": {...}}, ...]`。
 - `HC_OUT` 指向一个文件，驱动以 JSON Lines 格式向其追加结果，每个用例一行：

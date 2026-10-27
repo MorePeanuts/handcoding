@@ -1,0 +1,16 @@
+id: "430"
+slug: flatten-a-multilevel-doubly-linked-list
+title: Flatten a Multilevel Doubly Linked List
+difficulty: medium
+tags: [depth-first-search, linked-list, doubly-linked-list]
+kind: function
+function:
+  name: flatten
+  params:
+    - {name: head, type: MultilevelNode}
+  returns: MultilevelNode
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/flatten-a-multilevel-doubly-linked-list/

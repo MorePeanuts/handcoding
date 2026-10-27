@@ -36,6 +36,13 @@ var baseTypes = map[string]bool{
 	TypeCharacter: true,
 	TypeListNode:  true,
 	TypeTreeNode:  true,
+
+	TypeGraphNode:      true,
+	TypeNaryNode:       true,
+	TypeRandomListNode: true,
+	TypeNextTreeNode:   true,
+	TypeQuadNode:       true,
+	TypeMultilevelNode: true,
 }
 
 // NormalizeType converts LeetCode style type names (e.g. "list<list<integer>>")
@@ -85,6 +92,9 @@ func ValidateType(t string, allowVoid bool) error {
 	if (base == TypeListNode || base == TypeTreeNode) && depth > 1 {
 		return fmt.Errorf("unsupported type %q: node arrays deeper than 1", t)
 	}
+	if IsNodeVariant(base) && depth > 0 {
+		return fmt.Errorf("unsupported type %q: arrays of %s", t, base)
+	}
 	if depth > 3 {
 		return fmt.Errorf("unsupported type %q: array depth > 3", t)
 	}
@@ -94,8 +104,9 @@ func ValidateType(t string, allowVoid bool) error {
 // CheckValue reports whether raw is a valid JSON value of type t, using the
 // same conventions as the drivers: ListNode and TreeNode are arrays (null is
 // read as empty), a character is a one-byte string and integers are whole
-// numbers. The error names the offending element, e.g. `[2]: must be
-// integer, got string "x"`.
+// numbers; the Node variants have the forms described with their types.
+// The error names the offending element, e.g. `[2]: must be integer, got
+// string "x"`.
 func CheckValue(t string, raw json.RawMessage) error {
 	var v any
 	dec := json.NewDecoder(bytes.NewReader(raw))
@@ -156,6 +167,8 @@ func checkValue(t string, v any, path string) error {
 		if s, ok := v.(string); !ok || len(s) != 1 {
 			return fail(`a one-character string such as "a"`)
 		}
+	case TypeGraphNode, TypeNaryNode, TypeRandomListNode, TypeNextTreeNode, TypeQuadNode, TypeMultilevelNode:
+		return checkNodeVariant(base, v, path)
 	case TypeListNode, TypeTreeNode:
 		if v == nil {
 			return nil

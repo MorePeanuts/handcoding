@@ -1,7 +1,7 @@
 // Package python implements the Python 3 language for handcoding.
 //
 // A problem directory holds solution.py (the user's code), hc_runtime.py
-// (ListNode/TreeNode, codecs, driver loop) and _hc_runner.py, a tiny entry
+// (ListNode/TreeNode, the judge-defined types, codecs, driver loop) and _hc_runner.py, a tiny entry
 // point embedding the problem signature.
 package python
 
@@ -34,10 +34,18 @@ const (
 	runnerFile   = "_hc_runner.py"
 )
 
-const header = `from typing import Dict, List, Optional, Set, Tuple  # noqa: F401
-
-from hc_runtime import ListNode, TreeNode  # noqa: F401
-`
+// header is the import block of starters: typing names, ListNode and
+// TreeNode, and the judge-defined types the problem uses under the names
+// solution code knows them by (`from hc_runtime import GraphNode as Node`).
+func header(p *problem.Problem) string {
+	var b strings.Builder
+	b.WriteString("from typing import Dict, List, Optional, Set, Tuple  # noqa: F401\n\n")
+	b.WriteString("from hc_runtime import ListNode, TreeNode  # noqa: F401\n")
+	if v := p.NodeVariant(); v != "" {
+		fmt.Fprintf(&b, "from hc_runtime import %s as Node  # noqa: F401\n", v)
+	}
+	return b.String()
+}
 
 // Language is the Python implementation of lang.Language.
 type Language struct {
@@ -117,10 +125,10 @@ func (Language) Starter(p *problem.Problem) (string, error) {
 		if strings.Contains(t, "hc_runtime") {
 			return t, nil
 		}
-		return header + "\n\n" + strings.Trim(t, " \n") + "\n", nil
+		return header(p) + "\n\n" + strings.Trim(t, " \n") + "\n", nil
 	}
 	var b strings.Builder
-	b.WriteString(header + "\n\n")
+	b.WriteString(header(p) + "\n\n")
 	switch p.Kind {
 	case problem.KindFunction:
 		f := p.Function
@@ -164,6 +172,9 @@ func pyType(t string) string {
 		}
 	case problem.TypeVoid:
 		return "None"
+	case problem.TypeGraphNode, problem.TypeNaryNode, problem.TypeRandomListNode,
+		problem.TypeNextTreeNode, problem.TypeQuadNode, problem.TypeMultilevelNode:
+		return "Node | None"
 	default:
 		s = "object"
 	}

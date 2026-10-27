@@ -137,7 +137,7 @@ problems/0001-two-sum/          directory name: <4-digit number>-<slug> when id 
 | `difficulty` | `easy`, `medium` or `hard` |
 | `tags` | List of tags |
 | `kind` | `function` (one function) or `class` (a design problem). Defaults to `class` when there is a `class` section, otherwise `function` |
-| `function` | Signature of a function problem: `name`, `params` (a list of `{name, type}`, each with at most one of `cycle`, `join`, `ref`, `copy`), `hidden` (inputs not passed to the solution), `returns` (defaults to `void`), `returns_ref`. See [structure inputs](#structure-inputs) |
+| `function` | Signature of a function problem: `name`, `params` (a list of `{name, type}`, each with at most one of `cycle`, `join`, `ref`, `copy`), `hidden` (inputs not passed to the solution), `returns` (defaults to `void`), `returns_ref`, `returns_copy`. See [structure inputs](#structure-inputs) and [`returns_copy`](#returns_copy) |
 | `class` | Signature of a design problem: `name`, `constructor` (a list of `{name, type}`), `methods` (a list of `{name, params, returns}`) |
 | `judge.compare` | How outputs are compared (see below). No default: a problem without it is *not ready* (see below) |
 | `judge.tolerance` | Floating-point tolerance. Defaults to `1e-5` when returning `double`; either the absolute or the relative error must be within it |
@@ -206,10 +206,47 @@ Type names are LeetCode's `metaData` names, so problems fetched from LeetCode ne
 | `character` | one-character string `"a"` | `byte` | `str` |
 | `ListNode` | array `[1,2,3]` | `*ListNode` | `ListNode \| None` |
 | `TreeNode` | level-order array `[3,9,20,null,null,15,7]` | `*TreeNode` | `TreeNode \| None` |
+| `GraphNode`, `NaryNode`, `RandomListNode`, `NextTreeNode`, `QuadNode`, `MultilevelNode` | see [LeetCode's Node types](#leetcodes-node-types) | `*Node` | `Node \| None` |
 | `T[]` | array, up to 3 levels; 1 level for node arrays | `[]T` | `list[T]` |
 | `void` | return type only | — | `None` |
 
-`list<T>` is normalized to `T[]`, and `int`, `bool`, `char` and `float` to `integer`, `boolean`, `character` and `double`. Special types such as `Node` (graphs, N-ary trees, lists with random pointers) and `NestedInteger` are not supported yet.
+`list<T>` is normalized to `T[]`, and `int`, `bool`, `char` and `float` to `integer`, `boolean`, `character` and `double`. `NestedInteger` is not supported yet.
+
+### LeetCode's Node types
+
+LeetCode calls six different structures `Node`. hc gives each its own type name; in solution code every one of them is still a type (Go) or class (Python) named `Node`, with LeetCode's field names, so a problem can use only one of them. They are not allowed in arrays, and the [structure inputs](#structure-inputs) are only for `ListNode` and `TreeNode`.
+
+| Type | Fields (Go; Python uses the lower-case names) | JSON (case input and expected output) | Problems |
+|---|---|---|---|
+| `GraphNode` | `Val int`, `Neighbors []*Node` | Adjacency list: entry i lists the neighbors of node i+1, whose value is i+1. The value is node 1. `[[2,4],[1,3],[2,4],[1,3]]`; `[[]]` is a single node, `[]` no node | 133 |
+| `NaryNode` | `Val int`, `Children []*Node` | Level order: the root, `null`, then the children of each node in level order, each group followed by `null` (trailing `null`s trimmed): `[1,null,3,2,4,null,5,6]` | 429, 559, 589, 590 |
+| `RandomListNode` | `Val int`, `Next *Node`, `Random *Node` | `[[val, randomIndex], ...]`, `randomIndex` being the 0-based index of the random node or `null`: `[[7,null],[13,0],[11,4],[10,2],[1,0]]` | 138 |
+| `NextTreeNode` | `Val int`, `Left *Node`, `Right *Node`, `Next *Node` | Input: level order like `TreeNode`, with every next pointer unset. Output: the levels read by following next pointers from each level's leftmost node, `[[1],[2,3],[4,5,7]]` (LeetCode writes `[1,#,2,3,#,4,5,7,#]`, which is not JSON) | 116, 117 |
+| `QuadNode` | `Val bool`, `IsLeaf bool`, `TopLeft`, `TopRight`, `BottomLeft`, `BottomRight *Node` (Python: `val`, `isLeaf`, `topLeft`, ...) | Level order in which every node has four child slots (`null` when absent), each node written `[isLeaf, val]` with 0 or 1, trailing `null`s trimmed: `[[0,1],[1,0],[1,1],[1,1],[1,0]]` | 427, 558 |
+| `MultilevelNode` | `Val int`, `Prev *Node`, `Next *Node`, `Child *Node` | LeetCode's serialization: the levels one after the other, each ended by `null`; a child level is preceded by as many more `null`s as its parent's 0-based index in the level above: `[1,2,3,4,5,6,null,null,null,7,8,9,10,null,null,11,12]` | 430 |
+
+- In Go, the driver defines `Node` for problems that use one, so don't declare it. In Python, import it from `hc_runtime` under the name `Node`; starters do it for you: `from hc_runtime import GraphNode as Node`. Python constructors take LeetCode's arguments, all optional: `Node(val, neighbors)`, `Node(val, children)`, `Node(x, next, random)`, `Node(val, left, right, next)`, `Node(val, isLeaf, topLeft, topRight, bottomLeft, bottomRight)`, `Node(val, prev, next, child)`.
+- A solution may build its own nodes (clones do). Returned structures are written in the same JSON form, and these are runtime errors: a `GraphNode` result that is not node 1 of a graph valued 1 to n; a random pointer to a node outside the returned list; a `MultilevelNode` whose `prev` does not point to the node before it (or is set on the first node of a level), and two nodes of one level with a child, which the serialization cannot express.
+- A `QuadNode` that is not a leaf may have either value, so it is always written `[0,1]`.
+
+#### `returns_copy`
+
+`returns_copy: <param>` in `function` says the function returns a deep copy of a parameter (Clone Graph, Copy List with Random Pointer). If the returned structure shares any node with the parameter's structure, the case is a runtime error. The parameter must have the return type, which must be `ListNode`, `TreeNode` or one of the `Node` types; `returns_copy` cannot be combined with `returns_ref` or `judge.output`.
+
+```yaml
+function:
+  name: cloneGraph
+  params:
+    - {name: node, type: GraphNode}
+  returns: GraphNode
+  returns_copy: node
+judge:
+  compare: exact
+```
+
+```json
+{"input": {"node": [[2,4],[1,3],[2,4],[1,3]]}, "expected": [[2,4],[1,3],[2,4],[1,3]]}
+```
 
 ### Structure inputs
 
@@ -344,7 +381,7 @@ A reference solution is written exactly like a user's solution, in `reference/so
 | Python | `class Solution` with a method named `function.name`, or a module-level function of that name | A class named `class.name`; `__init__` takes the constructor parameters; methods have the names in `methods` |
 | Go | `package main`; `func <function.name>(...)` with the Go types from the table above | `type <Name> struct`, `func Constructor(...) <Name>`, and methods with pointer receivers whose names start with an upper-case letter (`getMin` → `GetMin`) |
 
-- `ListNode` and `TreeNode` are provided: in Python, `from hc_runtime import ListNode, TreeNode`; in Go they are predefined (`Val`, `Next`, `Left`, `Right`), so don't declare them.
+- `ListNode` and `TreeNode` are provided: in Python, `from hc_runtime import ListNode, TreeNode`; in Go they are predefined (`Val`, `Next`, `Left`, `Right`), so don't declare them. So is the problem's [`Node`](#leetcodes-node-types): `from hc_runtime import GraphNode as Node` in Python, predefined in Go.
 - With both references present, `hc cases build` uses Go, then Python; pick one with `-l python`. `hc validate --run` runs every reference.
 - `templates/solution.go` and `templates/solution.py` replace the generated starter code. They must keep the signature, because the driver calls it.
 
@@ -371,8 +408,8 @@ hc validate <slug> --run    # also run every reference solution on every case; a
 
 `hc validate` reports, with the case number and field:
 
-- `problem.yaml`: syntax errors (with line and column), unknown fields, invalid slug, missing title, unsupported types, a `judge.output` that is not a parameter or hidden input, a `void` function without `judge.output`, misused structure inputs (`hidden`, `cycle`, `join`, `ref`, `copy`, `returns_ref`), a misused `judge.output_length`, unknown `judge.compare`, an invalid `judge.time_limit`;
-- `cases.jsonl`: invalid JSON, unknown fields, missing or unknown inputs, values that don't match their declared type (`input "nums": [1]: must be integer, got string "x"`), structure inputs that don't fit (a cycle position outside the list, joined lists whose tails differ, a referenced value that is missing or repeated), wrong argument counts and unknown methods in design problems, and an `expected` of the wrong shape;
+- `problem.yaml`: syntax errors (with line and column), unknown fields, invalid slug, missing title, unsupported types, a `judge.output` that is not a parameter or hidden input, a `void` function without `judge.output`, misused structure inputs (`hidden`, `cycle`, `join`, `ref`, `copy`, `returns_ref`), a misused `returns_copy`, more than one `Node` type, a misused `judge.output_length`, unknown `judge.compare`, an invalid `judge.time_limit`;
+- `cases.jsonl`: invalid JSON, unknown fields, missing or unknown inputs, values that don't match their declared type (`input "nums": [1]: must be integer, got string "x"`) or `Node` form (a neighbor that is not a node, a random index outside the list, a misplaced `null`), structure inputs that don't fit (a cycle position outside the list, joined lists whose tails differ, a referenced value that is missing or repeated), wrong argument counts and unknown methods in design problems, and an `expected` of the wrong shape;
 - with `--run`: reference solutions that don't compile, crash, or disagree with `expected` (both values are shown).
 
 It warns about an undecided judge rule (no `judge.compare`), cases without `expected`, no case marked as an example, no reference solution, missing statement images and an ID used by another problem.
@@ -399,7 +436,7 @@ type Language interface {
 }
 ```
 
-A driver only **decodes the input, calls the user's code and encodes the output**. It never judges. All judging happens in Go (`internal/judge`), so a new language doesn't reimplement comparison. Decoding includes building [structure inputs](#structure-inputs), and encoding includes `returns_ref`; an input that does not fit its structure is reported as an error starting with `invalid input:`.
+A driver only **decodes the input, calls the user's code and encodes the output**. It never judges. All judging happens in Go (`internal/judge`), so a new language doesn't reimplement comparison. Decoding includes building [structure inputs](#structure-inputs) and [`Node` structures](#leetcodes-node-types), and encoding includes `returns_ref` and the `returns_copy` check; an input that does not fit its structure is reported as an error starting with `invalid input:`.
 
 - `HC_CASES` names a JSON file containing `[{"id": 1, "input": {...}}, ...]`.
 - `HC_OUT` names a file the driver appends results to, as JSON Lines, one per case:

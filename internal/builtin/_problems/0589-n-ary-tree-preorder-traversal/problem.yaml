@@ -1,0 +1,16 @@
+id: "589"
+slug: n-ary-tree-preorder-traversal
+title: N-ary Tree Preorder Traversal
+difficulty: easy
+tags: [stack, tree, depth-first-search]
+kind: function
+function:
+  name: preorder
+  params:
+    - {name: root, type: NaryNode}
+  returns: "integer[]"
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/n-ary-tree-preorder-traversal/

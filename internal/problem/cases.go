@@ -217,7 +217,7 @@ func (p *Problem) ValidateCase(c Case) error {
 	if !c.HasExpected() {
 		return nil
 	}
-	want := p.judgedType()
+	want := outputForm(p.judgedType())
 	if p.Judge.Compare == CompareAnyOf {
 		want += "[]"
 	}
@@ -288,7 +288,7 @@ func (p *Problem) validateClassCase(c Case) error {
 			}
 			continue
 		}
-		if err := CheckValue(m.Returns, expected[i]); err != nil {
+		if err := CheckValue(outputForm(m.Returns), expected[i]); err != nil {
 			return fmt.Errorf("expected[%d] (%s): %w", i, m.Name, err)
 		}
 	}

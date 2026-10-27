@@ -1,0 +1,72 @@
+// Node is a binary tree node with a pointer to the next node on its level
+// (NextTreeNode in problem.yaml).
+type Node struct {
+	Val   int
+	Left  *Node
+	Right *Node
+	Next  *Node
+}
+
+func hcNodeLinks(n *Node) []*Node { return []*Node{n.Left, n.Right, n.Next} }
+
+// hcDecNode0 reads a binary tree in level order; next pointers stay nil.
+func hcDecNode0(raw json.RawMessage) *Node {
+	vals := hcJSON[[]*int](raw)
+	if len(vals) == 0 || vals[0] == nil {
+		return nil
+	}
+	root := &Node{Val: *vals[0]}
+	queue := []*Node{root}
+	for i := 1; i < len(vals); {
+		if len(queue) == 0 {
+			panic(hcInputError{"more children than nodes in the level order"})
+		}
+		node := queue[0]
+		queue = queue[1:]
+		if vals[i] != nil {
+			node.Left = &Node{Val: *vals[i]}
+			queue = append(queue, node.Left)
+		}
+		i++
+		if i < len(vals) && vals[i] != nil {
+			node.Right = &Node{Val: *vals[i]}
+			queue = append(queue, node.Right)
+		}
+		i++
+	}
+	return root
+}
+
+// hcEncNode0 lists each level of the tree by following next pointers from
+// its leftmost node: [[1],[2,3],[4,5,7]].
+func hcEncNode0(root *Node) any {
+	out := []any{}
+	var level []*Node
+	if root != nil {
+		level = append(level, root)
+	}
+	count := 0
+	for len(level) > 0 {
+		vals := []int{}
+		for n := level[0]; n != nil; n = n.Next {
+			if count++; count > hcMaxNodes {
+				panic("next pointers too long (cycle?)")
+			}
+			vals = append(vals, n.Val)
+		}
+		out = append(out, vals)
+		var below []*Node
+		for _, n := range level {
+			for _, c := range []*Node{n.Left, n.Right} {
+				if c != nil {
+					if count++; count > hcMaxNodes {
+						panic("tree too large (cycle?)")
+					}
+					below = append(below, c)
+				}
+			}
+		}
+		level = below
+	}
+	return out
+}
