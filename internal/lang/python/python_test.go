@@ -1,11 +1,28 @@
 package python
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 )
+
+// debugpy runs with frozen modules off, so Python 3.11+ does not warn that
+// breakpoints may be missed.
+func TestDebugpyFrozenModulesOff(t *testing.T) {
+	f := newFakeEnv(t)
+	py := f.python(filepath.Join(f.bin, "python3"), "3.12.4")
+	p := &problem.Problem{Slug: "f", Kind: problem.KindFunction, Function: &problem.Function{Name: "f", Returns: problem.TypeInteger}}
+	cmd, err := Language{Interpreter: py}.DebugCommand(f.root, "", p, lang.DebugOptions{Headless: true, Addr: "127.0.0.1:5678"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(cmd.Args, " "), py+" -Xfrozen_modules=off -m debugpy --listen 127.0.0.1:5678"; !strings.HasPrefix(got, want) {
+		t.Errorf("command %q, want it to start with %q", got, want)
+	}
+}
 
 // Generated starters annotate like most of LeetCode's templates: builtin
 // generics and `X | None`, which the minimum Python supports.

@@ -313,7 +313,10 @@ func (l Language) DebugCommand(dir, _ string, p *problem.Problem, opts lang.Debu
 			}
 			return nil, fmt.Errorf("debugpy is not installed for %s: run `%s -m pip install debugpy`, or remove python.interpreter from hc.yaml to let hc manage a virtual environment with debugpy", l.python(), l.python())
 		}
-		cmd = exec.Command(l.python(), "-m", "debugpy", "--listen", opts.Addr, "--wait-for-client", runnerFile)
+		// Python 3.11+ freezes standard modules, and debugpy warns that
+		// breakpoints in them may be missed unless that is turned off.
+		// Older Pythons ignore the unknown -X option.
+		cmd = exec.Command(l.python(), "-Xfrozen_modules=off", "-m", "debugpy", "--listen", opts.Addr, "--wait-for-client", runnerFile)
 	} else {
 		args := []string{"-m", "pdb"}
 		if line, err := entryLine(filepath.Join(dir, solutionFile), p); err == nil {
