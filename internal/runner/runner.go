@@ -252,6 +252,12 @@ func readResults(path string) (map[int]driverResult, error) {
 			// A partially written last line after a crash; ignore it.
 			continue
 		}
+		// Drivers format JSON their own way (Python puts spaces after
+		// commas); compact it so outputs read like the expected ones.
+		var b bytes.Buffer
+		if len(r.Output) > 0 && json.Compact(&b, r.Output) == nil {
+			r.Output = b.Bytes()
+		}
 		results[r.ID] = r
 	}
 	return results, sc.Err()

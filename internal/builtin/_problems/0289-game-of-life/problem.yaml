@@ -1,0 +1,17 @@
+id: "289"
+slug: game-of-life
+title: Game of Life
+difficulty: medium
+tags: [array, matrix, simulation]
+kind: function
+function:
+  name: gameOfLife
+  params:
+    - {name: board, type: "integer[][]"}
+  returns: void
+judge:
+  compare: exact
+  output: board
+source:
+  site: builtin
+  url: https://leetcode.com/problems/game-of-life/
