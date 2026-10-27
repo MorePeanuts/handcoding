@@ -1,0 +1,22 @@
+id: "384"
+slug: shuffle-an-array
+title: Shuffle an Array
+difficulty: medium
+tags: [design, array, math, randomized]
+kind: class
+class:
+  name: Solution
+  constructor:
+    - {name: nums, type: "integer[]"}
+  methods:
+    - name: reset
+      params: []
+      returns: "integer[]"
+    - name: shuffle
+      params: []
+      returns: "integer[]"
+judge:
+  compare: checker
+source:
+  site: builtin
+  url: https://leetcode.com/problems/shuffle-an-array/

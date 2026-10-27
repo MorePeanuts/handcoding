@@ -1,0 +1,19 @@
+id: "528"
+slug: random-pick-with-weight
+title: Random Pick with Weight
+difficulty: medium
+tags: [array, math, binary-search, prefix-sum, randomized]
+kind: class
+class:
+  name: Solution
+  constructor:
+    - {name: w, type: "integer[]"}
+  methods:
+    - name: pickIndex
+      params: []
+      returns: integer
+judge:
+  compare: checker
+source:
+  site: builtin
+  url: https://leetcode.com/problems/random-pick-with-weight/

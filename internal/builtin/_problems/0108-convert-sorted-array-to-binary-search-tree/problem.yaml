@@ -1,0 +1,16 @@
+id: "108"
+slug: convert-sorted-array-to-binary-search-tree
+title: Convert Sorted Array to Binary Search Tree
+difficulty: easy
+tags: [tree, binary-search-tree, array, divide-and-conquer, binary-tree]
+kind: function
+function:
+  name: sortedArrayToBST
+  params:
+    - {name: nums, type: "integer[]"}
+  returns: TreeNode
+judge:
+  compare: checker
+source:
+  site: builtin
+  url: https://leetcode.com/problems/convert-sorted-array-to-binary-search-tree/

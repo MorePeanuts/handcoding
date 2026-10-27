@@ -1,0 +1,17 @@
+id: "210"
+slug: course-schedule-ii
+title: Course Schedule II
+difficulty: medium
+tags: [depth-first-search, breadth-first-search, graph, topological-sort]
+kind: function
+function:
+  name: findOrder
+  params:
+    - {name: numCourses, type: integer}
+    - {name: prerequisites, type: "integer[][]"}
+  returns: "integer[]"
+judge:
+  compare: checker
+source:
+  site: builtin
+  url: https://leetcode.com/problems/course-schedule-ii/

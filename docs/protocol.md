@@ -228,6 +228,8 @@ hc runs the checker once per run, after the solution: a helper calls `check` on 
 
 **Randomized problems** (Shuffle an Array, Random Pick with Weight) are design problems whose cases make many calls, from hundreds to a few thousand. The checker checks that every output is valid and that their distribution is plausible: compare the observed frequencies with the expected ones with bounds generous enough that a correct solution essentially never fails (state the false-reject probability in the checker, e.g. below 1e-6 per case), while an obviously non-random solution (always the same pick, the identity shuffle) fails.
 
+The built-in samples 5, 108, 210, 324 (in place), 384 and 528 (randomized) show checkers of each kind.
+
 ### Types
 
 Type names are LeetCode's `metaData` names, so problems fetched from LeetCode need no translation:

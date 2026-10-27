@@ -208,4 +208,4 @@ leetcode:
 - `hc fetch` imports problems with [LeetCode's `Node` types](protocol.md#leetcodes-node-types), `NestedInteger` and `Employee`, reading their signature from LeetCode's Go template. `returns_copy` (Clone Graph) is left to `hc gen`, and so are the examples of iterator problems such as Flatten Nested List Iterator, which LeetCode gives without the calls.
 - Run time is measured, but memory is not limited.
 - LeetCode premium problems cannot be fetched.
-- Problems with many valid answers that cannot all be listed ("return any valid answer") and randomized problems are judged by a [checker](protocol.md#checkers), which `hc gen` writes. Checkers are Python, so these problems need Python 3.10 or later even when you solve them in Go; the virtual environment hc manages provides it.
+- Problems with many valid answers that cannot all be listed ("return any valid answer") and randomized problems are judged by a [checker](protocol.md#checkers), which `hc gen` writes; the samples 5, 108, 210, 324, 384 and 528 have one. Checkers are Python, so these problems need Python 3.10 or later even when you solve them in Go; the virtual environment hc manages provides it.

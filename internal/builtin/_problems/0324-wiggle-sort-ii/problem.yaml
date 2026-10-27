@@ -1,0 +1,17 @@
+id: "324"
+slug: wiggle-sort-ii
+title: Wiggle Sort II
+difficulty: medium
+tags: [greedy, array, divide-and-conquer, quickselect, sorting]
+kind: function
+function:
+  name: wiggleSort
+  params:
+    - {name: nums, type: "integer[]"}
+  returns: void
+judge:
+  compare: checker
+  output: nums
+source:
+  site: builtin
+  url: https://leetcode.com/problems/wiggle-sort-ii/
