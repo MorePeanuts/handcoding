@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +28,9 @@ func newWorkspace(t *testing.T) *app.App {
 	if _, err := builtin.InstallProblems(ws.ProblemsPath()); err != nil {
 		t.Fatal(err)
 	}
+	// The python3 on PATH, rather than a virtual environment that may need
+	// the network.
+	ws.Config.Python.Interpreter = "python3"
 	a := app.New(ws)
 	t.Cleanup(func() { a.Close() })
 	return a
@@ -249,4 +253,32 @@ func mustLang(t *testing.T, a *app.App, name string) lang.Language {
 		t.Fatal(err)
 	}
 	return l
+}
+
+// Python runs in the workspace's virtual environment unless hc.yaml names an
+// interpreter.
+func TestPythonEnvironment(t *testing.T) {
+	ws, err := workspace.Create(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws.Config.Python.Interpreter != "" {
+		t.Fatalf("hc init sets python.interpreter: %q", ws.Config.Python.Interpreter)
+	}
+	l, err := app.New(ws).Lang("python")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := l.(python.Language).Venv; v == nil || v.Dir != ws.VenvPath() || v.Label != filepath.Join(".hc", "venv") {
+		t.Fatalf("venv %+v", v)
+	}
+
+	ws.Config.Python.Interpreter = "python3"
+	a := app.New(ws)
+	if l, _ := a.Lang("python"); l.(python.Language).Venv != nil {
+		t.Fatal("venv despite python.interpreter")
+	}
+	if _, err := a.SyncEnv(context.Background(), io.Discard); err == nil {
+		t.Fatal("SyncEnv despite python.interpreter")
+	}
 }

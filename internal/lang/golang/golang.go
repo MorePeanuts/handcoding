@@ -13,6 +13,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -48,6 +49,9 @@ func (Language) SolutionFile() string { return solutionFile }
 const MinVersion = "1.22"
 
 func (Language) Toolchain() (lang.Toolchain, error) { return detect() }
+
+// Setup does nothing: Go needs no environment besides the toolchain.
+func (Language) Setup(context.Context, io.Writer) error { return nil }
 
 var goVersionRE = regexp.MustCompile(`go(\d+(?:\.\d+)*)`)
 

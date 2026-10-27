@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,6 +41,7 @@ func newStartCmd(root *rootOptions) *cobra.Command {
 				if created {
 					fmt.Fprintf(os.Stderr, "%s %s\n", ui.Green.Render("created"), path)
 				}
+				setupEnv(cmd.Context(), l)
 				if edit {
 					return openEditor(a, path)
 				}
@@ -66,12 +68,22 @@ func newEditCmd(root *rootOptions) *cobra.Command {
 				if err != nil {
 					return err
 				}
+				setupEnv(cmd.Context(), l)
 				return openEditor(a, path)
 			})
 		},
 	}
 	langFlag(cmd, &langName)
 	return cmd
+}
+
+// setupEnv prepares the language's environment, such as the Python virtual
+// environment, so the editor finds it. A failure is only a warning here:
+// the solution can be edited anyway, and running it reports the error.
+func setupEnv(ctx context.Context, l lang.Language) {
+	if err := l.Setup(ctx, os.Stderr); err != nil {
+		fmt.Fprintln(os.Stderr, ui.Yellow.Render("warning:")+" "+err.Error())
+	}
 }
 
 func openEditor(a *app.App, path string) error {
@@ -305,7 +317,7 @@ terminal with a breakpoint at your function. Headless mode starts a debug
 server for your editor to attach to:
 
   Go:     dlv headless server (nvim-dap: type "go", request "attach", mode "remote")
-  Python: debugpy (pip install debugpy; nvim-dap: request "attach", connect to the port)`,
+  Python: debugpy, installed in the workspace's .hc/venv (nvim-dap: request "attach", connect to the port)`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return root.withProblem(args[0], langName, func(a *app.App, p *problem.Problem, l lang.Language) error {

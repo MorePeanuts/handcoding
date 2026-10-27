@@ -6,6 +6,7 @@
 //	  problems/<dir>/          problem bank (see package problem)
 //	  solutions/<lang>/<dir>/  the user's code, one directory per problem
 //	  .hc/hc.db                submission history
+//	  .hc/venv/                the Python virtual environment hc manages
 package workspace
 
 import (
@@ -30,6 +31,10 @@ const (
 	ProblemsDir  = "problems"
 	SolutionsDir = "solutions"
 	StateDir     = ".hc"
+	// VenvDir is the Python virtual environment, inside StateDir.
+	VenvDir = "venv"
+	// PyrightConfig points pyright at the virtual environment.
+	PyrightConfig = "pyrightconfig.json"
 	// EnvWorkspace overrides workspace discovery.
 	EnvWorkspace = "HC_WORKSPACE"
 )
@@ -57,6 +62,8 @@ type Config struct {
 
 // PythonConfig configures Python.
 type PythonConfig struct {
+	// Interpreter is the Python to run solutions with. Unset, hc manages a
+	// virtual environment in .hc/venv.
 	Interpreter string `yaml:"interpreter,omitempty"`
 }
 
@@ -82,7 +89,6 @@ func DefaultConfig() Config {
 		Theme:    "auto",
 		Images:   "auto",
 		Timeout:  "10s",
-		Python:   PythonConfig{Interpreter: "python3"},
 		Agent:    AgentConfig{Name: "claude"},
 		LeetCode: LeetCodeConfig{Site: "com"},
 	}
@@ -172,7 +178,7 @@ func Create(dir string) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	header := "# handcoding workspace configuration\n# agent.name: claude | codex   (or set agent.command for a custom agent)\n# leetcode.site: com | cn\n# theme: auto | dark | light   (set it if statements look wrong in your terminal)\n# images: auto | kitty | blocks | none   (kitty: kitty, Ghostty, herdr; blocks: any truecolor terminal)\n"
+	header := "# handcoding workspace configuration\n# agent.name: claude | codex   (or set agent.command for a custom agent)\n# leetcode.site: com | cn\n# theme: auto | dark | light   (set it if statements look wrong in your terminal)\n# images: auto | kitty | blocks | none   (kitty: kitty, Ghostty, herdr; blocks: any truecolor terminal)\n# python.interpreter: a Python 3.10+ to use instead of the virtual environment hc manages in .hc/venv\n"
 	if err := os.WriteFile(filepath.Join(abs, ConfigFile), append([]byte(header), data...), 0o644); err != nil {
 		return nil, err
 	}
@@ -188,6 +194,9 @@ func (w *Workspace) ProblemsPath() string { return filepath.Join(w.Root, Problem
 
 // StatePath is the directory for local state.
 func (w *Workspace) StatePath() string { return filepath.Join(w.Root, StateDir) }
+
+// VenvPath is the directory of the Python virtual environment.
+func (w *Workspace) VenvPath() string { return filepath.Join(w.Root, StateDir, VenvDir) }
 
 // SolutionDir is where the user's code for p in language langID lives.
 func (w *Workspace) SolutionDir(p *problem.Problem, langID string) string {

@@ -250,7 +250,7 @@ These versions bind the code hc generates (drivers, starters) and the code a pro
 
 - `hc test`, `hc submit` and `hc debug` name the toolchain they run with (`[Python 3.12.9]`) and warn when it is older, but still run.
 - `hc cases build` and `hc validate --run` refuse to run references on an older toolchain, so expected outputs always come from a supported one.
-- Python 3.10 is needed for the `X | None` annotations in LeetCode's templates. If `python3` is older (macOS ships 3.9), set `python.interpreter` in `hc.yaml`.
+- Python 3.10 is needed for the `X | None` annotations in LeetCode's templates. hc runs Python in a virtual environment it creates in `.hc/venv` with Python 3.10 or later (with uv, which downloads one if needed), so an older system `python3` (macOS ships 3.9) does not matter. `python.interpreter` in `hc.yaml` replaces the environment with an interpreter of your choice.
 - Go 1.22 limits both the language and the standard library. To check Go code against it, put `go 1.22` in its `go.mod` and run `go vet`, whose `stdversion` check reports newer standard library symbols.
 
 ### Validation
@@ -286,6 +286,7 @@ type Language interface {
     Command(ctx context.Context, dir, binDir string) *exec.Cmd
     DebugCommand(dir, binDir string, p *problem.Problem, opts lang.DebugOptions) (*exec.Cmd, error)
     Toolchain() (lang.Toolchain, error) // detects the compiler or interpreter and its version; fails if missing
+    Setup(ctx context.Context, w io.Writer) error // prepares an environment hc manages, e.g. Python's .hc/venv; called before running
 }
 ```
 

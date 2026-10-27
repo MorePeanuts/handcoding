@@ -51,10 +51,9 @@ go install github.com/MorePeanuts/handcoding/cmd/hc@latest
 
 Linux、macOS 和 Windows 的预编译二进制文件见 [Releases 页面](https://github.com/MorePeanuts/handcoding/releases)。
 
-答题需要对应语言的工具链：Go 1.22+，或 Python 3.10+（macOS 自带的是 3.9，请在 `hc.yaml` 中把 `python.interpreter` 指向更新的版本）。以下为可选依赖：
+答题需要对应语言的工具链：Go 1.22+；Python 则需要 [uv](https://docs.astral.sh/uv/)（推荐）或 Python 3.10+。hc 在工作区中为 Python 解答创建专用的虚拟环境，第一次需要 Python 时自动创建。有了 uv，即使系统自带的 Python 太旧（macOS 自带 3.9）也能用：uv 会下载一个新版本。以下为可选依赖：
 
 - [Delve](https://github.com/go-delve/delve)：调试 Go；
-- `debugpy`：以 headless 模式调试 Python；
 - `claude` 或 `codex`：生成测试用例。
 
 ## 快速开始

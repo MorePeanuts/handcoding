@@ -34,17 +34,47 @@ type App struct {
 func New(ws *workspace.Workspace) *App {
 	return &App{
 		WS:    ws,
-		Langs: Languages(ws.Config),
+		Langs: Languages(ws),
 	}
 }
 
 // Languages returns the registry of supported languages. New languages are
 // added here.
-func Languages(cfg workspace.Config) *lang.Registry {
+func Languages(ws *workspace.Workspace) *lang.Registry {
 	return lang.NewRegistry(
 		golang.Language{},
-		python.Language{Interpreter: cfg.Python.Interpreter},
+		pythonLanguage(ws),
 	)
+}
+
+// pythonLanguage runs solutions with python.interpreter from hc.yaml if it
+// is set, and otherwise in a virtual environment in the workspace.
+func pythonLanguage(ws *workspace.Workspace) python.Language {
+	if ws.Config.Python.Interpreter != "" {
+		return python.Language{Interpreter: ws.Config.Python.Interpreter}
+	}
+	return python.Language{Venv: &python.Venv{
+		Dir:     ws.VenvPath(),
+		Label:   filepath.Join(workspace.StateDir, workspace.VenvDir),
+		Pyright: filepath.Join(ws.Root, workspace.PyrightConfig),
+	}}
+}
+
+// SyncEnv creates the Python virtual environment again and returns the
+// toolchain it provides. Progress goes to w.
+func (a *App) SyncEnv(ctx context.Context, w io.Writer) (lang.Toolchain, error) {
+	l, err := a.Langs.Get("python")
+	if err != nil {
+		return lang.Toolchain{}, err
+	}
+	py, ok := l.(python.Language)
+	if !ok || py.Venv == nil {
+		return lang.Toolchain{}, fmt.Errorf("python.interpreter is set in %s, so hc manages no virtual environment", workspace.ConfigFile)
+	}
+	if err := py.Venv.Rebuild(ctx, w); err != nil {
+		return lang.Toolchain{}, err
+	}
+	return py.Toolchain()
 }
 
 // Close releases resources.
@@ -190,6 +220,9 @@ func (a *App) Run(ctx context.Context, p *problem.Problem, l lang.Language, sel 
 	if !a.HasSolution(p, l) {
 		return nil, fmt.Errorf("no %s solution for %s yet; run `hc start %s -l %s`", l.Name(), p.Slug, p.Slug, l.ID())
 	}
+	if err := l.Setup(ctx, o.Stderr); err != nil {
+		return nil, err
+	}
 	// The user's code may well run on an old toolchain; the report carries
 	// the toolchain so the front ends can warn.
 	tc, err := l.Toolchain()
@@ -293,6 +326,9 @@ func (a *App) ReferenceLangs(p *problem.Problem) []lang.Language {
 func (a *App) RunReference(ctx context.Context, p *problem.Problem, langName string, sel []runner.Selected, o RunOptions) (*runner.Report, lang.Language, error) {
 	l, path, err := a.ReferenceLang(p, langName)
 	if err != nil {
+		return nil, nil, err
+	}
+	if err := l.Setup(ctx, o.Stderr); err != nil {
 		return nil, nil, err
 	}
 	// Expected outputs and pack references must come from a toolchain the

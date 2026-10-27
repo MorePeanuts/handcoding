@@ -16,6 +16,7 @@ package lang
 import (
 	"context"
 	"fmt"
+	"io"
 	"os/exec"
 	"slices"
 	"strings"
@@ -65,6 +66,10 @@ type Language interface {
 	// fails when the toolchain is missing; a toolchain older than the
 	// protocol allows is returned, and its Err says so.
 	Toolchain() (Toolchain, error)
+	// Setup prepares an environment the language manages, such as a
+	// virtual environment, writing progress to w. It is called before
+	// running, and must be cheap once the environment is ready.
+	Setup(ctx context.Context, w io.Writer) error
 }
 
 // Toolchain is the compiler or interpreter a language runs solutions with.
@@ -76,9 +81,18 @@ type Toolchain struct {
 	Min string
 	// Upgrade tells the user how to get a supported version.
 	Upgrade string
+	// Env names the environment hc manages for the toolchain, if any, e.g.
+	// ".hc/venv".
+	Env string
 }
 
-func (t Toolchain) String() string { return t.Name + " " + t.Version }
+// String is e.g. "Python 3.12.9 (.hc/venv)".
+func (t Toolchain) String() string {
+	if t.Env != "" {
+		return t.Name + " " + t.Version + " (" + t.Env + ")"
+	}
+	return t.Name + " " + t.Version
+}
 
 // Supported reports whether the toolchain is at least the minimum version.
 func (t Toolchain) Supported() bool { return AtLeast(t.Version, t.Min) }
