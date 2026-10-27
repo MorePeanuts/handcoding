@@ -87,6 +87,19 @@ func (a *App) SyncEnv(ctx context.Context, w io.Writer) (lang.Toolchain, error) 
 	return py.Toolchain()
 }
 
+// RetryEnv lets the next run try again to create the Python virtual
+// environment if an earlier attempt failed. Within one command hc tries
+// once; the TUI calls this before each run (see python.Venv.Retry).
+func (a *App) RetryEnv() {
+	l, err := a.Langs.Get("python")
+	if err != nil {
+		return
+	}
+	if py, ok := l.(python.Language); ok && py.Venv != nil {
+		py.Venv.Retry()
+	}
+}
+
 // Close releases resources.
 func (a *App) Close() error {
 	if a.store != nil {

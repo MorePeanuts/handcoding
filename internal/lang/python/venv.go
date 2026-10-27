@@ -41,6 +41,9 @@ type Venv struct {
 
 	mu    sync.Mutex
 	ready bool
+	// failed is the error of the last attempt to create the environment,
+	// returned again until Retry.
+	failed error
 }
 
 // Python is the environment's interpreter.
@@ -52,12 +55,17 @@ func (v *Venv) Python() string {
 }
 
 // Ensure creates the environment unless its interpreter runs. It checks
-// once per process. Progress goes to w, or to Log if w is nil.
+// once per process, and tries to create the environment once: after a
+// failure it returns the same error until Retry. Progress goes to w, or to
+// Log if w is nil.
 func (v *Venv) Ensure(ctx context.Context, w io.Writer) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if v.ready {
 		return nil
+	}
+	if v.failed != nil {
+		return v.failed
 	}
 	w = v.writer(w)
 	if _, err := version(ctx, v.Python()); err != nil {
@@ -65,6 +73,7 @@ func (v *Venv) Ensure(ctx context.Context, w io.Writer) error {
 			fmt.Fprintf(w, "%s no longer runs (moved workspace or removed Python?); creating it again\n", v.Label)
 		}
 		if err := v.create(ctx, w); err != nil {
+			v.failed = err
 			return err
 		}
 	}
@@ -78,13 +87,25 @@ func (v *Venv) Rebuild(ctx context.Context, w io.Writer) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	w = v.writer(w)
-	v.ready = false
+	v.ready, v.failed = false, nil
 	if err := v.create(ctx, w); err != nil {
+		v.failed = err
 		return err
 	}
 	v.writePyright(w)
 	v.ready = true
 	return nil
+}
+
+// Retry lets the next Ensure try again to create the environment after a
+// failed attempt. A command tries once, so that its steps do not each
+// report the same failure; a long-running front end such as the TUI calls
+// Retry before each run, as the user may have fixed the cause (installed
+// uv, say) in the meantime.
+func (v *Venv) Retry() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.failed = nil
 }
 
 func (v *Venv) writer(w io.Writer) io.Writer {
