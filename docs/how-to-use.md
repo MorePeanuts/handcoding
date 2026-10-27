@@ -22,11 +22,20 @@ English · [简体中文](how-to-use_zh.md)
   solutions/go/0001-two-sum/  your code: solution.go, plus generated go.mod and zz_hc_driver.go
   solutions/python/...        your code: solution.py, plus generated hc_runtime.py and _hc_runner.py
   .hc/hc.db                   submission history (SQLite)
+  .hc/venv/                   Python virtual environment managed by hc
+  pyrightconfig.json          points pyright at .hc/venv
 ```
 
 `hc` finds the workspace from `-w <dir>`, then `$HC_WORKSPACE`, then the nearest parent directory containing `hc.yaml`, then `~/handcoding`. You can run it from anywhere.
 
 Each Go problem is a standalone module, and the driver sits next to `solution.go`. So gopls, `go build` and Delve breakpoints all work on your real file. The generated files are rewritten before every run, so don't edit them. `go.mod` follows your Go: its `go` line is your toolchain's version (`go 1.27` for Go 1.27.2), so your solutions can use everything it supports. hc builds with `GOTOOLCHAIN=local` and never downloads another toolchain.
+
+Python solutions run in a virtual environment that hc manages in `.hc/venv`. hc creates it the first time a command needs Python (`hc start`, `test`, `submit`, `debug`, `cases build`, `validate --run`):
+
+1. with [uv](https://docs.astral.sh/uv/) if it is installed: `uv venv --python '>=3.10'`, which downloads a Python if none is installed;
+2. otherwise with the newest Python 3.10+ on PATH (`python3`, `python` or `python3.N`) and `-m venv`. On Debian and Ubuntu this needs the `python3-venv` package.
+
+The environment holds debugpy for headless debugging. Downloading Python and installing debugpy need network access, once; judging stays offline. If the environment stops working (the workspace was moved, or its Python removed), hc creates it again. `hc env sync` recreates it on demand, for example after installing uv. hc also writes `pyrightconfig.json` at the workspace root, unless you have one, so pyright and basedpyright check your solutions with the same interpreter. To use your own Python instead (conda, a custom build), set `python.interpreter` in `hc.yaml`; hc then creates no environment.
 
 Consider running `git init` in the workspace to keep a record of your practice.
 
@@ -156,7 +165,7 @@ hc debug lru -l py          # Python: pdb
 
 ```sh
 hc debug two-sum -c 2 --headless    # Go: dlv headless on 127.0.0.1:38697
-hc debug lru -l py --headless       # Python: debugpy (pip install debugpy)
+hc debug lru -l py --headless       # Python: debugpy, from .hc/venv
 ```
 
 ```lua
@@ -179,7 +188,7 @@ theme: auto           # statement colors: auto | dark | light
 images: auto          # statement images: auto | kitty | blocks | none
 timeout: 10s          # wall-clock limit per run
 python:
-  interpreter: python3  # Python 3.10+; e.g. python3.12 or a full path
+  interpreter: python3.12  # Python 3.10+ to use instead of .hc/venv; e.g. a full path. Unset by default
 agent:
   name: claude        # claude | codex, or set command (see above)
 leetcode:

@@ -88,6 +88,7 @@ Run hc with no arguments to open the interactive problem list.`,
 		newResetCmd(opts),
 		newDiscardCmd(opts),
 		newHistoryCmd(opts),
+		newEnvCmd(opts),
 	)
 	add("bank",
 		newInitCmd(opts),

@@ -33,6 +33,9 @@ func newHarness(t *testing.T) *harness {
 	if _, err := builtin.InstallProblems(ws.ProblemsPath()); err != nil {
 		t.Fatal(err)
 	}
+	// The python3 on PATH, rather than a virtual environment that may need
+	// the network.
+	ws.Config.Python.Interpreter = "python3"
 	a := app.New(ws)
 	t.Cleanup(func() { a.Close() })
 	l, _ := a.Lang("go")

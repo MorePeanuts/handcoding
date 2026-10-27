@@ -55,6 +55,9 @@ hc.yaml, or ~/handcoding — so using the default lets you run hc anywhere.`,
 			if _, err := installSkill(ws.Root); err != nil {
 				return err
 			}
+			if l, err := app.New(ws).Lang(""); err == nil && l.ID() == "python" {
+				setupEnv(cmd.Context(), l)
+			}
 			fmt.Printf("%s workspace at %s (%d sample problems)\n\n", ui.Green.Render("Created"), ws.Root, n)
 			fmt.Println("Next steps:")
 			fmt.Println("  hc                      open the problem list")

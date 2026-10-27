@@ -22,11 +22,20 @@
   solutions/go/0001-two-sum/  你的代码：solution.go，以及自动生成的 go.mod 和 zz_hc_driver.go
   solutions/python/...        你的代码：solution.py，以及自动生成的 hc_runtime.py 和 _hc_runner.py
   .hc/hc.db                   提交历史（SQLite）
+  .hc/venv/                   hc 管理的 Python 虚拟环境
+  pyrightconfig.json          让 pyright 使用 .hc/venv
 ```
 
 `hc` 按以下顺序查找工作区：`-w <dir>`、`$HC_WORKSPACE`、包含 `hc.yaml` 的最近一级父目录、`~/handcoding`。所以在任何目录下都可以运行它。
 
 每道 Go 题都是一个独立的 module，驱动文件就放在 `solution.go` 旁边。因此 gopls、`go build` 和 Delve 断点都直接作用在你自己的文件上。自动生成的文件每次运行前都会重写，不要手动修改。`go.mod` 跟随本机的 Go：其中的 `go` 行就是本机工具链的版本（Go 1.27.2 对应 `go 1.27`），所以你的解答可以使用它支持的所有特性。hc 用 `GOTOOLCHAIN=local` 构建，不会下载其他版本的工具链。
+
+Python 解答在 hc 管理的虚拟环境 `.hc/venv` 中运行。第一次有命令需要 Python 时（`hc start`、`test`、`submit`、`debug`、`cases build`、`validate --run`），hc 会创建它：
+
+1. 如果装了 [uv](https://docs.astral.sh/uv/)，用 `uv venv --python '>=3.10'` 创建；本机没有合适的 Python 时，uv 会自动下载一个；
+2. 否则从 PATH 上的 `python3`、`python` 和 `python3.N` 中选出最新的 Python 3.10+，用 `-m venv` 创建。在 Debian 和 Ubuntu 上这需要安装 `python3-venv` 包。
+
+环境中装有 debugpy，用于 headless 调试。下载 Python 和安装 debugpy 需要联网，但只需一次；判题始终离线。如果环境失效（工作区被移动，或者它所用的 Python 被删除），hc 会重新创建。`hc env sync` 可以随时重建它，例如在装好 uv 之后。hc 还会在工作区根目录写入 `pyrightconfig.json`（已有时不覆盖），让 pyright 和 basedpyright 用同一个解释器检查你的解答。如果想用自己的 Python（conda、自行编译的版本），在 `hc.yaml` 中设置 `python.interpreter`，hc 就不再创建虚拟环境。
 
 建议在工作区里执行 `git init`，记录下自己的练习过程。
 
@@ -156,7 +165,7 @@ hc debug lru -l py          # Python：pdb
 
 ```sh
 hc debug two-sum -c 2 --headless    # Go：dlv headless，监听 127.0.0.1:38697
-hc debug lru -l py --headless       # Python：debugpy（pip install debugpy）
+hc debug lru -l py --headless       # Python：debugpy，来自 .hc/venv
 ```
 
 ```lua
@@ -179,7 +188,7 @@ theme: auto           # 题面配色：auto | dark | light
 images: auto          # 题面图片：auto | kitty | blocks | none
 timeout: 10s          # 每次运行的时限
 python:
-  interpreter: python3  # Python 3.10+，例如 python3.12 或完整路径
+  interpreter: python3.12  # 代替 .hc/venv 使用的 Python 3.10+，也可以是完整路径；默认不设置
 agent:
   name: claude        # claude | codex，或者设置 command（见上文）
 leetcode:

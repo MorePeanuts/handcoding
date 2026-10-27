@@ -8,7 +8,7 @@ Open an issue before starting on anything non-trivial. Use the bug report or fea
 
 ## Development
 
-You need Go (see `go.mod` for the version) and Python 3.10+. The integration tests compile and run real solutions in both languages; the Python ones are skipped when `python3` is older than 3.10. Solutions, references and drivers must keep working on the oldest versions hc supports (Python 3.10, Go 1.22; see the protocol's language versions): CI runs the tests on Python 3.10, and `TestGoMinimumVersion` builds the Go side at Go 1.22.
+You need Go (see `go.mod` for the version) and Python 3.10+. The integration tests compile and run real solutions in both languages; the Python ones are skipped when `python3` is older than 3.10. They use that `python3` directly, never the virtual environment hc manages for users, so they need no network. Solutions, references and drivers must keep working on the oldest versions hc supports (Python 3.10, Go 1.22; see the protocol's language versions): CI runs the tests on Python 3.10, and `TestGoMinimumVersion` builds the Go side at Go 1.22.
 
 ```sh
 make build      # bin/hc

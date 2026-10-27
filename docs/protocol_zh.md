@@ -250,7 +250,7 @@ judge:
 
 - `hc test`、`hc submit` 和 `hc debug` 会显示实际使用的工具链（`[Python 3.12.9]`），版本过低时给出警告，但仍然运行。
 - `hc cases build` 和 `hc validate --run` 拒绝在版本过低的工具链上运行参考解，保证期望输出总是来自受支持的版本。
-- LeetCode 模板中的 `X | None` 注解需要 Python 3.10。如果 `python3` 版本较低（macOS 自带 3.9），请在 `hc.yaml` 中设置 `python.interpreter`。
+- LeetCode 模板中的 `X | None` 注解需要 Python 3.10。hc 在 `.hc/venv` 中用 Python 3.10 或更新版本创建虚拟环境来运行 Python（借助 uv，必要时自动下载），所以系统自带的 `python3` 版本较低（macOS 自带 3.9）也没有关系。在 `hc.yaml` 中设置 `python.interpreter` 可以改用你指定的解释器。
 - Go 1.22 同时限制语言特性和标准库。要按这个版本检查 Go 代码，在它的 `go.mod` 中写 `go 1.22` 并运行 `go vet`，其中的 `stdversion` 检查会报告更新的标准库符号。
 
 ### 校验
@@ -286,6 +286,7 @@ type Language interface {
     Command(ctx context.Context, dir, binDir string) *exec.Cmd
     DebugCommand(dir, binDir string, p *problem.Problem, opts lang.DebugOptions) (*exec.Cmd, error)
     Toolchain() (lang.Toolchain, error) // 检测编译器或解释器及其版本；找不到时返回错误
+    Setup(ctx context.Context, w io.Writer) error // 准备 hc 管理的环境，如 Python 的 .hc/venv；运行前调用
 }
 ```
 

@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,6 +43,8 @@ from hc_runtime import ListNode, TreeNode  # noqa: F401
 type Language struct {
 	// Interpreter is the Python executable, "python3" by default.
 	Interpreter string
+	// Venv, when set, provides the interpreter instead.
+	Venv *Venv
 }
 
 var _ lang.Language = Language{}
@@ -52,10 +55,21 @@ func (Language) Aliases() []string    { return []string{"py", "python3"} }
 func (Language) SolutionFile() string { return solutionFile }
 
 func (l Language) python() string {
-	if l.Interpreter != "" {
+	switch {
+	case l.Venv != nil:
+		return l.Venv.Python()
+	case l.Interpreter != "":
 		return l.Interpreter
 	}
 	return "python3"
+}
+
+// Setup creates the virtual environment if there is one and it is not ready.
+func (l Language) Setup(ctx context.Context, w io.Writer) error {
+	if l.Venv == nil {
+		return nil
+	}
+	return l.Venv.Ensure(ctx, w)
 }
 
 // MinVersion is the oldest Python the problem protocol supports. LeetCode's
@@ -65,26 +79,35 @@ const MinVersion = "3.10"
 // toolchains caches detection per interpreter for the life of the process.
 var toolchains sync.Map // interpreter -> func() (lang.Toolchain, error)
 
+// Toolchain sets up the virtual environment first, if there is one.
 func (l Language) Toolchain() (lang.Toolchain, error) {
+	if err := l.Setup(context.Background(), nil); err != nil {
+		return lang.Toolchain{}, err
+	}
 	py := l.python()
 	f, _ := toolchains.LoadOrStore(py, sync.OnceValues(func() (lang.Toolchain, error) { return detect(py) }))
-	return f.(func() (lang.Toolchain, error))()
+	tc, err := f.(func() (lang.Toolchain, error))()
+	if err != nil {
+		return tc, err
+	}
+	if l.Venv != nil {
+		tc.Env = l.Venv.Label
+		tc.Upgrade = "run `hc env sync` to create " + l.Venv.Label + " again with Python " + MinVersion + " or later"
+	} else {
+		tc.Upgrade = "set python.interpreter in hc.yaml to Python " + MinVersion + " or later, or remove it to let hc manage a virtual environment"
+	}
+	return tc, nil
 }
 
 func detect(py string) (lang.Toolchain, error) {
 	if _, err := exec.LookPath(py); err != nil {
 		return lang.Toolchain{}, fmt.Errorf("%s not found in PATH", py)
 	}
-	out, err := exec.Command(py, "-c", "import sys; print('.'.join(map(str, sys.version_info[:3])))").Output()
+	v, err := version(context.Background(), py)
 	if err != nil {
 		return lang.Toolchain{}, fmt.Errorf("%s: cannot read its version: %w", py, err)
 	}
-	return lang.Toolchain{
-		Name:    "Python",
-		Version: strings.TrimSpace(string(out)),
-		Min:     MinVersion,
-		Upgrade: "set python.interpreter in hc.yaml to Python " + MinVersion + " or later",
-	}, nil
+	return lang.Toolchain{Name: "Python", Version: v, Min: MinVersion}, nil
 }
 
 // Starter returns the problem's Python template (with hc's import header) or
@@ -203,6 +226,9 @@ except SyntaxError:
 
 // Build only checks syntax; Python has no compile step worth caching.
 func (l Language) Build(ctx context.Context, dir, _ string) error {
+	if err := l.Setup(ctx, nil); err != nil {
+		return err
+	}
 	cmd := exec.CommandContext(ctx, l.python(), "-c", syntaxCheck, solutionFile)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
@@ -225,11 +251,17 @@ func (l Language) Command(ctx context.Context, dir, _ string) *exec.Cmd {
 // DebugCommand runs pdb with a breakpoint at the first statement of the entry
 // point, or debugpy in headless mode for DAP clients such as nvim-dap.
 func (l Language) DebugCommand(dir, _ string, p *problem.Problem, opts lang.DebugOptions) (*exec.Cmd, error) {
+	if err := l.Setup(context.Background(), nil); err != nil {
+		return nil, err
+	}
 	var cmd *exec.Cmd
 	if opts.Headless {
 		check := exec.Command(l.python(), "-c", "import debugpy")
 		if err := check.Run(); err != nil {
-			return nil, fmt.Errorf("debugpy not installed: %s -m pip install debugpy", l.python())
+			if l.Venv != nil {
+				return nil, fmt.Errorf("debugpy is not installed in %s; install it with `hc env sync`", l.Venv.Label)
+			}
+			return nil, fmt.Errorf("debugpy is not installed for %s: run `%s -m pip install debugpy`, or remove python.interpreter from hc.yaml to let hc manage a virtual environment with debugpy", l.python(), l.python())
 		}
 		cmd = exec.Command(l.python(), "-m", "debugpy", "--listen", opts.Addr, "--wait-for-client", runnerFile)
 	} else {
