@@ -55,6 +55,20 @@ type ReportOptions struct {
 	MaxLen int
 }
 
+// ExpectedLabel names a case's expected value: "Any of" for any_of, whose
+// value lists the acceptable answers, "Reference" for a checker, where it is
+// one valid answer among many, found by the reference, and "Expected"
+// otherwise.
+func ExpectedLabel(p *problem.Problem) string {
+	switch p.Judge.Compare {
+	case problem.CompareAnyOf:
+		return "Any of"
+	case problem.CompareChecker:
+		return "Reference"
+	}
+	return "Expected"
+}
+
 // PrintReport prints a run report.
 func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOptions) {
 	if o.MaxLen == 0 {
@@ -119,12 +133,7 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 		default:
 			field("Output", string(c.Output))
 			if c.Case.HasExpected() {
-				if p.Judge.Compare == problem.CompareChecker {
-					// One valid answer among many, found by the reference.
-					field("Reference", string(c.Case.Expected))
-				} else {
-					field("Expected", string(c.Case.Expected))
-				}
+				field(ExpectedLabel(p), string(c.Case.Expected))
 			}
 		}
 		if c.Message != "" {
