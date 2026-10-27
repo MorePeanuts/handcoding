@@ -131,7 +131,9 @@ One object per line: `{"input": {...}, "expected": <json>, "example": true, "not
    Every input must satisfy the stated constraints and guarantees. Use
    `note` to say what each non-example case targets.
 6. Run `hc cases build <slug> --lang python` to compute `expected` with the
-   reference. For `any_of`, write the `expected` arrays yourself.
+   reference. For `any_of`, write the `expected` arrays yourself (compute
+   every acceptable answer, e.g. with a throwaway script); `hc cases build`
+   refuses to fill them, because a reference finds only one answer.
 7. Run `hc validate <slug> --run` — it must report no errors, and every
    reference solution must pass every case.
 8. Summarize what you added (count by category) and the judge rule you chose,

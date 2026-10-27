@@ -395,6 +395,15 @@ func (a *App) BuildCases(ctx context.Context, p *problem.Problem, langName strin
 	if len(sel) == 0 {
 		return res, nil
 	}
+	if p.Judge.Compare == problem.CompareAnyOf {
+		// A reference finds one answer, but any_of needs all of them: storing
+		// the one answer would reject every other correct one.
+		nums := make([]string, len(sel))
+		for i, s := range sel {
+			nums[i] = fmt.Sprint(s.Index)
+		}
+		return nil, fmt.Errorf("judge.compare is any_of, so expected must list every acceptable answer, which a reference solution cannot compute; write it by hand for case(s) %s (`hc validate --run` checks the reference against it)", strings.Join(nums, ", "))
+	}
 	rep, l, err := a.RunReference(ctx, p, langName, sel, RunOptions{Stderr: os.Stderr})
 	if err != nil {
 		return nil, err

@@ -1,0 +1,22 @@
+id: "173"
+slug: binary-search-tree-iterator
+title: Binary Search Tree Iterator
+difficulty: medium
+tags: [stack, tree, design, binary-search-tree, binary-tree, iterator]
+kind: class
+class:
+  name: BSTIterator
+  constructor:
+    - {name: root, type: TreeNode}
+  methods:
+    - name: next
+      params: []
+      returns: integer
+    - name: hasNext
+      params: []
+      returns: boolean
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/binary-search-tree-iterator/
