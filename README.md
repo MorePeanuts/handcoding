@@ -35,7 +35,7 @@ Command-line clients bring your editor back, but they still send your code to th
 
 ## Features
 
-- **Local judge.** Supports Go and Python, plus design problems (`LRUCache`), in-place problems, linked lists, binary trees, character grids, floating-point tolerance, any-order answers, and checkers for problems with many valid answers or random output. No network needed.
+- **Local judge.** Supports Go and Python, plus design problems (`LRUCache`), in-place problems, linked lists, binary trees, character grids, floating-point tolerance, any-order answers, and checkers for problems with many valid answers or random output, and encoders judged by decoding (Serialize and Deserialize Binary Tree). No network needed.
 - **Real debuggers.** `hc debug` starts Delve or pdb stopped at your function. `--headless` serves DAP for nvim-dap or VS Code.
 - **Interactive TUI.** A problem list in the style of rustlings, with the statement, its images, test results and submission history in one place. Your editor stays in the next pane.
 - **LeetCode import.** `hc fetch 146` downloads the statement, its images, the signature, starter code and the examples.

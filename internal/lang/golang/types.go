@@ -91,6 +91,16 @@ func ident(name string) string {
 	return name
 }
 
+// methodName is the Go name of a method of p's class. LeetCode's Go snippets
+// capitalize method names (getMin: GetMin), except the encoder and decoder of
+// round-trip problems (297's serialize, 535's encode), which keep theirs.
+func methodName(p *problem.Problem, name string) string {
+	if rt := p.Judge.RoundTrip; rt != nil && (name == rt.Encode || name == rt.Decode) {
+		return name
+	}
+	return exported(name)
+}
+
 // exported capitalizes a method name the way LeetCode's Go snippets do.
 func exported(name string) string {
 	if name == "" {

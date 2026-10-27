@@ -210,11 +210,13 @@ type meta struct {
 	Output   string            `json:"output,omitempty"`
 	// OutputLength mirrors judge.output_length.
 	OutputLength string `json:"output_length,omitempty"`
+	// RoundTrip mirrors judge.round_trip.
+	RoundTrip *problem.RoundTrip `json:"round_trip,omitempty"`
 }
 
 // Prepare writes hc_runtime.py and _hc_runner.py.
 func (Language) Prepare(dir string, p *problem.Problem) error {
-	m, err := json.Marshal(meta{Kind: p.Kind, Function: p.Function, Class: p.Class, Output: p.Judge.Output, OutputLength: p.Judge.OutputLength})
+	m, err := json.Marshal(meta{Kind: p.Kind, Function: p.Function, Class: p.Class, Output: p.Judge.Output, OutputLength: p.Judge.OutputLength, RoundTrip: p.Judge.RoundTrip})
 	if err != nil {
 		return err
 	}
@@ -296,7 +298,8 @@ func (l Language) Command(ctx context.Context, dir, _ string) *exec.Cmd {
 }
 
 // DebugCommand runs pdb with a breakpoint at the first statement of the entry
-// point, or debugpy in headless mode for DAP clients such as nvim-dap.
+// point (the constructor of a class, the encoder of a round trip), or
+// debugpy in headless mode for DAP clients such as nvim-dap.
 func (l Language) DebugCommand(dir, _ string, p *problem.Problem, opts lang.DebugOptions) (*exec.Cmd, error) {
 	if err := l.Setup(context.Background(), nil); err != nil {
 		return nil, err
@@ -333,10 +336,15 @@ func entryLine(path string, p *problem.Problem) (int, error) {
 	}
 	defer f.Close()
 	name := p.EntryName()
-	re := regexp.MustCompile(`^\s*def\s+` + regexp.QuoteMeta(name) + `\s*\(`)
-	if p.Kind == problem.KindClass {
-		re = regexp.MustCompile(`^\s*def\s+__init__\s*\(`)
+	switch {
+	case p.Judge.RoundTrip != nil:
+		// A codec's constructor is often missing (LeetCode's template has
+		// none); the encoder is where a case starts.
+		name = p.Judge.RoundTrip.Encode
+	case p.Kind == problem.KindClass:
+		name = "__init__"
 	}
+	re := regexp.MustCompile(`^\s*def\s+` + regexp.QuoteMeta(name) + `\s*\(`)
 	sc := bufio.NewScanner(f)
 	line, found, inSig := 0, false, false
 	for sc.Scan() {

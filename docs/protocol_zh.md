@@ -144,6 +144,7 @@ problems/0001-two-sum/          目录名：id 是数字时为 <4 位编号>-<sl
 | `judge.tolerance` | 浮点误差。返回 `double` 时默认为 `1e-5`；绝对误差或相对误差满足其一即可 |
 | `judge.output` | 原地修改类题目：调用结束后比较这个参数（或隐藏输入）的值，而不是返回值 |
 | `judge.output_length` | `return`：只判 `judge.output` 的前 k 个元素，k 是函数返回的整数。用于 LeetCode 的"删除重复项"这类题 |
+| `judge.round_trip` | 用于把一个值编码再解码回来的设计题：`encode`、`decode`（方法名）和 `instances`（`separate` 或 `same`）。见[编解码往返题](#编解码往返题) |
 | `judge.time_limit` | 整次运行的时限，写成 `5s`、`500ms` 这样的时长。默认取 hc.yaml 中的 `timeout` |
 | `source` | 题目来源：`site`、`url` |
 
@@ -195,6 +196,47 @@ judge:
 
 `unordered` 和 `unordered_deep` 要求结果是数组。
 
+### 编解码往返题
+
+有些设计题要求写一个编码器和一个解码器，编码格式由题解自己决定：二叉树的序列化与反序列化（297）、序列化和反序列化二叉搜索树（449）、TinyURL 的加密与解密（535）。能评判的只有 `decode(encode(x))`；编码得到的字符串既无法写进用例，也无法比较。`judge.round_trip` 用来描述这类题目：
+
+```yaml
+kind: class
+class:
+  name: Codec
+  constructor: []
+  methods:
+    - name: serialize
+      params:
+        - {name: root, type: TreeNode}
+      returns: string
+    - name: deserialize
+      params:
+        - {name: data, type: string}
+      returns: TreeNode
+judge:
+  compare: exact
+  round_trip:
+    encode: serialize
+    decode: deserialize
+    instances: separate   # separate | same
+```
+
+用例给出的是要编码的值，键为编码器的参数名，不写 `ops` 和 `args`；`expected` 是解码器的结果，和平常一样由 `hc cases build` 用参考解填写。编解码器正确时，它就等于输入：
+
+```json
+{"input": {"root": [1,2,3,null,null,4,5]}, "expected": [1,2,3,null,null,4,5], "example": true}
+```
+
+对每个用例，驱动先解码输入，创建一个实例并用它调用 `encode`，再把 `encode` 返回的字符串传给 `decode`，然后按 `judge.compare`（`exact`，或[判题程序](#判题程序)）评判 `decode` 的结果。`instances` 没有默认值，因为它决定了题解能否在两次调用之间保留状态：
+
+- `separate`：`decode` 在第二个实例上调用，和 LeetCode 的 `ser = Codec(); deser = Codec(); ans = deser.deserialize(ser.serialize(root))` 一样（297、449）。只把树记在实例上的编解码器会失败。
+- `same`：两次调用在同一个实例上（535：`codec.decode(codec.encode(url))`），所以编解码器可以保存映射。
+
+两个实例在同一个进程中，和 LeetCode 一样。`encode` 返回的不是字符串时判为运行错误。运行时间包括两次调用。类的其他方法不会被调用，449 的"尽可能紧凑"这类要求也不评判。
+
+规则：`round_trip` 只用于设计题；`encode` 和 `decode` 是类中两个不同的方法；`encode` 恰好有一个参数并返回 `string`；`decode` 恰好有一个 `string` 参数，返回 `encode` 参数的类型；构造函数没有参数；`instances` 是 `separate` 或 `same`。
+
 ### 判题程序
 
 当一个用例的合法答案多到无法列举，或者输出是随机的，就交给程序判定：写 `judge.compare: checker`，并在 `problem.yaml` 旁边放一个 `checker.py`。不论题解用什么语言，判题程序都用 Python 编写，所以用判题程序评测的题目即使用 Go 作答也需要 Python 3.10 或更新版本；hc 管理的虚拟环境（`.hc/venv`）会提供它。
@@ -205,8 +247,8 @@ def check(input, output, expected):
     """Return None or True to accept; False or a message string to reject."""
 ```
 
-- `input` 是解码后的用例输入：函数题是参数（及隐藏输入）组成的对象，设计题是 `{"ops": [...], "args": [...]}`。
-- `output` 是解码后的题解输出，形式与 `expected` 相同（原地修改的题目是 `judge.output` 的值，设计题是每个操作的结果）。
+- `input` 是解码后的用例输入：函数题是参数（及隐藏输入）组成的对象，设计题是 `{"ops": [...], "args": [...]}`，[编解码往返题](#编解码往返题)是编码器的参数。
+- `output` 是解码后的题解输出，形式与 `expected` 相同（原地修改的题目是 `judge.output` 的值，设计题是每个操作的结果，编解码往返题是解码器的结果）。
 - `expected` 是用例的期望输出，和其他题目一样由参考解通过 `hc cases build` 计算。它是一个合法答案，所以判题程序可以比较一个派生值，而不必重新求解：最长回文的长度、子集的大小。没有 `expected` 的用例不评判（"No Expected Output"）。
 - 需要重建结构时，导入题解使用的编解码函数和类型：`from hc_runtime import decode, TreeNode`，再 `decode("TreeNode", output)`。
 - 被拒绝的用例判为 Wrong Answer，判题程序给出的信息会和它一起显示在 `hc test`、`hc submit`、TUI 和提交历史中。信息要说清哪里错了：`"[1,2] is not a permutation of nums"`、`"length 2, but the longest palindrome has length 3"`。
@@ -414,8 +456,8 @@ function:
 {"input": {"nums": [-1,-2,-3,-4,-5], "target": -8}, "expected": [2,4], "note": "negative numbers"}
 ```
 
-- `input`：函数题是一个对象，每个参数和隐藏输入恰好对应一个值，键为名字。`ref` 参数给出被引用节点的值；`copy` 参数不写。设计题是 `{"ops": [...], "args": [[...], ...]}`；`ops[0]` 必须是类名（即构造函数），`args` 的每一项恰好是对应操作的参数。
-- `expected`：期望输出。设计题是每个操作返回值组成的数组，构造函数和 `void` 方法写 `null`。`any_of` 模式下是可接受答案组成的数组，需要手写：参考解只能给出一个答案，所以 `hc cases build` 拒绝填写。`checker` 模式下是一个合法答案，会传给判题程序。其他模式下缺省时由 `hc cases build` 用参考解计算。
+- `input`：函数题是一个对象，每个参数和隐藏输入恰好对应一个值，键为名字。`ref` 参数给出被引用节点的值；`copy` 参数不写。设计题是 `{"ops": [...], "args": [[...], ...]}`；`ops[0]` 必须是类名（即构造函数），`args` 的每一项恰好是对应操作的参数。[编解码往返题](#编解码往返题)是编码器的参数：`{"root": [1,2,3]}`。
+- `expected`：期望输出。设计题是每个操作返回值组成的数组，构造函数和 `void` 方法写 `null`；编解码往返题是解码器的结果。`any_of` 模式下是可接受答案组成的数组，需要手写：参考解只能给出一个答案，所以 `hc cases build` 拒绝填写。`checker` 模式下是一个合法答案，会传给判题程序。其他模式下缺省时由 `hc cases build` 用参考解计算。
 - `example`：该用例是题面中的示例。`hc test` 默认只运行这些用例（一个都没标时运行前 3 个）。
 - `note`：用例说明。
 - 不允许出现其他字段。空行和以 `//` 开头的行会被忽略。用例从 1 开始编号，只计算真正包含用例的行。
@@ -427,7 +469,7 @@ function:
 | | 函数题 | 设计题 |
 |---|---|---|
 | Python | `class Solution`，其中有名为 `function.name` 的方法；也可以是同名的模块级函数 | 名为 `class.name` 的类；`__init__` 接收构造函数参数；方法名与 `methods` 中一致 |
-| Go | `package main`；`func <function.name>(...)`，参数类型见上面的类型表 | `type <Name> struct`、`func Constructor(...) <Name>`，以及指针接收者的方法，方法名首字母大写（`getMin` → `GetMin`） |
+| Go | `package main`；`func <function.name>(...)`，参数类型见上面的类型表 | `type <Name> struct`、`func Constructor(...) <Name>`，以及指针接收者的方法，方法名首字母大写（`getMin` → `GetMin`）；编解码往返题的编码器和解码器例外，和 LeetCode 的初始代码一样保留原名（`serialize`） |
 
 - `ListNode` 和 `TreeNode` 已经提供：Python 中用 `from hc_runtime import ListNode, TreeNode` 导入；Go 中已预先定义（字段为 `Val`、`Next`、`Left`、`Right`），不要自己再声明。题目用到的 [`Node`](#leetcode-的-node-类型)、`NestedInteger` 和 `Employee` 也一样：Python 中写 `from hc_runtime import GraphNode as Node` 或 `from hc_runtime import NestedInteger`，Go 中已预先定义。
 - 两份参考解都存在时，`hc cases build` 先用 Go，再用 Python；可以用 `-l python` 指定。`hc validate --run` 会运行每一份参考解。
@@ -457,8 +499,8 @@ hc validate <slug> --run    # 同时在每个用例上运行每一份参考解�
 
 `hc validate` 会报告以下错误，并指出用例编号和字段：
 
-- `problem.yaml`：语法错误（带行号和列号）、不认识的字段、不合法的 slug、缺少标题、不支持的类型、`judge.output` 不是参数或隐藏输入、`void` 函数没写 `judge.output`、结构输入用法不对（`hidden`、`cycle`、`join`、`ref`、`copy`、`returns_ref`）、`returns_copy` 用法不对、用了多种 `Node` 类型、`judge.output_length` 用法不对、不认识的 `judge.compare`、`judge.compare: checker` 却没有 `checker.py` 以及有 `checker.py` 却用了其他模式、不合法的 `judge.time_limit`；
-- `cases.jsonl`：JSON 不合法、不认识的字段、缺少或多出的输入、值与声明的类型或评测系统定义的类型的形式不符（`input "nums": [1]: must be integer, got string "x"`；邻居不是图中的节点、随机下标超出链表、`null` 的位置不对、下属不存在）、结构输入对不上（环的位置超出链表、相交链表的尾部不同、被引用的值不存在或重复）、设计题中参数个数不对或方法不存在、`expected` 的形状不对；
+- `problem.yaml`：语法错误（带行号和列号）、不认识的字段、不合法的 slug、缺少标题、不支持的类型、`judge.output` 不是参数或隐藏输入、`void` 函数没写 `judge.output`、结构输入用法不对（`hidden`、`cycle`、`join`、`ref`、`copy`、`returns_ref`）、`returns_copy` 用法不对、用了多种 `Node` 类型、`judge.output_length` 用法不对、`judge.round_trip` 用法不对、不认识的 `judge.compare`、`judge.compare: checker` 却没有 `checker.py` 以及有 `checker.py` 却用了其他模式、不合法的 `judge.time_limit`；
+- `cases.jsonl`：JSON 不合法、不认识的字段、缺少或多出的输入、值与声明的类型或评测系统定义的类型的形式不符（`input "nums": [1]: must be integer, got string "x"`；邻居不是图中的节点、随机下标超出链表、`null` 的位置不对、下属不存在）、结构输入对不上（环的位置超出链表、相交链表的尾部不同、被引用的值不存在或重复）、设计题中参数个数不对或方法不存在、编解码往返题写了 `ops` 和 `args`、`expected` 的形状不对；
 - 加上 `--run` 时：参考解无法编译、运行出错，或与 `expected` 不一致（会同时显示两个值，以及判题程序的信息）；`checker` 模式下每个参考解输出都经过判题程序，判题程序出错也算错误。
 
 以下情况会给出警告：判题规则未确定（没有 `judge.compare`）、有用例缺少 `expected`、没有标记示例用例、没有参考解、题面引用的图片不存在、编号与其他题目重复。

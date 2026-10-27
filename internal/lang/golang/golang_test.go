@@ -124,3 +124,32 @@ func TestStarterEmployee(t *testing.T) {
 		}
 	}
 }
+
+// TestStarterRoundTrip checks that the encoder and decoder of a round trip
+// keep their names, as in LeetCode's Go templates, while other methods are
+// capitalized.
+func TestStarterRoundTrip(t *testing.T) {
+	p := &problem.Problem{Slug: "f", Kind: problem.KindClass, Class: &problem.Class{
+		Name: "Codec",
+		Methods: []problem.Method{
+			{Name: "serialize", Params: []problem.Param{{Name: "root", Type: problem.TypeTreeNode}}, Returns: problem.TypeString},
+			{Name: "deserialize", Params: []problem.Param{{Name: "data", Type: problem.TypeString}}, Returns: problem.TypeTreeNode},
+			{Name: "size", Returns: problem.TypeInteger},
+		},
+	}}
+	p.Judge.RoundTrip = &problem.RoundTrip{Encode: "serialize", Decode: "deserialize", Instances: problem.InstancesSeparate}
+	got, err := Language{}.Starter(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"func Constructor() Codec {",
+		"func (this *Codec) serialize(root *TreeNode) string {",
+		"func (this *Codec) deserialize(data string) *TreeNode {",
+		"func (this *Codec) Size() int {",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("starter does not contain %q:\n%s", want, got)
+		}
+	}
+}

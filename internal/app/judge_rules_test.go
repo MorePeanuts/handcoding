@@ -601,3 +601,185 @@ func TestCheckerClassProblem(t *testing.T) {
 		}
 	}
 }
+
+const treeCodecYAML = `slug: tree-codec
+title: Tree Codec
+kind: class
+class:
+  name: Codec
+  constructor: []
+  methods:
+    - name: serialize
+      params:
+        - {name: root, type: TreeNode}
+      returns: string
+    - name: deserialize
+      params:
+        - {name: data, type: string}
+      returns: TreeNode
+judge:
+  compare: exact
+  round_trip:
+    encode: serialize
+    decode: deserialize
+    instances: separate
+`
+
+const (
+	// Preorder with # for missing children.
+	goTreeCodec = `package main
+
+import (
+	"strconv"
+	"strings"
+)
+
+type Codec struct{}
+
+func Constructor() Codec { return Codec{} }
+
+func (c *Codec) serialize(root *TreeNode) string {
+	if root == nil {
+		return "#"
+	}
+	return strconv.Itoa(root.Val) + "," + c.serialize(root.Left) + "," + c.serialize(root.Right)
+}
+
+func (c *Codec) deserialize(data string) *TreeNode {
+	parts := strings.Split(data, ",")
+	var build func() *TreeNode
+	build = func() *TreeNode {
+		v := parts[0]
+		parts = parts[1:]
+		if v == "#" {
+			return nil
+		}
+		n, _ := strconv.Atoi(v)
+		return &TreeNode{Val: n, Left: build(), Right: build()}
+	}
+	return build()
+}
+`
+	pyTreeCodec = `from hc_runtime import TreeNode
+
+
+class Codec:
+    def serialize(self, root):
+        out = []
+
+        def go(n):
+            if n is None:
+                out.append("#")
+                return
+            out.append(str(n.val))
+            go(n.left)
+            go(n.right)
+
+        go(root)
+        return ",".join(out)
+
+    def deserialize(self, data):
+        it = iter(data.split(","))
+
+        def go():
+            v = next(it)
+            if v == "#":
+                return None
+            return TreeNode(int(v), go(), go())
+
+        return go()
+`
+	// The cheats remember the tree on the instance and return it as it is.
+	goTreeCheat = `package main
+
+type Codec struct{ last *TreeNode }
+
+func Constructor() Codec { return Codec{} }
+
+func (c *Codec) serialize(root *TreeNode) string { c.last = root; return "" }
+
+func (c *Codec) deserialize(data string) *TreeNode { return c.last }
+`
+	pyTreeCheat = `class Codec:
+    def __init__(self):
+        self.seen = {}
+
+    def serialize(self, root):
+        self.seen[str(id(root))] = root
+        return str(id(root))
+
+    def deserialize(self, data):
+        return self.seen.get(data)
+`
+)
+
+// TestRoundTrip checks judge.round_trip in both drivers: a codec is judged
+// on decode(encode(x)) only; with instances: separate the decoder is a
+// second instance, so a codec that keeps the tree on the instance fails,
+// while with same it passes.
+func TestRoundTrip(t *testing.T) {
+	requireTools(t, "go", "python3")
+	a := newWorkspace(t)
+	const cases = `{"input":{"root":[1,2,3,null,null,4,5]},"expected":[1,2,3,null,null,4,5]}` + "\n" +
+		`{"input":{"root":[]},"expected":[]}` + "\n" +
+		`{"input":{"root":[-1,null,2000,3]},"expected":[-1,null,2000,3]}` + "\n"
+	separate := addProblem(t, a, "tree-codec", treeCodecYAML, cases)
+	same := addProblem(t, a, "tree-codec-same",
+		strings.NewReplacer("slug: tree-codec", "slug: tree-codec-same", "instances: separate", "instances: same").Replace(treeCodecYAML), cases)
+	for _, p := range []*problem.Problem{separate, same} {
+		if err := p.Validate(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tests := []struct {
+		p          *problem.Problem
+		lang, code string
+		want       runner.Verdict
+		errSub     string
+	}{
+		{separate, "go", goTreeCodec, runner.Accepted, ""},
+		{separate, "python", pyTreeCodec, runner.Accepted, ""},
+		{same, "go", goTreeCodec, runner.Accepted, ""},
+		{same, "python", pyTreeCodec, runner.Accepted, ""},
+		{same, "go", goTreeCheat, runner.Accepted, ""},
+		{same, "python", pyTreeCheat, runner.Accepted, ""},
+		{separate, "go", goTreeCheat, runner.WrongAnswer, ""},
+		{separate, "python", pyTreeCheat, runner.WrongAnswer, ""},
+		// A Go encoder returning something else does not compile.
+		{separate, "python", strings.Replace(pyTreeCodec, `return ",".join(out)`, "return out", 1),
+			runner.RuntimeError, "serialize must return a string, but returned list ['1', '2', '#'"},
+		{separate, "go", strings.Replace(goTreeCodec, "Left: build(), Right: build()", "Right: build(), Left: build()", 1), runner.WrongAnswer, ""},
+		{separate, "python", strings.Replace(pyTreeCodec, "return go()\n", "return TreeNode(1)\n", 1), runner.WrongAnswer, ""},
+	}
+	for _, tt := range tests {
+		l := writeSolution(t, a, tt.p, tt.lang, tt.code)
+		cs, err := tt.p.LoadCases()
+		if err != nil {
+			t.Fatal(err)
+		}
+		sel, _ := app.Select(cs, nil, true)
+		rep, err := a.Run(context.Background(), tt.p, l, sel, app.RunOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var errs []string
+		for _, c := range rep.Cases {
+			errs = append(errs, c.Error)
+		}
+		if rep.Verdict != tt.want || !strings.Contains(strings.Join(errs, "\n"), tt.errSub) {
+			t.Errorf("%s %s %q: %s %q, want %s %q", tt.p.Slug, tt.lang, tt.code, rep.Verdict, errs, tt.want, tt.errSub)
+		}
+	}
+
+	// The case shows the encoder's input, and the output is decode's result.
+	l := writeSolution(t, a, separate, "python", strings.Replace(pyTreeCodec, "return go()\n", "return TreeNode(1)\n", 1))
+	cs, _ := separate.LoadCases()
+	rep, err := a.Run(context.Background(), separate, l, []runner.Selected{{Index: 1, Case: cs[0]}}, app.RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := rep.Cases[0]; separate.FormatInput(c.Case) != "root = [1,2,3,null,null,4,5]" || string(c.Output) != "[1]" {
+		t.Errorf("case %q, output %s", separate.FormatInput(c.Case), c.Output)
+	}
+}
