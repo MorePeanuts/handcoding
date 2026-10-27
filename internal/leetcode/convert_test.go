@@ -88,6 +88,43 @@ func TestConvertClassAndInPlace(t *testing.T) {
 	}
 }
 
+// Parameters of one language's template only (C passes array lengths) are
+// not part of the signature, so the examples still match it.
+func TestConvertSkipsLanguageOnlyParams(t *testing.T) {
+	q := &Question{
+		QuestionFrontendID: "703", Title: "Kth Largest Element in a Stream", TitleSlug: "kth-largest-element-in-a-stream", Difficulty: "Easy",
+		Content: "<pre><strong>Input</strong>\n[...]\n<strong>Output</strong>\n[null, 4]\n</pre>",
+		MetaData: `{"classname":"KthLargest","constructor":{"params":[{"type":"integer","name":"k"},{"type":"integer[]","name":"nums"},
+			{"type":"integer","name":"numsSize","lang":"c","value":"size_2"}]},
+			"methods":[{"params":[{"type":"integer","name":"val"},{"type":"integer","name":"valSize","lang":"c"}],"name":"add","return":{"type":"integer"}}],
+			"return":{"type":"boolean"},"systemdesign":true}`,
+		ExampleTestcases: `["KthLargest","add"]` + "\n" + `[[3,[4,5,8,2]],[3]]`,
+	}
+	c, err := Convert(q, SiteCom, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cl := c.Problem.Class
+	if len(cl.Constructor) != 2 || cl.Constructor[1].Name != "nums" || len(cl.Methods[0].Params) != 1 {
+		t.Fatalf("signature: %+v", cl)
+	}
+	if len(c.Cases) != 1 || len(c.Warnings) != 0 {
+		t.Fatalf("cases %+v, warnings %q", c.Cases, c.Warnings)
+	}
+
+	q = &Question{
+		QuestionFrontendID: "1", Title: "Sum", TitleSlug: "sum", Difficulty: "Easy",
+		MetaData: `{"name":"sum","params":[{"name":"nums","type":"integer[]"},{"name":"numsSize","type":"integer","lang":"c"}],"return":{"type":"integer"}}`,
+	}
+	c, err = Convert(q, SiteCom, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ps := c.Problem.Function.Params; len(ps) != 1 || ps[0].Name != "nums" {
+		t.Fatalf("function params: %+v", ps)
+	}
+}
+
 func goSnippet(code string) []struct {
 	LangSlug string `json:"langSlug"`
 	Code     string `json:"code"`
