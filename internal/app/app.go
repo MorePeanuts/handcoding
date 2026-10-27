@@ -229,21 +229,59 @@ func (a *App) Run(ctx context.Context, p *problem.Problem, l lang.Language, sel 
 	if err != nil {
 		return nil, err
 	}
-	rep, err := runner.Run(ctx, l, p, filepath.Dir(a.SolutionPath(p, l)), sel, a.runnerOpts(p, o))
+	opts, err := a.runnerOpts(ctx, p, sel, o)
+	if err != nil {
+		return nil, err
+	}
+	rep, err := runner.Run(ctx, l, p, filepath.Dir(a.SolutionPath(p, l)), sel, opts)
 	if rep != nil {
 		rep.Toolchain = tc
 	}
 	return rep, err
 }
 
-func (a *App) runnerOpts(p *problem.Problem, o RunOptions) runner.Options {
+func (a *App) runnerOpts(ctx context.Context, p *problem.Problem, sel []runner.Selected, o RunOptions) (runner.Options, error) {
 	timeout := a.WS.Config.TimeoutDuration()
 	if p.Judge.TimeLimit != "" {
 		if d, err := time.ParseDuration(p.Judge.TimeLimit); err == nil {
 			timeout = d
 		}
 	}
-	return runner.Options{Timeout: timeout, Stdout: o.Stdout, Stderr: o.Stderr}
+	opts := runner.Options{Timeout: timeout, Stdout: o.Stdout, Stderr: o.Stderr}
+	if p.Judge.Compare == problem.CompareChecker && slices.ContainsFunc(sel, func(s runner.Selected) bool { return s.Case.HasExpected() }) {
+		c, err := a.checker(ctx, p, o.Stderr)
+		if err != nil {
+			return opts, err
+		}
+		opts.Checker = c
+	}
+	return opts, nil
+}
+
+// checker returns what runs the problem's checker.py: the workspace's
+// Python, whatever the solution's language. Unlike solutions, checkers are
+// part of the problem, so they need a supported Python.
+func (a *App) checker(ctx context.Context, p *problem.Problem, w io.Writer) (lang.Checker, error) {
+	l, err := a.Langs.Get("python")
+	if err != nil {
+		return nil, err
+	}
+	c, ok := l.(lang.Checker)
+	if !ok {
+		return nil, errors.New("python cannot run checkers")
+	}
+	needs := fmt.Sprintf("%s is judged by %s, which needs Python %s or later", p.Slug, problem.CheckerFile, python.MinVersion)
+	if err := l.Setup(ctx, w); err != nil {
+		return nil, fmt.Errorf("%s: %w", needs, err)
+	}
+	tc, err := l.Toolchain()
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", needs, err)
+	}
+	if err := tc.Err(); err != nil {
+		return nil, fmt.Errorf("%s: %w", needs, err)
+	}
+	return c, nil
 }
 
 // Submit runs all cases and records the submission.
@@ -352,7 +390,11 @@ func (a *App) RunReference(ctx context.Context, p *problem.Problem, langName str
 	if err := os.WriteFile(filepath.Join(dir, l.SolutionFile()), code, 0o644); err != nil {
 		return nil, nil, err
 	}
-	rep, err := runner.Run(ctx, l, p, dir, sel, a.runnerOpts(p, o))
+	opts, err := a.runnerOpts(ctx, p, sel, o)
+	if err != nil {
+		return nil, nil, err
+	}
+	rep, err := runner.Run(ctx, l, p, dir, sel, opts)
 	if rep != nil {
 		rep.Toolchain = tc
 	}
@@ -420,7 +462,12 @@ func (a *App) BuildCases(ctx context.Context, p *problem.Problem, langName strin
 		}
 		old := cases[cr.Index-1].Expected
 		if old != nil {
-			if same, _ := judge.Equal(judge.OptionsFor(p), old, cr.Output); !same {
+			opts := judge.OptionsFor(p)
+			if opts.Mode == problem.CompareChecker {
+				// Expected is the reference's own answer.
+				opts.Mode = problem.CompareExact
+			}
+			if same, _ := judge.Equal(opts, old, cr.Output); !same {
 				res.Changed = append(res.Changed, cr.Index)
 			}
 		}

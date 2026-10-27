@@ -20,6 +20,7 @@ problems/0001-two-sum/
   cases.jsonl        test cases, one JSON object per line
   reference/         reference solutions (solution.py and/or solution.go)
   templates/         optional starter code (solution.go, solution.py)
+  checker.py         the checker, only with judge.compare: checker
 ```
 
 ### problem.yaml
@@ -38,7 +39,7 @@ function:
     - {name: target, type: integer}
   returns: "integer[]"
 judge:
-  compare: unordered        # exact | unordered | unordered_deep | any_of — no default
+  compare: unordered        # exact | unordered | unordered_deep | any_of | checker — no default
   # tolerance: 1e-5         # floats; default 1e-5 when returning double
   # output: nums            # in-place problems: judge this param after the call (returns: void)
   # output_length: return   # judge only output[:k], k being the return value
@@ -166,10 +167,50 @@ One object per line: `{"input": {...}, "expected": <json>, "example": true, "not
   character is a 1-char string `"a"`.
 - `expected` may be omitted; `hc cases build` fills it from the reference solution.
 - `any_of` mode: `expected` is an array of all acceptable answers.
+- `checker` mode: `expected` is the reference's answer, filled by `hc cases build`.
 - `example: true` marks the statement examples (run by `hc test`); `hc submit` runs all.
 - `hc validate` checks every value against its declared type, rejects unknown
   inputs or case fields, requires each op's exact argument count, and checks
   the shape of `expected`.
+
+### Checkers
+
+`judge.compare: checker` hands the decision to `checker.py` in the problem
+directory (required with this mode, an error with any other). It is Python
+for solutions in every language and must run on Python 3.10:
+
+```python
+def check(input, output, expected):
+    """Return None or True to accept; False or a message string to reject."""
+```
+
+- `input`: the case input as decoded JSON (the parameters and hidden inputs
+  of a function problem; `{"ops": [...], "args": [...]}` for a class problem).
+- `output`: the solution's output as decoded JSON, in the form of `expected`.
+- `expected`: the reference's answer from `hc cases build` — one valid answer
+  among many. Use it for the optimal value instead of solving the problem
+  again: the longest palindrome's length, the size of the largest subset, the
+  minimum sum. Check validity from `input` and optimality against `expected`.
+- Return a message that says what is wrong (`"nums[3] = 2 is not less than
+  nums[4] = 2"`); users see it with the Wrong Answer.
+- `from hc_runtime import decode, TreeNode` rebuilds structures:
+  `decode("TreeNode", output)`. Plain JSON is enough for most checkers.
+- A checker that raises, returns anything else or runs out of time (it gets
+  `judge.time_limit`) fails the whole run as a broken problem. Validate
+  `output`'s type and shape before using it, so a wrong output is a
+  rejection, not a crash.
+
+Randomized problems (Shuffle an Array, Random Pick with Weight, Linked List
+Random Node, `getRandom`) are class problems whose cases make many calls —
+hundreds to a few thousand. The checker checks every output's validity, then
+the distribution: compare observed with expected counts per bucket (value,
+position, index) with generous bounds — a chi-square test at a tiny
+significance level, or at least 5 standard deviations per bucket — so a
+correct solution essentially never fails while an obviously non-random one
+(always the same pick, the identity shuffle) does. Write the false-reject
+probability per case in a comment of the checker, and keep it below 1e-6.
+`expected` of the random calls is just one sample: only compare
+deterministic calls with it (`reset`).
 
 ## Workflow: generate test cases
 
@@ -186,12 +227,13 @@ One object per line: `{"input": {...}, "expected": <json>, "example": true, "not
      permutation's own order matters);
    - several valid answers that can all be listed (a handful per case) →
      `any_of`, with `expected` holding every acceptable answer;
+   - many valid answers ("return any of them", "any valid order", any
+     height-balanced BST), or a randomized output → `checker`, and write
+     `checker.py` (see [Checkers](#checkers)). Prefer a built-in mode when one
+     fits;
    - in-place problems: `judge.output` (and `output_length: return` when only
-     the first k elements count) come from LeetCode's metadata — keep them.
-   If no rule fits (e.g. "return any valid answer" with many possible
-   answers, or a randomized problem), leave `judge.compare` unset, still
-   write the reference and cases, and say in your summary that the problem
-   needs a custom checker, which hc does not support yet.
+     the first k elements count) come from LeetCode's metadata — keep them;
+     they combine with any mode, `checker` included.
 3. Write a **reference solution** in `reference/solution.py` (it must run on
    Python 3.10, the oldest version hc supports; same shape as LeetCode:
    `class Solution` with the method, or the design class). Annotate with
@@ -204,10 +246,17 @@ One object per line: `{"input": {...}, "expected": <json>, "example": true, "not
    `reference/solution.go` so that it returns a *different* valid answer than
    the Python one wherever the rule allows (another order, another valid
    answer). `hc validate --run` runs both against the same expected outputs,
-   so a rule that is too strict fails there. A Go reference starts with
+   so a rule that is too strict fails there. For a randomized problem, the
+   two references may use different (correct) random algorithms. A Go reference starts with
    `package main` (LeetCode's template in `templates/solution.go` omits it)
    and must build with Go 1.22: no newer language features or standard
    library functions (e.g. `slices.Sorted`, `maps.Keys`).
+   **Prove a checker rejects wrong answers** too: temporarily replace
+   `reference/solution.go` (keep a copy) with plausible wrong solutions — an
+   invalid answer, a valid but not optimal one, always the same random pick —
+   and check that `hc validate <slug> --run` reports Wrong Answer with a
+   helpful checker message on the cases you expect. Then restore the real
+   reference.
 5. Add inputs to `cases.jsonl` **without** `expected`. Keep existing lines
    (do not drop `example: true` cases). Aim for 15–40 cases covering:
    - every statement example (`"example": true`)
@@ -220,14 +269,17 @@ One object per line: `{"input": {...}, "expected": <json>, "example": true, "not
      under ~2 MB
    Every input must satisfy the stated constraints and guarantees. Use
    `note` to say what each non-example case targets.
+   For a randomized problem, a few cases with many calls (around 1000–3000)
+   are better than many small ones: the checker needs samples.
 6. Run `hc cases build <slug> --lang python` to compute `expected` with the
-   reference. For `any_of`, write the `expected` arrays yourself (compute
+   reference (for `checker` too: the checker receives it). For `any_of`, write the `expected` arrays yourself (compute
    every acceptable answer, e.g. with a throwaway script); `hc cases build`
    refuses to fill them, because a reference finds only one answer.
 7. Run `hc validate <slug> --run` — it must report no errors, and every
    reference solution must pass every case.
 8. Summarize what you added (count by category) and the judge rule you chose,
-   with the sentence of the statement it rests on.
+   with the sentence of the statement it rests on; for a checker, what it
+   verifies (and its false-reject probability for a randomized problem).
 
 ## Workflow: fix a test case
 
@@ -237,12 +289,13 @@ non-comment lines; see `hc cases list <slug>`) and the user's complaint.
 1. Inspect the case with `hc cases list <slug> --case N` and re-read the
    constraints.
 2. Decide what is wrong: the input violates constraints, the expected output
-   is wrong (reference bug), or the judge rule is wrong (e.g. order should not
+   is wrong (reference bug), the judge rule is wrong (e.g. order should not
    matter; see step 2 of the generate workflow — and if `judge.compare` is
-   unset, decide it). It is also possible the case is right and the user's solution is
+   unset, decide it), or `checker.py` rejects a valid answer or accepts a
+   wrong one. It is also possible the case is right and the user's solution is
    wrong — then say so and explain why, without changing anything.
-3. Fix the root cause: correct the reference solution, the input, or
-   `judge.compare`. When you loosen the judge rule, prove it with a second
+3. Fix the root cause: correct the reference solution, the input,
+   `judge.compare` or `checker.py`. When you loosen the judge rule, prove it with a second
    reference as in step 4 of the generate workflow. Then run `hc cases build <slug> --force` to recompute every
    expected output and `hc validate <slug> --run`.
 4. Report what was wrong and what you changed.

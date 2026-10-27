@@ -55,6 +55,9 @@ type CaseResult struct {
 	Error    string
 	Elapsed  time.Duration
 	JudgeErr error
+	// Message is the checker's reason for rejecting the output (judge.compare:
+	// checker).
+	Message string
 	// InputText overrides the rendered input; set for results restored from
 	// history, where the input may be truncated.
 	InputText string
@@ -82,6 +85,8 @@ type Options struct {
 	Stdout io.Writer
 	// Stderr receives the program's standard error.
 	Stderr io.Writer
+	// Checker runs checker.py; required for problems judged by one.
+	Checker lang.Checker
 }
 
 // Run prepares, builds and runs the solution in dir against the cases.
@@ -130,6 +135,7 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 	if err != nil {
 		return nil, err
 	}
+	var toCheck []judge.CheckerCase
 	for _, sel := range cases {
 		cr := CaseResult{Index: sel.Index, Case: sel.Case}
 		res, ok := results[sel.Index]
@@ -150,11 +156,25 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 			cr.Output = res.Output
 			cr.Elapsed = time.Duration(res.ElapsedNs)
 			cr.Verdict = judgeCase(p, sel.Case, res.Output, &cr)
+			if cr.Verdict == "" {
+				input, err := json.Marshal(sel.Case.Input)
+				if err != nil {
+					return nil, err
+				}
+				toCheck = append(toCheck, judge.CheckerCase{ID: sel.Index, Input: input, Output: res.Output, Expected: sel.Case.Expected})
+			}
 		}
+		rep.Cases = append(rep.Cases, cr)
+	}
+	if len(toCheck) > 0 {
+		if err := check(ctx, p, work, rep, toCheck, opts); err != nil {
+			return nil, err
+		}
+	}
+	for _, cr := range rep.Cases {
 		if cr.Verdict == Accepted {
 			rep.Passed++
 		}
-		rep.Cases = append(rep.Cases, cr)
 	}
 	if runErr != nil && len(results) < len(cases) {
 		rep.Stderr = stderr.String()
@@ -163,12 +183,17 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 	return rep, nil
 }
 
+// judgeCase returns the case's verdict, or "" when the problem's checker
+// has to decide it.
 func judgeCase(p *problem.Problem, c problem.Case, out json.RawMessage, cr *CaseResult) Verdict {
 	if !c.HasExpected() {
 		return NoExpected
 	}
 	if !p.Ready() {
 		return NotJudged
+	}
+	if p.Judge.Compare == problem.CompareChecker {
+		return ""
 	}
 	ok, err := judge.Equal(judge.OptionsFor(p), c.Expected, out)
 	if err != nil {

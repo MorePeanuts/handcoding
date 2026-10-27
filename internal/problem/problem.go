@@ -10,6 +10,7 @@
 //	  cases.jsonl       test cases, one JSON object per line
 //	  templates/        optional starter code per language (solution.go, solution.py, ...)
 //	  reference/        optional reference solutions used to compute expected outputs
+//	  checker.py        the checker, with judge.compare: checker
 package problem
 
 import (
@@ -32,6 +33,9 @@ const (
 	TemplatesDir    = "templates"
 	ReferenceDir    = "reference"
 	AssetsDir       = "assets"
+	// CheckerFile judges the outputs of a problem with judge.compare:
+	// checker. Checkers are Python whatever the solution's language.
+	CheckerFile = "checker.py"
 )
 
 // Kind is the shape of a problem.
@@ -154,6 +158,7 @@ const (
 	CompareUnordered     = "unordered"      // outermost array order is ignored
 	CompareUnorderedDeep = "unordered_deep" // order is ignored at every array level
 	CompareAnyOf         = "any_of"         // expected is an array of acceptable answers
+	CompareChecker       = "checker"        // checker.py decides; expected is one valid answer
 )
 
 // Judge holds judging options.
@@ -383,7 +388,7 @@ func (p *Problem) Validate() error {
 		errs = append(errs, fmt.Errorf("the signature uses %s: solution code calls each of them Node, so a problem can use only one", strings.Join(variants, " and ")))
 	}
 	switch p.Judge.Compare {
-	case "", CompareExact, CompareAnyOf:
+	case "", CompareExact, CompareAnyOf, CompareChecker:
 	case CompareUnordered, CompareUnorderedDeep:
 		if t := p.judgedType(); p.Kind == KindFunction && t != "" {
 			if _, depth := SplitArray(t); depth == 0 {
@@ -391,7 +396,13 @@ func (p *Problem) Validate() error {
 			}
 		}
 	default:
-		errs = append(errs, fmt.Errorf("unknown judge.compare %q (exact, unordered, unordered_deep or any_of)", p.Judge.Compare))
+		errs = append(errs, fmt.Errorf("unknown judge.compare %q (exact, unordered, unordered_deep, any_of or checker)", p.Judge.Compare))
+	}
+	switch checker := p.HasChecker(); {
+	case p.Judge.Compare == CompareChecker && !checker:
+		errs = append(errs, fmt.Errorf("judge.compare checker needs %s in the problem directory", CheckerFile))
+	case p.Judge.Compare != CompareChecker && checker:
+		errs = append(errs, fmt.Errorf("%s is only used with judge.compare: checker; set it, or remove %s", CheckerFile, CheckerFile))
 	}
 	if tl := p.Judge.TimeLimit; tl != "" {
 		if d, err := time.ParseDuration(tl); err != nil || d <= 0 {
@@ -488,6 +499,18 @@ func (p *Problem) Template(fileName string) (string, bool) {
 		return "", false
 	}
 	return string(data), true
+}
+
+// CheckerPath is where the problem's checker lives.
+func (p *Problem) CheckerPath() string { return filepath.Join(p.Dir, CheckerFile) }
+
+// HasChecker reports whether the problem directory holds a checker.
+func (p *Problem) HasChecker() bool {
+	if p.Dir == "" {
+		return false
+	}
+	_, err := os.Stat(p.CheckerPath())
+	return err == nil
 }
 
 // Reference returns the path of the reference solution with the given file

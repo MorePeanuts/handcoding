@@ -136,6 +136,37 @@ func TestValidateJudgeOptions(t *testing.T) {
 	}
 }
 
+// TestValidateChecker checks that checker.py and judge.compare: checker
+// come together.
+func TestValidateChecker(t *testing.T) {
+	mk := func(compare string, checker bool) *Problem {
+		p := &Problem{Slug: "x", Title: "X", Kind: KindFunction, Function: &Function{Name: "f", Returns: TypeInteger}, Dir: t.TempDir()}
+		p.Judge.Compare = compare
+		if checker {
+			if err := os.WriteFile(p.CheckerPath(), []byte("def check(input, output, expected):\n    pass\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		p.Normalize()
+		return p
+	}
+	if err := mk(CompareChecker, true).Validate(); err != nil {
+		t.Errorf("checker with checker.py: %v", err)
+	}
+	for _, tt := range []struct {
+		p    *Problem
+		want string
+	}{
+		{mk(CompareChecker, false), "judge.compare checker needs checker.py"},
+		{mk(CompareExact, true), "checker.py is only used with judge.compare: checker"},
+		{mk("", true), "checker.py is only used with judge.compare: checker"},
+	} {
+		if err := tt.p.Validate(); err == nil || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("compare %q: error = %v, want %q", tt.p.Judge.Compare, err, tt.want)
+		}
+	}
+}
+
 func TestNormalizeType(t *testing.T) {
 	for in, want := range map[string]string{
 		"int": "integer", "int[]": "integer[]", "list<list<int>>": "integer[][]",

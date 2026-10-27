@@ -43,7 +43,8 @@ func newGenCmd(root *rootOptions) *cobra.Command {
 		Use:   "gen <problem>",
 		Short: "Have a coding agent write a reference solution and test cases",
 		Long: `Run a coding agent (Claude Code or Codex, headless) in the workspace to
-decide how a problem is judged (judge.compare) and to write a reference
+decide how a problem is judged (judge.compare, and checker.py when no built-in
+rule fits) and to write a reference
 solution and test cases for it, following the handcoding skill. The agent
 computes expected outputs with ` + "`hc cases build`" + ` and verifies them with
 ` + "`hc validate --run`" + `. A freshly fetched problem becomes ready to submit this way.`,

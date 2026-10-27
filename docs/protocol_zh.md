@@ -123,6 +123,7 @@ problems/0001-two-sum/          目录名：id 是数字时为 <4 位编号>-<sl
   reference/solution.go
   templates/solution.go         初始代码（可选；缺省时根据签名生成）
   templates/solution.py
+  checker.py                    判题程序，配合 judge.compare: checker 使用（见[判题程序](#判题程序)）
 ```
 
 `hc import` 只复制以上这些文件和目录，其余内容（编辑器文件、`solutions/` 目录等）不会被导入。
@@ -190,8 +191,42 @@ judge:
 | `unordered` | 最外层数组视为多重集合，不计顺序 | Two Sum、全排列 |
 | `unordered_deep` | 每一层数组都不计顺序 | 字母异位词分组、子集 |
 | `any_of` | `expected` 是所有可接受答案组成的数组 | 合法答案不多的题目 |
+| `checker` | 由题目目录下的 `checker.py` 判定；`expected` 是一个合法答案 | 合法答案很多（"返回任意一个"）、输出随机的题目 |
 
 `unordered` 和 `unordered_deep` 要求结果是数组。
+
+### 判题程序
+
+当一个用例的合法答案多到无法列举，或者输出是随机的，就交给程序判定：写 `judge.compare: checker`，并在 `problem.yaml` 旁边放一个 `checker.py`。不论题解用什么语言，判题程序都用 Python 编写，所以用判题程序评测的题目即使用 Go 作答也需要 Python 3.10 或更新版本；hc 管理的虚拟环境（`.hc/venv`）会提供它。
+
+```python
+# checker.py
+def check(input, output, expected):
+    """Return None or True to accept; False or a message string to reject."""
+```
+
+- `input` 是解码后的用例输入：函数题是参数（及隐藏输入）组成的对象，设计题是 `{"ops": [...], "args": [...]}`。
+- `output` 是解码后的题解输出，形式与 `expected` 相同（原地修改的题目是 `judge.output` 的值，设计题是每个操作的结果）。
+- `expected` 是用例的期望输出，和其他题目一样由参考解通过 `hc cases build` 计算。它是一个合法答案，所以判题程序可以比较一个派生值，而不必重新求解：最长回文的长度、子集的大小。没有 `expected` 的用例不评判（"No Expected Output"）。
+- 需要重建结构时，导入题解使用的编解码函数和类型：`from hc_runtime import decode, TreeNode`，再 `decode("TreeNode", output)`。
+- 被拒绝的用例判为 Wrong Answer，判题程序给出的信息会和它一起显示在 `hc test`、`hc submit`、TUI 和提交历史中。信息要说清哪里错了：`"[1,2] is not a permutation of nums"`、`"length 2, but the longest palindrome has length 3"`。
+
+最长回文子串（5），`"bab"` 和 `"aba"` 都正确：
+
+```python
+def check(input, output, expected):
+    s = input["s"]
+    if not isinstance(output, str) or output not in s:
+        return "%r is not a substring of s" % (output,)
+    if output != output[::-1]:
+        return "%r is not a palindrome" % output
+    if len(output) != len(expected):
+        return "%r has length %d, but the longest palindrome has length %d" % (output, len(output), len(expected))
+```
+
+每次运行时，hc 在题解运行完后启动一次判题程序：一个辅助脚本对每个产生了输出的用例调用 `check`（已经判为运行错误或超时的用例不会送去）。判题程序的时间限制与题解相同（`judge.time_limit`）。判题程序无法加载、抛出异常、返回 `None`、布尔值和字符串以外的值，或者超时，都说明题目本身有问题，而不是答案错误：这次运行以错误结束，错误中注明 `checker.py`、用例和调用栈，`hc submit` 也不会记录提交。判题程序打印的内容只在这时显示。
+
+**随机题**（打乱数组、按权重随机选择）是设计题，每个用例包含大量调用，从几百到几千次。判题程序既检查每个输出是否合法，也检查它们的分布是否合理：把观察到的频率和期望频率比较，界限要足够宽松，让正确的题解几乎不可能失败（在判题程序中写明误判概率，例如每个用例低于 1e-6），同时明显不随机的题解（总是选同一个、原样返回数组）会失败。
 
 ### 类型
 
@@ -378,7 +413,7 @@ function:
 ```
 
 - `input`：函数题是一个对象，每个参数和隐藏输入恰好对应一个值，键为名字。`ref` 参数给出被引用节点的值；`copy` 参数不写。设计题是 `{"ops": [...], "args": [[...], ...]}`；`ops[0]` 必须是类名（即构造函数），`args` 的每一项恰好是对应操作的参数。
-- `expected`：期望输出。设计题是每个操作返回值组成的数组，构造函数和 `void` 方法写 `null`。`any_of` 模式下是可接受答案组成的数组，需要手写：参考解只能给出一个答案，所以 `hc cases build` 拒绝填写。其他模式下缺省时由 `hc cases build` 用参考解计算。
+- `expected`：期望输出。设计题是每个操作返回值组成的数组，构造函数和 `void` 方法写 `null`。`any_of` 模式下是可接受答案组成的数组，需要手写：参考解只能给出一个答案，所以 `hc cases build` 拒绝填写。`checker` 模式下是一个合法答案，会传给判题程序。其他模式下缺省时由 `hc cases build` 用参考解计算。
 - `example`：该用例是题面中的示例。`hc test` 默认只运行这些用例（一个都没标时运行前 3 个）。
 - `note`：用例说明。
 - 不允许出现其他字段。空行和以 `//` 开头的行会被忽略。用例从 1 开始编号，只计算真正包含用例的行。
@@ -407,6 +442,7 @@ function:
 
 - `hc test`、`hc submit` 和 `hc debug` 会显示实际使用的工具链（`[Python 3.12.9]`），版本过低时给出警告，但仍然运行。
 - `hc cases build` 和 `hc validate --run` 拒绝在版本过低的工具链上运行参考解，保证期望输出总是来自受支持的版本。
+- 判题程序总是在 Python 3.10 或更新版本上运行，Go 题解也一样。
 - LeetCode 模板中的 `X | None` 注解需要 Python 3.10。hc 在 `.hc/venv` 中用 Python 3.10 或更新版本创建虚拟环境来运行 Python（借助 uv，必要时自动下载），所以系统自带的 `python3` 版本较低（macOS 自带 3.9）也没有关系。在 `hc.yaml` 中设置 `python.interpreter` 可以改用你指定的解释器。
 - Go 1.22 同时限制语言特性和标准库。要按这个版本检查 Go 代码，在它的 `go.mod` 中写 `go 1.22` 并运行 `go vet`，其中的 `stdversion` 检查会报告更新的标准库符号。
 
@@ -419,9 +455,9 @@ hc validate <slug> --run    # 同时在每个用例上运行每一份参考解�
 
 `hc validate` 会报告以下错误，并指出用例编号和字段：
 
-- `problem.yaml`：语法错误（带行号和列号）、不认识的字段、不合法的 slug、缺少标题、不支持的类型、`judge.output` 不是参数或隐藏输入、`void` 函数没写 `judge.output`、结构输入用法不对（`hidden`、`cycle`、`join`、`ref`、`copy`、`returns_ref`）、`returns_copy` 用法不对、用了多种 `Node` 类型、`judge.output_length` 用法不对、不认识的 `judge.compare`、不合法的 `judge.time_limit`；
+- `problem.yaml`：语法错误（带行号和列号）、不认识的字段、不合法的 slug、缺少标题、不支持的类型、`judge.output` 不是参数或隐藏输入、`void` 函数没写 `judge.output`、结构输入用法不对（`hidden`、`cycle`、`join`、`ref`、`copy`、`returns_ref`）、`returns_copy` 用法不对、用了多种 `Node` 类型、`judge.output_length` 用法不对、不认识的 `judge.compare`、`judge.compare: checker` 却没有 `checker.py` 以及有 `checker.py` 却用了其他模式、不合法的 `judge.time_limit`；
 - `cases.jsonl`：JSON 不合法、不认识的字段、缺少或多出的输入、值与声明的类型或评测系统定义的类型的形式不符（`input "nums": [1]: must be integer, got string "x"`；邻居不是图中的节点、随机下标超出链表、`null` 的位置不对、下属不存在）、结构输入对不上（环的位置超出链表、相交链表的尾部不同、被引用的值不存在或重复）、设计题中参数个数不对或方法不存在、`expected` 的形状不对；
-- 加上 `--run` 时：参考解无法编译、运行出错，或与 `expected` 不一致（会同时显示两个值）。
+- 加上 `--run` 时：参考解无法编译、运行出错，或与 `expected` 不一致（会同时显示两个值，以及判题程序的信息）；`checker` 模式下每个参考解输出都经过判题程序，判题程序出错也算错误。
 
 以下情况会给出警告：判题规则未确定（没有 `judge.compare`）、有用例缺少 `expected`、没有标记示例用例、没有参考解、题面引用的图片不存在、编号与其他题目重复。
 
@@ -459,5 +495,6 @@ type Language interface {
   `error` 非空表示运行时错误；尽量只保留用户代码中的调用栈。`elapsed_ns` 只统计用户代码的耗时。
 - 用户的 stdout 和 stderr 直接输出到终端，所以可以用打印调试。
 - 如果驱动崩溃或超时，没有结果行的用例分别判为 Runtime Error 或 Time Limit Exceeded。
+- [判题程序](#判题程序)同样不归驱动管：它们由 Python 为所有语言运行（`lang.Checker`），再由 `internal/judge` 把结果变成判定。
 
 现有的驱动可以作为参考：`internal/lang/golang`（生成代码加静态运行时）和 `internal/lang/python`（动态运行时，签名嵌入其中）。
