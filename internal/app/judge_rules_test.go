@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -138,5 +139,46 @@ func TestBuildCasesAnyOf(t *testing.T) {
 	after, _ := os.ReadFile(filepath.Join(p.Dir, problem.CasesFile))
 	if string(after) != string(before) {
 		t.Fatal("cases.jsonl changed")
+	}
+}
+
+// TestInPlaceBoard checks an in-place character board in both drivers: the
+// judged value is the board after the call, rebinding the parameter changes
+// nothing, and outputs are compact JSON like the expected ones.
+func TestInPlaceBoard(t *testing.T) {
+	requireTools(t, "go", "python3")
+	a := newWorkspace(t)
+	p, err := a.WS.Problem("surrounded-regions")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sel := []runner.Selected{{Index: 1, Case: problem.Case{
+		Input:    map[string]json.RawMessage{"board": json.RawMessage(`[["X","O"],["O","X"]]`)},
+		Expected: json.RawMessage(`[["X","O"],["O","X"]]`),
+	}}}
+	tests := []struct {
+		lang, code, output string
+	}{
+		{"go", "package main\n\nfunc solve(board [][]byte) { board[0][0] = 'O' }\n", `[["O","O"],["O","X"]]`},
+		{"go", "package main\n\nfunc solve(board [][]byte) { board = nil }\n", `[["X","O"],["O","X"]]`},
+		{"python", "class Solution:\n    def solve(self, board):\n        board[0][0] = 'O'\n", `[["O","O"],["O","X"]]`},
+		{"python", "class Solution:\n    def solve(self, board):\n        board = []\n", `[["X","O"],["O","X"]]`},
+	}
+	for _, tt := range tests {
+		l := mustLang(t, a, tt.lang)
+		path, _, err := a.Start(p, l)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(tt.code), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		rep, err := a.Run(context.Background(), p, l, sel, app.RunOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := string(rep.Cases[0].Output); got != tt.output {
+			t.Errorf("%s %q: output %s, want %s (%+v)", tt.lang, tt.code, got, tt.output, rep.Cases[0])
+		}
 	}
 }
