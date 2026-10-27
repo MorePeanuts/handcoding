@@ -1,0 +1,62 @@
+// Node is a node of a linked list with random pointers (RandomListNode in
+// problem.yaml).
+type Node struct {
+	Val    int
+	Next   *Node
+	Random *Node
+}
+
+func hcNodeLinks(n *Node) []*Node { return []*Node{n.Next, n.Random} }
+
+// hcDecNode0 reads [[val, randomIndex or null], ...].
+func hcDecNode0(raw json.RawMessage) *Node {
+	pairs := hcJSON[[][]*int](raw)
+	nodes := make([]*Node, len(pairs))
+	for i, p := range pairs {
+		if len(p) != 2 || p[0] == nil {
+			panic(hcInputError{fmt.Sprintf("node %d must be [val, randomIndex]", i)})
+		}
+		nodes[i] = &Node{Val: *p[0]}
+		if i > 0 {
+			nodes[i-1].Next = nodes[i]
+		}
+	}
+	for i, p := range pairs {
+		if p[1] == nil {
+			continue
+		}
+		if *p[1] < 0 || *p[1] >= len(nodes) {
+			panic(hcInputError{fmt.Sprintf("random index %d of node %d is outside [0, %d]", *p[1], i, len(nodes)-1)})
+		}
+		nodes[i].Random = nodes[*p[1]]
+	}
+	if len(nodes) == 0 {
+		return nil
+	}
+	return nodes[0]
+}
+
+func hcEncNode0(head *Node) any {
+	index := map[*Node]int{}
+	var nodes []*Node
+	for n := head; n != nil; n = n.Next {
+		if len(nodes) >= hcMaxNodes {
+			panic("linked list too long (cycle?)")
+		}
+		index[n] = len(nodes)
+		nodes = append(nodes, n)
+	}
+	out := make([]any, len(nodes))
+	for i, n := range nodes {
+		var r any
+		if n.Random != nil {
+			j, ok := index[n.Random]
+			if !ok {
+				panic(fmt.Sprintf("the random pointer of node %d (Val %d) points to a node outside the list", i, n.Val))
+			}
+			r = j
+		}
+		out[i] = []any{n.Val, r}
+	}
+	return out
+}

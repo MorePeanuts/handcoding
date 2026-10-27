@@ -108,8 +108,33 @@ parameters (236: `p` and `q` as `integer`, while `templates/solution.go`
 takes `*TreeNode`); fix `problem.yaml` to the template's signature with
 these attributes. Design problems cannot use them.
 
+### LeetCode's Node types
+
+LeetCode calls six structures `Node`; problem.yaml names the one the template
+means by its fields (one per problem, never in arrays, no structure
+attributes). Solution code still calls it `Node`: Go predefines it, Python
+references start with `from hc_runtime import GraphNode as Node` (etc.).
+Case values and `expected` use these forms:
+
+| Fields in the template | Type | Value |
+|---|---|---|
+| `Neighbors` | `GraphNode` | adjacency list of nodes 1..n (node i has value i), param = node 1: `[[2,4],[1,3],[2,4],[1,3]]`, `[[]]` one node, `[]` none. Write symmetric lists without self loops when the statement says undirected |
+| `Children` | `NaryNode` | level order, `null` after each node's children: `[1,null,3,2,4,null,5,6]` |
+| `Next`, `Random` | `RandomListNode` | `[[val, randomIndex or null], ...]` |
+| `Left`, `Right`, `Next` | `NextTreeNode` | input: TreeNode level order; expected: levels read through next pointers, `[[1],[2,3],[4,5,7]]` (not LeetCode's `[1,#,2,3,#,...]`) |
+| `IsLeaf`, `TopLeft`, ... | `QuadNode` | level order of `[isLeaf, val]` (0/1), four child slots per node: `[[0,1],[1,0],[1,1],[1,1],[1,0]]`; a non-leaf is always output as `[0,1]` |
+| `Prev`, `Next`, `Child` | `MultilevelNode` | LeetCode's serialization: `[1,2,3,4,5,6,null,null,null,7,8,9,10,null,null,11,12]` |
+
+Let `hc cases build` compute `expected` for these as for any other type.
+When the function returns a deep copy of a parameter (133 Clone Graph, 138
+Copy List with Random Pointer), add `returns_copy: <param>` to `function`:
+returning any original node is then a runtime error. Fetched problems may
+declare such parameters with LeetCode's test-data types (589 `root:
+integer`, 138 `head: ListNode`); fix them to the template's `*Node`.
+
 Types: `integer long double boolean string character ListNode TreeNode void`,
-arrays with `[]` suffix (up to 3 levels, node arrays 1 level).
+the Node types above, arrays with `[]` suffix (up to 3 levels, ListNode and
+TreeNode arrays 1 level).
 Quote array types inside `{...}` / `[...]` (`type: "integer[]"`): unquoted,
 `[]` is YAML syntax. Unknown fields are errors.
 

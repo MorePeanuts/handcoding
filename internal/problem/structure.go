@@ -139,6 +139,33 @@ func (p *Problem) validateStructures() []error {
 	return errs
 }
 
+// validateReturnsCopy checks function.returns_copy.
+func (p *Problem) validateReturnsCopy() []error {
+	f := p.Function
+	c := f.ReturnsCopy
+	if c == "" {
+		return nil
+	}
+	var errs []error
+	fail := func(format string, args ...any) { errs = append(errs, fmt.Errorf(format, args...)) }
+	i := slices.IndexFunc(f.Params, func(prm Param) bool { return prm.Name == c })
+	switch {
+	case i < 0:
+		fail("function.returns_copy %q is not a parameter", c)
+	case !IsNodeType(f.Returns):
+		fail("function.returns_copy needs a node return type (ListNode, TreeNode or a Node variant), not %s", f.Returns)
+	case f.Params[i].Type != f.Returns:
+		fail("function.returns_copy %q is %s, but the function returns %s", c, f.Params[i].Type, f.Returns)
+	}
+	if f.ReturnsRef != "" {
+		fail("function.returns_ref and function.returns_copy exclude each other")
+	}
+	if p.Judge.Output != "" {
+		fail("function.returns_copy has no effect with judge.output")
+	}
+	return errs
+}
+
 // checkStructureCase checks the structure inputs of a case whose values
 // already have the right types: positions within their lists, joined lists
 // that really share their tails, and referenced values that occur exactly

@@ -1,0 +1,94 @@
+// Node is a node of a multilevel doubly linked list (MultilevelNode in
+// problem.yaml).
+type Node struct {
+	Val   int
+	Prev  *Node
+	Next  *Node
+	Child *Node
+}
+
+func hcNodeLinks(n *Node) []*Node { return []*Node{n.Prev, n.Next, n.Child} }
+
+// hcDecNode0 reads LeetCode's serialization: the levels one after the other,
+// each ended by null, and each child level preceded by as many more nulls as
+// its parent's index in the level above.
+func hcDecNode0(raw json.RawMessage) *Node {
+	vals := hcJSON[[]*int](raw)
+	var head *Node
+	var above []*Node
+	for i := 0; i < len(vals); {
+		var parent *Node
+		if above != nil {
+			i++ // the null ending the level above
+			k := 0
+			for ; i < len(vals) && vals[i] == nil; i++ {
+				k++
+			}
+			if i == len(vals) {
+				break
+			}
+			if k >= len(above) {
+				panic(hcInputError{fmt.Sprintf("a child level starts under node %d of a level with %d nodes", k+1, len(above))})
+			}
+			parent = above[k]
+		}
+		var level []*Node
+		for ; i < len(vals) && vals[i] != nil; i++ {
+			n := &Node{Val: *vals[i]}
+			if len(level) > 0 {
+				n.Prev = level[len(level)-1]
+				n.Prev.Next = n
+			}
+			level = append(level, n)
+		}
+		if len(level) == 0 {
+			panic(hcInputError{"the list must start with a value"})
+		}
+		if parent == nil {
+			head = level[0]
+		} else {
+			parent.Child = level[0]
+		}
+		above = level
+	}
+	return head
+}
+
+// hcEncNode0 writes the same serialization. It fails when a prev pointer
+// does not point to the node before, and when two nodes of a level have a
+// child, which the serialization cannot express.
+func hcEncNode0(head *Node) any {
+	out := []any{}
+	count := 0
+	for level := head; level != nil; {
+		var child *Node
+		at := 0
+		var prev *Node
+		for i, n := 0, level; n != nil; i, prev, n = i+1, n, n.Next {
+			if count++; count > hcMaxNodes {
+				panic("list too long (cycle?)")
+			}
+			if n.Prev != prev {
+				if prev == nil {
+					panic(fmt.Sprintf("node %d (Val %d) starts a level but its prev pointer is not nil", i, n.Val))
+				}
+				panic(fmt.Sprintf("the prev pointer of node %d (Val %d) does not point to the node before it (Val %d)", i, n.Val, prev.Val))
+			}
+			out = append(out, n.Val)
+			if n.Child != nil {
+				if child != nil {
+					panic(fmt.Sprintf("nodes %d and %d of a level both have a child; the multilevel format allows one per level", at, i))
+				}
+				child, at = n.Child, i
+			}
+		}
+		if child != nil {
+			out = append(out, nil)
+			for j := 0; j < at; j++ {
+				out = append(out, nil)
+			}
+		}
+		level = child
+	}
+	return out
+}

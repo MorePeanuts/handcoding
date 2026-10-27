@@ -265,3 +265,83 @@ func TestStructureInputs(t *testing.T) {
 		}
 	}
 }
+
+// TestNodeVariants checks how both drivers encode LeetCode's Node variants
+// for wrong solutions: a clone that keeps original nodes (returns_copy), a
+// broken prev pointer, next pointers that miss nodes, and inputs that do not
+// fit their form.
+func TestNodeVariants(t *testing.T) {
+	requireTools(t, "go", "python3")
+	a := newWorkspace(t)
+	const square = `{"node":[[2,4],[1,3],[2,4],[1,3]]}`
+	tests := []struct {
+		slug, lang, code, input, expected string
+		want                              runner.Verdict
+		errSub                            string
+	}{
+		{"clone-graph", "go", "package main\n\nfunc cloneGraph(node *Node) *Node { return node }\n",
+			square, `[[2,4],[1,3],[2,4],[1,3]]`, runner.RuntimeError, "shares nodes with node; return a deep copy"},
+		{"clone-graph", "python", "from hc_runtime import GraphNode as Node\n\n\nclass Solution:\n    def cloneGraph(self, node):\n        return node\n",
+			square, `[[2,4],[1,3],[2,4],[1,3]]`, runner.RuntimeError, "shares nodes with node; return a deep copy"},
+		// A new node 1 whose neighbors are the original nodes.
+		{"clone-graph", "go", "package main\n\nfunc cloneGraph(node *Node) *Node { return &Node{Val: 1, Neighbors: node.Neighbors} }\n",
+			square, `[[2,4],[1,3],[2,4],[1,3]]`, runner.RuntimeError, "shares nodes with node"},
+		{"clone-graph", "python", "from hc_runtime import GraphNode as Node\n\n\nclass Solution:\n    def cloneGraph(self, node):\n        return Node(2, [Node(1)])\n",
+			square, `[[2,4],[1,3],[2,4],[1,3]]`, runner.RuntimeError, "the returned node has value 2; it must be node 1"},
+		{"clone-graph", "go", "package main\n\nfunc cloneGraph(node *Node) *Node { return &Node{Val: 1, Neighbors: []*Node{{Val: 3}}} }\n",
+			square, `[[2,4],[1,3],[2,4],[1,3]]`, runner.RuntimeError, "values must be 1 to 2"},
+		{"copy-list-with-random-pointer", "python",
+			"from hc_runtime import RandomListNode as Node\n\n\nclass Solution:\n    def copyRandomList(self, head):\n        return Node(head.val, None, head)\n",
+			`{"head":[[1,0]]}`, `[[1,0]]`, runner.RuntimeError, "shares nodes with head"},
+		{"copy-list-with-random-pointer", "go",
+			"package main\n\nfunc copyRandomList(head *Node) *Node { return &Node{Val: head.Val, Random: &Node{}} }\n",
+			`{"head":[[1,0]]}`, `[[1,0]]`, runner.RuntimeError, "points to a node outside the list"},
+		{"copy-list-with-random-pointer", "go", "package main\n\nfunc copyRandomList(head *Node) *Node { return nil }\n",
+			`{"head":[[1,2]]}`, `[[1,0]]`, runner.RuntimeError, "invalid input: random index 2 of node 0 is outside [0, 0]"},
+		// Flattening without fixing prev pointers.
+		{"flatten-a-multilevel-doubly-linked-list", "go",
+			"package main\n\nfunc flatten(head *Node) *Node {\n\tc := head.Child\n\thead.Child, head.Next, c.Next = nil, c, head.Next\n\treturn head\n}\n",
+			`{"head":[1,2,null,3]}`, `[1,3,2]`, runner.RuntimeError, "the prev pointer of node 1 (Val 3) does not point to the node before it (Val 1)"},
+		{"flatten-a-multilevel-doubly-linked-list", "python",
+			"class Solution:\n    def flatten(self, head):\n        c = head.child\n        head.child, head.next, c.next = None, c, head.next\n        return head\n",
+			`{"head":[1,2,null,3]}`, `[1,3,2]`, runner.RuntimeError, "the prev pointer of node 1 (val 3) does not point to the node before it (val 1)"},
+		// Child pointers left in place: the child level is still encoded.
+		{"flatten-a-multilevel-doubly-linked-list", "python", "class Solution:\n    def flatten(self, head):\n        return head\n",
+			`{"head":[1,2,null,3]}`, `[1,3,2]`, runner.WrongAnswer, ""},
+		{"flatten-a-multilevel-doubly-linked-list", "go", "package main\n\nfunc flatten(head *Node) *Node { return head }\n",
+			`{"head":[1,2,null,null,null,3]}`, `[1,2,3]`, runner.RuntimeError, "invalid input: a child level starts under node 3 of a level with 2 nodes"},
+		// Linking only siblings misses the link from 5 to 7.
+		{"populating-next-right-pointers-in-each-node-ii", "go",
+			"package main\n\nfunc connect(root *Node) *Node {\n\tif root != nil {\n\t\tif root.Left != nil {\n\t\t\troot.Left.Next = root.Right\n\t\t}\n\t\tconnect(root.Left)\n\t\tconnect(root.Right)\n\t}\n\treturn root\n}\n",
+			`{"root":[1,2,3,4,5,null,7]}`, `[[1],[2,3],[4,5,7]]`, runner.WrongAnswer, ""},
+		{"populating-next-right-pointers-in-each-node-ii", "python", "class Solution:\n    def connect(self, root):\n        root.left.next = root.right.left\n        return root\n",
+			`{"root":[1,2,3,4]}`, `[[1],[2,3],[4]]`, runner.WrongAnswer, ""},
+	}
+	for _, tt := range tests {
+		p, err := a.WS.Problem(tt.slug)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var input map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(tt.input), &input); err != nil {
+			t.Fatal(err)
+		}
+		sel := []runner.Selected{{Index: 1, Case: problem.Case{Input: input, Expected: json.RawMessage(tt.expected)}}}
+		l := mustLang(t, a, tt.lang)
+		path, _, err := a.Start(p, l)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(tt.code), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		rep, err := a.Run(context.Background(), p, l, sel, app.RunOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := rep.Cases[0]
+		if c.Verdict != tt.want || !strings.Contains(c.Error, tt.errSub) {
+			t.Errorf("%s %s %q: %s %q (output %s), want %s %q", tt.slug, tt.lang, tt.code, c.Verdict, c.Error, c.Output, tt.want, tt.errSub)
+		}
+	}
+}

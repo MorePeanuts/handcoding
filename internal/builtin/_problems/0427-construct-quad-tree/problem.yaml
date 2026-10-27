@@ -1,0 +1,16 @@
+id: "427"
+slug: construct-quad-tree
+title: Construct Quad Tree
+difficulty: medium
+tags: [tree, array, divide-and-conquer, matrix]
+kind: function
+function:
+  name: construct
+  params:
+    - {name: grid, type: "integer[][]"}
+  returns: QuadNode
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/construct-quad-tree/

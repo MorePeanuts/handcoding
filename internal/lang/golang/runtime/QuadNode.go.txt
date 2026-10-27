@@ -1,0 +1,82 @@
+// Node is a quad tree node (QuadNode in problem.yaml).
+type Node struct {
+	Val         bool
+	IsLeaf      bool
+	TopLeft     *Node
+	TopRight    *Node
+	BottomLeft  *Node
+	BottomRight *Node
+}
+
+func hcNodeLinks(n *Node) []*Node {
+	return []*Node{n.TopLeft, n.TopRight, n.BottomLeft, n.BottomRight}
+}
+
+// hcDecNode0 reads LeetCode's level order of [isLeaf, val] pairs, in which
+// every node has four child slots (null when absent).
+func hcDecNode0(raw json.RawMessage) *Node {
+	vals := hcJSON[[][]int](raw)
+	node := func(i int) *Node {
+		v := vals[i]
+		if v == nil {
+			return nil
+		}
+		if len(v) != 2 {
+			panic(hcInputError{fmt.Sprintf("node %d must be [isLeaf, val]", i)})
+		}
+		return &Node{IsLeaf: v[0] != 0, Val: v[1] != 0}
+	}
+	if len(vals) == 0 || vals[0] == nil {
+		return nil
+	}
+	root := node(0)
+	queue := []*Node{root}
+	for i := 1; i < len(vals); {
+		if len(queue) == 0 {
+			panic(hcInputError{"more children than nodes in the level order"})
+		}
+		n := queue[0]
+		queue = queue[1:]
+		for _, c := range []**Node{&n.TopLeft, &n.TopRight, &n.BottomLeft, &n.BottomRight} {
+			if i < len(vals) {
+				if *c = node(i); *c != nil {
+					queue = append(queue, *c)
+				}
+			}
+			i++
+		}
+	}
+	return root
+}
+
+// hcEncNode0 writes the same level order. The value of a node that is not a
+// leaf does not matter, so it is always written as 1, as in LeetCode's
+// examples.
+func hcEncNode0(root *Node) any {
+	out := []any{}
+	queue := []*Node{root}
+	for len(queue) > 0 {
+		if len(out) >= hcMaxNodes {
+			panic("quad tree too large (cycle?)")
+		}
+		n := queue[0]
+		queue = queue[1:]
+		if n == nil {
+			out = append(out, nil)
+			continue
+		}
+		switch {
+		case !n.IsLeaf:
+			out = append(out, []int{0, 1})
+		case n.Val:
+			out = append(out, []int{1, 1})
+		default:
+			out = append(out, []int{1, 0})
+		}
+		queue = append(queue, n.TopLeft, n.TopRight, n.BottomLeft, n.BottomRight)
+	}
+	for len(out) > 0 && out[len(out)-1] == nil {
+		out = out[:len(out)-1]
+	}
+	return out
+}

@@ -1,0 +1,56 @@
+// Node is a node of an undirected graph (GraphNode in problem.yaml).
+type Node struct {
+	Val       int
+	Neighbors []*Node
+}
+
+func hcNodeLinks(n *Node) []*Node { return n.Neighbors }
+
+// hcDecNode0 builds a graph from its adjacency list: node i (1-based) has
+// value i, and the result is node 1.
+func hcDecNode0(raw json.RawMessage) *Node {
+	adj := hcJSON[[][]int](raw)
+	nodes := make([]*Node, len(adj))
+	for i := range nodes {
+		nodes[i] = &Node{Val: i + 1}
+	}
+	for i, ns := range adj {
+		for _, v := range ns {
+			if v < 1 || v > len(nodes) {
+				panic(hcInputError{fmt.Sprintf("neighbor %d of node %d is outside [1, %d]", v, i+1, len(nodes))})
+			}
+			nodes[i].Neighbors = append(nodes[i].Neighbors, nodes[v-1])
+		}
+	}
+	if len(nodes) == 0 {
+		return nil
+	}
+	return nodes[0]
+}
+
+// hcEncNode0 encodes the graph reachable from n as its adjacency list, which
+// needs n to be node 1 and the values to be 1 to the number of nodes.
+func hcEncNode0(n *Node) any {
+	if n == nil {
+		return []any{}
+	}
+	nodes := hcReach(n, hcNodeLinks)
+	adj := make([][]int, len(nodes))
+	for m := range nodes {
+		if m.Val < 1 || m.Val > len(nodes) || adj[m.Val-1] != nil {
+			panic(fmt.Sprintf("the returned graph has %d node(s), so its values must be 1 to %d, each once; found %d twice or out of range", len(nodes), len(nodes), m.Val))
+		}
+		vals := make([]int, len(m.Neighbors))
+		for i, x := range m.Neighbors {
+			if x == nil {
+				panic(fmt.Sprintf("neighbor %d of node %d is nil", i, m.Val))
+			}
+			vals[i] = x.Val
+		}
+		adj[m.Val-1] = vals
+	}
+	if n.Val != 1 {
+		panic(fmt.Sprintf("the returned node has value %d; it must be node 1", n.Val))
+	}
+	return adj
+}

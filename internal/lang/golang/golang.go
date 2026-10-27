@@ -2,15 +2,15 @@
 //
 // Each problem directory is a standalone module containing solution.go (the
 // user's code, package main) and a generated zz_hc_driver.go with main(),
-// ListNode/TreeNode and the codecs. Keeping both in the same directory means
-// gopls, `go build` and Delve all see the real solution.go path, so editor
-// breakpoints just work.
+// ListNode/TreeNode, the judge-defined types the problem uses (Node, ...) and
+// the codecs. Keeping both in the same directory means gopls, `go build` and
+// Delve all see the real solution.go path, so editor breakpoints just work.
 package golang
 
 import (
 	"bytes"
 	"context"
-	_ "embed"
+	"embed"
 	"errors"
 	"fmt"
 	"io"
@@ -28,6 +28,13 @@ import (
 
 //go:embed runtime.go.txt
 var runtimeSrc string
+
+// typeRuntime holds runtime/<type>.go.txt for each judge-defined type: its
+// definition and codecs, included only in the drivers of problems using it,
+// so that a solution never meets a Node it did not expect.
+//
+//go:embed runtime
+var typeRuntime embed.FS
 
 const (
 	solutionFile = "solution.go"
@@ -130,38 +137,67 @@ func (Language) Starter(p *problem.Problem) (string, error) {
 	return b.String(), nil
 }
 
+// typeComments show the judge-defined types in generated starters, as
+// LeetCode's templates do.
+var typeComments = map[string]string{
+	problem.TypeListNode: `// Definition for singly-linked list (provided by hc, do not redeclare).
+// type ListNode struct {
+//     Val  int
+//     Next *ListNode
+// }`,
+	problem.TypeTreeNode: `// Definition for a binary tree node (provided by hc, do not redeclare).
+// type TreeNode struct {
+//     Val   int
+//     Left  *TreeNode
+//     Right *TreeNode
+// }`,
+	problem.TypeGraphNode: `// Definition for a graph node (provided by hc, do not redeclare).
+// type Node struct {
+//     Val       int
+//     Neighbors []*Node
+// }`,
+	problem.TypeNaryNode: `// Definition for an N-ary tree node (provided by hc, do not redeclare).
+// type Node struct {
+//     Val      int
+//     Children []*Node
+// }`,
+	problem.TypeRandomListNode: `// Definition for a list node with a random pointer (provided by hc, do not redeclare).
+// type Node struct {
+//     Val    int
+//     Next   *Node
+//     Random *Node
+// }`,
+	problem.TypeNextTreeNode: `// Definition for a binary tree node with a next pointer (provided by hc, do not redeclare).
+// type Node struct {
+//     Val   int
+//     Left  *Node
+//     Right *Node
+//     Next  *Node
+// }`,
+	problem.TypeQuadNode: `// Definition for a QuadTree node (provided by hc, do not redeclare).
+// type Node struct {
+//     Val         bool
+//     IsLeaf      bool
+//     TopLeft     *Node
+//     TopRight    *Node
+//     BottomLeft  *Node
+//     BottomRight *Node
+// }`,
+	problem.TypeMultilevelNode: `// Definition for a multilevel doubly linked list node (provided by hc, do not redeclare).
+// type Node struct {
+//     Val   int
+//     Prev  *Node
+//     Next  *Node
+//     Child *Node
+// }`,
+}
+
 func nodeComment(p *problem.Problem) string {
-	var types []string
-	walk := func(t string) {
-		base, _ := problem.SplitArray(t)
-		types = append(types, base)
-	}
-	if p.Function != nil {
-		for _, prm := range p.Function.Params {
-			walk(prm.Type)
-		}
-		walk(p.Function.Returns)
-	}
-	if p.Class != nil {
-		for _, prm := range p.Class.Constructor {
-			walk(prm.Type)
-		}
-		for _, m := range p.Class.Methods {
-			for _, prm := range m.Params {
-				walk(prm.Type)
-			}
-			walk(m.Returns)
-		}
-	}
 	var b strings.Builder
-	has := func(t string) bool { return slices.Contains(types, t) }
-	if has(problem.TypeListNode) {
-		b.WriteString("// Definition for singly-linked list (provided by hc, do not redeclare).\n")
-		b.WriteString("// type ListNode struct {\n//     Val  int\n//     Next *ListNode\n// }\n\n")
-	}
-	if has(problem.TypeTreeNode) {
-		b.WriteString("// Definition for a binary tree node (provided by hc, do not redeclare).\n")
-		b.WriteString("// type TreeNode struct {\n//     Val   int\n//     Left  *TreeNode\n//     Right *TreeNode\n// }\n\n")
+	for _, t := range p.BaseTypes() {
+		if c, ok := typeComments[t]; ok {
+			b.WriteString(c + "\n\n")
+		}
 	}
 	return b.String()
 }
@@ -222,7 +258,14 @@ func writeIfChanged(path string, data []byte) error {
 func Driver(p *problem.Problem) ([]byte, error) {
 	var b strings.Builder
 	b.WriteString(runtimeSrc)
-	b.WriteString("func hcCall(in map[string]json.RawMessage) any {\n")
+	for _, t := range p.BaseTypes() {
+		src, err := typeRuntime.ReadFile("runtime/" + t + ".go.txt")
+		if err == nil {
+			b.WriteString("\n")
+			b.Write(src)
+		}
+	}
+	b.WriteString("\nfunc hcCall(in map[string]json.RawMessage) any {\n")
 	switch p.Kind {
 	case problem.KindFunction:
 		if err := writeFunctionCall(&b, p); err != nil {
@@ -265,6 +308,9 @@ func writeFunctionCall(b *strings.Builder, p *problem.Problem) error {
 		args[i] = vars[prm.Name]
 	}
 	call := fmt.Sprintf("%s(%s)", f.Name, strings.Join(args, ", "))
+	if f.ReturnsCopy != "" {
+		fmt.Fprintf(b, "\torig := hcReach(%s, %s)\n", vars[f.ReturnsCopy], links(f.Returns))
+	}
 	b.WriteString("\thcStart()\n")
 	out, hasOut := f.Input(p.Judge.Output)
 	switch {
@@ -279,6 +325,10 @@ func writeFunctionCall(b *strings.Builder, p *problem.Problem) error {
 	case f.ReturnsRef != "":
 		fmt.Fprintf(b, "\tret := %s\n\thcStop()\n", call)
 		fmt.Fprintf(b, "\treturn hc%sRef(%sN, ret, %q)\n", nodeKind(f.Returns), vars[f.ReturnsRef], f.ReturnsRef)
+	case f.ReturnsCopy != "":
+		fmt.Fprintf(b, "\tret := %s\n\thcStop()\n", call)
+		fmt.Fprintf(b, "\thcCheckCopy(orig, ret, %s, %q)\n", links(f.Returns), f.ReturnsCopy)
+		fmt.Fprintf(b, "\treturn %s\n", encodeExpr(f.Returns, "ret"))
 	default:
 		fmt.Fprintf(b, "\tret := %s\n\thcStop()\n", call)
 		fmt.Fprintf(b, "\treturn %s\n", encodeExpr(f.Returns, "ret"))
@@ -344,6 +394,17 @@ func nodeKind(t string) string {
 		return "Tree"
 	}
 	return "List"
+}
+
+// links names the runtime function listing a node's links, for hcReach.
+func links(t string) string {
+	switch t {
+	case problem.TypeListNode:
+		return "hcListLinks"
+	case problem.TypeTreeNode:
+		return "hcTreeLinks"
+	}
+	return "hcNodeLinks"
 }
 
 func writeClassCall(b *strings.Builder, c *problem.Class) error {

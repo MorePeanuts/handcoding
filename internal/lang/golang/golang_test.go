@@ -77,3 +77,33 @@ func TestStarterStructureInputs(t *testing.T) {
 		t.Errorf("starter does not contain %q:\n%s", want, got)
 	}
 }
+
+// A Node variant is Node in solution code: starters show its definition, and
+// only drivers of problems using it define it.
+func TestNodeVariant(t *testing.T) {
+	p := &problem.Problem{Slug: "f", Kind: problem.KindFunction, Function: &problem.Function{
+		Name:    "cloneGraph",
+		Params:  []problem.Param{{Name: "node", Type: problem.TypeGraphNode}},
+		Returns: problem.TypeGraphNode,
+	}}
+	got, err := Language{}.Starter(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"//     Neighbors []*Node\n", "func cloneGraph(node *Node) *Node {"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("starter does not contain %q:\n%s", want, got)
+		}
+	}
+	src, err := Driver(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(src), "\ntype Node struct {") {
+		t.Error("driver does not define Node")
+	}
+	p.Function.Params[0].Type, p.Function.Returns = problem.TypeInteger, problem.TypeInteger
+	if src, _ := Driver(p); strings.Contains(string(src), "type Node") {
+		t.Error("driver defines Node for a problem without it")
+	}
+}
