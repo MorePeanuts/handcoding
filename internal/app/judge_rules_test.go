@@ -182,3 +182,86 @@ func TestInPlaceBoard(t *testing.T) {
 		}
 	}
 }
+
+// TestStructureInputs checks how both drivers build structure inputs and
+// judge returned nodes beyond what the references exercise: a returned node
+// that belongs to another structure is a runtime error, a wrong node is a
+// wrong answer, and inputs that do not fit the structure are input errors.
+func TestStructureInputs(t *testing.T) {
+	requireTools(t, "go", "python3")
+	a := newWorkspace(t)
+	tests := []struct {
+		slug, lang, code, input string
+		want                    runner.Verdict
+		errSub                  string
+	}{
+		// 142: a node of a list built by the solution is not a node of head.
+		{"linked-list-cycle-ii", "go", "package main\n\nfunc detectCycle(head *ListNode) *ListNode { return &ListNode{Val: head.Val} }\n",
+			`{"head":[3,2,0,-4],"pos":1}`, runner.RuntimeError, "is not a node of head"},
+		{"linked-list-cycle-ii", "python", "class Solution:\n    def detectCycle(self, head):\n        return type(head)(head.val)\n",
+			`{"head":[3,2,0,-4],"pos":1}`, runner.RuntimeError, "is not a node of head"},
+		// The head is a node of the list, but not the cycle's entry.
+		{"linked-list-cycle-ii", "go", "package main\n\nfunc detectCycle(head *ListNode) *ListNode { return head }\n",
+			`{"head":[3,2,0,-4],"pos":1}`, runner.WrongAnswer, ""},
+		{"linked-list-cycle-ii", "python", "class Solution:\n    def detectCycle(self, head):\n        return head\n",
+			`{"head":[3,2,0,-4],"pos":1}`, runner.WrongAnswer, ""},
+		{"linked-list-cycle", "go", "package main\n\nfunc hasCycle(head *ListNode) bool { return false }\n",
+			`{"head":[1,2],"pos":2}`, runner.RuntimeError, "invalid input: pos = 2 is outside [-1, 1] for head"},
+		{"linked-list-cycle", "python", "class Solution:\n    def hasCycle(self, head):\n        return False\n",
+			`{"head":[1,2],"pos":2}`, runner.RuntimeError, "invalid input: pos = 2 is outside [-1, 1] for head"},
+		// 1379: the target itself is a node of original, not of cloned.
+		{"find-a-corresponding-node-of-a-binary-tree-in-a-clone-of-that-tree", "go",
+			"package main\n\nfunc getTargetCopy(original, cloned, target *TreeNode) *TreeNode { return target }\n",
+			`{"original":[7,4,3],"target":3}`, runner.RuntimeError, "is not a node of cloned"},
+		{"find-a-corresponding-node-of-a-binary-tree-in-a-clone-of-that-tree", "python",
+			"class Solution:\n    def getTargetCopy(self, original, cloned, target):\n        return target\n",
+			`{"original":[7,4,3],"target":3}`, runner.RuntimeError, "is not a node of cloned"},
+		{"lowest-common-ancestor-of-a-binary-tree", "go", "package main\n\nfunc lowestCommonAncestor(root, p, q *TreeNode) *TreeNode { return root }\n",
+			`{"root":[1,2,2],"p":2,"q":1}`, runner.RuntimeError, "invalid input: p = 2 occurs 2 times in root"},
+		{"lowest-common-ancestor-of-a-binary-tree", "python", "class Solution:\n    def lowestCommonAncestor(self, root, p, q):\n        return root\n",
+			`{"root":[1,2,3],"p":5,"q":1}`, runner.RuntimeError, "invalid input: p = 5 is not a value in root"},
+		// 160: the lists are joined, so B's last node is A's last node.
+		{"intersection-of-two-linked-lists", "go",
+			"package main\n\nfunc getIntersectionNode(headA, headB *ListNode) *ListNode {\n\tfor headB.Next != nil {\n\t\theadB = headB.Next\n\t}\n\treturn headB\n}\n",
+			`{"headA":[4,1,8,4,5],"headB":[5,6,1,8,4,5],"skipA":2,"skipB":3}`, runner.WrongAnswer, ""},
+		{"intersection-of-two-linked-lists", "python",
+			"class Solution:\n    def getIntersectionNode(self, headA, headB):\n        return headB\n",
+			`{"headA":[4,1,8,4,5],"headB":[5,6,1,8,4,5],"skipA":2,"skipB":3}`, runner.RuntimeError, "is not a node of headA"},
+		// 237: the judged list is head, which the solution never sees.
+		{"delete-node-in-a-linked-list", "go", "package main\n\nfunc deleteNode(node *ListNode) { node.Val = 0 }\n",
+			`{"node":5,"head":[4,5,1,9]}`, runner.WrongAnswer, ""},
+		{"delete-node-in-a-linked-list", "python", "class Solution:\n    def deleteNode(self, node):\n        node.next = node\n",
+			`{"node":5,"head":[4,5,1,9]}`, runner.RuntimeError, "cycle?"},
+	}
+	for _, tt := range tests {
+		p, err := a.WS.Problem(tt.slug)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var input map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(tt.input), &input); err != nil {
+			t.Fatal(err)
+		}
+		// The expected output only matters for the wrong answers.
+		sel := []runner.Selected{{Index: 1, Case: problem.Case{Input: input, Expected: json.RawMessage(`[4,1,9]`)}}}
+		if tt.slug != "delete-node-in-a-linked-list" {
+			sel[0].Case.Expected = json.RawMessage(`1`)
+		}
+		l := mustLang(t, a, tt.lang)
+		path, _, err := a.Start(p, l)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(tt.code), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		rep, err := a.Run(context.Background(), p, l, sel, app.RunOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := rep.Cases[0]
+		if c.Verdict != tt.want || !strings.Contains(c.Error, tt.errSub) {
+			t.Errorf("%s %s %q: %s %q, want %s %q", tt.slug, tt.lang, tt.code, c.Verdict, c.Error, tt.want, tt.errSub)
+		}
+	}
+}

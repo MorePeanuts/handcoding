@@ -22,6 +22,11 @@ const (
 	TypeVoid      = "void"
 )
 
+// typeNodeRef is the judged type of a returned node reference
+// (Function.ReturnsRef): an integer, or null for no node. It is internal to
+// case validation and never valid in problem.yaml.
+const typeNodeRef = "noderef"
+
 var baseTypes = map[string]bool{
 	TypeInteger:   true,
 	TypeLong:      true,
@@ -120,6 +125,13 @@ func checkValue(t string, v any, path string) error {
 		return nil
 	}
 	switch base {
+	case typeNodeRef:
+		if v == nil {
+			return nil
+		}
+		if checkValue(TypeInteger, v, path) != nil {
+			return fail("a node index or value (an integer) or null")
+		}
 	case TypeInteger, TypeLong:
 		n, ok := v.(json.Number)
 		if !ok {

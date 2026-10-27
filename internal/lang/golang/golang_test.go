@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -51,5 +52,28 @@ func TestPrepareGoMod(t *testing.T) {
 	}
 	if want := "module solution\n\ngo " + modVersion(tc.Version) + "\n"; string(got) != want {
 		t.Errorf("go.mod = %q, want %q", got, want)
+	}
+}
+
+// Starters show only the parameters the solution receives: hidden inputs
+// are left out, and node references and copies keep their node type.
+func TestStarterStructureInputs(t *testing.T) {
+	p := &problem.Problem{Slug: "f", Kind: problem.KindFunction, Function: &problem.Function{
+		Name: "getTargetCopy",
+		Params: []problem.Param{
+			{Name: "original", Type: problem.TypeTreeNode},
+			{Name: "cloned", Type: problem.TypeTreeNode, Copy: "original"},
+			{Name: "target", Type: problem.TypeTreeNode, Ref: "original"},
+		},
+		Hidden:     []problem.Param{{Name: "pos", Type: problem.TypeInteger}},
+		Returns:    problem.TypeTreeNode,
+		ReturnsRef: "cloned",
+	}}
+	got, err := Language{}.Starter(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "func getTargetCopy(original *TreeNode, cloned *TreeNode, target *TreeNode) *TreeNode {"; !strings.Contains(got, want) {
+		t.Errorf("starter does not contain %q:\n%s", want, got)
 	}
 }

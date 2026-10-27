@@ -241,35 +241,109 @@ func Driver(p *problem.Problem) ([]byte, error) {
 
 func writeFunctionCall(b *strings.Builder, p *problem.Problem) error {
 	f := p.Function
-	args := make([]string, len(f.Params))
-	outIdx := -1
+	vars := map[string]string{} // input name -> Go variable
 	for i, prm := range f.Params {
+		vars[prm.Name] = fmt.Sprintf("p%d", i)
+	}
+	for i, h := range f.Hidden {
+		vars[h.Name] = fmt.Sprintf("h%d", i)
+	}
+	// Plain inputs come straight from the case.
+	for _, prm := range append(slices.Clip(f.Params), f.Hidden...) {
+		if prm.Ref != "" || prm.Copy != "" {
+			continue
+		}
 		expr, err := decodeExpr(prm.Type, fmt.Sprintf("hcArg(in, %q)", prm.Name))
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(b, "\tp%d := %s\n", i, expr)
-		args[i] = fmt.Sprintf("p%d", i)
-		if prm.Name == p.Judge.Output {
-			outIdx = i
-		}
+		fmt.Fprintf(b, "\t%s := %s\n", vars[prm.Name], expr)
+	}
+	writeStructures(b, f, vars)
+	args := make([]string, len(f.Params))
+	for i, prm := range f.Params {
+		args[i] = vars[prm.Name]
 	}
 	call := fmt.Sprintf("%s(%s)", f.Name, strings.Join(args, ", "))
 	b.WriteString("\thcStart()\n")
+	out, hasOut := f.Input(p.Judge.Output)
 	switch {
-	case outIdx >= 0 && p.Judge.OutputLength == problem.OutputLengthReturn:
+	case hasOut && p.Judge.OutputLength == problem.OutputLengthReturn:
 		fmt.Fprintf(b, "\tret := %s\n\thcStop()\n", call)
-		fmt.Fprintf(b, "\treturn %s\n", encodeExpr(f.Params[outIdx].Type, fmt.Sprintf("hcPrefix(%s, int(ret))", args[outIdx])))
-	case outIdx >= 0:
+		fmt.Fprintf(b, "\treturn %s\n", encodeExpr(out.Type, fmt.Sprintf("hcPrefix(%s, int(ret))", vars[out.Name])))
+	case hasOut:
 		fmt.Fprintf(b, "\t%s\n\thcStop()\n", call)
-		fmt.Fprintf(b, "\treturn %s\n", encodeExpr(f.Params[outIdx].Type, args[outIdx]))
+		fmt.Fprintf(b, "\treturn %s\n", encodeExpr(out.Type, vars[out.Name]))
 	case f.Returns == problem.TypeVoid:
 		return errors.New("go: void function without judge.output")
+	case f.ReturnsRef != "":
+		fmt.Fprintf(b, "\tret := %s\n\thcStop()\n", call)
+		fmt.Fprintf(b, "\treturn hc%sRef(%sN, ret, %q)\n", nodeKind(f.Returns), vars[f.ReturnsRef], f.ReturnsRef)
 	default:
 		fmt.Fprintf(b, "\tret := %s\n\thcStop()\n", call)
 		fmt.Fprintf(b, "\treturn %s\n", encodeExpr(f.Returns, "ret"))
 	}
 	return nil
+}
+
+// writeStructures emits the code that builds structure inputs: the node
+// lists (<var>N) of the structures something links into or refers to, then
+// cycles, joins, copies and refs, in that order.
+func writeStructures(b *strings.Builder, f *problem.Function, vars map[string]string) {
+	needs := map[string]bool{} // inputs whose node list is used
+	for _, prm := range f.Params {
+		switch {
+		case prm.Cycle != "":
+			needs[prm.Name] = true
+		case prm.Join != nil:
+			needs[prm.Name], needs[prm.Join.List] = true, true
+		case prm.Ref != "":
+			needs[prm.Ref] = true
+		}
+	}
+	needs[f.ReturnsRef] = true
+	inputs := append(slices.Clip(f.Params), f.Hidden...)
+	for _, prm := range inputs {
+		if needs[prm.Name] && prm.Ref == "" && prm.Copy == "" {
+			v := vars[prm.Name]
+			fmt.Fprintf(b, "\t%sN := hc%sNodes(%s)\n", v, nodeKind(prm.Type), v)
+		}
+	}
+	for _, prm := range f.Params {
+		v := vars[prm.Name]
+		switch {
+		case prm.Cycle != "":
+			fmt.Fprintf(b, "\thcCycle(%sN, %s, %q, %q)\n", v, vars[prm.Cycle], prm.Name, prm.Cycle)
+		case prm.Join != nil:
+			j := prm.Join
+			fmt.Fprintf(b, "\t%sN = hcJoin(%sN, %sN, %s, %s, %q, %q, %q, %q)\n", v, v, vars[j.List], vars[j.Skip], vars[j.At], prm.Name, j.List, j.Skip, j.At)
+			fmt.Fprintf(b, "\t%s = hcHead(%sN)\n", v, v)
+		}
+	}
+	for _, prm := range f.Params {
+		if prm.Copy == "" {
+			continue
+		}
+		v, kind := vars[prm.Name], nodeKind(prm.Type)
+		fmt.Fprintf(b, "\t%s := hcCopy%s(%s)\n", v, kind, vars[prm.Copy])
+		if needs[prm.Name] {
+			fmt.Fprintf(b, "\t%sN := hc%sNodes(%s)\n", v, kind, v)
+		}
+	}
+	for _, prm := range f.Params {
+		if prm.Ref == "" {
+			continue
+		}
+		fmt.Fprintf(b, "\t%s := hcFind(%sN, hcJSON[int](hcArg(in, %q)), %q, %q)\n", vars[prm.Name], vars[prm.Ref], prm.Name, prm.Name, prm.Ref)
+	}
+}
+
+// nodeKind names the runtime helpers for a node type: "List" or "Tree".
+func nodeKind(t string) string {
+	if t == problem.TypeTreeNode {
+		return "Tree"
+	}
+	return "List"
 }
 
 func writeClassCall(b *strings.Builder, c *problem.Class) error {

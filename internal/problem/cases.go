@@ -156,14 +156,20 @@ func MarshalCase(c Case) ([]byte, error) {
 	return json.Marshal(o)
 }
 
-// InputKeys are the keys a case input must provide.
+// InputKeys are the keys a case input must provide: for function problems
+// the parameters, except copies, then the hidden inputs.
 func (p *Problem) InputKeys() []string {
 	if p.Kind == KindClass {
 		return []string{"ops", "args"}
 	}
-	keys := make([]string, 0, len(p.Function.Params))
+	keys := make([]string, 0, len(p.Function.Params)+len(p.Function.Hidden))
 	for _, prm := range p.Function.Params {
-		keys = append(keys, prm.Name)
+		if prm.Copy == "" {
+			keys = append(keys, prm.Name)
+		}
+	}
+	for _, h := range p.Function.Hidden {
+		keys = append(keys, h.Name)
 	}
 	return keys
 }
@@ -180,16 +186,33 @@ func (p *Problem) ValidateCase(c Case) error {
 	}
 	for k := range c.Input {
 		if !slices.Contains(keys, k) {
+			if p.Kind == KindFunction {
+				if prm, ok := p.Function.Input(k); ok && prm.Copy != "" {
+					return fmt.Errorf("input %q must not be given: the solution gets a copy of %q", k, prm.Copy)
+				}
+			}
 			return fmt.Errorf("unknown input %q (expected %s)", k, strings.Join(keys, ", "))
 		}
 	}
 	if p.Kind == KindClass {
 		return p.validateClassCase(c)
 	}
-	for _, prm := range p.Function.Params {
-		if err := CheckValue(prm.Type, c.Input[prm.Name]); err != nil {
+	f := p.Function
+	for _, prm := range append(slices.Clip(f.Params), f.Hidden...) {
+		t := prm.Type
+		switch {
+		case prm.Copy != "":
+			continue
+		case prm.Ref != "":
+			// The value of the referenced node.
+			t = TypeInteger
+		}
+		if err := CheckValue(t, c.Input[prm.Name]); err != nil {
 			return fmt.Errorf("input %q: %w", prm.Name, err)
 		}
+	}
+	if err := p.checkStructureCase(c); err != nil {
+		return err
 	}
 	if !c.HasExpected() {
 		return nil
@@ -197,6 +220,9 @@ func (p *Problem) ValidateCase(c Case) error {
 	want := p.judgedType()
 	if p.Judge.Compare == CompareAnyOf {
 		want += "[]"
+	}
+	if f.ReturnsRef != "" {
+		want = typeNodeRef + strings.TrimPrefix(want, TypeInteger)
 	}
 	if err := CheckValue(want, c.Expected); err != nil {
 		if p.Judge.Compare == CompareAnyOf {

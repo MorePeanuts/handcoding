@@ -203,7 +203,8 @@ leetcode:
 
 ## Current limitations
 
-- Some signatures are not supported yet: `Node` (graphs, N-ary trees, lists with random pointers), `NestedInteger`, linked lists with cycles given as input. Problems that need a special judge (checker) aren't supported either.
+- Some signatures are not supported yet: `Node` (graphs, N-ary trees, lists with random pointers), `NestedInteger`. Problems that need a special judge (checker) aren't supported either.
+- Problems with [structure inputs](protocol.md#structure-inputs) (a list with a cycle, intersecting lists, node references such as Lowest Common Ancestor) can be judged, but `hc fetch` cannot import them correctly yet; write their `problem.yaml` by hand. The samples 141, 142, 160, 236, 237 and 1379 show how.
 - Run time is measured, but memory is not limited.
 - LeetCode premium problems cannot be fetched.
 - Problems with many valid answers that cannot all be listed ("return any valid answer") need a custom checker, which is not supported yet; `hc gen` says so when it meets one.

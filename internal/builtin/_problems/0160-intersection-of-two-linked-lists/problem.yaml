@@ -1,0 +1,21 @@
+id: "160"
+slug: intersection-of-two-linked-lists
+title: Intersection of Two Linked Lists
+difficulty: easy
+tags: [hash-table, linked-list, two-pointers]
+kind: function
+function:
+  name: getIntersectionNode
+  params:
+    - {name: headA, type: ListNode}
+    - {name: headB, type: ListNode, join: {list: headA, skip: skipB, at: skipA}}
+  hidden:
+    - {name: skipA, type: integer}
+    - {name: skipB, type: integer}
+  returns: ListNode
+  returns_ref: headA
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/intersection-of-two-linked-lists/

@@ -1,0 +1,19 @@
+id: "142"
+slug: linked-list-cycle-ii
+title: Linked List Cycle II
+difficulty: medium
+tags: [hash-table, linked-list, two-pointers]
+kind: function
+function:
+  name: detectCycle
+  params:
+    - {name: head, type: ListNode, cycle: pos}
+  hidden:
+    - {name: pos, type: integer}
+  returns: ListNode
+  returns_ref: head
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/linked-list-cycle-ii/
