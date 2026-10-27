@@ -18,6 +18,9 @@ import (
 type metaParam struct {
 	Name string `json:"name"`
 	Type string `json:"type"`
+	// Lang marks a parameter that exists only in that language's template,
+	// such as the length C passes with an array.
+	Lang string `json:"lang"`
 }
 
 type metaReturn struct {
@@ -108,9 +111,11 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 		}
 	}
 	params := func(ps []metaParam) []problem.Param {
-		out := make([]problem.Param, len(ps))
-		for i, x := range ps {
-			out[i] = problem.Param{Name: x.Name, Type: x.Type}
+		out := make([]problem.Param, 0, len(ps))
+		for _, x := range ps {
+			if x.Lang == "" {
+				out = append(out, problem.Param{Name: x.Name, Type: x.Type})
+			}
 		}
 		return out
 	}
