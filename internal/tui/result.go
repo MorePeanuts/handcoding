@@ -55,6 +55,9 @@ func (m *model) startRun(kind runKind, p *problem.Problem) tea.Cmd {
 		m.message = "no " + m.lang.Name() + " solution yet — press enter or e first"
 		return nil
 	}
+	// The user may have fixed what made creating the Python environment
+	// fail on an earlier run.
+	m.app.RetryEnv()
 	ctx, cancel := context.WithCancel(m.ctx)
 	run := &runState{kind: kind, slug: p.Slug, langID: m.lang.ID(), running: true, cancel: cancel}
 	m.run, m.current = run, p

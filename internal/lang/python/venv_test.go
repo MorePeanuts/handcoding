@@ -198,3 +198,38 @@ func TestVenvNoPython(t *testing.T) {
 		t.Error("toolchain without an environment")
 	}
 }
+
+// A command tries to create the environment once: later steps get the same
+// error without running uv again, until Retry (the TUI's next run).
+func TestVenvFailsOnce(t *testing.T) {
+	f := newFakeEnv(t)
+	f.script(filepath.Join(f.bin, "uv"), "echo 'no network' >&2\nexit 1\n")
+	v := f.venv()
+	var out bytes.Buffer
+	first := v.Ensure(context.Background(), &out)
+	if first == nil || !strings.Contains(first.Error(), "no network") {
+		t.Fatalf("Ensure = %v", first)
+	}
+	if _, err := (Language{Venv: v}).Toolchain(); err == nil || err.Error() != first.Error() {
+		t.Errorf("Toolchain after a failure: %v", err)
+	}
+	if err := v.Ensure(context.Background(), &out); err == nil || err.Error() != first.Error() {
+		t.Errorf("second Ensure: %v", err)
+	}
+	if n := strings.Count(f.logged(), "uv venv"); n != 1 {
+		t.Errorf("uv venv ran %d times:\n%s", n, f.logged())
+	}
+	if n := strings.Count(out.String(), "Creating"); n != 1 {
+		t.Errorf("creation reported %d times:\n%s", n, out.String())
+	}
+
+	// The user fixes the cause; the next run tries again.
+	f.uv("3.12.4")
+	v.Retry()
+	if err := v.Ensure(context.Background(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(f.logged(), "uv venv"); n != 2 {
+		t.Errorf("uv venv ran %d times after Retry:\n%s", n, f.logged())
+	}
+}
