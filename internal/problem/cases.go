@@ -18,7 +18,9 @@ import (
 // For function problems Input maps parameter names to values. For class
 // problems Input has two keys: "ops" (method names, the first being the class
 // name) and "args" (argument arrays, one per op); Expected is the array of
-// return values with null for constructors and void methods.
+// return values with null for constructors and void methods. For round-trip
+// problems (Judge.RoundTrip) Input maps the encoder's parameter name to the
+// value, and Expected is the decoder's result.
 //
 // Values use LeetCode's JSON conventions: ListNode is an array of values and
 // TreeNode is a level-order array with null for missing children.
@@ -157,8 +159,12 @@ func MarshalCase(c Case) ([]byte, error) {
 }
 
 // InputKeys are the keys a case input must provide: for function problems
-// the parameters, except copies, then the hidden inputs.
+// the parameters, except copies, then the hidden inputs; for round-trip
+// problems the encoder's parameter.
 func (p *Problem) InputKeys() []string {
+	if enc, _, ok := p.RoundTripMethods(); ok {
+		return []string{enc.Params[0].Name}
+	}
 	if p.Kind == KindClass {
 		return []string{"ops", "args"}
 	}
@@ -194,6 +200,13 @@ func (p *Problem) ValidateCase(c Case) error {
 			return fmt.Errorf("unknown input %q (expected %s)", k, strings.Join(keys, ", "))
 		}
 	}
+	if enc, _, ok := p.RoundTripMethods(); ok {
+		prm := enc.Params[0]
+		if err := CheckValue(prm.Type, c.Input[prm.Name]); err != nil {
+			return fmt.Errorf("input %q: %w", prm.Name, err)
+		}
+		return p.validateExpected(c)
+	}
 	if p.Kind == KindClass {
 		return p.validateClassCase(c)
 	}
@@ -214,6 +227,12 @@ func (p *Problem) ValidateCase(c Case) error {
 	if err := p.checkStructureCase(c); err != nil {
 		return err
 	}
+	return p.validateExpected(c)
+}
+
+// validateExpected checks the shape of a function or round-trip problem's
+// expected output, if the case has one.
+func (p *Problem) validateExpected(c Case) error {
 	if !c.HasExpected() {
 		return nil
 	}
@@ -221,7 +240,7 @@ func (p *Problem) ValidateCase(c Case) error {
 	if p.Judge.Compare == CompareAnyOf {
 		want += "[]"
 	}
-	if f.ReturnsRef != "" {
+	if p.Function != nil && p.Function.ReturnsRef != "" {
 		want = typeNodeRef + strings.TrimPrefix(want, TypeInteger)
 	}
 	if err := CheckValue(want, c.Expected); err != nil {

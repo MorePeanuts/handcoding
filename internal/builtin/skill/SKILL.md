@@ -61,6 +61,40 @@ class:
     - {name: put, params: [{name: key, type: integer}, {name: value, type: integer}], returns: void}
 ```
 
+### Round trips (class problems)
+
+When a design problem asks for an encoder and a decoder in a format the
+solution chooses, and the judge only checks that decoding the encoded value
+gives it back (297 Serialize and Deserialize Binary Tree, 449 Serialize and
+Deserialize BST, 535 Encode and Decode TinyURL), set `judge.round_trip`:
+
+```yaml
+kind: class
+class:
+  name: Codec
+  constructor: []
+  methods:
+    - {name: serialize, params: [{name: root, type: TreeNode}], returns: string}
+    - {name: deserialize, params: [{name: data, type: string}], returns: TreeNode}
+judge:
+  compare: exact
+  round_trip: {encode: serialize, decode: deserialize, instances: separate}
+```
+
+- `instances` comes from the template's comment: `separate` when it encodes
+  and decodes with two objects (`ser = Codec(); deser = Codec()`: 297, 449),
+  `same` when one object does both (`codec.decode(codec.encode(url))`: 535,
+  whose codec has to remember its mapping).
+- Cases are not `ops`/`args`: `input` holds encode's parameter by name,
+  `{"root": [1,2,null,3]}` or `{"longUrl": "https://leetcode.com/problems/design-tinyurl"}`,
+  and `expected` is decode's result, filled by `hc cases build` (it equals the
+  input for a correct codec).
+- The judge rule is almost always `exact`. Requirements on the encoded
+  string itself, such as 449's "as compact as possible", are not judged;
+  say so in your summary rather than inventing a check.
+- The constructor takes no parameters, encode takes one value and returns
+  `string`, decode takes that `string` and returns the value's type.
+
 ### Structure inputs (function problems only)
 
 When the statement says the judge builds a structure from inputs the
@@ -163,6 +197,8 @@ One object per line: `{"input": {...}, "expected": <json>, "example": true, "not
   parameters).
 - Class problems: `input` is `{"ops": ["LRUCache","put","get"], "args": [[2],[1,1],[1]]}`
   and `expected` is `[null,null,1]` (null for the constructor and void methods).
+  Round trips: `input` is `{"root": [1,2,3]}` (encode's parameter), `expected`
+  decode's result.
 - ListNode is an array `[1,2,3]`; TreeNode is LeetCode level order `[3,9,20,null,null,15,7]`;
   character is a 1-char string `"a"`.
 - `expected` may be omitted; `hc cases build` fills it from the reference solution.
@@ -185,7 +221,8 @@ def check(input, output, expected):
 ```
 
 - `input`: the case input as decoded JSON (the parameters and hidden inputs
-  of a function problem; `{"ops": [...], "args": [...]}` for a class problem).
+  of a function problem; `{"ops": [...], "args": [...]}` for a class problem;
+  encode's parameter for a round trip).
 - `output`: the solution's output as decoded JSON, in the form of `expected`.
 - `expected`: the reference's answer from `hc cases build` — one valid answer
   among many. Use it for the optimal value instead of solving the problem

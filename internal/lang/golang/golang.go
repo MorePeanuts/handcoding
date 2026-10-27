@@ -131,7 +131,7 @@ func (Language) Starter(p *problem.Problem) (string, error) {
 			if ret != "" {
 				ret = " " + ret
 			}
-			fmt.Fprintf(&b, "\nfunc (this *%s) %s(%s)%s {\n\n}\n", c.Name, exported(m.Name), sig, ret)
+			fmt.Fprintf(&b, "\nfunc (this *%s) %s(%s)%s {\n\n}\n", c.Name, methodName(p, m.Name), sig, ret)
 		}
 	}
 	return b.String(), nil
@@ -298,7 +298,11 @@ func Driver(p *problem.Problem) ([]byte, error) {
 			return nil, err
 		}
 	case problem.KindClass:
-		if err := writeClassCall(&b, p.Class); err != nil {
+		write := writeClassCall
+		if p.Judge.RoundTrip != nil {
+			write = writeRoundTripCall
+		}
+		if err := write(&b, p); err != nil {
 			return nil, err
 		}
 	default:
@@ -433,7 +437,8 @@ func links(t string) string {
 	return "hcNodeLinks"
 }
 
-func writeClassCall(b *strings.Builder, c *problem.Class) error {
+func writeClassCall(b *strings.Builder, p *problem.Problem) error {
+	c := p.Class
 	b.WriteString("\tops := hcJSON[[]string](hcArg(in, \"ops\"))\n")
 	b.WriteString("\targs := hcJSON[[][]json.RawMessage](hcArg(in, \"args\"))\n")
 	b.WriteString("\tif len(ops) == 0 || len(ops) != len(args) {\n\t\tpanic(hcInputError{\"ops and args must be non-empty and of equal length\"})\n\t}\n")
@@ -451,7 +456,7 @@ func writeClassCall(b *strings.Builder, c *problem.Class) error {
 		if err != nil {
 			return err
 		}
-		call := fmt.Sprintf("obj.%s(%s)", exported(m.Name), al)
+		call := fmt.Sprintf("obj.%s(%s)", methodName(p, m.Name), al)
 		fmt.Fprintf(b, "\t\tcase %q:\n\t\t\thcArity(%q, a, %d)\n", m.Name, m.Name, len(m.Params))
 		if m.Returns == problem.TypeVoid {
 			fmt.Fprintf(b, "\t\t\t%s\n", call)
@@ -461,6 +466,35 @@ func writeClassCall(b *strings.Builder, c *problem.Class) error {
 	}
 	b.WriteString("\t\tdefault:\n\t\t\tpanic(hcInputError{fmt.Sprintf(\"unknown method %q\", ops[i])})\n\t\t}\n\t}\n")
 	b.WriteString("\thcStop()\n\treturn out\n")
+	return nil
+}
+
+// writeRoundTripCall encodes the input with one instance and decodes the
+// string with another one (or the same one), as LeetCode does:
+// ser := Constructor(); deser := Constructor(); deser.deserialize(ser.serialize(root)).
+func writeRoundTripCall(b *strings.Builder, p *problem.Problem) error {
+	enc, dec, ok := p.RoundTripMethods()
+	if !ok {
+		return errors.New("go: judge.round_trip does not name an encoder and a decoder of the class")
+	}
+	prm := enc.Params[0]
+	expr, err := decodeExpr(prm.Type, fmt.Sprintf("hcArg(in, %q)", prm.Name))
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(b, "\tv := %s\n", expr)
+	b.WriteString("\thcStart()\n")
+	b.WriteString("\tser := Constructor()\n")
+	fmt.Fprintf(b, "\tdata := ser.%s(v)\n", methodName(p, enc.Name))
+	if p.Judge.RoundTrip.Instances == problem.InstancesSame {
+		// The same variable, not a copy: Constructor may return a value.
+		fmt.Fprintf(b, "\tret := ser.%s(data)\n", methodName(p, dec.Name))
+	} else {
+		b.WriteString("\tdeser := Constructor()\n")
+		fmt.Fprintf(b, "\tret := deser.%s(data)\n", methodName(p, dec.Name))
+	}
+	b.WriteString("\thcStop()\n")
+	fmt.Fprintf(b, "\treturn %s\n", encodeExpr(dec.Returns, "ret"))
 	return nil
 }
 
@@ -507,7 +541,12 @@ func (Language) DebugCommand(dir, binDir string, p *problem.Problem, opts lang.D
 		args = append(args, "--headless", "--listen="+opts.Addr, "--api-version=2", "--accept-multiclient")
 	} else {
 		entry := "main." + p.EntryName()
-		if p.Kind == problem.KindClass {
+		switch {
+		case p.Judge.RoundTrip != nil:
+			// The encoder, where a case starts; Delve matches it with a
+			// pointer or a value receiver.
+			entry = fmt.Sprintf("main.%s.%s", p.Class.Name, methodName(p, p.Judge.RoundTrip.Encode))
+		case p.Kind == problem.KindClass:
 			entry = "main.Constructor"
 		}
 		initFile := filepath.Join(binDir, "dlv-init")

@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -177,12 +178,38 @@ type Judge struct {
 	// OutputLengthReturn: the function returns k, and only the first k
 	// elements of Output are judged (LeetCode's "remove duplicates" style).
 	OutputLength string `yaml:"output_length,omitempty" json:"output_length,omitempty"`
+	// RoundTrip makes a class problem judge an encoder and a decoder
+	// together: decode(encode(x)) is judged, never the encoded value.
+	RoundTrip *RoundTrip `yaml:"round_trip,omitempty" json:"round_trip,omitempty"`
 	// TimeLimit is the wall clock limit for a whole run, e.g. "10s".
 	TimeLimit string `yaml:"time_limit,omitempty" json:"time_limit,omitempty"`
 }
 
 // OutputLengthReturn judges Output[:k], where k is the return value.
 const OutputLengthReturn = "return"
+
+// RoundTrip describes a class problem whose methods encode a value into a
+// string in the solution's own format and decode it back (Serialize and
+// Deserialize Binary Tree, Encode and Decode TinyURL). A case gives the value
+// as Encode's parameter; the driver calls Encode, passes the string it
+// returns to Decode, and Decode's result is judged.
+type RoundTrip struct {
+	Encode string `yaml:"encode" json:"encode"`
+	Decode string `yaml:"decode" json:"decode"`
+	// Instances is InstancesSeparate or InstancesSame. It has no default,
+	// because it decides whether a solution may keep state between the calls.
+	Instances string `yaml:"instances" json:"instances"`
+}
+
+// Round-trip instances.
+const (
+	// InstancesSeparate encodes with one instance and decodes with a second
+	// one (297: ser = Codec(); deser = Codec()).
+	InstancesSeparate = "separate"
+	// InstancesSame encodes and decodes with one instance, which may remember
+	// what it encoded (535: a URL shortener keeps its mapping).
+	InstancesSame = "same"
+)
 
 // Source records where a problem came from.
 type Source struct {
@@ -330,6 +357,9 @@ func (p *Problem) Validate() error {
 		}
 		errs = append(errs, p.validateStructures()...)
 		errs = append(errs, p.validateReturnsCopy()...)
+		if p.Judge.RoundTrip != nil {
+			errs = append(errs, errors.New("judge.round_trip is for class problems only"))
+		}
 		if p.Judge.Output != "" {
 			if prm, ok := f.Input(p.Judge.Output); !ok {
 				errs = append(errs, fmt.Errorf("judge.output %q is not a parameter or hidden input", p.Judge.Output))
@@ -375,6 +405,9 @@ func (p *Problem) Validate() error {
 				errs = append(errs, fmt.Errorf("method %s returns: %w", m.Name, err))
 			}
 		}
+		if p.Judge.RoundTrip != nil {
+			errs = append(errs, p.validateRoundTrip()...)
+		}
 	default:
 		errs = append(errs, fmt.Errorf("unknown kind %q", p.Kind))
 	}
@@ -390,7 +423,7 @@ func (p *Problem) Validate() error {
 	switch p.Judge.Compare {
 	case "", CompareExact, CompareAnyOf, CompareChecker:
 	case CompareUnordered, CompareUnorderedDeep:
-		if t := p.judgedType(); p.Kind == KindFunction && t != "" {
+		if t := p.judgedType(); t != "" {
 			if _, depth := SplitArray(t); depth == 0 {
 				errs = append(errs, fmt.Errorf("judge.compare %s needs an array result, but the judged value is %s", p.Judge.Compare, t))
 			}
@@ -412,10 +445,14 @@ func (p *Problem) Validate() error {
 	return errors.Join(errs...)
 }
 
-// judgedType is the type of the value a function problem is judged on: the
-// return type, or the judge.output input's type for in-place problems. A
-// returned node reference is judged as an integer (see Function.ReturnsRef).
+// judgedType is the type of the value a function or round-trip problem is
+// judged on: the return type, the judge.output input's type for in-place
+// problems, or the decoder's return type. A returned node reference is
+// judged as an integer (see Function.ReturnsRef).
 func (p *Problem) judgedType() string {
+	if _, dec, ok := p.RoundTripMethods(); ok {
+		return dec.Returns
+	}
 	if p.Function == nil {
 		return ""
 	}
@@ -427,6 +464,70 @@ func (p *Problem) judgedType() string {
 		return TypeInteger
 	}
 	return p.Function.Returns
+}
+
+// validateRoundTrip checks judge.round_trip against the class: decode must
+// invert encode, which takes one value and returns a string.
+func (p *Problem) validateRoundTrip() []error {
+	rt, c := p.Judge.RoundTrip, p.Class
+	var errs []error
+	method := func(field, name string) (Method, bool) {
+		if name == "" {
+			errs = append(errs, fmt.Errorf("judge.round_trip.%s is required", field))
+			return Method{}, false
+		}
+		i := slices.IndexFunc(c.Methods, func(m Method) bool { return m.Name == name })
+		if i < 0 {
+			errs = append(errs, fmt.Errorf("judge.round_trip.%s %q is not a method of %s", field, name, c.Name))
+			return Method{}, false
+		}
+		return c.Methods[i], true
+	}
+	enc, encOK := method("encode", rt.Encode)
+	dec, decOK := method("decode", rt.Decode)
+	switch {
+	case encOK && decOK && enc.Name == dec.Name:
+		errs = append(errs, fmt.Errorf("judge.round_trip: encode and decode must be different methods, not both %s", enc.Name))
+	case encOK && len(enc.Params) != 1:
+		errs = append(errs, fmt.Errorf("judge.round_trip: encode method %s must take exactly one parameter, the value to encode", enc.Name))
+	case encOK && enc.Returns != TypeString:
+		errs = append(errs, fmt.Errorf("judge.round_trip: encode method %s must return string, not %s", enc.Name, enc.Returns))
+	case decOK && (len(dec.Params) != 1 || dec.Params[0].Type != TypeString):
+		errs = append(errs, fmt.Errorf("judge.round_trip: decode method %s must take exactly one string parameter, the encoded value", dec.Name))
+	case encOK && decOK && dec.Returns != enc.Params[0].Type:
+		errs = append(errs, fmt.Errorf("judge.round_trip: decode method %s must return %s, the type of %s's parameter, not %s", dec.Name, enc.Params[0].Type, enc.Name, dec.Returns))
+	}
+	if len(c.Constructor) > 0 {
+		errs = append(errs, fmt.Errorf("judge.round_trip: the constructor of %s must take no parameters, since cases give only the value to encode", c.Name))
+	}
+	switch rt.Instances {
+	case InstancesSeparate, InstancesSame:
+	case "":
+		errs = append(errs, errors.New("judge.round_trip.instances is required: separate (encode and decode on two instances) or same (one instance)"))
+	default:
+		errs = append(errs, fmt.Errorf("unknown judge.round_trip.instances %q (separate or same)", rt.Instances))
+	}
+	return errs
+}
+
+// RoundTripMethods returns the encode and decode methods of a round-trip
+// problem. ok is false for other problems, and for a round trip whose
+// methods are missing or whose encoder does not take one parameter.
+func (p *Problem) RoundTripMethods() (encode, decode Method, ok bool) {
+	rt := p.Judge.RoundTrip
+	if rt == nil || p.Kind != KindClass || p.Class == nil {
+		return Method{}, Method{}, false
+	}
+	var foundEnc, foundDec bool
+	for _, m := range p.Class.Methods {
+		switch m.Name {
+		case rt.Encode:
+			encode, foundEnc = m, true
+		case rt.Decode:
+			decode, foundDec = m, true
+		}
+	}
+	return encode, decode, foundEnc && foundDec && len(encode.Params) == 1
 }
 
 // Ready reports whether the judge rule has been decided, i.e. whether

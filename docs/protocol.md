@@ -144,6 +144,7 @@ problems/0001-two-sum/          directory name: <4-digit number>-<slug> when id 
 | `judge.tolerance` | Floating-point tolerance. Defaults to `1e-5` when returning `double`; either the absolute or the relative error must be within it |
 | `judge.output` | For in-place problems: the judge compares this parameter's (or hidden input's) value after the call instead of the return value |
 | `judge.output_length` | `return`: judge only the first k elements of `judge.output`, k being the (integer) return value. LeetCode's "remove duplicates" problems |
+| `judge.round_trip` | For design problems that encode a value and decode it back: `encode`, `decode` (method names) and `instances` (`separate` or `same`). See [round-trip problems](#round-trip-problems) |
 | `judge.time_limit` | Time limit for a whole run, as a duration such as `5s` or `500ms`. Defaults to `timeout` in hc.yaml |
 | `source` | Where the problem comes from: `site`, `url` |
 
@@ -195,6 +196,47 @@ Comparison modes:
 
 `unordered` and `unordered_deep` need an array result.
 
+### Round-trip problems
+
+Some design problems ask for an encoder and a decoder, in a format of the solution's choosing: Serialize and Deserialize Binary Tree (297), Serialize and Deserialize BST (449), Encode and Decode TinyURL (535). Only `decode(encode(x))` can be judged; the encoded string can neither be written in a case nor compared. `judge.round_trip` describes such a problem:
+
+```yaml
+kind: class
+class:
+  name: Codec
+  constructor: []
+  methods:
+    - name: serialize
+      params:
+        - {name: root, type: TreeNode}
+      returns: string
+    - name: deserialize
+      params:
+        - {name: data, type: string}
+      returns: TreeNode
+judge:
+  compare: exact
+  round_trip:
+    encode: serialize
+    decode: deserialize
+    instances: separate   # separate | same
+```
+
+A case gives the value to encode, keyed by the encoder's parameter name, instead of `ops` and `args`; `expected` is the decoder's result, which `hc cases build` fills from the reference as usual. For a correct codec it equals the input:
+
+```json
+{"input": {"root": [1,2,3,null,null,4,5]}, "expected": [1,2,3,null,null,4,5], "example": true}
+```
+
+For each case the driver decodes the input, constructs an instance and calls `encode` with it, then calls `decode` with the string `encode` returned, and judges `decode`'s result with `judge.compare` (`exact`, or a [checker](#checkers)). `instances` has no default, because it decides whether a solution may keep state between the two calls:
+
+- `separate`: `decode` runs on a second instance, as in LeetCode's `ser = Codec(); deser = Codec(); ans = deser.deserialize(ser.serialize(root))` (297, 449). A codec that only remembers the tree on its instance fails.
+- `same`: both calls run on one instance (535: `codec.decode(codec.encode(url))`), so a codec may keep a mapping.
+
+Both instances live in the same process, as on LeetCode. An `encode` that does not return a string is a runtime error. The run time covers both calls. Other methods of the class are never called, and a requirement such as 449's "as compact as possible" is not judged.
+
+Rules: `round_trip` is only for design problems; `encode` and `decode` name two different methods of the class; `encode` takes exactly one parameter and returns `string`; `decode` takes exactly one `string` parameter and returns the type of `encode`'s parameter; the constructor takes no parameters; `instances` is `separate` or `same`.
+
 ### Checkers
 
 When a case has too many valid answers to list, or the output is random, a program decides: `judge.compare: checker` and a `checker.py` next to `problem.yaml`. Checkers are written in Python whatever language the solution is in, so problems judged by one need Python 3.10 or later even for Go solutions; the virtual environment hc manages (`.hc/venv`) provides it.
@@ -205,8 +247,8 @@ def check(input, output, expected):
     """Return None or True to accept; False or a message string to reject."""
 ```
 
-- `input` is the case's input as decoded JSON: the object of parameters (and hidden inputs) for function problems, `{"ops": [...], "args": [...]}` for design problems.
-- `output` is the solution's output as decoded JSON, in the same form as `expected` (the value of `judge.output` for in-place problems, one result per operation for design problems).
+- `input` is the case's input as decoded JSON: the object of parameters (and hidden inputs) for function problems, `{"ops": [...], "args": [...]}` for design problems, the encoder's parameter for [round trips](#round-trip-problems).
+- `output` is the solution's output as decoded JSON, in the same form as `expected` (the value of `judge.output` for in-place problems, one result per operation for design problems, the decoder's result for round trips).
 - `expected` is the case's expected output, computed by the reference solution with `hc cases build` as for any other problem. It is one valid answer, so a checker can compare a derived value instead of solving the problem again: the length of the longest palindrome, the size of a subset. A case without `expected` is not judged ("No Expected Output").
 - To rebuild a structure, import the codecs and types solutions use: `from hc_runtime import decode, TreeNode` and `decode("TreeNode", output)`.
 - A rejected case is a Wrong Answer, and the message is shown with it in `hc test`, `hc submit`, the TUI and the submission history. Write messages that say what is wrong: `"[1,2] is not a permutation of nums"`, `"length 2, but the longest palindrome has length 3"`.
@@ -414,8 +456,8 @@ One case per line:
 {"input": {"nums": [-1,-2,-3,-4,-5], "target": -8}, "expected": [2,4], "note": "negative numbers"}
 ```
 
-- `input`: for function problems, an object with exactly one value per parameter and hidden input, keyed by name. A `ref` parameter takes the referenced node's value; a `copy` parameter is left out. For design problems, `{"ops": [...], "args": [[...], ...]}`; `ops[0]` must be the class name (the constructor), and each `args` entry holds exactly the arguments of its op.
-- `expected`: the expected output. For design problems, an array with each operation's return value, using `null` for the constructor and `void` methods. For `any_of`, an array of acceptable answers, written by hand: a reference solution finds only one answer, so `hc cases build` refuses to fill it. For `checker`, one valid answer, passed to the checker. Otherwise, if missing, `hc cases build` computes it with the reference solution.
+- `input`: for function problems, an object with exactly one value per parameter and hidden input, keyed by name. A `ref` parameter takes the referenced node's value; a `copy` parameter is left out. For design problems, `{"ops": [...], "args": [[...], ...]}`; `ops[0]` must be the class name (the constructor), and each `args` entry holds exactly the arguments of its op. For [round-trip problems](#round-trip-problems), the encoder's parameter: `{"root": [1,2,3]}`.
+- `expected`: the expected output. For design problems, an array with each operation's return value, using `null` for the constructor and `void` methods; for round trips, the decoder's result. For `any_of`, an array of acceptable answers, written by hand: a reference solution finds only one answer, so `hc cases build` refuses to fill it. For `checker`, one valid answer, passed to the checker. Otherwise, if missing, `hc cases build` computes it with the reference solution.
 - `example`: the case is an example from the statement. `hc test` runs only these by default (the first 3 cases if none is marked).
 - `note`: a description of the case.
 - No other fields are allowed. Blank lines and lines starting with `//` are ignored. Cases are numbered from 1, counting only the lines that hold a case.
@@ -427,7 +469,7 @@ A reference solution is written exactly like a user's solution, in `reference/so
 | | Function problem | Class problem |
 |---|---|---|
 | Python | `class Solution` with a method named `function.name`, or a module-level function of that name | A class named `class.name`; `__init__` takes the constructor parameters; methods have the names in `methods` |
-| Go | `package main`; `func <function.name>(...)` with the Go types from the table above | `type <Name> struct`, `func Constructor(...) <Name>`, and methods with pointer receivers whose names start with an upper-case letter (`getMin` → `GetMin`) |
+| Go | `package main`; `func <function.name>(...)` with the Go types from the table above | `type <Name> struct`, `func Constructor(...) <Name>`, and methods with pointer receivers whose names start with an upper-case letter (`getMin` → `GetMin`), except the encoder and decoder of a round trip, which keep their names as in LeetCode's templates (`serialize`) |
 
 - `ListNode` and `TreeNode` are provided: in Python, `from hc_runtime import ListNode, TreeNode`; in Go they are predefined (`Val`, `Next`, `Left`, `Right`), so don't declare them. So are the problem's [`Node`](#leetcodes-node-types), `NestedInteger` and `Employee`: `from hc_runtime import GraphNode as Node` or `from hc_runtime import NestedInteger` in Python, predefined in Go.
 - With both references present, `hc cases build` uses Go, then Python; pick one with `-l python`. `hc validate --run` runs every reference.
@@ -457,8 +499,8 @@ hc validate <slug> --run    # also run every reference solution on every case; a
 
 `hc validate` reports, with the case number and field:
 
-- `problem.yaml`: syntax errors (with line and column), unknown fields, invalid slug, missing title, unsupported types, a `judge.output` that is not a parameter or hidden input, a `void` function without `judge.output`, misused structure inputs (`hidden`, `cycle`, `join`, `ref`, `copy`, `returns_ref`), a misused `returns_copy`, more than one `Node` type, a misused `judge.output_length`, unknown `judge.compare`, `judge.compare: checker` without `checker.py` and `checker.py` with another mode, an invalid `judge.time_limit`;
-- `cases.jsonl`: invalid JSON, unknown fields, missing or unknown inputs, values that don't match their declared type (`input "nums": [1]: must be integer, got string "x"`) or the form of a judge-defined type (a neighbor that is not a node, a random index outside the list, a misplaced `null`, an unknown subordinate), structure inputs that don't fit (a cycle position outside the list, joined lists whose tails differ, a referenced value that is missing or repeated), wrong argument counts and unknown methods in design problems, and an `expected` of the wrong shape;
+- `problem.yaml`: syntax errors (with line and column), unknown fields, invalid slug, missing title, unsupported types, a `judge.output` that is not a parameter or hidden input, a `void` function without `judge.output`, misused structure inputs (`hidden`, `cycle`, `join`, `ref`, `copy`, `returns_ref`), a misused `returns_copy`, more than one `Node` type, a misused `judge.output_length`, a misused `judge.round_trip`, unknown `judge.compare`, `judge.compare: checker` without `checker.py` and `checker.py` with another mode, an invalid `judge.time_limit`;
+- `cases.jsonl`: invalid JSON, unknown fields, missing or unknown inputs, values that don't match their declared type (`input "nums": [1]: must be integer, got string "x"`) or the form of a judge-defined type (a neighbor that is not a node, a random index outside the list, a misplaced `null`, an unknown subordinate), structure inputs that don't fit (a cycle position outside the list, joined lists whose tails differ, a referenced value that is missing or repeated), wrong argument counts and unknown methods in design problems, `ops` and `args` in a round trip, and an `expected` of the wrong shape;
 - with `--run`: reference solutions that don't compile, crash, or disagree with `expected` (both values are shown, and the checker's message); with `checker`, every reference output goes through the checker, and a broken checker is an error.
 
 It warns about an undecided judge rule (no `judge.compare`), cases without `expected`, no case marked as an example, no reference solution, missing statement images and an ID used by another problem.

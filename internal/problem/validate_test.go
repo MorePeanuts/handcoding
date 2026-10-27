@@ -383,3 +383,86 @@ judge: {compare: any_of}
 		t.Errorf("FormatInput: %s", got)
 	}
 }
+
+// codec is a round-trip problem: Codec.serialize(root) -> string,
+// Codec.deserialize(data) -> TreeNode.
+func codec(instances string) *Problem {
+	p := &Problem{Slug: "codec", Title: "Codec", Kind: KindClass, Class: &Class{
+		Name: "Codec",
+		Methods: []Method{
+			{Name: "serialize", Params: []Param{{Name: "root", Type: TypeTreeNode}}, Returns: TypeString},
+			{Name: "deserialize", Params: []Param{{Name: "data", Type: TypeString}}, Returns: TypeTreeNode},
+		},
+	}}
+	p.Judge.Compare = CompareExact
+	p.Judge.RoundTrip = &RoundTrip{Encode: "serialize", Decode: "deserialize", Instances: instances}
+	p.Normalize()
+	return p
+}
+
+func TestValidateRoundTrip(t *testing.T) {
+	for _, instances := range []string{InstancesSeparate, InstancesSame} {
+		if err := codec(instances).Validate(); err != nil {
+			t.Errorf("%s: %v", instances, err)
+		}
+	}
+	tests := []struct {
+		name string
+		mut  func(p *Problem)
+		want string
+	}{
+		{"no instances", func(p *Problem) { p.Judge.RoundTrip.Instances = "" }, "judge.round_trip.instances is required"},
+		{"bad instances", func(p *Problem) { p.Judge.RoundTrip.Instances = "both" }, `unknown judge.round_trip.instances "both"`},
+		{"no encode", func(p *Problem) { p.Judge.RoundTrip.Encode = "" }, "judge.round_trip.encode is required"},
+		{"unknown decode", func(p *Problem) { p.Judge.RoundTrip.Decode = "load" }, `judge.round_trip.decode "load" is not a method of Codec`},
+		{"same method", func(p *Problem) { p.Judge.RoundTrip.Decode = "serialize" }, "must be different methods"},
+		{"encode arity", func(p *Problem) {
+			p.Class.Methods[0].Params = append(p.Class.Methods[0].Params, Param{Name: "k", Type: TypeInteger})
+		}, "must take exactly one parameter"},
+		{"encode returns", func(p *Problem) { p.Class.Methods[0].Returns = "integer[]" }, "encode method serialize must return string, not integer[]"},
+		{"decode param", func(p *Problem) { p.Class.Methods[1].Params[0].Type = "integer[]" }, "decode method deserialize must take exactly one string parameter"},
+		{"decode returns", func(p *Problem) { p.Class.Methods[1].Returns = TypeListNode }, "must return TreeNode, the type of serialize's parameter, not ListNode"},
+		{"constructor", func(p *Problem) { p.Class.Constructor = []Param{{Name: "n", Type: TypeInteger}} }, "constructor of Codec must take no parameters"},
+		{"function", func(p *Problem) {
+			p.Kind, p.Class, p.Function = KindFunction, nil, &Function{Name: "f", Returns: TypeInteger}
+		}, "judge.round_trip is for class problems only"},
+		{"unordered", func(p *Problem) { p.Judge.Compare = CompareUnordered }, "needs an array result, but the judged value is TreeNode"},
+	}
+	for _, tt := range tests {
+		p := codec(InstancesSeparate)
+		tt.mut(p)
+		if err := p.Validate(); err == nil || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("%s: error = %v, want %q", tt.name, err, tt.want)
+		}
+	}
+}
+
+func TestValidateCaseRoundTrip(t *testing.T) {
+	p := codec(InstancesSeparate)
+	if keys := strings.Join(p.InputKeys(), ","); keys != "root" {
+		t.Errorf("input keys %s", keys)
+	}
+	tests := []struct {
+		line, err string
+	}{
+		{`{"input":{"root":[1,2,3,null,null,4,5]},"expected":[1,2,3,null,null,4,5]}`, ""},
+		{`{"input":{"root":[]},"expected":[]}`, ""},
+		{`{"input":{"root":null}}`, ""},
+		{`{"input":{"root":[1,"x"]}}`, `input "root": [1]: must be integer`},
+		{`{"input":{"ops":["Codec","serialize"],"args":[[],[[1]]]}}`, `missing input "root"`},
+		{`{"input":{"root":[1],"data":"1"}}`, `unknown input "data" (expected root)`},
+		{`{"input":{"root":[1]},"expected":"1"}`, `expected: must be TreeNode`},
+	}
+	for _, tt := range tests {
+		err := p.ValidateCase(mustParseCase(t, tt.line))
+		switch {
+		case tt.err == "" && err != nil:
+			t.Errorf("%s: unexpected error %v", tt.line, err)
+		case tt.err != "" && (err == nil || !strings.Contains(err.Error(), tt.err)):
+			t.Errorf("%s: error = %v, want %q", tt.line, err, tt.err)
+		}
+	}
+	if got := p.FormatInput(mustParseCase(t, `{"input":{"root":[1,null,2]}}`)); got != "root = [1,null,2]" {
+		t.Errorf("FormatInput: %s", got)
+	}
+}

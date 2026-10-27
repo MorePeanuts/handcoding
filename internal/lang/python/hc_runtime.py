@@ -743,6 +743,30 @@ def _call_class(solution, meta, inp):
     return out, elapsed
 
 
+def _call_round_trip(solution, meta, inp):
+    """Encode the input with one instance and decode the string with another
+    one (or the same one), as LeetCode does: ser = Codec(); deser = Codec();
+    ans = deser.deserialize(ser.serialize(root))."""
+    cls_meta, rt = meta["class"], meta["round_trip"]
+    methods = {m["name"]: m for m in cls_meta["methods"]}
+    enc, dec = methods[rt["encode"]], methods[rt["decode"]]
+    param = enc["params"][0]
+    if param["name"] not in inp:
+        raise InputError("missing input %r" % param["name"])
+    value = decode(param["type"], inp[param["name"]])
+    cls = getattr(solution, cls_meta["name"])
+
+    start = time.perf_counter_ns()
+    encoder = cls()
+    data = getattr(encoder, enc["name"])(value)
+    if not isinstance(data, str):
+        raise RuntimeError("%s must return a string, but returned %s %r" % (enc["name"], type(data).__name__, data))
+    decoder = encoder if rt["instances"] == "same" else cls()
+    ret = getattr(decoder, dec["name"])(data)
+    elapsed = time.perf_counter_ns() - start
+    return encode(dec["returns"], ret), elapsed
+
+
 def main(meta):
     here = os.path.dirname(os.path.abspath(__file__))
     if here not in sys.path:
@@ -751,7 +775,12 @@ def main(meta):
 
     with open(os.environ["HC_CASES"]) as f:
         cases = json.load(f)
-    call = _call_class if meta["kind"] == "class" else _call_function
+    if meta.get("round_trip"):
+        call = _call_round_trip
+    elif meta["kind"] == "class":
+        call = _call_class
+    else:
+        call = _call_function
     with open(os.environ["HC_OUT"], "w") as out:
         for c in cases:
             res = {"id": c["id"], "output": None, "elapsed_ns": 0}
