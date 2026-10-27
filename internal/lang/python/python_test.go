@@ -27,3 +27,23 @@ func TestStarterAnnotations(t *testing.T) {
 		t.Errorf("starter does not contain %q:\n%s", want, got)
 	}
 }
+
+// Starters show only the parameters the solution receives: hidden inputs
+// are left out, and node references keep their node type.
+func TestStarterStructureInputs(t *testing.T) {
+	p := &problem.Problem{Slug: "f", Kind: problem.KindFunction, Function: &problem.Function{
+		Name: "deleteNode",
+		Params: []problem.Param{
+			{Name: "node", Type: problem.TypeListNode, Ref: "head"},
+		},
+		Hidden:  []problem.Param{{Name: "head", Type: problem.TypeListNode}},
+		Returns: problem.TypeVoid,
+	}}
+	got, err := Language{}.Starter(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "def deleteNode(self, node: ListNode | None) -> None:"; !strings.Contains(got, want) {
+		t.Errorf("starter does not contain %q:\n%s", want, got)
+	}
+}

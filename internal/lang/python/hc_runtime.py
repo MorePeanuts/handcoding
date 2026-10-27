@@ -136,6 +136,105 @@ def _user_traceback(exc):
     return "".join(lines).rstrip()
 
 
+def _node_list(t, v):
+    """Return the nodes of a list in order, or of a tree in level order."""
+    if t == "ListNode":
+        out = []
+        while v is not None:
+            out.append(v)
+            v = v.next
+        return out
+    out, head = [v] if v is not None else [], 0
+    while head < len(out):
+        node = out[head]
+        head += 1
+        out.extend(c for c in (node.left, node.right) if c is not None)
+    return out
+
+
+def _hidden_int(inp, name):
+    v = inp.get(name)
+    if not isinstance(v, int) or isinstance(v, bool):
+        raise InputError("%s must be an integer, got %r" % (name, v))
+    return v
+
+
+def _copy(t, nodes):
+    """Deep-copy a structure given its nodes; returns the copy's nodes."""
+    if t == "ListNode":
+        out = [ListNode(n.val) for n in nodes]
+        for a, b in zip(out, out[1:]):
+            a.next = b
+        return out
+    copies = {id(n): TreeNode(n.val) for n in nodes}
+    for n in nodes:
+        c = copies[id(n)]
+        c.left = copies[id(n.left)] if n.left is not None else None
+        c.right = copies[id(n.right)] if n.right is not None else None
+    return [copies[id(n)] for n in nodes]
+
+
+def _build_structures(fn_meta, inp):
+    """Decode the inputs and build the structures that cycle, join, copy and
+    ref describe. Returns the values by name and the node lists of every
+    ListNode and TreeNode structure."""
+    params = fn_meta["params"]
+    values, nodes = {}, {}
+    for p in params + (fn_meta.get("hidden") or []):
+        if p.get("ref") or p.get("copy"):
+            continue
+        if p["name"] not in inp:
+            raise InputError("missing input %r" % p["name"])
+        values[p["name"]] = decode(p["type"], inp[p["name"]])
+        if p["type"] in ("ListNode", "TreeNode"):
+            nodes[p["name"]] = _node_list(p["type"], values[p["name"]])
+    for p in params:
+        name = p["name"]
+        if p.get("cycle"):
+            pos, ns = _hidden_int(inp, p["cycle"]), nodes[name]
+            if not -1 <= pos < len(ns):
+                raise InputError("%s = %d is outside [-1, %d] for %s" % (p["cycle"], pos, len(ns) - 1, name))
+            if pos >= 0:
+                ns[-1].next = ns[pos]
+        elif p.get("join"):
+            j = p["join"]
+            a, b = nodes[j["list"]], nodes[name]
+            skip, at = _hidden_int(inp, j["skip"]), _hidden_int(inp, j["at"])
+            if not (0 <= skip <= len(b) and 0 <= at <= len(a) and len(b) - skip == len(a) - at):
+                raise InputError("%s = %d and %s = %d do not fit %s (%d nodes) and %s (%d nodes)" % (
+                    j["skip"], skip, j["at"], at, name, len(b), j["list"], len(a)))
+            nodes[name] = b[:skip] + a[at:]
+            if skip:
+                b[skip - 1].next = a[at] if at < len(a) else None
+            values[name] = nodes[name][0] if nodes[name] else None
+    for p in params:
+        if p.get("copy"):
+            nodes[p["name"]] = _copy(p["type"], nodes[p["copy"]])
+            values[p["name"]] = nodes[p["name"]][0] if nodes[p["name"]] else None
+    for p in params:
+        if p.get("ref"):
+            name, want = p["name"], inp.get(p["name"])
+            if not isinstance(want, int) or isinstance(want, bool):
+                raise InputError("%s must be the integer value of a node of %s, got %r" % (name, p["ref"], want))
+            found = [n for n in nodes[p["ref"]] if n.val == want]
+            if len(found) != 1:
+                raise InputError("%s = %d %s in %s" % (
+                    name, want, "occurs %d times" % len(found) if found else "is not a value", p["ref"]))
+            values[name] = found[0]
+    return values, nodes
+
+
+def _node_ref(t, node, nodes, name):
+    """Encode a returned node of a structure: its index in a list, its value
+    in a tree."""
+    if node is None:
+        return None
+    for i, n in enumerate(nodes):
+        if n is node:
+            return i if t == "ListNode" else n.val
+    raise RuntimeError("the returned node %r is not a node of %s" % (node, name))
+
+
 def _call_function(solution, meta, inp):
     fn_meta = meta["function"]
     name = fn_meta["name"]
@@ -143,23 +242,23 @@ def _call_function(solution, meta, inp):
         fn = getattr(solution.Solution(), name)
     else:
         fn = getattr(solution, name)
-    args = []
-    for p in fn_meta["params"]:
-        if p["name"] not in inp:
-            raise InputError("missing input %r" % p["name"])
-        args.append(decode(p["type"], inp[p["name"]]))
+    values, nodes = _build_structures(fn_meta, inp)
     start = time.perf_counter_ns()
-    ret = fn(*args)
+    ret = fn(*[values[p["name"]] for p in fn_meta["params"]])
     elapsed = time.perf_counter_ns() - start
-    output_param = meta.get("output")
-    if output_param:
-        for p, a in zip(fn_meta["params"], args):
-            if p["name"] == output_param:
-                if meta.get("output_length") == "return":
-                    if not isinstance(ret, int) or not 0 <= ret <= len(a):
-                        raise RuntimeError("returned length %r is outside [0, %d]" % (ret, len(a)))
-                    a = a[:ret]
-                return encode(p["type"], a), elapsed
+    output = meta.get("output")
+    if output:
+        inputs = fn_meta["params"] + (fn_meta.get("hidden") or [])
+        t = next(p["type"] for p in inputs if p["name"] == output)
+        a = values[output]
+        if meta.get("output_length") == "return":
+            if not isinstance(ret, int) or not 0 <= ret <= len(a):
+                raise RuntimeError("returned length %r is outside [0, %d]" % (ret, len(a)))
+            a = a[:ret]
+        return encode(t, a), elapsed
+    ref = fn_meta.get("returns_ref")
+    if ref:
+        return _node_ref(fn_meta["returns"], ret, nodes[ref], ref), elapsed
     return encode(fn_meta["returns"], ret), elapsed
 
 

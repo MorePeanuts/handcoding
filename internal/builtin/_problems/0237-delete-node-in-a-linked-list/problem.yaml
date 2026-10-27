@@ -1,0 +1,19 @@
+id: "237"
+slug: delete-node-in-a-linked-list
+title: Delete Node in a Linked List
+difficulty: medium
+tags: [linked-list]
+kind: function
+function:
+  name: deleteNode
+  params:
+    - {name: node, type: ListNode, ref: head}
+  hidden:
+    - {name: head, type: ListNode}
+  returns: void
+judge:
+  compare: exact
+  output: head
+source:
+  site: builtin
+  url: https://leetcode.com/problems/delete-node-in-a-linked-list/

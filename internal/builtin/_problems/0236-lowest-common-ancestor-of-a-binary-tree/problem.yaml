@@ -1,0 +1,19 @@
+id: "236"
+slug: lowest-common-ancestor-of-a-binary-tree
+title: Lowest Common Ancestor of a Binary Tree
+difficulty: medium
+tags: [tree, depth-first-search, binary-tree]
+kind: function
+function:
+  name: lowestCommonAncestor
+  params:
+    - {name: root, type: TreeNode}
+    - {name: p, type: TreeNode, ref: root}
+    - {name: q, type: TreeNode, ref: root}
+  returns: TreeNode
+  returns_ref: root
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/lowest-common-ancestor-of-a-binary-tree/

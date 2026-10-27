@@ -53,16 +53,82 @@ const (
 )
 
 // Param is a named, typed parameter.
+//
+// The structure attributes Cycle, Join, Ref and Copy (function parameters
+// only, at most one each) make the driver build the argument from other
+// inputs rather than pass the case value as it is.
 type Param struct {
 	Name string `yaml:"name" json:"name"`
 	Type string `yaml:"type" json:"type"`
+	// Cycle names an integer hidden input: the ListNode's tail links back to
+	// the node at that 0-based index, or nowhere for -1 (Linked List Cycle).
+	Cycle string `yaml:"cycle,omitempty" json:"cycle,omitempty"`
+	// Join makes this ListNode share its tail with another list
+	// (Intersection of Two Linked Lists).
+	Join *Join `yaml:"join,omitempty" json:"join,omitempty"`
+	// Ref names a ListNode or TreeNode input of the same type. The case gives
+	// a node's value, and the solution receives the node of that structure
+	// holding it (Lowest Common Ancestor: p and q in root).
+	Ref string `yaml:"ref,omitempty" json:"ref,omitempty"`
+	// Copy names a parameter of the same node type. The case does not give
+	// this parameter: the solution receives a deep copy of the other one.
+	Copy string `yaml:"copy,omitempty" json:"copy,omitempty"`
+}
+
+// Join describes a list that continues with the nodes of another one: it
+// keeps its first Skip nodes, then links to List's node at index At. Skip and
+// At name integer hidden inputs. When At equals List's length the lists do
+// not intersect, and the joined list keeps all its own nodes.
+type Join struct {
+	List string `yaml:"list" json:"list"`
+	Skip string `yaml:"skip" json:"skip"`
+	At   string `yaml:"at" json:"at"`
+}
+
+// structural reports whether the driver builds the parameter from other
+// inputs.
+func (prm Param) structural() bool {
+	return prm.Cycle != "" || prm.Join != nil || prm.Ref != "" || prm.Copy != ""
 }
 
 // Function describes the signature of a function-kind problem.
 type Function struct {
-	Name    string  `yaml:"name" json:"name"`
-	Params  []Param `yaml:"params" json:"params"`
+	Name   string  `yaml:"name" json:"name"`
+	Params []Param `yaml:"params" json:"params"`
+	// Hidden are case inputs the driver uses to build parameters (or judges,
+	// with judge.output) but never passes to the solution, e.g. the pos of a
+	// list cycle.
+	Hidden  []Param `yaml:"hidden,omitempty" json:"hidden,omitempty"`
 	Returns string  `yaml:"returns" json:"returns"`
+	// ReturnsRef names the ListNode or TreeNode input the returned node
+	// belongs to. The output is the node's index in that list, or its value
+	// in that tree, and null for no node.
+	ReturnsRef string `yaml:"returns_ref,omitempty" json:"returns_ref,omitempty"`
+}
+
+// Input returns the parameter or hidden input with the given name.
+func (f *Function) Input(name string) (Param, bool) {
+	for _, prm := range f.Params {
+		if prm.Name == name {
+			return prm, true
+		}
+	}
+	for _, h := range f.Hidden {
+		if h.Name == name {
+			return h, true
+		}
+	}
+	return Param{}, false
+}
+
+// IsHidden reports whether name is a hidden input.
+func (f *Function) IsHidden(name string) bool {
+	for _, h := range f.Hidden {
+		if h.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // Method is a method of a class-kind problem.
@@ -167,6 +233,7 @@ func (p *Problem) Normalize() {
 	}
 	if f := p.Function; f != nil {
 		norm(f.Params)
+		norm(f.Hidden)
 		f.Returns = NormalizeType(f.Returns)
 		if f.Returns == "" {
 			f.Returns = TypeVoid
@@ -216,8 +283,7 @@ func (p *Problem) Validate() error {
 	default:
 		errs = append(errs, fmt.Errorf("difficulty %q must be easy, medium or hard", p.Difficulty))
 	}
-	checkParams := func(where string, ps []Param) {
-		seen := map[string]bool{}
+	checkParams := func(where string, ps []Param, seen map[string]bool) {
 		for _, prm := range ps {
 			if prm.Name == "" {
 				errs = append(errs, fmt.Errorf("%s: parameter without name", where))
@@ -231,6 +297,13 @@ func (p *Problem) Validate() error {
 			}
 		}
 	}
+	noStructures := func(where string, ps []Param) {
+		for _, prm := range ps {
+			if prm.structural() {
+				errs = append(errs, fmt.Errorf("%s: parameter %q: cycle, join, ref and copy are for function problems only", where, prm.Name))
+			}
+		}
+	}
 	switch p.Kind {
 	case KindFunction:
 		f := p.Function
@@ -241,17 +314,18 @@ func (p *Problem) Validate() error {
 		if f.Name == "" {
 			errs = append(errs, errors.New("function.name is required"))
 		}
-		checkParams("function", f.Params)
+		seen := map[string]bool{}
+		checkParams("function", f.Params, seen)
+		checkParams("function.hidden", f.Hidden, seen)
 		if err := ValidateType(f.Returns, true); err != nil {
 			errs = append(errs, fmt.Errorf("function.returns: %w", err))
 		}
+		errs = append(errs, p.validateStructures()...)
 		if p.Judge.Output != "" {
-			found := false
-			for _, prm := range f.Params {
-				found = found || prm.Name == p.Judge.Output
-			}
-			if !found {
-				errs = append(errs, fmt.Errorf("judge.output %q is not a parameter", p.Judge.Output))
+			if prm, ok := f.Input(p.Judge.Output); !ok {
+				errs = append(errs, fmt.Errorf("judge.output %q is not a parameter or hidden input", p.Judge.Output))
+			} else if prm.Cycle != "" {
+				errs = append(errs, fmt.Errorf("judge.output %q may have a cycle and cannot be judged", p.Judge.Output))
 			}
 		} else if f.Returns == TypeVoid {
 			errs = append(errs, errors.New("void functions need judge.output to name the modified parameter"))
@@ -280,12 +354,14 @@ func (p *Problem) Validate() error {
 		if c.Name == "" {
 			errs = append(errs, errors.New("class.name is required"))
 		}
-		checkParams("class constructor", c.Constructor)
+		checkParams("class constructor", c.Constructor, map[string]bool{})
+		noStructures("class constructor", c.Constructor)
 		if len(c.Methods) == 0 {
 			errs = append(errs, errors.New("class.methods must not be empty"))
 		}
 		for _, m := range c.Methods {
-			checkParams("method "+m.Name, m.Params)
+			checkParams("method "+m.Name, m.Params, map[string]bool{})
+			noStructures("method "+m.Name, m.Params)
 			if err := ValidateType(m.Returns, true); err != nil {
 				errs = append(errs, fmt.Errorf("method %s returns: %w", m.Name, err))
 			}
@@ -313,18 +389,18 @@ func (p *Problem) Validate() error {
 }
 
 // judgedType is the type of the value a function problem is judged on: the
-// return type, or the judge.output parameter's type for in-place problems.
+// return type, or the judge.output input's type for in-place problems. A
+// returned node reference is judged as an integer (see Function.ReturnsRef).
 func (p *Problem) judgedType() string {
 	if p.Function == nil {
 		return ""
 	}
 	if p.Judge.Output != "" {
-		for _, prm := range p.Function.Params {
-			if prm.Name == p.Judge.Output {
-				return prm.Type
-			}
-		}
-		return ""
+		prm, _ := p.Function.Input(p.Judge.Output)
+		return prm.Type
+	}
+	if p.Function.ReturnsRef != "" {
+		return TypeInteger
 	}
 	return p.Function.Returns
 }

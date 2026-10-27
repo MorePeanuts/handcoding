@@ -1,0 +1,18 @@
+id: "141"
+slug: linked-list-cycle
+title: Linked List Cycle
+difficulty: easy
+tags: [hash-table, linked-list, two-pointers]
+kind: function
+function:
+  name: hasCycle
+  params:
+    - {name: head, type: ListNode, cycle: pos}
+  hidden:
+    - {name: pos, type: integer}
+  returns: boolean
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/linked-list-cycle/

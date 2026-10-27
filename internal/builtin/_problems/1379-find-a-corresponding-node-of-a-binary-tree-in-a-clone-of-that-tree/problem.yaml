@@ -1,0 +1,19 @@
+id: "1379"
+slug: find-a-corresponding-node-of-a-binary-tree-in-a-clone-of-that-tree
+title: Find a Corresponding Node of a Binary Tree in a Clone of That Tree
+difficulty: easy
+tags: [tree, depth-first-search, breadth-first-search, binary-tree]
+kind: function
+function:
+  name: getTargetCopy
+  params:
+    - {name: original, type: TreeNode}
+    - {name: cloned, type: TreeNode, copy: original}
+    - {name: target, type: TreeNode, ref: original}
+  returns: TreeNode
+  returns_ref: cloned
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/find-a-corresponding-node-of-a-binary-tree-in-a-clone-of-that-tree/

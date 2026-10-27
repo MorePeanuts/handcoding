@@ -137,11 +137,11 @@ problems/0001-two-sum/          目录名：id 是数字时为 <4 位编号>-<sl
 | `difficulty` | `easy`、`medium` 或 `hard` |
 | `tags` | 标签列表 |
 | `kind` | `function`（单个函数）或 `class`（设计题）。缺省时，有 `class` 段则为 `class`，否则为 `function` |
-| `function` | 函数题的签名：`name`、`params`（`{name, type}` 列表）、`returns`（缺省为 `void`） |
+| `function` | 函数题的签名：`name`、`params`（`{name, type}` 列表，每项最多带 `cycle`、`join`、`ref`、`copy` 之一）、`hidden`（不传给解答的输入）、`returns`（缺省为 `void`）、`returns_ref`。见[结构输入](#结构输入) |
 | `class` | 设计题的签名：`name`、`constructor`（`{name, type}` 列表）、`methods`（`{name, params, returns}` 列表） |
 | `judge.compare` | 输出的比较方式（见下文）。没有默认值：不写就表示题目*未就绪*（见下文） |
 | `judge.tolerance` | 浮点误差。返回 `double` 时默认为 `1e-5`；绝对误差或相对误差满足其一即可 |
-| `judge.output` | 原地修改类题目：调用结束后比较这个参数的值，而不是返回值 |
+| `judge.output` | 原地修改类题目：调用结束后比较这个参数（或隐藏输入）的值，而不是返回值 |
 | `judge.output_length` | `return`：只判 `judge.output` 的前 k 个元素，k 是函数返回的整数。用于 LeetCode 的"删除重复项"这类题 |
 | `judge.time_limit` | 整次运行的时限，写成 `5s`、`500ms` 这样的时长。默认取 hc.yaml 中的 `timeout` |
 | `source` | 题目来源：`site`、`url` |
@@ -211,6 +211,115 @@ judge:
 
 `list<T>` 会规范化为 `T[]`；`int`、`bool`、`char`、`float` 会规范化为 `integer`、`boolean`、`character`、`double`。`Node`（图、N 叉树、带随机指针的链表）和 `NestedInteger` 等特殊类型暂不支持。
 
+### 结构输入
+
+有些题目传给解答的链式结构无法用普通 JSON 值描述：尾部连回自身的链表、共享尾部的两个链表、树中的某个节点。函数题用下面这些属性描述它们，和 LeetCode 评测系统处理自己的测试数据的方式一致：
+
+| 属性 | 位置 | 含义 |
+|---|---|---|
+| `hidden` | `function` | 额外的用例输入（`{name, type}`），驱动程序会用到，但不传给解答 |
+| `cycle: <输入>` | `ListNode` 参数 | 链表尾部连到下标为 `<输入>` 的节点（`<输入>` 是整数隐藏输入，从 0 开始）；`-1` 表示无环 |
+| `join: {list, skip, at}` | `ListNode` 参数 | 链表保留自己的前 `skip` 个节点，然后接上参数 `list` 从下标 `at` 开始的节点（共享节点，不是副本） |
+| `ref: <输入>` | `ListNode` / `TreeNode` 参数 | 用例给出节点的**值**；解答拿到结构 `<输入>` 中持有该值的节点 |
+| `copy: <参数>` | `ListNode` / `TreeNode` 参数 | 不出现在用例中；解答拿到 `<参数>` 的深拷贝 |
+| `returns_ref: <输入>` | `function` | 函数返回结构 `<输入>` 中的一个节点（或空），按节点本身判题 |
+
+一个参数最多带 `cycle`、`join`、`ref`、`copy` 中的一个。初始代码只列出参数，类型是节点类型（`head *ListNode`、`p: TreeNode | None`）。
+
+**`cycle`**，环形链表 II。用例给出 `head` 和 `pos`，解答只拿到 `head`：
+
+```yaml
+function:
+  name: detectCycle
+  params:
+    - {name: head, type: ListNode, cycle: pos}
+  hidden:
+    - {name: pos, type: integer}
+  returns: ListNode
+  returns_ref: head
+```
+
+```json
+{"input": {"head": [3,2,0,-4], "pos": 1}, "expected": 1}
+```
+
+**`join`**，相交链表。`headA` 和 `headB` 是完整的链表，包括共享的尾部；`skipA` 和 `skipB` 是共享部分之前的节点数。`skipA` 等于 `headA` 的长度时两个链表不相交，此时 `skipB` 等于 `headB` 的长度：
+
+```yaml
+function:
+  name: getIntersectionNode
+  params:
+    - {name: headA, type: ListNode}
+    - {name: headB, type: ListNode, join: {list: headA, skip: skipB, at: skipA}}
+  hidden:
+    - {name: skipA, type: integer}
+    - {name: skipB, type: integer}
+  returns: ListNode
+  returns_ref: headA
+```
+
+```json
+{"input": {"headA": [4,1,8,4,5], "headB": [5,6,1,8,4,5], "skipA": 2, "skipB": 3}, "expected": 2}
+{"input": {"headA": [2,6,4], "headB": [1,5], "skipA": 3, "skipB": 2}, "expected": null}
+```
+
+**`ref`**，二叉树的最近公共祖先。`p` 和 `q` 在用例中是值，在解答中是 `root` 的节点。被引用的值在结构中必须恰好出现一次：
+
+```yaml
+function:
+  name: lowestCommonAncestor
+  params:
+    - {name: root, type: TreeNode}
+    - {name: p, type: TreeNode, ref: root}
+    - {name: q, type: TreeNode, ref: root}
+  returns: TreeNode
+  returns_ref: root
+```
+
+```json
+{"input": {"root": [3,5,1,6,2,0,8,null,null,7,4], "p": 5, "q": 1}, "expected": 3}
+```
+
+`ref` 可以指向隐藏输入，`judge.output` 也可以是隐藏输入。删除链表中的节点只把 `node` 传给解答，判的是整个链表：
+
+```yaml
+function:
+  name: deleteNode
+  params:
+    - {name: node, type: ListNode, ref: head}
+  hidden:
+    - {name: head, type: ListNode}
+  returns: void
+judge:
+  compare: exact
+  output: head
+```
+
+```json
+{"input": {"node": 5, "head": [4,5,1,9]}, "expected": [4,1,9]}
+```
+
+**`copy`**，找出克隆二叉树中的相同节点。`cloned` 不出现在用例中：
+
+```yaml
+function:
+  name: getTargetCopy
+  params:
+    - {name: original, type: TreeNode}
+    - {name: cloned, type: TreeNode, copy: original}
+    - {name: target, type: TreeNode, ref: original}
+  returns: TreeNode
+  returns_ref: cloned
+```
+
+```json
+{"input": {"original": [7,4,3,null,null,6,19], "target": 3}, "expected": 3}
+```
+
+**`returns_ref`** 对返回的节点编码，使判题看的是节点本身，而不是它后面的值：`ListNode` 结构中编码为从 0 开始的**下标**（链表的值可能重复），`TreeNode` 结构中编码为节点的**值**（引用树节点的题目保证值互不相同），没有节点时为 `null`。返回不属于该结构的节点是运行错误。`expected` 使用同样的编码。
+
+规则：`cycle`、`skip`、`at` 指向整数隐藏输入；`join.list` 指向另一个普通的 `ListNode` 参数；`ref` 和 `returns_ref` 指向同一节点类型、持有整个结构（不是 `ref`）的参数或隐藏输入；`copy` 指向同类型的普通参数；每个隐藏输入都必须被用到；`judge.output` 不能是带环的链表。设计题不支持这些属性。
+
 ### cases.jsonl
 
 每行一个用例：
@@ -220,7 +329,7 @@ judge:
 {"input": {"nums": [-1,-2,-3,-4,-5], "target": -8}, "expected": [2,4], "note": "negative numbers"}
 ```
 
-- `input`：函数题是一个对象，每个参数恰好对应一个值，键为参数名。设计题是 `{"ops": [...], "args": [[...], ...]}`；`ops[0]` 必须是类名（即构造函数），`args` 的每一项恰好是对应操作的参数。
+- `input`：函数题是一个对象，每个参数和隐藏输入恰好对应一个值，键为名字。`ref` 参数给出被引用节点的值；`copy` 参数不写。设计题是 `{"ops": [...], "args": [[...], ...]}`；`ops[0]` 必须是类名（即构造函数），`args` 的每一项恰好是对应操作的参数。
 - `expected`：期望输出。设计题是每个操作返回值组成的数组，构造函数和 `void` 方法写 `null`。`any_of` 模式下是可接受答案组成的数组，需要手写：参考解只能给出一个答案，所以 `hc cases build` 拒绝填写。其他模式下缺省时由 `hc cases build` 用参考解计算。
 - `example`：该用例是题面中的示例。`hc test` 默认只运行这些用例（一个都没标时运行前 3 个）。
 - `note`：用例说明。
@@ -262,8 +371,8 @@ hc validate <slug> --run    # 同时在每个用例上运行每一份参考解�
 
 `hc validate` 会报告以下错误，并指出用例编号和字段：
 
-- `problem.yaml`：语法错误（带行号和列号）、不认识的字段、不合法的 slug、缺少标题、不支持的类型、`judge.output` 不是参数、`void` 函数没写 `judge.output`、`judge.output_length` 用法不对、不认识的 `judge.compare`、不合法的 `judge.time_limit`；
-- `cases.jsonl`：JSON 不合法、不认识的字段、缺少或多出的输入、值与声明的类型不符（`input "nums": [1]: must be integer, got string "x"`）、设计题中参数个数不对或方法不存在、`expected` 的形状不对；
+- `problem.yaml`：语法错误（带行号和列号）、不认识的字段、不合法的 slug、缺少标题、不支持的类型、`judge.output` 不是参数或隐藏输入、`void` 函数没写 `judge.output`、结构输入用法不对（`hidden`、`cycle`、`join`、`ref`、`copy`、`returns_ref`）、`judge.output_length` 用法不对、不认识的 `judge.compare`、不合法的 `judge.time_limit`；
+- `cases.jsonl`：JSON 不合法、不认识的字段、缺少或多出的输入、值与声明的类型不符（`input "nums": [1]: must be integer, got string "x"`）、结构输入对不上（环的位置超出链表、相交链表的尾部不同、被引用的值不存在或重复）、设计题中参数个数不对或方法不存在、`expected` 的形状不对；
 - 加上 `--run` 时：参考解无法编译、运行出错，或与 `expected` 不一致（会同时显示两个值）。
 
 以下情况会给出警告：判题规则未确定（没有 `judge.compare`）、有用例缺少 `expected`、没有标记示例用例、没有参考解、题面引用的图片不存在、编号与其他题目重复。
@@ -290,7 +399,7 @@ type Language interface {
 }
 ```
 
-驱动只负责**解码输入、调用用户代码、编码输出**，从不判题。所有判题都在 Go 中完成（`internal/judge`），所以新语言不需要重新实现比较逻辑。
+驱动只负责**解码输入、调用用户代码、编码输出**，从不判题。所有判题都在 Go 中完成（`internal/judge`），所以新语言不需要重新实现比较逻辑。解码包括构建[结构输入](#结构输入)，编码包括 `returns_ref`；与结构对不上的输入报告为以 `invalid input:` 开头的错误。
 
 - `HC_CASES` 指向一个 JSON 文件，内容为 `[{"id": 1, "input": {...}}, ...]`。
 - `HC_OUT` 指向一个文件，驱动以 JSON Lines 格式向其追加结果，每个用例一行：

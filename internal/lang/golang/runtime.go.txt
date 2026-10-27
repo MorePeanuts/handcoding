@@ -88,7 +88,7 @@ func hcRun(c hcCase) (res hcResult) {
 				res.Error = "invalid input: " + ie.msg
 				return
 			}
-			res.Error = fmt.Sprintf("panic: %v\n%s", r, hcStack())
+			res.Error = strings.TrimRight(fmt.Sprintf("panic: %v\n%s", r, hcStack()), "\n")
 		}
 	}()
 	hcElapsed = 0
@@ -347,6 +347,132 @@ func hcEncTree1(roots []*TreeNode) any {
 		out[i] = hcEncTree0(r)
 	}
 	return out
+}
+
+// Structure inputs (cycle, join, ref, copy, returns_ref in problem.yaml).
+// A structure is handled through its nodes: a list's in order, a tree's in
+// level order.
+
+func hcListNodes(head *ListNode) []*ListNode {
+	var out []*ListNode
+	for n := head; n != nil; n = n.Next {
+		out = append(out, n)
+	}
+	return out
+}
+
+func hcTreeNodes(root *TreeNode) []*TreeNode {
+	var out []*TreeNode
+	if root != nil {
+		out = append(out, root)
+	}
+	for i := 0; i < len(out); i++ {
+		for _, c := range []*TreeNode{out[i].Left, out[i].Right} {
+			if c != nil {
+				out = append(out, c)
+			}
+		}
+	}
+	return out
+}
+
+func hcHead(nodes []*ListNode) *ListNode {
+	if len(nodes) == 0 {
+		return nil
+	}
+	return nodes[0]
+}
+
+// hcCycle links the tail to nodes[pos]; pos -1 means no cycle.
+func hcCycle(nodes []*ListNode, pos int, name, posName string) {
+	if pos < -1 || pos >= len(nodes) {
+		panic(hcInputError{fmt.Sprintf("%s = %d is outside [-1, %d] for %s", posName, pos, len(nodes)-1, name)})
+	}
+	if pos >= 0 {
+		nodes[len(nodes)-1].Next = nodes[pos]
+	}
+}
+
+// hcJoin keeps the first skip nodes of b and continues with a's nodes from
+// index at, returning the nodes of the joined list.
+func hcJoin(b, a []*ListNode, skip, at int, bName, aName, skipName, atName string) []*ListNode {
+	if skip < 0 || skip > len(b) || at < 0 || at > len(a) || len(b)-skip != len(a)-at {
+		panic(hcInputError{fmt.Sprintf("%s = %d and %s = %d do not fit %s (%d nodes) and %s (%d nodes)", skipName, skip, atName, at, bName, len(b), aName, len(a))})
+	}
+	if skip > 0 {
+		b[skip-1].Next = hcHead(a[at:])
+	}
+	return append(b[:skip:skip], a[at:]...)
+}
+
+func hcCopyList(head *ListNode) *ListNode {
+	dummy := &ListNode{}
+	for n, c := head, dummy; n != nil; n, c = n.Next, c.Next {
+		c.Next = &ListNode{Val: n.Val}
+	}
+	return dummy.Next
+}
+
+func hcCopyTree(root *TreeNode) *TreeNode {
+	if root == nil {
+		return nil
+	}
+	return &TreeNode{Val: root.Val, Left: hcCopyTree(root.Left), Right: hcCopyTree(root.Right)}
+}
+
+func hcVal(n any) int {
+	switch n := n.(type) {
+	case *ListNode:
+		return n.Val
+	case *TreeNode:
+		return n.Val
+	}
+	panic("hc driver: not a node")
+}
+
+// hcFind returns the node of a structure holding val, which must be unique.
+func hcFind[N comparable](nodes []N, val int, name, in string) N {
+	var found N
+	count := 0
+	for _, n := range nodes {
+		if hcVal(n) == val {
+			found = n
+			count++
+		}
+	}
+	switch {
+	case count == 0:
+		panic(hcInputError{fmt.Sprintf("%s = %d is not a value in %s", name, val, in)})
+	case count > 1:
+		panic(hcInputError{fmt.Sprintf("%s = %d occurs %d times in %s", name, val, count, in)})
+	}
+	return found
+}
+
+// hcIndex finds a returned node in its structure.
+func hcIndex[N comparable](nodes []N, n N, in string) int {
+	for i, x := range nodes {
+		if x == n {
+			return i
+		}
+	}
+	panic(fmt.Sprintf("the returned node (Val %d) is not a node of %s", hcVal(n), in))
+}
+
+// hcListRef encodes a returned list node as its index in the list.
+func hcListRef(nodes []*ListNode, n *ListNode, in string) any {
+	if n == nil {
+		return nil
+	}
+	return hcIndex(nodes, n, in)
+}
+
+// hcTreeRef encodes a returned tree node as its value.
+func hcTreeRef(nodes []*TreeNode, n *TreeNode, in string) any {
+	if n == nil {
+		return nil
+	}
+	return nodes[hcIndex(nodes, n, in)].Val
 }
 
 // ---- generated per problem ----

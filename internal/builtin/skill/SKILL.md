@@ -60,6 +60,54 @@ class:
     - {name: put, params: [{name: key, type: integer}, {name: value, type: integer}], returns: void}
 ```
 
+### Structure inputs (function problems only)
+
+When the statement says the judge builds a structure from inputs the
+solution does not receive ("`pos` is not passed as a parameter", "the judge
+creates the linked structure from `skipA`/`skipB`", "`p` and `q` are nodes of
+the tree", "you are given the node to delete, not the head"), describe it
+instead of passing the raw value:
+
+```yaml
+function:
+  name: getIntersectionNode
+  params:
+    - {name: headA, type: ListNode}
+    - {name: headB, type: ListNode, join: {list: headA, skip: skipB, at: skipA}}
+  hidden:                     # case inputs never passed to the solution
+    - {name: skipA, type: integer}
+    - {name: skipB, type: integer}
+  returns: ListNode
+  returns_ref: headA          # the returned node belongs to headA
+```
+
+- `hidden`: extra inputs (`{name, type}`); every one must be used by one of
+  the attributes below or by `judge.output`.
+- `cycle: pos` (ListNode param): the tail links to the node at index `pos`, an
+  integer hidden input; `-1` = no cycle (141, 142). Case: `{"head": [3,2,0,-4], "pos": 1}`.
+- `join: {list: A, skip: s, at: a}` (ListNode param B): B keeps its first `s`
+  nodes, then continues with A's nodes from index `a` (160). In cases, A and B
+  are the full lists including the shared tail, so `B[s:] == A[a:]`; no
+  intersection: `a == len(A)` and `s == len(B)`.
+- `ref: X` (ListNode/TreeNode param): the case gives a node **value** (an
+  integer), the solution gets the node of structure X holding it (235/236
+  `p`, `q` with `ref: root`; 237 `node` with `ref: head` where `head` is a
+  hidden ListNode and `judge.output: head`). The value must occur exactly once in X.
+- `copy: X` (ListNode/TreeNode param): not in cases; the solution gets a deep
+  copy of param X (1379 `cloned`).
+- `returns_ref: X` when the function returns a node of structure X. Expected
+  is the node's 0-based **index** in a ListNode X, its **value** in a TreeNode
+  X, and `null` for no node (142: `"expected": 1`; 236: `"expected": 3`).
+  Returning a node outside X is a runtime error.
+
+`params` must match LeetCode's template (the solution's real signature);
+hidden inputs never reach the solution. Keep the input names the statement
+uses (`pos`, `skipA`, `skipB`), and drop inputs the driver does not need
+(160's `intersectVal`). A fetched problem may declare such inputs as plain
+parameters (236: `p` and `q` as `integer`, while `templates/solution.go`
+takes `*TreeNode`); fix `problem.yaml` to the template's signature with
+these attributes. Design problems cannot use them.
+
 Types: `integer long double boolean string character ListNode TreeNode void`,
 arrays with `[]` suffix (up to 3 levels, node arrays 1 level).
 Quote array types inside `{...}` / `[...]` (`type: "integer[]"`): unquoted,
@@ -69,7 +117,9 @@ Quote array types inside `{...}` / `[...]` (`type: "integer[]"`): unquoted,
 
 One object per line: `{"input": {...}, "expected": <json>, "example": true, "note": "..."}`.
 
-- Function problems: `input` maps every parameter name to its value.
+- Function problems: `input` maps every parameter and hidden input name to
+  its value (a `ref` parameter takes the node's value; leave out `copy`
+  parameters).
 - Class problems: `input` is `{"ops": ["LRUCache","put","get"], "args": [[2],[1,1],[1]]}`
   and `expected` is `[null,null,1]` (null for the constructor and void methods).
 - ListNode is an array `[1,2,3]`; TreeNode is LeetCode level order `[3,9,20,null,null,15,7]`;
