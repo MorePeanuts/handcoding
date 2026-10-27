@@ -1,0 +1,16 @@
+id: "5"
+slug: longest-palindromic-substring
+title: Longest Palindromic Substring
+difficulty: medium
+tags: [two-pointers, string, dynamic-programming]
+kind: function
+function:
+  name: longestPalindrome
+  params:
+    - {name: s, type: string}
+  returns: string
+judge:
+  compare: checker
+source:
+  site: builtin
+  url: https://leetcode.com/problems/longest-palindromic-substring/
