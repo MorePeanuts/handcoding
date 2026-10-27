@@ -1,0 +1,17 @@
+id: "143"
+slug: reorder-list
+title: Reorder List
+difficulty: medium
+tags: [stack, recursion, linked-list, two-pointers]
+kind: function
+function:
+  name: reorderList
+  params:
+    - {name: head, type: ListNode}
+  returns: void
+judge:
+  compare: exact
+  output: head
+source:
+  site: builtin
+  url: https://leetcode.com/problems/reorder-list/

@@ -1,0 +1,19 @@
+id: "27"
+slug: remove-element
+title: Remove Element
+difficulty: easy
+tags: [array, two-pointers]
+kind: function
+function:
+  name: removeElement
+  params:
+    - {name: nums, type: "integer[]"}
+    - {name: val, type: integer}
+  returns: integer
+judge:
+  compare: unordered
+  output: nums
+  output_length: return
+source:
+  site: builtin
+  url: https://leetcode.com/problems/remove-element/

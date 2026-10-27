@@ -221,7 +221,7 @@ One case per line:
 ```
 
 - `input`: for function problems, an object with exactly one value per parameter, keyed by name. For design problems, `{"ops": [...], "args": [[...], ...]}`; `ops[0]` must be the class name (the constructor), and each `args` entry holds exactly the arguments of its op.
-- `expected`: the expected output. For design problems, an array with each operation's return value, using `null` for the constructor and `void` methods. For `any_of`, an array of acceptable answers. If missing, `hc cases build` computes it with the reference solution.
+- `expected`: the expected output. For design problems, an array with each operation's return value, using `null` for the constructor and `void` methods. For `any_of`, an array of acceptable answers, written by hand: a reference solution finds only one answer, so `hc cases build` refuses to fill it. Otherwise, if missing, `hc cases build` computes it with the reference solution.
 - `example`: the case is an example from the statement. `hc test` runs only these by default (the first 3 cases if none is marked).
 - `note`: a description of the case.
 - No other fields are allowed. Blank lines and lines starting with `//` are ignored. Cases are numbered from 1, counting only the lines that hold a case.

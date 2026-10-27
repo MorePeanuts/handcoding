@@ -1,0 +1,16 @@
+id: "162"
+slug: find-peak-element
+title: Find Peak Element
+difficulty: medium
+tags: [array, binary-search]
+kind: function
+function:
+  name: findPeakElement
+  params:
+    - {name: nums, type: "integer[]"}
+  returns: integer
+judge:
+  compare: any_of
+source:
+  site: builtin
+  url: https://leetcode.com/problems/find-peak-element/

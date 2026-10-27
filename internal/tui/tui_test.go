@@ -112,7 +112,7 @@ func TestListRendersAndNavigates(t *testing.T) {
 
 func TestListSearchAndFilter(t *testing.T) {
 	h := newHarness(t)
-	h.press("/", "t", "r", "e", "e", "enter")
+	h.press("/", "m", "a", "x", "i", "enter")
 	if len(h.m.visible) != 1 || h.m.selected().Slug != "maximum-depth-of-binary-tree" {
 		t.Fatalf("search: %d visible", len(h.m.visible))
 	}

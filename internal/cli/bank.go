@@ -390,7 +390,9 @@ func newCasesBuildCmd(root *rootOptions) *cobra.Command {
 		Short: "Compute expected outputs by running the reference solution",
 		Long: `Run the reference solution (problems/<dir>/reference/solution.{py,go}) on
 every case without an expected output and store the results. With --force,
-recompute all expected outputs and report which ones changed.`,
+recompute all expected outputs and report which ones changed. Problems judged
+with any_of are refused: their expected outputs list every acceptable answer,
+so write them by hand.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {

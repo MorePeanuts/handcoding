@@ -1,0 +1,17 @@
+id: "114"
+slug: flatten-binary-tree-to-linked-list
+title: Flatten Binary Tree to Linked List
+difficulty: medium
+tags: [stack, tree, depth-first-search, linked-list, binary-tree]
+kind: function
+function:
+  name: flatten
+  params:
+    - {name: root, type: TreeNode}
+  returns: void
+judge:
+  compare: exact
+  output: root
+source:
+  site: builtin
+  url: https://leetcode.com/problems/flatten-binary-tree-to-linked-list/

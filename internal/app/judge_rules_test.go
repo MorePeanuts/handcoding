@@ -119,3 +119,24 @@ func TestNotReady(t *testing.T) {
 		t.Fatalf("submit error = %v", err)
 	}
 }
+
+// TestBuildCasesAnyOf checks that hc cases build refuses to fill an any_of
+// expected output: the reference finds one answer, not all of them.
+func TestBuildCasesAnyOf(t *testing.T) {
+	a := newWorkspace(t)
+	p, err := a.WS.Problem("find-peak-element")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(filepath.Join(p.Dir, problem.CasesFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.BuildCases(context.Background(), p, "", true); err == nil || !strings.Contains(err.Error(), "any_of") {
+		t.Fatalf("build --force: error = %v", err)
+	}
+	after, _ := os.ReadFile(filepath.Join(p.Dir, problem.CasesFile))
+	if string(after) != string(before) {
+		t.Fatal("cases.jsonl changed")
+	}
+}
