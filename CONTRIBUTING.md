@@ -46,7 +46,7 @@ internal/builtin    embedded sample problems and agent skill
 
 ## Branches
 
-`main` is always releasable; releases are tags on `main`. Work happens on short-lived branches that are merged through a pull request and then deleted.
+`main` is always releasable; releases are tags on `main`, except patch releases from a maintenance branch (see [Versions and releases](#versions-and-releases)). Work happens on short-lived branches that are merged through a pull request and then deleted.
 
 | Change | Where |
 |---|---|
@@ -65,3 +65,32 @@ Name branches `<type>/<issue>-<summary>`, with the same types as commit messages
 - PRs are **squash merged** by default: the PR title becomes the commit on `main`, and the individual commits stay visible on the PR. If a change contains parts that should be separate commits (say, a refactor and a feature built on it), prefer splitting it into separate PRs. Rebase merge is the exception, for a series of commits that must land together and are each clean and conventionally titled. Merge commits are disabled.
 - If you change the CLI or the problem protocol, update `docs/protocol.md` (and its Chinese mirror `docs/protocol_zh.md`) and the agent skill in `internal/builtin/skill/SKILL.md`. Agents follow the skill literally. `README.md` and `docs/how-to-use.md` have Chinese mirrors too.
 - Until 1.0 there is no backward compatibility to preserve. Prefer the cleanest design over migrations or compatibility shims.
+
+## Versions and releases
+
+Versions are [SemVer](https://semver.org/) tags with a `v` prefix. Pushing a tag runs the release workflow.
+
+| Change | Version |
+|---|---|
+| Fixes and small changes to the released line | Patch: `v0.1.1`, `v0.1.2` … |
+| Features for the next milestone, while it is in progress | Pre-release: `v0.2.0-alpha.1`, `v0.2.0-alpha.2` … |
+| The milestone is done | `v0.2.0` |
+
+Patch releases contain only fixes, never new features or problem protocol changes. Features accumulate on `main` and ship as pre-releases when there is something worth trying. There are no `-rc` releases.
+
+### Maintenance branches
+
+As long as `main` holds nothing unreleased beyond fixes, a patch release is tagged on `main` and there is no maintenance branch. Once `main` has features for the next milestone and a fix has to ship before them, create a maintenance branch named after the line, from its release tag:
+
+```sh
+git switch -c v0.1.x v0.1.0
+git push -u origin v0.1.x
+```
+
+- A fix lands on `main` first, through the usual PR. Then cherry-pick it (`git cherry-pick -x`) onto a branch from `v0.1.x` and open a PR against `v0.1.x`. CI runs there too: the same change on older code can break in ways `main`'s CI never saw.
+- A fix for code that no longer exists on `main` goes to `v0.1.x` directly, through a PR.
+- Tag the patch release (`v0.1.1`) on `v0.1.x` once its CI is green.
+- Never merge a maintenance branch into `main`, and never delete it.
+- Only the latest line is maintained. Once `v0.2.0` ships, `v0.1.x` gets no more releases.
+
+CI runs on every pull request and on every push to `main` and to `v*.x` branches.
