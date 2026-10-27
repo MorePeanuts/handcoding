@@ -1,0 +1,17 @@
+id: "690"
+slug: employee-importance
+title: Employee Importance
+difficulty: medium
+tags: [tree, depth-first-search, breadth-first-search, array, hash-table]
+kind: function
+function:
+  name: getImportance
+  params:
+    - {name: employees, type: "Employee[]"}
+    - {name: id, type: integer}
+  returns: integer
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/employee-importance/

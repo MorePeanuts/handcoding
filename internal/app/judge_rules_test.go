@@ -266,11 +266,11 @@ func TestStructureInputs(t *testing.T) {
 	}
 }
 
-// TestNodeVariants checks how both drivers encode LeetCode's Node variants
-// for wrong solutions: a clone that keeps original nodes (returns_copy), a
-// broken prev pointer, next pointers that miss nodes, and inputs that do not
-// fit their form.
-func TestNodeVariants(t *testing.T) {
+// TestJudgeDefinedTypes checks how both drivers encode the judge-defined
+// types for wrong solutions: a clone that keeps original nodes
+// (returns_copy), a broken prev pointer, next pointers that miss nodes, a
+// NestedInteger of the wrong shape, and inputs that do not fit their form.
+func TestJudgeDefinedTypes(t *testing.T) {
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	const square = `{"node":[[2,4],[1,3],[2,4],[1,3]]}`
@@ -316,6 +316,21 @@ func TestNodeVariants(t *testing.T) {
 			`{"root":[1,2,3,4,5,null,7]}`, `[[1],[2,3],[4,5,7]]`, runner.WrongAnswer, ""},
 		{"populating-next-right-pointers-in-each-node-ii", "python", "class Solution:\n    def connect(self, root):\n        root.left.next = root.right.left\n        return root\n",
 			`{"root":[1,2,3,4]}`, `[[1],[2,3],[4]]`, runner.WrongAnswer, ""},
+		// An empty list is not the integer 324.
+		{"mini-parser", "go", "package main\n\nfunc deserialize(s string) *NestedInteger { return &NestedInteger{} }\n",
+			`{"s":"324"}`, `324`, runner.WrongAnswer, ""},
+		{"mini-parser", "python",
+			"from hc_runtime import NestedInteger\n\n\nclass Solution:\n    def deserialize(self, s):\n        n = NestedInteger(1)\n        n.add(NestedInteger())\n        return n\n",
+			`{"s":"[[]]"}`, `[[]]`, runner.Accepted, ""},
+		{"employee-importance", "python",
+			"class Solution:\n    def getImportance(self, employees, id):\n        e = next(e for e in employees if e.id == id)\n        return e.importance + sum(x.importance for x in employees if x.id in e.subordinates)\n",
+			`{"employees":[[1,5,[2]],[2,3,[3]],[3,1,[]]],"id":1}`, `9`, runner.WrongAnswer, ""},
+		{"employee-importance", "go", "package main\n\nfunc getImportance(employees []*Employee, id int) int { return 0 }\n",
+			`{"employees":[[1,5]],"id":1}`, `5`, runner.RuntimeError, "invalid input: an employee must be [id, importance, [subordinate ids]]"},
+		// Only the integers at the top level.
+		{"flatten-nested-list-iterator", "go",
+			"package main\n\ntype NestedIterator struct{ l []*NestedInteger }\n\nfunc Constructor(l []*NestedInteger) NestedIterator { return NestedIterator{l} }\n\nfunc (it *NestedIterator) Next() int {\n\tv := it.l[0].GetInteger()\n\tit.l = it.l[1:]\n\treturn v\n}\n\nfunc (it *NestedIterator) HasNext() bool { return len(it.l) > 0 }\n",
+			`{"ops":["NestedIterator","hasNext","next","hasNext","next","hasNext"],"args":[[[1,[2]]],[],[],[],[],[]]}`, `[null,true,1,true,2,false]`, runner.WrongAnswer, ""},
 	}
 	for _, tt := range tests {
 		p, err := a.WS.Problem(tt.slug)

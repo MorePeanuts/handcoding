@@ -18,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 
@@ -43,6 +44,11 @@ func header(p *problem.Problem) string {
 	b.WriteString("from hc_runtime import ListNode, TreeNode  # noqa: F401\n")
 	if v := p.NodeVariant(); v != "" {
 		fmt.Fprintf(&b, "from hc_runtime import %s as Node  # noqa: F401\n", v)
+	}
+	for _, t := range []string{problem.TypeNestedInteger, problem.TypeEmployee} {
+		if slices.Contains(p.BaseTypes(), t) {
+			fmt.Fprintf(&b, "from hc_runtime import %s  # noqa: F401\n", t)
+		}
 	}
 	return b.String()
 }
@@ -175,6 +181,8 @@ func pyType(t string) string {
 	case problem.TypeGraphNode, problem.TypeNaryNode, problem.TypeRandomListNode,
 		problem.TypeNextTreeNode, problem.TypeQuadNode, problem.TypeMultilevelNode:
 		return "Node | None"
+	case problem.TypeNestedInteger, problem.TypeEmployee:
+		s = base
 	default:
 		s = "object"
 	}

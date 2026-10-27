@@ -207,10 +207,12 @@ judge:
 | `ListNode` | 数组 `[1,2,3]` | `*ListNode` | `ListNode \| None` |
 | `TreeNode` | 层序数组 `[3,9,20,null,null,15,7]` | `*TreeNode` | `TreeNode \| None` |
 | `GraphNode`、`NaryNode`、`RandomListNode`、`NextTreeNode`、`QuadNode`、`MultilevelNode` | 见 [LeetCode 的 Node 类型](#leetcode-的-node-类型) | `*Node` | `Node \| None` |
-| `T[]` | 数组，最多 3 层；节点数组只支持 1 层 | `[]T` | `list[T]` |
+| `NestedInteger` | 整数或（嵌套）数组，`[1,[4,[6]]]`；见[下文](#nestedinteger-和-employee) | `*NestedInteger` | `NestedInteger` |
+| `Employee` | `[id, importance, [下属 id]]` | `*Employee` | `Employee` |
+| `T[]` | 数组，最多 3 层；`ListNode`、`TreeNode`、`NestedInteger`、`Employee` 的数组只支持 1 层，`Node` 类型不能组成数组 | `[]T` | `list[T]` |
 | `void` | 只能作返回类型 | — | `None` |
 
-`list<T>` 会规范化为 `T[]`；`int`、`bool`、`char`、`float` 会规范化为 `integer`、`boolean`、`character`、`double`。`NestedInteger` 暂不支持。
+`list<T>` 会规范化为 `T[]`；`int`、`bool`、`char`、`float` 会规范化为 `integer`、`boolean`、`character`、`double`。
 
 ### LeetCode 的 Node 类型
 
@@ -228,6 +230,15 @@ LeetCode 把六种不同的结构都叫作 `Node`。hc 给每种结构各起一�
 - Go 中，题目用到哪种 `Node`，驱动程序就定义哪种，不要自己声明。Python 中从 `hc_runtime` 以 `Node` 这个名字导入，初始代码已经写好：`from hc_runtime import GraphNode as Node`。Python 构造函数的参数与 LeetCode 一致，且都可省略：`Node(val, neighbors)`、`Node(val, children)`、`Node(x, next, random)`、`Node(val, left, right, next)`、`Node(val, isLeaf, topLeft, topRight, bottomLeft, bottomRight)`、`Node(val, prev, next, child)`。
 - 解答可以自己创建节点（克隆题就需要）。返回的结构按同样的 JSON 形式输出，以下情况算运行错误：`GraphNode` 的结果不是一个值为 1 到 n 的图中的节点 1；随机指针指向返回链表之外的节点；`MultilevelNode` 的 `prev` 没有指向前一个节点（或者某层第一个节点的 `prev` 不为空），以及同一层有两个节点带子链表，这种结构无法序列化。
 - 非叶子的 `QuadNode` 取哪个值都可以，所以输出时一律写成 `[0,1]`。
+
+### NestedInteger 和 Employee
+
+另外两个类型也由评测系统而不是解答定义，沿用 LeetCode 的名字：
+
+- `NestedInteger` 存放一个整数，或一个由 `NestedInteger` 组成的列表。它的 JSON 形式是整数或由这类值组成的数组；`NestedInteger[]` 是它们组成的数组：`[[1,1],2,[1,1]]`（扁平化嵌套列表迭代器，341）。hc 实现了 LeetCode 的接口，所以解答也可以自己构造一个并返回（迷你语法分析器，385）。Go：`IsInteger() bool`、`GetInteger() int`、`SetInteger(int)`、`Add(NestedInteger)`、`GetList() []*NestedInteger`；零值是空列表。Python：`NestedInteger(value=None)`（不给值就是空列表）、`isInteger()`、`getInteger()`、`setInteger(value)`、`add(elem)`、`getList()`。
+- `Employee` 的字段是 `Id`、`Importance`、`Subordinates []int`（Python：`id`、`importance`、`subordinates`），写作 `[id, importance, [下属 id]]`。`Employee[]` 中的 id 必须互不相同，每个下属都必须在其中：`[[1,5,[2,3]],[2,3,[]],[3,3,[]]]`（员工的重要性，690）。
+
+Go 中，题目用到它们时驱动程序会定义。Python 中从 `hc_runtime` 导入：`from hc_runtime import NestedInteger`。
 
 #### `returns_copy`
 
@@ -381,7 +392,7 @@ function:
 | Python | `class Solution`，其中有名为 `function.name` 的方法；也可以是同名的模块级函数 | 名为 `class.name` 的类；`__init__` 接收构造函数参数；方法名与 `methods` 中一致 |
 | Go | `package main`；`func <function.name>(...)`，参数类型见上面的类型表 | `type <Name> struct`、`func Constructor(...) <Name>`，以及指针接收者的方法，方法名首字母大写（`getMin` → `GetMin`） |
 
-- `ListNode` 和 `TreeNode` 已经提供：Python 中用 `from hc_runtime import ListNode, TreeNode` 导入；Go 中已预先定义（字段为 `Val`、`Next`、`Left`、`Right`），不要自己再声明。题目用到的 [`Node`](#leetcode-的-node-类型) 也一样：Python 中写 `from hc_runtime import GraphNode as Node`，Go 中已预先定义。
+- `ListNode` 和 `TreeNode` 已经提供：Python 中用 `from hc_runtime import ListNode, TreeNode` 导入；Go 中已预先定义（字段为 `Val`、`Next`、`Left`、`Right`），不要自己再声明。题目用到的 [`Node`](#leetcode-的-node-类型)、`NestedInteger` 和 `Employee` 也一样：Python 中写 `from hc_runtime import GraphNode as Node` 或 `from hc_runtime import NestedInteger`，Go 中已预先定义。
 - 两份参考解都存在时，`hc cases build` 先用 Go，再用 Python；可以用 `-l python` 指定。`hc validate --run` 会运行每一份参考解。
 - `templates/solution.go` 和 `templates/solution.py` 会替换自动生成的初始代码。它们必须保持签名不变，因为驱动要按签名调用。
 
@@ -409,7 +420,7 @@ hc validate <slug> --run    # 同时在每个用例上运行每一份参考解�
 `hc validate` 会报告以下错误，并指出用例编号和字段：
 
 - `problem.yaml`：语法错误（带行号和列号）、不认识的字段、不合法的 slug、缺少标题、不支持的类型、`judge.output` 不是参数或隐藏输入、`void` 函数没写 `judge.output`、结构输入用法不对（`hidden`、`cycle`、`join`、`ref`、`copy`、`returns_ref`）、`returns_copy` 用法不对、用了多种 `Node` 类型、`judge.output_length` 用法不对、不认识的 `judge.compare`、不合法的 `judge.time_limit`；
-- `cases.jsonl`：JSON 不合法、不认识的字段、缺少或多出的输入、值与声明的类型或 `Node` 的形式不符（`input "nums": [1]: must be integer, got string "x"`；邻居不是图中的节点、随机下标超出链表、`null` 的位置不对）、结构输入对不上（环的位置超出链表、相交链表的尾部不同、被引用的值不存在或重复）、设计题中参数个数不对或方法不存在、`expected` 的形状不对；
+- `cases.jsonl`：JSON 不合法、不认识的字段、缺少或多出的输入、值与声明的类型或评测系统定义的类型的形式不符（`input "nums": [1]: must be integer, got string "x"`；邻居不是图中的节点、随机下标超出链表、`null` 的位置不对、下属不存在）、结构输入对不上（环的位置超出链表、相交链表的尾部不同、被引用的值不存在或重复）、设计题中参数个数不对或方法不存在、`expected` 的形状不对；
 - 加上 `--run` 时：参考解无法编译、运行出错，或与 `expected` 不一致（会同时显示两个值）。
 
 以下情况会给出警告：判题规则未确定（没有 `judge.compare`）、有用例缺少 `expected`、没有标记示例用例、没有参考解、题面引用的图片不存在、编号与其他题目重复。

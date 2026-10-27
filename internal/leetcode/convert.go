@@ -127,6 +127,9 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 		}
 		p.Class = c
 	} else {
+		if md.Name == "" {
+			return nil, fmt.Errorf("LeetCode's metadata for %s names no function or class: %w", q.TitleSlug, ErrUnsupported)
+		}
 		p.Kind = problem.KindFunction
 		p.Function = &problem.Function{Name: md.Name, Params: params(md.Params), Returns: md.Return.Type}
 		if md.Output != nil && md.Output.ParamIndex >= 0 && md.Output.ParamIndex < len(md.Params) {

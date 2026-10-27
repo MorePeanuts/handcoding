@@ -207,10 +207,12 @@ Type names are LeetCode's `metaData` names, so problems fetched from LeetCode ne
 | `ListNode` | array `[1,2,3]` | `*ListNode` | `ListNode \| None` |
 | `TreeNode` | level-order array `[3,9,20,null,null,15,7]` | `*TreeNode` | `TreeNode \| None` |
 | `GraphNode`, `NaryNode`, `RandomListNode`, `NextTreeNode`, `QuadNode`, `MultilevelNode` | see [LeetCode's Node types](#leetcodes-node-types) | `*Node` | `Node \| None` |
-| `T[]` | array, up to 3 levels; 1 level for node arrays | `[]T` | `list[T]` |
+| `NestedInteger` | integer or (nested) array, `[1,[4,[6]]]`; see [below](#nestedinteger-and-employee) | `*NestedInteger` | `NestedInteger` |
+| `Employee` | `[id, importance, [subordinate ids]]` | `*Employee` | `Employee` |
+| `T[]` | array, up to 3 levels; 1 level for `ListNode`, `TreeNode`, `NestedInteger` and `Employee`; none for the `Node` types | `[]T` | `list[T]` |
 | `void` | return type only | — | `None` |
 
-`list<T>` is normalized to `T[]`, and `int`, `bool`, `char` and `float` to `integer`, `boolean`, `character` and `double`. `NestedInteger` is not supported yet.
+`list<T>` is normalized to `T[]`, and `int`, `bool`, `char` and `float` to `integer`, `boolean`, `character` and `double`.
 
 ### LeetCode's Node types
 
@@ -228,6 +230,15 @@ LeetCode calls six different structures `Node`. hc gives each its own type name;
 - In Go, the driver defines `Node` for problems that use one, so don't declare it. In Python, import it from `hc_runtime` under the name `Node`; starters do it for you: `from hc_runtime import GraphNode as Node`. Python constructors take LeetCode's arguments, all optional: `Node(val, neighbors)`, `Node(val, children)`, `Node(x, next, random)`, `Node(val, left, right, next)`, `Node(val, isLeaf, topLeft, topRight, bottomLeft, bottomRight)`, `Node(val, prev, next, child)`.
 - A solution may build its own nodes (clones do). Returned structures are written in the same JSON form, and these are runtime errors: a `GraphNode` result that is not node 1 of a graph valued 1 to n; a random pointer to a node outside the returned list; a `MultilevelNode` whose `prev` does not point to the node before it (or is set on the first node of a level), and two nodes of one level with a child, which the serialization cannot express.
 - A `QuadNode` that is not a leaf may have either value, so it is always written `[0,1]`.
+
+### NestedInteger and Employee
+
+Two more types are defined by the judge rather than by the solution, under LeetCode's names:
+
+- `NestedInteger` holds an integer or a list of `NestedInteger`s. Its JSON form is an integer or an array of such values; `NestedInteger[]` is an array of them: `[[1,1],2,[1,1]]` (Flatten Nested List Iterator, 341). hc implements LeetCode's interface, so a solution can also build one to return (Mini Parser, 385). Go: `IsInteger() bool`, `GetInteger() int`, `SetInteger(int)`, `Add(NestedInteger)`, `GetList() []*NestedInteger`; the zero value is an empty list. Python: `NestedInteger(value=None)` (no value: an empty list), `isInteger()`, `getInteger()`, `setInteger(value)`, `add(elem)`, `getList()`.
+- `Employee` has the fields `Id`, `Importance`, `Subordinates []int` (Python: `id`, `importance`, `subordinates`) and is written `[id, importance, [subordinate ids]]`. In an `Employee[]` the ids must be distinct and every subordinate must be one of them: `[[1,5,[2,3]],[2,3,[]],[3,3,[]]]` (Employee Importance, 690).
+
+Go defines them in the driver of problems that use them. Python imports them from `hc_runtime`: `from hc_runtime import NestedInteger`.
 
 #### `returns_copy`
 
@@ -381,7 +392,7 @@ A reference solution is written exactly like a user's solution, in `reference/so
 | Python | `class Solution` with a method named `function.name`, or a module-level function of that name | A class named `class.name`; `__init__` takes the constructor parameters; methods have the names in `methods` |
 | Go | `package main`; `func <function.name>(...)` with the Go types from the table above | `type <Name> struct`, `func Constructor(...) <Name>`, and methods with pointer receivers whose names start with an upper-case letter (`getMin` → `GetMin`) |
 
-- `ListNode` and `TreeNode` are provided: in Python, `from hc_runtime import ListNode, TreeNode`; in Go they are predefined (`Val`, `Next`, `Left`, `Right`), so don't declare them. So is the problem's [`Node`](#leetcodes-node-types): `from hc_runtime import GraphNode as Node` in Python, predefined in Go.
+- `ListNode` and `TreeNode` are provided: in Python, `from hc_runtime import ListNode, TreeNode`; in Go they are predefined (`Val`, `Next`, `Left`, `Right`), so don't declare them. So are the problem's [`Node`](#leetcodes-node-types), `NestedInteger` and `Employee`: `from hc_runtime import GraphNode as Node` or `from hc_runtime import NestedInteger` in Python, predefined in Go.
 - With both references present, `hc cases build` uses Go, then Python; pick one with `-l python`. `hc validate --run` runs every reference.
 - `templates/solution.go` and `templates/solution.py` replace the generated starter code. They must keep the signature, because the driver calls it.
 
@@ -409,7 +420,7 @@ hc validate <slug> --run    # also run every reference solution on every case; a
 `hc validate` reports, with the case number and field:
 
 - `problem.yaml`: syntax errors (with line and column), unknown fields, invalid slug, missing title, unsupported types, a `judge.output` that is not a parameter or hidden input, a `void` function without `judge.output`, misused structure inputs (`hidden`, `cycle`, `join`, `ref`, `copy`, `returns_ref`), a misused `returns_copy`, more than one `Node` type, a misused `judge.output_length`, unknown `judge.compare`, an invalid `judge.time_limit`;
-- `cases.jsonl`: invalid JSON, unknown fields, missing or unknown inputs, values that don't match their declared type (`input "nums": [1]: must be integer, got string "x"`) or `Node` form (a neighbor that is not a node, a random index outside the list, a misplaced `null`), structure inputs that don't fit (a cycle position outside the list, joined lists whose tails differ, a referenced value that is missing or repeated), wrong argument counts and unknown methods in design problems, and an `expected` of the wrong shape;
+- `cases.jsonl`: invalid JSON, unknown fields, missing or unknown inputs, values that don't match their declared type (`input "nums": [1]: must be integer, got string "x"`) or the form of a judge-defined type (a neighbor that is not a node, a random index outside the list, a misplaced `null`, an unknown subordinate), structure inputs that don't fit (a cycle position outside the list, joined lists whose tails differ, a referenced value that is missing or repeated), wrong argument counts and unknown methods in design problems, and an `expected` of the wrong shape;
 - with `--run`: reference solutions that don't compile, crash, or disagree with `expected` (both values are shown).
 
 It warns about an undecided judge rule (no `judge.compare`), cases without `expected`, no case marked as an example, no reference solution, missing statement images and an ID used by another problem.

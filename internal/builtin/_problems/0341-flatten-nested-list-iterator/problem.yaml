@@ -1,0 +1,22 @@
+id: "341"
+slug: flatten-nested-list-iterator
+title: Flatten Nested List Iterator
+difficulty: medium
+tags: [stack, tree, depth-first-search, design, queue, iterator]
+kind: class
+class:
+  name: NestedIterator
+  constructor:
+    - {name: nestedList, type: "NestedInteger[]"}
+  methods:
+    - name: next
+      params: []
+      returns: integer
+    - name: hasNext
+      params: []
+      returns: boolean
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/flatten-nested-list-iterator/

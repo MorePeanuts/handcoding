@@ -33,6 +33,16 @@ const (
 	TypeMultilevelNode = "MultilevelNode"
 )
 
+// Other types the judge defines rather than the solution.
+const (
+	// TypeNestedInteger holds an integer or a list of NestedIntegers, with
+	// LeetCode's interface. Its JSON form is an integer or a (nested) array.
+	TypeNestedInteger = "NestedInteger"
+	// TypeEmployee is an employee record: id, importance, subordinates. Its
+	// JSON form is [id, importance, [subordinate ids]].
+	TypeEmployee = "Employee"
+)
+
 // nodeVariants are the types solution code knows as Node.
 var nodeVariants = []string{TypeGraphNode, TypeNaryNode, TypeRandomListNode, TypeNextTreeNode, TypeQuadNode, TypeMultilevelNode}
 
@@ -221,6 +231,57 @@ func checkNodeVariant(base string, v any, path string) error {
 			above = 0
 			for ; i < len(arr) && arr[i] != nil; i++ {
 				above++
+			}
+		}
+	}
+	return nil
+}
+
+// checkNestedInteger checks an integer or a (nested) array of integers.
+func checkNestedInteger(v any, path string) error {
+	arr, ok := v.([]any)
+	if !ok {
+		if checkValue(TypeInteger, v, "") != nil {
+			return fmt.Errorf("%smust be an integer or an array of NestedInteger values, got %s", pathPrefix(path), describe(v))
+		}
+		return nil
+	}
+	for i, x := range arr {
+		if err := checkNestedInteger(x, fmt.Sprintf("%s[%d]", path, i)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func checkEmployee(v any, path string) error {
+	e, ok := v.([]any)
+	if !ok || len(e) != 3 {
+		return fmt.Errorf("%smust be an employee, [id, importance, [subordinate ids]], got %s", pathPrefix(path), describe(v))
+	}
+	for i, t := range []string{TypeInteger, TypeInteger, TypeInteger + "[]"} {
+		if err := checkValue(t, e[i], fmt.Sprintf("%s[%d]", path, i)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkEmployees checks that the employees of an Employee[] have distinct
+// ids and that their subordinates are among them.
+func checkEmployees(arr []any, path string) error {
+	ids := map[json.Number]bool{}
+	for i, x := range arr {
+		id := x.([]any)[0].(json.Number)
+		if ids[id] {
+			return fmt.Errorf("%sid %s is used twice", pathPrefix(fmt.Sprintf("%s[%d]", path, i)), id)
+		}
+		ids[id] = true
+	}
+	for i, x := range arr {
+		for j, sub := range x.([]any)[2].([]any) {
+			if !ids[sub.(json.Number)] {
+				return fmt.Errorf("%ssubordinate %s is not an employee", pathPrefix(fmt.Sprintf("%s[%d][2][%d]", path, i, j)), sub)
 			}
 		}
 	}

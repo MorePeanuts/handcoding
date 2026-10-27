@@ -132,9 +132,24 @@ returning any original node is then a runtime error. Fetched problems may
 declare such parameters with LeetCode's test-data types (589 `root:
 integer`, 138 `head: ListNode`); fix them to the template's `*Node`.
 
+### NestedInteger and Employee
+
+Also judge-defined, under LeetCode's names (Python references import them:
+`from hc_runtime import NestedInteger`):
+
+- `NestedInteger`: an integer or an array of NestedInteger values; type
+  `"NestedInteger[]"` for a list of them (341 constructor arg
+  `[[1,1],2,[1,1]]`). A function may return one (385: `"expected":
+  [123,[456,[789]]]` or `324`). Iterator problems (341) are class problems:
+  write `ops` as the statement's test loop, `hasNext` then `next` until
+  `hasNext` is false.
+- `Employee`: `[id, importance, [subordinate ids]]`; `"Employee[]"` needs
+  distinct ids and known subordinates (690).
+
 Types: `integer long double boolean string character ListNode TreeNode void`,
-the Node types above, arrays with `[]` suffix (up to 3 levels, ListNode and
-TreeNode arrays 1 level).
+the Node types, `NestedInteger`, `Employee`, arrays with `[]` suffix (up to 3
+levels; ListNode, TreeNode, NestedInteger and Employee arrays 1 level; no
+Node arrays).
 Quote array types inside `{...}` / `[...]` (`type: "integer[]"`): unquoted,
 `[]` is YAML syntax. Unknown fields are errors.
 

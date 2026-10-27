@@ -65,3 +65,20 @@ func TestStarterNodeVariant(t *testing.T) {
 		}
 	}
 }
+
+func TestStarterNestedInteger(t *testing.T) {
+	p := &problem.Problem{Slug: "f", Kind: problem.KindClass, Class: &problem.Class{
+		Name:        "NestedIterator",
+		Constructor: []problem.Param{{Name: "nestedList", Type: "NestedInteger[]"}},
+		Methods:     []problem.Method{{Name: "next", Returns: problem.TypeInteger}},
+	}}
+	got, err := Language{}.Starter(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"from hc_runtime import NestedInteger  # noqa: F401", "def __init__(self, nestedList: list[NestedInteger]):"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("starter does not contain %q:\n%s", want, got)
+		}
+	}
+}
