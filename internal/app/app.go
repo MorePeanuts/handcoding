@@ -264,6 +264,7 @@ func (a *App) runnerOpts(ctx context.Context, p *problem.Problem, sel []runner.S
 			return opts, err
 		}
 		opts.Checker = c
+		opts.CheckerName = a.WS.Rel(p.CheckerPath())
 	}
 	return opts, nil
 }

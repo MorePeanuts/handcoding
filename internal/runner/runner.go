@@ -87,6 +87,9 @@ type Options struct {
 	Stderr io.Writer
 	// Checker runs checker.py; required for problems judged by one.
 	Checker lang.Checker
+	// CheckerName is how errors refer to checker.py, e.g. relative to the
+	// workspace; its absolute path if empty.
+	CheckerName string
 }
 
 // Run prepares, builds and runs the solution in dir against the cases.

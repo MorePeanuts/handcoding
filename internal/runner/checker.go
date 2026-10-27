@@ -20,9 +20,12 @@ import (
 // checker's message; a broken checker fails the run with a
 // *judge.CheckerError.
 func check(ctx context.Context, p *problem.Problem, work string, rep *Report, cases []judge.CheckerCase, opts Options) error {
-	path := p.CheckerPath()
+	path, name := p.CheckerPath(), opts.CheckerName
+	if name == "" {
+		name = path
+	}
 	if _, err := os.Stat(path); err != nil {
-		return fmt.Errorf("judge.compare is checker, but %s is missing", path)
+		return fmt.Errorf("judge.compare is checker, but %s is missing", name)
 	}
 	if opts.Checker == nil {
 		return errors.New("no checker runner configured")
@@ -59,7 +62,7 @@ func check(ctx context.Context, p *problem.Problem, work string, rep *Report, ca
 		return ctx.Err()
 	}
 	run := judge.CheckerRun{
-		Path: path, Output: output.String(), Limit: opts.Timeout,
+		Path: path, Name: name, Output: output.String(), Limit: opts.Timeout,
 		TimedOut: errors.Is(runCtx.Err(), context.DeadlineExceeded),
 	}
 	if runErr != nil && !run.TimedOut {

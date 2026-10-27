@@ -36,3 +36,16 @@ func TestProblemReportsLoadError(t *testing.T) {
 		t.Errorf("missing: error = %v", err)
 	}
 }
+
+func TestRel(t *testing.T) {
+	root := t.TempDir()
+	w := &Workspace{Root: root}
+	for path, want := range map[string]string{
+		filepath.Join(root, "problems", "p", "checker.py"): filepath.Join("problems", "p", "checker.py"),
+		filepath.Join(filepath.Dir(root), "other.py"):      filepath.Join(filepath.Dir(root), "other.py"),
+	} {
+		if got := w.Rel(path); got != want {
+			t.Errorf("Rel(%s) = %s, want %s", path, got, want)
+		}
+	}
+}
