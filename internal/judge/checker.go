@@ -30,7 +30,7 @@ type CheckerResult struct {
 // CheckerError reports a broken checker. It is an error of the problem, not
 // a verdict on the solution.
 type CheckerError struct {
-	Path string // the checker's path
+	Path string // the checker's path, as shown to the user
 	// Case is the case the checker failed on, or 0 when it failed to load.
 	Case   int
 	Reason string
@@ -56,7 +56,10 @@ func (e *CheckerError) Error() string {
 
 // CheckerRun is the outcome of one checker process.
 type CheckerRun struct {
-	Path    string
+	Path string
+	// Name is how errors refer to the checker, e.g. its path relative to the
+	// workspace; Path if empty. It also replaces Path in tracebacks.
+	Name    string
 	Results []CheckerResult
 	// Output is the tail of what the process printed.
 	Output   string
@@ -72,7 +75,7 @@ func Checked(ids []int, run CheckerRun) (map[int]CheckerResult, error) {
 	results := make(map[int]CheckerResult, len(run.Results))
 	for _, r := range run.Results {
 		if r.ID == 0 {
-			return nil, &CheckerError{Path: run.Path, Detail: r.Error}
+			return nil, run.fail(0, "", r.Error)
 		}
 		results[r.ID] = r
 	}
@@ -80,12 +83,22 @@ func Checked(ids []int, run CheckerRun) (map[int]CheckerResult, error) {
 		r, ok := results[id]
 		switch {
 		case ok && r.Error != "":
-			return nil, &CheckerError{Path: run.Path, Case: id, Detail: r.Error}
+			return nil, run.fail(id, "", r.Error)
 		case !ok && run.TimedOut:
-			return nil, &CheckerError{Path: run.Path, Case: id, Reason: fmt.Sprintf("time limit of %s exceeded", run.Limit), Detail: run.Output}
+			return nil, run.fail(id, fmt.Sprintf("time limit of %s exceeded", run.Limit), run.Output)
 		case !ok:
-			return nil, &CheckerError{Path: run.Path, Case: id, Reason: "exited without a result", Detail: run.Output}
+			return nil, run.fail(id, "exited without a result", run.Output)
 		}
 	}
 	return results, nil
+}
+
+func (run CheckerRun) fail(id int, reason, detail string) *CheckerError {
+	name := run.Name
+	if name == "" {
+		name = run.Path
+	} else if run.Path != "" {
+		detail = strings.ReplaceAll(detail, run.Path, name)
+	}
+	return &CheckerError{Path: name, Case: id, Reason: reason, Detail: detail}
 }

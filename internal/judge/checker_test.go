@@ -22,6 +22,9 @@ func TestChecked(t *testing.T) {
 		{CheckerRun{Results: []CheckerResult{ok, {ID: 2, Error: "KeyError: 'nums'"}}}, "checker.py failed on case 2 (the problem's checker is broken; this is not a verdict on your solution)\nKeyError"},
 		{CheckerRun{Results: []CheckerResult{ok}, TimedOut: true, Limit: 2 * time.Second}, "failed on case 2: time limit of 2s exceeded"},
 		{CheckerRun{Results: []CheckerResult{ok}, Output: "Killed"}, "failed on case 2: exited without a result (the problem's checker is broken; this is not a verdict on your solution)\nKilled"},
+		// Name replaces the path, in the traceback too.
+		{CheckerRun{Name: "problems/p/checker.py", Results: []CheckerResult{{ID: 1, Error: `File "checker.py", line 2, in check`}}},
+			`problems/p/checker.py failed on case 1 (the problem's checker is broken; this is not a verdict on your solution)` + "\n" + `File "problems/p/checker.py", line 2`},
 	} {
 		tt.run.Path = "checker.py"
 		_, err := Checked([]int{1, 2}, tt.run)

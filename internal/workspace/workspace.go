@@ -193,6 +193,16 @@ func Create(dir, language string) (*Workspace, error) {
 	return &Workspace{Root: abs, Config: cfg}, nil
 }
 
+// Rel shows path relative to the workspace root, such as
+// problems/0001-two-sum/checker.py, or as it is when outside the workspace.
+func (w *Workspace) Rel(path string) string {
+	rel, err := filepath.Rel(w.Root, path)
+	if err != nil || !filepath.IsLocal(rel) {
+		return path
+	}
+	return rel
+}
+
 // ProblemsPath is the directory of the problem bank.
 func (w *Workspace) ProblemsPath() string { return filepath.Join(w.Root, ProblemsDir) }
 

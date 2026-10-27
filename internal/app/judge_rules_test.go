@@ -489,8 +489,8 @@ func TestChecker(t *testing.T) {
 
 // TestBrokenChecker checks that a checker that cannot be loaded, raises,
 // returns something else than a verdict or runs out of time fails the run
-// with an error naming checker.py and the case, rather than judging the
-// solution.
+// with an error naming checker.py, relative to the workspace, and the case,
+// rather than judging the solution.
 func TestBrokenChecker(t *testing.T) {
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
@@ -501,10 +501,11 @@ func TestBrokenChecker(t *testing.T) {
 		checker string
 		want    []string
 	}{
-		{"def check(input, output, expected)\n    pass\n", []string{"checker.py cannot be loaded", "SyntaxError"}},
+		{"def check(input, output, expected)\n    pass\n", []string{"problems/any-index/checker.py cannot be loaded", "SyntaxError"}},
 		{"def judge(input, output, expected):\n    pass\n", []string{"checker.py cannot be loaded", "must define check(input, output, expected)"}},
 		{"def check(input, output, expected):\n    if input[\"target\"] == 2:\n        raise ValueError(\"boom\")\n",
-			[]string{"checker.py failed on case 2", "not a verdict on your solution", `raise ValueError("boom")`, "ValueError: boom"}},
+			[]string{"problems/any-index/checker.py failed on case 2", "not a verdict on your solution",
+				`File "problems/any-index/checker.py", line 3, in check`, `raise ValueError("boom")`, "ValueError: boom"}},
 		{"def check(input, output, expected):\n    return 1\n", []string{"checker.py failed on case 1", "check returned 1"}},
 		{"import os\n\ndef check(input, output, expected):\n    print('dying')\n    os._exit(3)\n", []string{"checker.py failed on case 1: exited without a result", "dying", "exit status 3"}},
 		{"def check(input, output, expected):\n    while input[\"target\"] == 2:\n        pass\n", []string{"checker.py failed on case 2: time limit of 2s exceeded"}},
@@ -527,6 +528,9 @@ func TestBrokenChecker(t *testing.T) {
 				if !strings.Contains(err.Error(), w) {
 					t.Errorf("%s %q: error %q does not contain %q", langID, tt.checker, err, w)
 				}
+			}
+			if strings.Contains(err.Error(), a.WS.Root) {
+				t.Errorf("%s %q: error %q shows the absolute path", langID, tt.checker, err)
 			}
 		}
 	}
