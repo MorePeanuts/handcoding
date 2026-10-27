@@ -5,12 +5,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/builtin"
 	"github.com/MorePeanuts/handcoding/internal/lang"
+	"github.com/MorePeanuts/handcoding/internal/lang/golang"
+	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
@@ -34,6 +37,17 @@ func requireTools(t *testing.T, tools ...string) {
 	for _, tool := range tools {
 		if _, err := exec.LookPath(tool); err != nil {
 			t.Skipf("%s not installed", tool)
+		}
+	}
+	// hc refuses to run references on a toolchain below the protocol's
+	// minimum; CI installs supported versions.
+	if slices.Contains(tools, "python3") {
+		tc, err := python.Language{}.Toolchain()
+		if err != nil {
+			t.Skip(err)
+		}
+		if err := tc.Err(); err != nil {
+			t.Skip(err)
 		}
 	}
 }
@@ -80,6 +94,49 @@ func TestBuiltinReferences(t *testing.T) {
 						}
 					}
 				}
+			}
+		})
+	}
+}
+
+// TestGoMinimumVersion builds the Go driver with every built-in Go reference
+// at the protocol's minimum Go version: the go directive limits the language,
+// and go vet's stdversion analyzer reports standard library symbols that are
+// too new. A newer local toolchain is enough to check both.
+func TestGoMinimumVersion(t *testing.T) {
+	requireTools(t, "go")
+	a := newWorkspace(t)
+	probs, err := a.WS.Problems()
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := golang.Language{}
+	for _, p := range probs {
+		ref, ok := p.Reference(l.SolutionFile())
+		if !ok {
+			continue
+		}
+		t.Run(p.Slug, func(t *testing.T) {
+			dir := t.TempDir()
+			code, err := os.ReadFile(ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, l.SolutionFile()), code, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := l.Prepare(dir, p); err != nil {
+				t.Fatal(err)
+			}
+			mod := "module solution\n\ngo " + golang.MinVersion + "\n"
+			if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.Command("go", "vet", ".")
+			cmd.Dir = dir
+			cmd.Env = append(os.Environ(), "GOTOOLCHAIN=local")
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Errorf("go vet at go %s: %v\n%s", golang.MinVersion, err, out)
 			}
 		})
 	}

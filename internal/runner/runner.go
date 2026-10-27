@@ -70,6 +70,9 @@ type Report struct {
 	// Stderr holds the tail of the program's stderr if it crashed.
 	Stderr  string
 	Elapsed time.Duration
+	// Toolchain is what the solution ran with, set by the caller; the zero
+	// value when unknown (e.g. a report decoded from history).
+	Toolchain lang.Toolchain
 }
 
 // Options configure a run.

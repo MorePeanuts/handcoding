@@ -173,7 +173,7 @@ the problem has one.`,
 				}
 				ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 				defer stop()
-				fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Running %d case(s) of %s [%s]…", len(sel), p.Slug, l.Name())))
+				fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Running %d case(s) of %s [%s]…", len(sel), p.Slug, toolchainLabel(l))))
 				rep, err := a.Run(ctx, p, l, sel, app.RunOptions{Stdout: os.Stdout, Stderr: os.Stderr})
 				if err != nil {
 					return err
@@ -232,6 +232,15 @@ func parseInput(p *problem.Problem, s string) (problem.Case, error) {
 	return c, nil
 }
 
+// toolchainLabel names the toolchain a run uses, e.g. "Python 3.12.9", or
+// just the language when it cannot be detected (the run then reports why).
+func toolchainLabel(l lang.Language) string {
+	if tc, err := l.Toolchain(); err == nil {
+		return tc.String()
+	}
+	return l.Name()
+}
+
 // errSilent signals a failing exit status without printing an error (the
 // report already explains the failure).
 var errSilent = errors.New("")
@@ -256,7 +265,7 @@ func newSubmitCmd(root *rootOptions) *cobra.Command {
 				}
 				ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 				defer stop()
-				fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Submitting %s [%s]…", p.Slug, l.Name())))
+				fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Submitting %s [%s]…", p.Slug, toolchainLabel(l))))
 				rep, sub, err := a.Submit(ctx, p, l, app.RunOptions{Stdout: os.Stdout, Stderr: os.Stderr})
 				if err != nil {
 					return err
@@ -321,6 +330,13 @@ server for your editor to attach to:
 					if sel, err = app.Select(cases, caseNums, false); err != nil {
 						return err
 					}
+				}
+				tc, err := l.Toolchain()
+				if err != nil {
+					return err
+				}
+				if err := tc.Err(); err != nil {
+					fmt.Fprintln(os.Stderr, ui.Yellow.Render("warning:")+" "+err.Error())
 				}
 				dcmd, cleanup, err := runner.DebugCommand(l, p, filepath.Dir(a.SolutionPath(p, l)), sel, lang.DebugOptions{Headless: headless, Addr: addr})
 				if err != nil {

@@ -61,8 +61,66 @@ type Language interface {
 	// DebugCommand returns an interactive or headless debugger command that
 	// runs the driver with a breakpoint on the solution entry point.
 	DebugCommand(dir, binDir string, p *problem.Problem, opts DebugOptions) (*exec.Cmd, error)
-	// Check reports whether the toolchain is available.
-	Check() error
+	// Toolchain detects the compiler or interpreter solutions run with. It
+	// fails when the toolchain is missing; a toolchain older than the
+	// protocol allows is returned, and its Err says so.
+	Toolchain() (Toolchain, error)
+}
+
+// Toolchain is the compiler or interpreter a language runs solutions with.
+type Toolchain struct {
+	Name    string // e.g. "Python"
+	Version string // e.g. "3.12.9"
+	// Min is the oldest version the problem protocol supports: the code hc
+	// generates and the code packs ship must work with it.
+	Min string
+	// Upgrade tells the user how to get a supported version.
+	Upgrade string
+}
+
+func (t Toolchain) String() string { return t.Name + " " + t.Version }
+
+// Supported reports whether the toolchain is at least the minimum version.
+func (t Toolchain) Supported() bool { return AtLeast(t.Version, t.Min) }
+
+// Err explains that the toolchain is too old, or returns nil.
+func (t Toolchain) Err() error {
+	if t.Supported() {
+		return nil
+	}
+	return fmt.Errorf("%s is older than %s, the oldest version hc supports; %s", t, t.Min, t.Upgrade)
+}
+
+// AtLeast compares dotted version numbers: AtLeast("3.9.6", "3.10") is
+// false. Each component is read up to its first non-digit, so "1.22rc1"
+// counts as 1.22.
+func AtLeast(version, min string) bool {
+	v, m := versionParts(version), versionParts(min)
+	for i, n := range m {
+		x := 0
+		if i < len(v) {
+			x = v[i]
+		}
+		if x != n {
+			return x > n
+		}
+	}
+	return true
+}
+
+func versionParts(s string) []int {
+	var out []int
+	for part := range strings.SplitSeq(s, ".") {
+		n := 0
+		for _, r := range part {
+			if r < '0' || r > '9' {
+				break
+			}
+			n = n*10 + int(r-'0')
+		}
+		out = append(out, n)
+	}
+	return out
 }
 
 // CompileError reports a build failure with the compiler output.

@@ -626,8 +626,13 @@ func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run boo
 	} else if run && len(errs) == 0 && len(cases) > 0 {
 		sel, _ := app.Select(cases, nil, true)
 		for _, l := range refs {
-			if err := l.Check(); err != nil {
+			tc, err := l.Toolchain()
+			if err != nil {
 				warns = append(warns, fmt.Sprintf("%s reference not run: %v", l.Name(), err))
+				continue
+			}
+			if err := tc.Err(); err != nil {
+				errs = append(errs, fmt.Sprintf("%s reference not run: %v", l.Name(), err))
 				continue
 			}
 			e, w := checkReference(cmd, a, p, l, sel)

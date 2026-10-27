@@ -51,7 +51,7 @@ go install github.com/MorePeanuts/handcoding/cmd/hc@latest
 
 Prebuilt binaries for Linux, macOS and Windows are on the [releases page](https://github.com/MorePeanuts/handcoding/releases).
 
-To solve problems you need the toolchain of your language: Go, or Python 3.8+. Optional extras:
+To solve problems you need the toolchain of your language: Go 1.22+, or Python 3.10+ (macOS ships 3.9; point `python.interpreter` in `hc.yaml` to a newer one). Optional extras:
 
 - [Delve](https://github.com/go-delve/delve) for debugging Go;
 - `debugpy` for headless Python debugging;
