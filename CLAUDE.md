@@ -57,7 +57,7 @@ Rebuild or reinstall `hc` afterwards; the samples are embedded at compile time.
 ## Conventions
 
 - Pre-1.0 (`v0.x`): no backward compatibility is required for the CLI, `hc.yaml`, the problem protocol or the DB schema. Prefer the cleanest design over migrations or compatibility shims.
-- Versioning: SemVer tags with a `v` prefix. Pre-releases look like `v0.1.0-alpha.N`. Pushing a `v*` tag runs `.github/workflows/release.yml` (GoReleaser; `prerelease: auto` marks `-alpha` tags). `hc --version` falls back to the module build-info version for `go install …@vX` builds.
+- Versioning (details in CONTRIBUTING.md): SemVer tags with a `v` prefix. Fixes to the released line bump the patch (`v0.1.1`) and never change features or the protocol; features for the next milestone ship as pre-releases (`v0.2.0-alpha.N`) until it is done; no `-rc`. Patch releases are tagged on `main` until `main` holds unreleased features, then on a maintenance branch `v0.N.x` created from tag `v0.N.0`: the fix lands on `main` first, then `git cherry-pick -x` through a PR against `v0.N.x`. Never merge or delete a maintenance branch. Pushing a `v*` tag runs `.github/workflows/release.yml` (GoReleaser; `prerelease: auto` marks `-alpha` tags). `hc --version` falls back to the module build-info version for `go install …@vX` builds.
 - Commit messages use Conventional Commits (`feat:`, `fix:`, `ci:`, `docs:` …). GoReleaser groups the changelog by these prefixes.
 - Imports are grouped std / third-party / `github.com/MorePeanuts/handcoding` (goimports `local-prefixes`).
 

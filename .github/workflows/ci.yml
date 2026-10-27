@@ -2,11 +2,19 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Maintenance branches (v0.1.x) receive cherry-picks onto older code,
+    # which main's CI never tested.
+    branches: [main, "v*.x"]
   pull_request:
 
 permissions:
   contents: read
+
+# A new push to a PR supersedes its running checks. Pushes to main and
+# maintenance branches always finish, since any of them may be tagged.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -23,7 +31,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: go vet ./...
+      # go vet runs once, as part of golangci-lint in the lint job.
       - run: go test -race ./...
 
   lint:
