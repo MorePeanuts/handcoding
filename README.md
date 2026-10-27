@@ -63,6 +63,8 @@ hc init                 # create ~/handcoding with a few sample problems
 hc                      # open the problem list
 ```
 
+To solve in Python by default, run `hc init --lang python` instead; it also sets up the Python environment right away.
+
 Press `enter` on a problem. `hc` shows the statement, creates `solution.go` from the template and copies its path to the clipboard. Open it in your editor next door, then press `t` to test and `s` to submit.
 
 > [!TIP]

@@ -21,7 +21,7 @@ import (
 
 func newWorkspace(t *testing.T) *app.App {
 	t.Helper()
-	ws, err := workspace.Create(t.TempDir())
+	ws, err := workspace.Create(t.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +258,7 @@ func mustLang(t *testing.T, a *app.App, name string) lang.Language {
 // Python runs in the workspace's virtual environment unless hc.yaml names an
 // interpreter.
 func TestPythonEnvironment(t *testing.T) {
-	ws, err := workspace.Create(t.TempDir())
+	ws, err := workspace.Create(t.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)
 	}

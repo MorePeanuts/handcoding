@@ -63,6 +63,8 @@ hc init                 # 创建 ~/handcoding 工作区，附带几道示例题
 hc                      # 打开题目列表
 ```
 
+如果默认用 Python 解题，改为执行 `hc init --lang python`，它还会立即创建 Python 环境。
+
 在列表里选一道题按 `enter`：hc 会显示题面，按模板生成 `solution.go`，并把文件路径复制到剪贴板。在旁边的编辑器里打开它，写完后按 `t` 测试、按 `s` 提交。
 
 > [!TIP]

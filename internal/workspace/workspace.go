@@ -159,8 +159,9 @@ func Open(dir string) (*Workspace, error) {
 	return &Workspace{Root: abs, Config: cfg}, nil
 }
 
-// Create initializes a new workspace at dir.
-func Create(dir string) (*Workspace, error) {
+// Create initializes a new workspace at dir whose default solution language
+// is language, or Go if it is empty. The caller validates the language.
+func Create(dir, language string) (*Workspace, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
@@ -174,6 +175,9 @@ func Create(dir string) (*Workspace, error) {
 		}
 	}
 	cfg := DefaultConfig()
+	if language != "" {
+		cfg.Language = language
+	}
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return nil, err
