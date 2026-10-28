@@ -157,7 +157,7 @@ The section that does not match `kind` (`class` in a function problem, `function
 
 > **YAML pitfall.** Inside YAML's flow syntax (`{...}`, `[...]`), `[]` is YAML syntax, so an array type there MUST be quoted: `{name: nums, type: "integer[]"}`. In block style (`type: integer[]` on its own line) quotes are optional.
 
-Built-in sample 0001:
+Problem 0001:
 
 ```yaml
 id: "1"
@@ -238,7 +238,7 @@ LeetCode calls six different structures `Node`. The protocol gives each its own 
 
 ### NestedInteger and Employee
 
-- `NestedInteger` holds an integer or a list of `NestedInteger`s. JSON: an integer, or an array of `NestedInteger` values: `[1,[4,[6]]]`. `NestedInteger[]` is an array of them (built-in sample 0341: `[[1,1],2,[1,1]]`). The interface is LeetCode's, so a solution can also build one (LeetCode 385):
+- `NestedInteger` holds an integer or a list of `NestedInteger`s. JSON: an integer, or an array of `NestedInteger` values: `[1,[4,[6]]]`. `NestedInteger[]` is an array of them (problem 0341: `[[1,1],2,[1,1]]`). The interface is LeetCode's, so a solution can also build one (LeetCode 385):
   - Go: `IsInteger() bool`, `GetInteger() int`, `SetInteger(int)`, `Add(NestedInteger)`, `GetList() []*NestedInteger`. The zero value is an empty list.
   - Python: `NestedInteger(value=None)` (without a value, an empty list), `isInteger()`, `getInteger()`, `setInteger(value)`, `add(elem)`, `getList()`.
 - `Employee` has the fields `Id int`, `Importance int`, `Subordinates []int` (Python: `Employee(id, importance, subordinates)`). JSON: `[id, importance, [subordinate ids]]`. In an `Employee[]` the ids MUST be distinct and every subordinate MUST be one of them: `[[1,5,[2,3]],[2,3,[]],[3,3,[]]]` (LeetCode 690).
@@ -273,7 +273,7 @@ The judged value is the return value, or the value of `judge.output` after the c
 
 A case gives a sequence of operations: the constructor, then method calls on the instance it made. The judged value is the array of their results; see [Cases](#cases). Class problems have no [structure inputs](#structure-inputs), and MUST NOT have `judge.output` or `judge.output_length`.
 
-Built-in sample 0146:
+Problem 0146:
 
 ```yaml
 kind: class
@@ -328,7 +328,7 @@ In a case:
 
 `returns_ref` encodes the returned node, in outputs and in `expected`, by identity: in a `ListNode` structure as its 0-based index in node order, in a `TreeNode` structure as its value, and no node as `null`. Returning a node that is not part of the structure is a Runtime Error.
 
-Built-in sample 0142 (Linked List Cycle II) gives `head` and `pos`; the solution receives only `head`:
+Problem 0142 (Linked List Cycle II) gives `head` and `pos`; the solution receives only `head`:
 
 ```yaml
 function:
@@ -345,7 +345,7 @@ function:
 {"input": {"head": [3,2,0,-4], "pos": 1}, "expected": 1}
 ```
 
-Built-in sample 0160 (Intersection of Two Linked Lists): `headA` and `headB` are the full lists, including the shared tail:
+Problem 0160 (Intersection of Two Linked Lists): `headA` and `headB` are the full lists, including the shared tail:
 
 ```yaml
   params:
@@ -362,7 +362,7 @@ Built-in sample 0160 (Intersection of Two Linked Lists): `headA` and `headB` are
 {"input": {"headA": [4,1,8,4,5], "headB": [5,6,1,8,4,5], "skipA": 2, "skipB": 3}, "expected": 2}
 ```
 
-Built-in sample 0236 (Lowest Common Ancestor of a Binary Tree): `p` and `q` are values in the case and nodes of `root` in the solution:
+Problem 0236 (Lowest Common Ancestor of a Binary Tree): `p` and `q` are values in the case and nodes of `root` in the solution:
 
 ```yaml
   params:
@@ -377,7 +377,7 @@ Built-in sample 0236 (Lowest Common Ancestor of a Binary Tree): `p` and `q` are 
 {"input": {"root": [3,5,1,6,2,0,8,null,null,7,4], "p": 5, "q": 1}, "expected": 3}
 ```
 
-Built-in sample 0237 (Delete Node in a Linked List) refers into a hidden input and judges it:
+Problem 0237 (Delete Node in a Linked List) refers into a hidden input and judges it:
 
 ```yaml
   params:
@@ -394,7 +394,7 @@ judge:
 {"input": {"head": [4,5,1,9], "node": 5}, "expected": [4,1,9]}
 ```
 
-Built-in sample 1379 gives no `cloned` in the case:
+Problem 1379 gives no `cloned` in the case:
 
 ```yaml
   params:
@@ -417,7 +417,7 @@ Built-in sample 1379 gives no `cloned` in the case:
 - The return type is `ListNode`, `TreeNode` or one of the `Node` types.
 - `returns_copy` excludes `returns_ref` and `judge.output`.
 
-Built-in sample 0133:
+Problem 0133:
 
 ```yaml
 function:
@@ -448,7 +448,7 @@ A class problem whose methods encode a value into a string of the solution's own
 - `separate`: `decode` runs on a second instance, as in LeetCode's `ser = Codec(); deser = Codec(); deser.deserialize(ser.serialize(root))`, so the solution cannot pass the value through instance state. `same`: both calls run on one instance (535: `codec.decode(codec.encode(url))`).
 - Both instances live in the same process. Other methods are never called, and requirements on the encoding itself (449: "as compact as possible") are not judged.
 
-Built-in sample 0297 (`separate`; 0535 is `same`):
+Problem 0297 (`separate`; 0535 is `same`):
 
 ```yaml
 kind: class
@@ -501,7 +501,7 @@ judge:
 
 With `judge.compare: any_of`, `expected` is instead an array of all acceptable values of the form above. With `checker`, it is one valid answer. Values MUST have the encoding of their declared type ([Types](#types)); a `NextTreeNode` output has its level form.
 
-Built-in sample 0146:
+Problem 0146:
 
 ```json
 {"input": {"ops": ["LRUCache","put","put","get","put","get","put","get","get","get"], "args": [[2],[1,1],[2,2],[1],[3,3],[2],[4,4],[1],[3],[4]]}, "expected": [null,null,null,1,null,-1,null,-1,3,4], "example": true}
@@ -530,10 +530,10 @@ A case is judged by comparing the solution's output with `expected` under `judge
 
 For function problems that modify an input:
 
-- `judge.output: <input>` names a parameter or hidden input. The judged value is its value after the call, encoded with its type, instead of the return value. Built-in sample 0189 (`rotate`, returning `void`) judges `nums`.
+- `judge.output: <input>` names a parameter or hidden input. The judged value is its value after the call, encoded with its type, instead of the return value. Problem 0189 (`rotate`, returning `void`) judges `nums`.
 - `judge.output_length: return` judges only the first k elements of `judge.output`, k being the return value (LeetCode's "the elements beyond the first k do not matter"). It requires `judge.output`, an array type for it, and a return type of `integer` or `long`. A returned k outside 0 to the array's length is a Runtime Error.
 
-Built-in sample 0027:
+Problem 0027:
 
 ```yaml
 function:
@@ -601,7 +601,7 @@ def check(input, output, expected):
 - A checker MAY import the public names of `hc_runtime` ([Python](#python)) to rebuild structures, `decode("TreeNode", output)`, and otherwise only the standard library.
 - A checker MUST accept every correct output. For randomized problems (LeetCode 384, 528), whose outputs are checked for a plausible distribution, this means a correct solution MUST be rejected with negligible probability.
 
-Built-in sample 0005 (Longest Palindromic Substring, `"bab"` and `"aba"` both right):
+Problem 0005 (Longest Palindromic Substring, `"bab"` and `"aba"` both right):
 
 ```python
 def check(input, output, expected):

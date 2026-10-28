@@ -12,8 +12,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
-	"github.com/MorePeanuts/handcoding/internal/builtin"
 	"github.com/MorePeanuts/handcoding/internal/problem"
+	"github.com/MorePeanuts/handcoding/internal/regression"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
@@ -30,7 +30,7 @@ func newHarness(t *testing.T) *harness {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := builtin.InstallProblems(ws.ProblemsPath()); err != nil {
+	if err := regression.Install(ws); err != nil {
 		t.Fatal(err)
 	}
 	// The python3 on PATH, rather than a virtual environment that may need
@@ -126,6 +126,46 @@ func TestListSearchAndFilter(t *testing.T) {
 	}
 }
 
+// A new workspace has no problems; the list says how to add some.
+func TestListEmptyWorkspace(t *testing.T) {
+	ws, err := workspace.Create(t.TempDir(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := app.New(ws)
+	t.Cleanup(func() { a.Close() })
+	l, _ := a.Lang("go")
+	m, err := newModel(context.Background(), a, Options{Lang: l, Theme: "dark"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	if view := m.View(); !strings.Contains(view, "no problems yet") {
+		t.Errorf("empty list:\n%s", view)
+	}
+}
+
+// With problems in several packs, the list shows each problem's pack and
+// search matches pack/slug.
+func TestListPacks(t *testing.T) {
+	h := newHarness(t)
+	if strings.Contains(h.view(), "Pack") {
+		t.Error("a pack column with a single pack")
+	}
+	dir := filepath.Join(h.m.app.WS.WritablePack().ProblemsPath(), "0001-two-sum")
+	if err := os.CopyFS(dir, os.DirFS(filepath.Join(regression.ProblemsDir(), "0001-two-sum"))); err != nil {
+		t.Fatal(err)
+	}
+	h.m.refresh()
+	if view := h.view(); !strings.Contains(view, "Pack") || !strings.Contains(view, "regression") {
+		t.Errorf("no pack column:\n%s", view)
+	}
+	h.press("/", "l", "o", "c", "a", "l", "/", "enter")
+	if len(h.m.visible) != 1 || h.m.selected().Ref() != "local/two-sum" {
+		t.Fatalf("search local/: %d visible", len(h.m.visible))
+	}
+}
+
 func TestEnterOpensDetailAndCopiesPath(t *testing.T) {
 	h := newHarness(t)
 	h.press("enter")
@@ -151,8 +191,8 @@ func TestEnterOpensDetailAndCopiesPath(t *testing.T) {
 		t.Errorf("detail view has %d lines, want 30", got)
 	}
 	h.press("esc")
-	if h.m.top() != screenList || h.m.statuses[p.Slug] != app.StatusAttempted {
-		t.Fatalf("after esc: screen %v, status %v", h.m.top(), h.m.statuses[p.Slug])
+	if h.m.top() != screenList || h.m.statuses[p.Ref()] != app.StatusAttempted {
+		t.Fatalf("after esc: screen %v, status %v", h.m.top(), h.m.statuses[p.Ref()])
 	}
 }
 
@@ -227,8 +267,8 @@ func TestRunSubmitHistoryAndDiscard(t *testing.T) {
 	if h.m.run.report.Verdict != runner.Accepted || h.m.run.subID == 0 {
 		t.Fatalf("submit: %+v", h.m.run)
 	}
-	if h.m.statuses["two-sum"] != app.StatusSolved {
-		t.Fatalf("status after accepted submit: %v", h.m.statuses["two-sum"])
+	if h.m.statuses["regression/two-sum"] != app.StatusSolved {
+		t.Fatalf("status after accepted submit: %v", h.m.statuses["regression/two-sum"])
 	}
 
 	h.press("h")
@@ -257,11 +297,11 @@ func TestRunSubmitHistoryAndDiscard(t *testing.T) {
 		t.Fatalf("solution still exists: %v", err)
 	}
 	st, _ := h.m.app.Store()
-	if subs, _ := st.List(context.Background(), "two-sum"); len(subs) != 0 {
+	if subs, _ := st.List(context.Background(), regression.Name, "two-sum"); len(subs) != 0 {
 		t.Fatalf("%d submissions left", len(subs))
 	}
-	if h.m.statuses["two-sum"] != app.StatusNew {
-		t.Fatalf("status after discard: %v", h.m.statuses["two-sum"])
+	if h.m.statuses["regression/two-sum"] != app.StatusNew {
+		t.Fatalf("status after discard: %v", h.m.statuses["regression/two-sum"])
 	}
 }
 

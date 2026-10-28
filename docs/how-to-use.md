@@ -13,22 +13,36 @@ English · [简体中文](how-to-use_zh.md)
 
 ## Workspace
 
-`hc init` creates a workspace, by default `~/handcoding`:
+`hc init` creates an empty workspace, by default `~/handcoding`:
 
 ```
 ~/handcoding/
-  hc.yaml                     configuration
-  problems/0001-two-sum/      problem bank (see the problem protocol)
-  solutions/go/0001-two-sum/  your code: solution.go, plus generated go.mod and zz_hc_driver.go
-  solutions/python/...        your code: solution.py, plus generated hc_runtime.py and _hc_runner.py
-  .hc/hc.db                   submission history (SQLite)
-  .hc/venv/                   Python virtual environment managed by hc
-  pyrightconfig.json          points pyright at .hc/venv
+  hc.yaml                                  configuration
+  packs/local/problems/0001-two-sum/       your own problems (see the problem protocol)
+  packs/<name>/                            installed packs (read-only)
+  solutions/local/go/0001-two-sum/         your code: solution.go, plus generated go.mod and zz_hc_driver.go
+  solutions/local/python/0001-two-sum/     your code: solution.py, plus generated hc_runtime.py and _hc_runner.py
+  .hc/hc.db                                submission history (SQLite)
+  .hc/venv/                                Python virtual environment managed by hc
+  pyrightconfig.json                       points pyright at .hc/venv
 ```
 
 `hc init --lang python` makes Python the default solution language (`language` in `hc.yaml`; default `go`) and creates the Python environment described below right away. If that fails, for example because neither uv nor Python 3.10+ is installed, `hc init` warns and creates the workspace anyway.
 
 `hc` finds the workspace from `-w <dir>`, then `$HC_WORKSPACE`, then the nearest parent directory containing `hc.yaml`, then `~/handcoding`. You can run it from anywhere.
+
+### Packs
+
+The problems of a workspace come in [packs](protocol.md#packs), each a directory of `packs/`:
+
+- `packs/local/` holds your own problems: what `hc fetch`, `hc new` and `hc import` add. It has no `pack.yaml` (`local` is a reserved name), and is solved in every language.
+- Every other directory is an installed pack: a `pack.yaml` whose `name` is the directory's name, and its `problems/`. Installed packs are **read-only**: `hc gen`, `hc fix` and `hc cases add|rm|edit|build` refuse to change them, since updating the pack would replace the change. A pack whose `pack.yaml` lists `languages` can only be solved in those: `hc start -l` refuses the others, and if your default language is not among them, hc uses the pack's first language and says so. Installing packs (`hc pack install`) is coming; until then a pack can be copied into `packs/` by hand.
+
+A pack that hc cannot read (no `pack.yaml`, an invalid one, or one written for a newer protocol, which says to upgrade hc) is reported by `hc validate` and the list, and its problems are left out; the rest of the workspace works.
+
+Solutions live in `solutions/<pack>/<lang>/<dir>/`, and the history keeps each submission's pack and slug, so the same slug in two packs is two problems.
+
+A workspace made by an older hc keeps its problems in `problems/` instead of `packs/`. hc stops there and says so: create a new workspace with `hc init <dir>` and move your problems into its `packs/local/problems/`. Solutions and history are not carried over.
 
 Each Go problem is a standalone module, and the driver sits next to `solution.go`. So gopls, `go build` and Delve breakpoints all work on your real file. The generated files are rewritten before every run, so don't edit them. `go.mod` follows your Go: its `go` line is your toolchain's version (`go 1.27` for Go 1.27.2), so your solutions can use everything it supports. hc builds with `GOTOOLCHAIN=local` and never downloads another toolchain.
 
@@ -52,6 +66,7 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 - The debugger takes over the terminal. The screen is cleared before it starts, and the TUI comes back when it exits. If the last run had a failing case, `d` debugs that case.
 - Statement images are drawn in the terminal. kitty and Ghostty show the original image. Other truecolor terminals show a block-character approximation that loses detail; press `o` to open the original in your image viewer. See [`images`](#configuration) to choose the mode.
 - Statement colors follow the terminal background. If they look wrong, set `theme` in `hc.yaml`.
+- With problems from more than one pack, the list shows each problem's pack, and search matches `pack/slug` (`/local/` finds your own problems). `hc list --pack <name>` and `--group <name>` open the list limited to a pack or a group of one.
 
 | Key | Action | Key | Action |
 |---|---|---|---|
@@ -68,11 +83,11 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 
 ```
 Practice       list  start  edit  show  test  submit  debug  reset  discard  history
-Problem bank   init  fetch  new  import  cases  validate  docs
+Problems       init  fetch  new  import  cases  validate  docs
 Coding agent   gen  fix  skill
 ```
 
-Problems can be referred to by slug, slug prefix, number or directory name: `hc test 1`, `hc test two`.
+Problems can be referred to by slug, slug prefix, number or directory name: `hc test 1`, `hc test two`. These search every pack. `<pack>/<ref>` searches one: `hc test local/two-sum`, `hc test leetcode/1`. When a slug (or number) is in several packs, a bare reference is an error that lists them as `pack/slug`, and a prefix must match one slug across all packs.
 
 ```sh
 hc start two-sum -e                                 # create the solution and open the editor
@@ -83,6 +98,9 @@ hc test two-sum -i '{"nums":[1,2,3],"target":5}'    # custom input (expected out
 hc test lru-cache -l py                             # solve in Python
 hc submit two-sum                                   # all cases, recorded in history
 
+hc list --plain --pack leetcode --group arrays   # a pack's group, in its order, as a table
+
+hc history                  # every submission (problems as pack/slug when there are several packs)
 hc history two-sum          # submissions of a problem
 hc history show 12          # code and judge report of a submission
 hc history restore 12       # make a past submission your current code
@@ -115,19 +133,20 @@ Premium problems are not available. Neither are problems whose signature uses ty
 
 ```sh
 hc new my-problem --kind function   # scaffold a problem (--kind class for a design problem)
-$EDITOR ~/handcoding/problems/my-problem/problem.yaml
+$EDITOR ~/handcoding/packs/local/problems/my-problem/problem.yaml
 hc validate my-problem              # check the signature and the cases as you go
 hc gen my-problem                   # have an agent write a reference and cases, or write them yourself:
 hc cases build my-problem           #   expected outputs from reference/solution.*
 hc validate my-problem --run        #   every reference must pass every case
-hc import ./my-problems/            # import problem directories shared by others
+hc import ./my-problems/            # import problem directories shared by others, or a pack's problems
 ```
 
-The format of a problem, from `problem.yaml` to the reference solution, is specified by the [problem protocol](protocol.md); `hc new` scaffolds one to fill in, and the built-in samples (`hc init` puts them in the bank) are complete examples.
+`hc fetch`, `hc new` and `hc import` write into `packs/local/problems/`. The format of a problem, from `problem.yaml` to the reference solution, is specified by the [problem protocol](protocol.md); `hc new` scaffolds one to fill in, and hc's regression set ([`testdata/regression`](../testdata/regression) in its repository) has complete examples of every feature.
 
 - `hc cases build` runs a reference solution: the Go one if there is one, else the Python one; `-l` picks one. It refuses problems judged with `any_of`, whose `expected` lists every acceptable answer and has to be written by hand.
 - `hc validate` reports every break of the protocol's [validity rules](protocol.md#validity-rules) as an error, with the case number and field. With `--run` it also runs every reference solution on every case, and through the checker if there is one. It warns about an undecided judge rule (no `judge.compare`), no cases, cases without `expected`, no case marked as an example, no reference solution, and statement images that do not exist.
-- `hc import` copies only the entries the protocol defines (anything else, such as editor files or a `solutions/` folder, is left behind), and refuses problems whose slug or ID is already in the bank (`--force` replaces a problem with the same slug).
+- `hc import` copies only the entries the protocol defines (anything else, such as editor files or a `solutions/` folder, is left behind), and refuses problems whose slug or ID is already among your own problems (`--force` replaces a problem with the same slug). Slugs and IDs only need to be unique within a pack, so importing a problem that an installed pack also has is fine.
+- `hc validate` without arguments also checks every installed pack's `pack.yaml`, and that its groups name problems of the pack. Each problem's directory name, slug and ID are checked against the rest of its pack.
 
 hc carries the protocol (in English) for its own version, so it is at hand offline:
 
@@ -233,9 +252,9 @@ leetcode:
 ## Current limitations
 
 - Interactive problems aren't supported yet.
-- `hc fetch` imports problems with [structure inputs](protocol.md#structure-inputs) (a list with a cycle, intersecting lists, node references such as Lowest Common Ancestor), working out the structures from the difference between LeetCode's metadata, which describes its test data, and its template, which is the real signature: test data the template does not take becomes a hidden input, a value the template takes as a node becomes a `ref`, a node parameter missing from the test data becomes a `copy`, a `pos` makes a `cycle`, 160's `skipA` and `skipB` make a `join`, and a returned node gets `returns_ref`. The examples are mapped onto the new inputs. Example outputs that are not plain JSON, such as 142's "tail connects to node index 1", are left to `hc gen`. The samples 141, 142, 160, 236, 237 and 1379 show these problems.
+- `hc fetch` imports problems with [structure inputs](protocol.md#structure-inputs) (a list with a cycle, intersecting lists, node references such as Lowest Common Ancestor), working out the structures from the difference between LeetCode's metadata, which describes its test data, and its template, which is the real signature: test data the template does not take becomes a hidden input, a value the template takes as a node becomes a `ref`, a node parameter missing from the test data becomes a `copy`, a `pos` makes a `cycle`, 160's `skipA` and `skipB` make a `join`, and a returned node gets `returns_ref`. The examples are mapped onto the new inputs. Example outputs that are not plain JSON, such as 142's "tail connects to node index 1", are left to `hc gen`. Problems 141, 142, 160, 236, 237 and 1379 of the regression set show them.
 - `hc fetch` imports problems with [LeetCode's `Node` types](protocol.md#leetcodes-node-types), `NestedInteger` and `Employee`, reading their signature from LeetCode's Go template. `returns_copy` (Clone Graph) is left to `hc gen`, and so are the examples of iterator problems such as Flatten Nested List Iterator, which LeetCode gives without the calls.
-- Problems that encode a value and decode it back (297, 449, 535) are judged as [round trips](protocol.md#round-trip-problems): only the decoded value is compared, so requirements on the encoding itself (449: "as compact as possible") are not checked. `hc fetch` imports them, reading the encoder, the decoder and whether they share an instance from the harness in LeetCode's template comment. The samples 297 and 535 show both kinds.
+- Problems that encode a value and decode it back (297, 449, 535) are judged as [round trips](protocol.md#round-trip-problems): only the decoded value is compared, so requirements on the encoding itself (449: "as compact as possible") are not checked. `hc fetch` imports them, reading the encoder, the decoder and whether they share an instance from the harness in LeetCode's template comment. Problems 297 and 535 of the regression set show both kinds.
 - Run time is measured, but memory is not limited.
 - LeetCode premium problems cannot be fetched.
-- Problems with many valid answers that cannot all be listed ("return any valid answer") and randomized problems are judged by a [checker](protocol.md#checkers), which `hc gen` writes; the samples 5, 108, 210, 324, 384 and 528 have one. Checkers are Python, so these problems need Python 3.10 or later even when you solve them in Go; the virtual environment hc manages provides it.
+- Problems with many valid answers that cannot all be listed ("return any valid answer") and randomized problems are judged by a [checker](protocol.md#checkers), which `hc gen` writes; problems 5, 108, 210, 324, 384 and 528 of the regression set have one. Checkers are Python, so these problems need Python 3.10 or later even when you solve them in Go; the virtual environment hc manages provides it.

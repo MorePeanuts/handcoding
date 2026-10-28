@@ -21,10 +21,10 @@ func newFetchCmd(root *rootOptions) *cobra.Command {
 		Use:     "fetch <slug|id|url>...",
 		Aliases: []string{"pull"},
 		Short:   "Import problems from LeetCode",
-		Long: `Download problems from LeetCode's public API into the bank: statement
-(with its images, for offline use), signature, Go/Python templates and the
-examples (with expected outputs when they can be parsed from the statement).
-Premium problems are not available.
+		Long: `Download problems from LeetCode's public API into the workspace's own
+problems, packs/local/problems/: statement (with its images, for offline use),
+signature, Go/Python templates and the examples (with expected outputs when
+they can be parsed from the statement). Premium problems are not available.
 
 The problem is not ready to submit yet: LeetCode publishes only the examples
 and not how answers are judged (any order? several valid answers?).
@@ -95,12 +95,13 @@ func fetchOne(cmd *cobra.Command, a *app.App, client *leetcode.Client, ref strin
 		return err
 	}
 	// LeetCode accepts slugs in any case; compare with its canonical one.
-	existing, err := a.WS.Problem(q.TitleSlug)
-	if err != nil || existing.Slug != q.TitleSlug {
-		existing = nil
+	k := a.WS.WritablePack()
+	existing, err := packProblem(k, q.TitleSlug)
+	if err != nil {
+		return err
 	}
 	if existing != nil && !force {
-		return fmt.Errorf("already in the bank at %s (use --force to replace)", existing.Dir)
+		return fmt.Errorf("already fetched into %s (use --force to replace)", a.WS.Rel(existing.Dir))
 	}
 	conv, err := leetcode.Convert(q, client.Site, translated)
 	if err != nil {
@@ -124,10 +125,11 @@ func fetchOne(cmd *cobra.Command, a *app.App, client *leetcode.Client, ref strin
 		}
 	}
 	fmt.Printf("%s %s. %s → %s (%d examples, %d with expected output)\n", ui.Green.Render("fetched"),
-		conv.Problem.ID, conv.Problem.Title, dir, len(conv.Cases), withExpected)
+		conv.Problem.ID, conv.Problem.Title, a.WS.Rel(dir), len(conv.Cases), withExpected)
 	for _, w := range conv.Warnings {
 		fmt.Printf("    %s %s\n", ui.Yellow.Render("note:"), w)
 	}
-	fmt.Printf("    next: hc gen %s — writes the test cases and decides how answers are judged\n", conv.Problem.Slug)
+	conv.Problem.Pack = k.Name
+	fmt.Printf("    next: hc gen %s — writes the test cases and decides how answers are judged\n", a.WS.Ref(conv.Problem))
 	return nil
 }

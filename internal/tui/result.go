@@ -26,7 +26,7 @@ const (
 // runState is the latest test or submit run.
 type runState struct {
 	kind    runKind
-	slug    string
+	ref     string // the problem's pack/slug
 	langID  string
 	running bool
 	cancel  context.CancelFunc
@@ -59,7 +59,7 @@ func (m *model) startRun(kind runKind, p *problem.Problem) tea.Cmd {
 	// fail on an earlier run.
 	m.app.RetryEnv()
 	ctx, cancel := context.WithCancel(m.ctx)
-	run := &runState{kind: kind, slug: p.Slug, langID: m.lang.ID(), running: true, cancel: cancel}
+	run := &runState{kind: kind, ref: p.Ref(), langID: m.lang.ID(), running: true, cancel: cancel}
 	m.run, m.current = run, p
 	m.message = ""
 	m.push(screenResult)
@@ -95,7 +95,7 @@ func testExamples(ctx context.Context, a *app.App, p *problem.Problem, l lang.La
 		return nil, err
 	}
 	if len(sel) == 0 {
-		return nil, fmt.Errorf("%s has no test cases yet (hc gen %s)", p.Slug, p.Slug)
+		return nil, fmt.Errorf("%s has no test cases yet (hc gen %s)", p.Slug, a.WS.Ref(p))
 	}
 	return a.Run(ctx, p, l, sel, opts)
 }
@@ -185,7 +185,7 @@ func (m *model) viewResult() string {
 		}
 	}
 	keys := []string{"↑↓ scroll", "t test", "s submit", "d debug", "e edit", "v statement", "h history", "esc back"}
-	if r != nil && !r.running && r.slug == p.Slug && r.report != nil {
+	if r != nil && !r.running && r.ref == p.Ref() && r.report != nil {
 		if n := m.debugCase(p); n > 1 || r.report.Verdict != runner.Accepted {
 			keys[3] = fmt.Sprintf("d debug-case-%d", n)
 		}

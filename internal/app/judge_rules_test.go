@@ -14,10 +14,11 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/runner"
 )
 
-// addProblem writes a problem into the workspace bank.
+// addProblem writes a problem into the workspace's own problems.
 func addProblem(t *testing.T, a *app.App, dir, yaml, cases string) *problem.Problem {
 	t.Helper()
-	d := filepath.Join(a.WS.ProblemsPath(), dir)
+	local := a.WS.WritablePack()
+	d := filepath.Join(local.ProblemsPath(), dir)
 	if err := os.MkdirAll(d, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -28,6 +29,9 @@ func addProblem(t *testing.T, a *app.App, dir, yaml, cases string) *problem.Prob
 		t.Fatal(err)
 	}
 	p, err := problem.Load(d)
+	if err == nil {
+		p.Pack = local.Name
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -546,11 +550,11 @@ func TestBrokenChecker(t *testing.T) {
 		checker string
 		want    []string
 	}{
-		{"def check(input, output, expected)\n    pass\n", []string{"problems/any-index/checker.py cannot be loaded", "SyntaxError"}},
+		{"def check(input, output, expected)\n    pass\n", []string{"packs/local/problems/any-index/checker.py cannot be loaded", "SyntaxError"}},
 		{"def judge(input, output, expected):\n    pass\n", []string{"checker.py cannot be loaded", "must define check(input, output, expected)"}},
 		{"def check(input, output, expected):\n    if input[\"target\"] == 2:\n        raise ValueError(\"boom\")\n",
-			[]string{"problems/any-index/checker.py failed on case 2", "not a verdict on your solution",
-				`File "problems/any-index/checker.py", line 3, in check`, `raise ValueError("boom")`, "ValueError: boom"}},
+			[]string{"packs/local/problems/any-index/checker.py failed on case 2", "not a verdict on your solution",
+				`File "packs/local/problems/any-index/checker.py", line 3, in check`, `raise ValueError("boom")`, "ValueError: boom"}},
 		{"def check(input, output, expected):\n    return 1\n", []string{"checker.py failed on case 1", "check returned 1"}},
 		{"import os\n\ndef check(input, output, expected):\n    print('dying')\n    os._exit(3)\n", []string{"checker.py failed on case 1: exited without a result", "dying", "exit status 3"}},
 		{"def check(input, output, expected):\n    while input[\"target\"] == 2:\n        pass\n", []string{"checker.py failed on case 2: time limit of 2s exceeded"}},
@@ -583,7 +587,7 @@ func TestBrokenChecker(t *testing.T) {
 		t.Error("submit with a broken checker succeeded")
 	}
 	st, _ := a.Store()
-	if subs, _ := st.List(context.Background(), p.Slug); len(subs) != 0 {
+	if subs, _ := st.List(context.Background(), p.Pack, p.Slug); len(subs) != 0 {
 		t.Errorf("a broken checker recorded %d submission(s)", len(subs))
 	}
 }

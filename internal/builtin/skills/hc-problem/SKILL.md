@@ -6,9 +6,16 @@ description: Write or fix the definition of an hc (handcoding) problem, what it 
 # handcoding problem authoring
 
 `hc` is a local judge for LeetCode-style problems. A workspace contains
-`hc.yaml`; problems live in `problems/<dir>/`, the user's own code in
-`solutions/<lang>/<dir>/`. **Never read or modify the user's solutions
-unless asked to diagnose a reported failure, and never change them.**
+`hc.yaml`; its own problems live in `packs/local/problems/<dir>/`, and
+`hc new` and `hc fetch` put new ones there. Other directories of `packs/`
+are installed packs: read-only, so never edit them (hc refuses to). The
+user's own code is in `solutions/<pack>/<lang>/<dir>/`. **Never read or
+modify the user's solutions unless asked to diagnose a reported failure,
+and never change them.**
+
+In hc commands, name a problem by its slug, or as `<pack>/<slug>` when the
+slug is in several packs (`local/two-sum`); `hc gen` and `hc fix` tell you
+the name to use.
 
 This skill covers what a problem is: its directory, its signature, its
 statement and its templates. How it is judged (`judge.compare`, reference

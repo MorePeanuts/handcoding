@@ -13,6 +13,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -27,10 +28,12 @@ import (
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/lang"
+	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/store"
 	"github.com/MorePeanuts/handcoding/internal/termimg"
 	"github.com/MorePeanuts/handcoding/internal/ui"
+	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
 // Options configure the TUI.
@@ -45,6 +48,9 @@ type Options struct {
 	Theme string
 	// Images draws statement images; nil means configure from hc.yaml.
 	Images *termimg.Renderer
+	// Pack and Group limit the list to a pack, or a group of a pack (see
+	// workspace.Filter).
+	Pack, Group string
 }
 
 type screen int
@@ -88,6 +94,9 @@ type model struct {
 	filter    filter
 	search    textinput.Model
 	searching bool
+	// multiPack is set when the problems come from several packs, which
+	// the list then shows.
+	multiPack bool
 
 	// current is the problem shown by the detail, result and history screens.
 	current      *problem.Problem
@@ -140,7 +149,7 @@ func newModel(ctx context.Context, a *app.App, opts Options) (*model, error) {
 	}
 	m.search = textinput.New()
 	m.search.Prompt = "/"
-	m.search.Placeholder = "search title, slug, id or tag"
+	m.search.Placeholder = "search title, pack/slug, id or tag"
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Dot))
 	m.detail = viewport.New(0, 0)
 	m.result = viewport.New(0, 0)
@@ -168,28 +177,40 @@ func (m *model) pop() {
 // problem.
 func (m *model) reload() error {
 	probs, err := m.app.WS.Problems()
-	if err != nil && len(probs) == 0 {
+	if err != nil && probs == nil && !loadFailed(err) {
 		return err
 	}
 	if err != nil {
 		m.message = ui.Red.Render(err.Error())
 	}
+	if probs, err = m.app.WS.Filter(probs, m.opts.Pack, m.opts.Group); err != nil {
+		return err
+	}
+	m.multiPack = workspace.SpansPacks(probs)
 	statuses, err := m.app.Statuses(m.ctx, probs)
 	if err != nil {
 		return err
 	}
 	var current string
 	if p := m.selected(); p != nil {
-		current = p.Slug
+		current = p.Ref()
 	}
 	m.probs, m.statuses = probs, statuses
 	m.applyFilter()
 	for i, idx := range m.visible {
-		if m.probs[idx].Slug == current {
+		if m.probs[idx].Ref() == current {
 			m.cursor = i
 		}
 	}
 	return nil
+}
+
+// loadFailed reports whether err holds only problems or packs that failed to
+// load, which the list shows next to the rest.
+func loadFailed(err error) bool {
+	_, pe := errors.AsType[*workspace.PackError](err)
+	_, le := errors.AsType[*pack.LoadError](err)
+	return pe || le
 }
 
 func (m *model) Init() tea.Cmd { return nil }

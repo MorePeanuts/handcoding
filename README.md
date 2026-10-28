@@ -59,11 +59,13 @@ To solve problems you need the toolchain of your language: Go 1.22+, or for Pyth
 ## Quick start
 
 ```sh
-hc init                 # create ~/handcoding with a few sample problems
+hc init                 # create an empty workspace in ~/handcoding
+hc fetch two-sum        # import a problem from LeetCode
+hc gen two-sum          # let a coding agent write its test cases and judge rule
 hc                      # open the problem list
 ```
 
-To solve in Python by default, run `hc init --lang python` instead; it also sets up the Python environment right away.
+To solve in Python by default, run `hc init --lang python` instead; it also sets up the Python environment right away. Your problems live in the workspace's `packs/local/problems/`: `hc new` scaffolds one of your own, and `hc import` copies problem directories in. Installed packs of ready-made problems sit beside it in `packs/` (`hc pack install` is coming).
 
 Press `enter` on a problem. `hc` shows the statement, creates `solution.go` from the template and copies its path to the clipboard. Open it in your editor next door, then press `t` to test and `s` to submit.
 
@@ -73,8 +75,7 @@ Press `enter` on a problem. `hc` shows the statement, creates `solution.go` from
 Every action also has a command:
 
 ```sh
-hc fetch 206            # import a problem from LeetCode
-hc gen 206              # let a coding agent write its test cases and judge rule
+hc start two-sum -e     # create the solution and open it in your editor
 hc test two-sum         # run the examples
 hc submit two-sum       # judge on all cases and record the submission
 hc debug two-sum -c 4   # debug case 4

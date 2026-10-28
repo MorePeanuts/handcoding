@@ -38,7 +38,7 @@ func fakeUV(t *testing.T) {
 func TestInitLang(t *testing.T) {
 	fakeUV(t)
 	dir := filepath.Join(t.TempDir(), "ws")
-	if err := runHC(t, "init", "--no-samples", "--lang", "py", dir); err != nil {
+	if err := runHC(t, "init", "--lang", "py", dir); err != nil {
 		t.Fatal(err)
 	}
 	ws, err := workspace.Open(dir)
@@ -57,7 +57,7 @@ func TestInitLang(t *testing.T) {
 func TestInitLangNoPython(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	dir := filepath.Join(t.TempDir(), "ws")
-	if err := runHC(t, "init", "--no-samples", "-l", "python", dir); err != nil {
+	if err := runHC(t, "init", "-l", "python", dir); err != nil {
 		t.Fatal(err)
 	}
 	ws, err := workspace.Open(dir)
@@ -72,7 +72,7 @@ func TestInitLangNoPython(t *testing.T) {
 func TestInitDefaultsAndRejectsLang(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	dir := filepath.Join(t.TempDir(), "ws")
-	if err := runHC(t, "init", "--no-samples", dir); err != nil {
+	if err := runHC(t, "init", dir); err != nil {
 		t.Fatal(err)
 	}
 	if ws, err := workspace.Open(dir); err != nil || ws.Config.Language != "go" {
@@ -108,6 +108,9 @@ func TestSkillsInstalledForAgents(t *testing.T) {
 	}
 
 	if err := os.RemoveAll(filepath.Join(dir, skill.ClaudeDir)); err != nil {
+		t.Fatal(err)
+	}
+	if err := runHC(t, "-w", dir, "new", "two-sum"); err != nil {
 		t.Fatal(err)
 	}
 	if err := runHC(t, "-w", dir, "gen", "two-sum", "--dry-run"); err != nil {

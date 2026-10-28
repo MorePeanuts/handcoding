@@ -238,6 +238,19 @@ type Problem struct {
 
 	// Dir is the directory the problem was loaded from.
 	Dir string `yaml:"-"`
+	// Pack is the name of the pack the problem belongs to, set by the
+	// workspace that loaded it; empty for a problem loaded on its own.
+	Pack string `yaml:"-"`
+}
+
+// Ref is the reference that names the problem in any workspace: pack/slug,
+// or the slug alone when the problem belongs to no pack. Solutions and
+// history are keyed by it.
+func (p *Problem) Ref() string {
+	if p.Pack == "" {
+		return p.Slug
+	}
+	return p.Pack + "/" + p.Slug
 }
 
 var (
@@ -589,7 +602,7 @@ func (p *Problem) Ready() bool { return p.Judge.Compare != "" }
 
 // NotReadyHint tells the user how to make an undecided problem judgeable.
 func (p *Problem) NotReadyHint() string {
-	return fmt.Sprintf("the judge rule of %s is not decided yet: run `hc gen %s`, or set judge.compare in problem.yaml", p.Slug, p.Slug)
+	return fmt.Sprintf("the judge rule of %s is not decided yet: run `hc gen %s`, or set judge.compare in problem.yaml", p.Slug, p.Ref())
 }
 
 // EntryName is the name of the function or class the user implements.

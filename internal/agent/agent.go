@@ -97,11 +97,13 @@ func useSkill(name, task string) string {
 // skill when the problem itself, not its cases, is wrong.
 var definitionSkill = fmt.Sprintf("If the problem's definition itself is wrong (its signature, structure inputs, statement or templates), fix it with the %s skill (read %s) first.\n", skill.Problem, skill.Path(skill.Problem))
 
-// GeneratePrompt asks the agent to write a reference solution and cases.
-func GeneratePrompt(slug, problemDir string, count int, extra string) string {
+// GeneratePrompt asks the agent to write a reference solution and cases for
+// the problem ref (pack/slug) in problemDir, relative to the workspace.
+func GeneratePrompt(ref, problemDir string, count int, extra string) string {
 	var b strings.Builder
-	b.WriteString(useSkill(skill.Cases, fmt.Sprintf("generate test cases for the hc problem %q in %s", slug, problemDir)))
-	fmt.Fprintf(&b, "Follow its \"generate test cases\" workflow: decide the judge rule from the statement, write the reference solutions, add the cases, and finish when `hc validate %s --run` passes.\n", slug)
+	b.WriteString(useSkill(skill.Cases, fmt.Sprintf("generate test cases for the hc problem %s in %s", ref, problemDir)))
+	fmt.Fprintf(&b, "Name the problem %s in hc commands.\n", ref)
+	fmt.Fprintf(&b, "Follow its \"generate test cases\" workflow: decide the judge rule from the statement, write the reference solutions, add the cases, and finish when `hc validate %s --run` passes.\n", ref)
 	if count > 0 {
 		fmt.Fprintf(&b, "Target about %d cases in total.\n", count)
 	}
@@ -113,12 +115,14 @@ func GeneratePrompt(slug, problemDir string, count int, extra string) string {
 	return b.String()
 }
 
-// FixPrompt asks the agent to investigate and fix test cases.
-func FixPrompt(slug, problemDir string, cases []int, complaint, solutionPath string) string {
+// FixPrompt asks the agent to investigate and fix test cases of the problem
+// ref (pack/slug) in problemDir.
+func FixPrompt(ref, problemDir string, cases []int, complaint, solutionPath string) string {
 	var b strings.Builder
-	b.WriteString(useSkill(skill.Cases, fmt.Sprintf("fix test cases of the hc problem %q in %s", slug, problemDir)))
+	b.WriteString(useSkill(skill.Cases, fmt.Sprintf("fix test cases of the hc problem %s in %s", ref, problemDir)))
+	fmt.Fprintf(&b, "Name the problem %s in hc commands.\n", ref)
 	if len(cases) > 0 {
-		fmt.Fprintf(&b, "Suspicious case number(s): %v (inspect with `hc cases list %s --case N`).\n", cases, slug)
+		fmt.Fprintf(&b, "Suspicious case number(s): %v (inspect with `hc cases list %s --case N`).\n", cases, ref)
 	}
 	if complaint != "" {
 		fmt.Fprintf(&b, "The user reports: %s\n", complaint)

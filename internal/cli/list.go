@@ -13,11 +13,14 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/tui"
 	"github.com/MorePeanuts/handcoding/internal/ui"
+	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
 type listOptions struct {
 	plain bool
 	lang  string
+	pack  string
+	group string
 }
 
 func newListCmd(root *rootOptions) *cobra.Command {
@@ -26,12 +29,17 @@ func newListCmd(root *rootOptions) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "Browse problems (interactive in a terminal)",
-		Args:    cobra.NoArgs,
+		Long: `Browse the problems of every pack in the workspace, or only those of one
+pack (--pack), or of one group of a pack (--group), in the group's order. A
+group name that only one pack uses needs no --pack.`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runList(cmd, root, o)
 		},
 	}
 	cmd.Flags().BoolVar(&o.plain, "plain", false, "print a plain table instead of the interactive list")
+	cmd.Flags().StringVar(&o.pack, "pack", "", "only the problems of this pack")
+	cmd.Flags().StringVar(&o.group, "group", "", "only the problems of this group of a pack")
 	langFlag(cmd, &o.lang)
 	return cmd
 }
@@ -46,6 +54,11 @@ func runList(cmd *cobra.Command, root *rootOptions, o listOptions) error {
 	if err != nil {
 		return err
 	}
+	all, loadErr := a.WS.Problems()
+	probs, err := a.WS.Filter(all, o.pack, o.group)
+	if err != nil {
+		return err
+	}
 	if !o.plain && isTerminal(os.Stdout) && isTerminal(os.Stdin) {
 		exe, err := os.Executable()
 		if err != nil {
@@ -55,20 +68,28 @@ func runList(cmd *cobra.Command, root *rootOptions, o listOptions) error {
 			Exe:       exe,
 			Lang:      l,
 			EditorCmd: func(path string) (*exec.Cmd, error) { return editorCommand(a.WS.Config, path) },
+			Pack:      o.pack,
+			Group:     o.group,
 		})
 	}
-	probs, err := a.WS.Problems()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, ui.Red.Render(err.Error()))
+	if loadErr != nil {
+		fmt.Fprintln(os.Stderr, ui.Red.Render(loadErr.Error()))
+	}
+	if len(all) == 0 {
+		fmt.Fprintln(os.Stderr, "No problems yet: add some with `hc fetch <slug>` or `hc new <slug>`.")
+		return nil
 	}
 	statuses, err := a.Statuses(cmd.Context(), probs)
 	if err != nil {
 		return err
 	}
+	// With several packs, slugs may repeat: pack/slug names a problem in
+	// every case.
+	qualify := workspace.SpansPacks(all)
 	rows := [][]string{{"STATUS", "ID", "SLUG", "TITLE", "DIFFICULTY", "TAGS"}}
 	for _, p := range probs {
 		status := "todo"
-		switch statuses[p.Slug] {
+		switch statuses[p.Ref()] {
 		case app.StatusSolved:
 			status = "solved"
 		case app.StatusAttempted:
@@ -78,7 +99,11 @@ func runList(cmd *cobra.Command, root *rootOptions, o listOptions) error {
 		if !p.Ready() {
 			tags = "[not ready: hc gen] " + tags
 		}
-		rows = append(rows, []string{status, p.ID, p.Slug, p.Title, p.Difficulty, tags})
+		slug := p.Slug
+		if qualify {
+			slug = p.Ref()
+		}
+		rows = append(rows, []string{status, p.ID, slug, p.Title, p.Difficulty, tags})
 	}
 	_, err = io.WriteString(os.Stdout, formatTable(rows))
 	return err

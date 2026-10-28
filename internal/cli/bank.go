@@ -12,8 +12,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
-	"github.com/MorePeanuts/handcoding/internal/builtin"
 	"github.com/MorePeanuts/handcoding/internal/lang"
+	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/skill"
@@ -23,15 +23,13 @@ import (
 )
 
 func newInitCmd(_ *rootOptions) *cobra.Command {
-	var (
-		noSamples bool
-		langName  string
-	)
+	var langName string
 	cmd := &cobra.Command{
 		Use:   "init [dir]",
 		Short: "Create a workspace (default ~/handcoding)",
-		Long: `Create a handcoding workspace with the built-in sample problems and the
-agent skills (see ` + "`hc skill`" + `).
+		Long: `Create an empty handcoding workspace with the agent skills (see
+` + "`hc skill`" + `). Your own problems go to its packs/local/problems/: add
+them with ` + "`hc fetch`" + ` (from LeetCode), ` + "`hc new`" + ` or ` + "`hc import`" + `.
 
 hc finds the workspace from $HC_WORKSPACE, the nearest parent directory with
 hc.yaml, or ~/handcoding — so using the default lets you run hc anywhere.
@@ -58,12 +56,6 @@ python, hc also creates the workspace's Python virtual environment now.`,
 			if err != nil {
 				return err
 			}
-			n := 0
-			if !noSamples {
-				if n, err = builtin.InstallProblems(ws.ProblemsPath()); err != nil {
-					return err
-				}
-			}
 			opts := skill.Options{Version: version.String(), Exclusive: true}
 			if _, err := skill.Install(ws.Root, skill.Set(skill.Practice), opts); err != nil {
 				return err
@@ -71,18 +63,20 @@ python, hc also creates the workspace's Python virtual environment now.`,
 			if l, err := app.New(ws).Lang(""); err == nil && l.ID() == "python" {
 				setupEnv(cmd.Context(), l)
 			}
-			fmt.Printf("%s workspace at %s (%d sample problems)\n\n", ui.Green.Render("Created"), ws.Root, n)
-			fmt.Println("Next steps:")
-			fmt.Println("  hc                      open the problem list")
-			fmt.Println("  hc start two-sum -e     start a problem in your editor")
-			fmt.Println("  hc test two-sum         run the examples")
-			fmt.Println("  hc submit two-sum       judge all cases")
-			fmt.Println("  hc fetch 3              fetch a problem from LeetCode")
-			fmt.Println("\nTip: version your progress with `git init` in the workspace.")
+			fmt.Printf("%s workspace at %s\n\n", ui.Green.Render("Created"), ws.Root)
+			fmt.Println("It has no problems yet. Next steps:")
+			fmt.Println("  hc fetch two-sum         fetch a problem from LeetCode")
+			fmt.Println("  hc gen two-sum           have an agent write its test cases")
+			fmt.Println("  hc new my-problem        or write a problem of your own")
+			fmt.Println("  hc start two-sum -e      start a problem in your editor")
+			fmt.Println("  hc test two-sum          run the examples")
+			fmt.Println("  hc submit two-sum        judge all cases")
+			fmt.Println("  hc                       open the problem list")
+			fmt.Println("\nPacks of ready-made problems are coming with `hc pack install`.")
+			fmt.Println("Tip: version your progress with `git init` in the workspace.")
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&noSamples, "no-samples", false, "do not install the sample problems")
 	cmd.Flags().StringVarP(&langName, "lang", "l", workspace.DefaultConfig().Language, "default solution language (go, python)")
 	return cmd
 }
@@ -93,10 +87,10 @@ func newNewCmd(root *rootOptions) *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "new <slug>",
-		Short: "Scaffold a custom problem in the bank",
-		Long: `Create problems/<slug>/ with a problem.yaml skeleton, description.md and an
-empty cases.jsonl. Edit them, then run ` + "`hc validate <slug>`" + ` and
-` + "`hc gen <slug>`" + ` to have an agent write test cases.`,
+		Short: "Scaffold a problem of your own",
+		Long: `Create packs/local/problems/<slug>/ with a problem.yaml skeleton,
+description.md and an empty cases.jsonl. Edit them, then run
+` + "`hc validate <slug>`" + ` and ` + "`hc gen <slug>`" + ` to have an agent write test cases.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, err := root.openApp()
@@ -130,13 +124,16 @@ empty cases.jsonl. Edit them, then run ` + "`hc validate <slug>`" + ` and
 			if err := p.Validate(); err != nil {
 				return err
 			}
-			if _, err := a.WS.Problem(p.Slug); err == nil {
-				return fmt.Errorf("problem %s already exists", p.Slug)
+			k := a.WS.WritablePack()
+			if existing, err := packProblem(k, p.Slug); err != nil {
+				return err
+			} else if existing != nil {
+				return fmt.Errorf("problem %s already exists", existing.Ref())
 			}
-			if other := duplicateID(a, p); other != "" {
+			if other := duplicateID(k, p); other != "" {
 				return fmt.Errorf("id %s is already used by %s", p.ID, other)
 			}
-			p.Dir = a.WS.NewProblemDir(p)
+			p.Dir, p.Pack = a.WS.NewProblemDir(p), k.Name
 			if err := p.Save(); err != nil {
 				return err
 			}
@@ -150,8 +147,9 @@ empty cases.jsonl. Edit them, then run ` + "`hc validate <slug>`" + ` and
 			if err := os.WriteFile(filepath.Join(p.Dir, problem.CasesFile), nil, 0o644); err != nil {
 				return err
 			}
-			fmt.Printf("%s %s\n", ui.Green.Render("created"), p.Dir)
-			fmt.Println("Edit problem.yaml and description.md, then run `hc validate " + p.Slug + "` and `hc gen " + p.Slug + "`.")
+			fmt.Printf("%s %s\n", ui.Green.Render("created"), a.WS.Rel(p.Dir))
+			ref := a.WS.Ref(p)
+			fmt.Println("Edit problem.yaml and description.md, then run `hc validate " + ref + "` and `hc gen " + ref + "`.")
 			return nil
 		},
 	}
@@ -166,9 +164,10 @@ func newImportCmd(root *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "import <dir>...",
 		Short: "Import custom problems (directories in the hc problem format)",
-		Long: `Copy problems into the bank. Each argument is a problem directory containing
-problem.yaml, or a directory whose subdirectories are problems. See
-docs/protocol.md for the format.`,
+		Long: `Copy problems into the workspace's own problems, packs/local/problems/.
+Each argument is a problem directory containing problem.yaml, a directory
+whose subdirectories are problems, or a pack (a directory with pack.yaml),
+whose problems are copied. See ` + "`hc docs protocol`" + ` for the format.`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, err := root.openApp()
@@ -181,6 +180,9 @@ docs/protocol.md for the format.`,
 				if _, err := os.Stat(filepath.Join(arg, problem.MetaFile)); err == nil {
 					dirs = append(dirs, arg)
 					continue
+				}
+				if _, err := os.Stat(filepath.Join(arg, pack.ManifestFile)); err == nil {
+					arg = filepath.Join(arg, pack.ProblemsDir)
 				}
 				entries, err := os.ReadDir(arg)
 				if err != nil {
@@ -241,13 +243,18 @@ func importProblem(a *app.App, dir string, force bool) error {
 			missing++
 		}
 	}
-	if other := duplicateID(a, p); other != "" {
+	k := a.WS.WritablePack()
+	if other := duplicateID(k, p); other != "" {
 		return fmt.Errorf("id %s is already used by %s", p.ID, other)
 	}
 	target := a.WS.NewProblemDir(p)
-	if existing, err := a.WS.Problem(p.Slug); err == nil {
+	existing, err := packProblem(k, p.Slug)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
 		if !force {
-			return fmt.Errorf("%s already exists (use --force to overwrite)", p.Slug)
+			return fmt.Errorf("%s already exists (use --force to overwrite)", existing.Ref())
 		}
 		if err := os.RemoveAll(existing.Dir); err != nil {
 			return err
@@ -274,12 +281,13 @@ func importProblem(a *app.App, dir string, force bool) error {
 			return err
 		}
 	}
-	fmt.Printf("%s %s (%d cases)\n", ui.Green.Render("imported"), p.Slug, len(cases))
+	p.Dir, p.Pack = target, k.Name
+	fmt.Printf("%s %s (%d cases)\n", ui.Green.Render("imported"), p.Ref(), len(cases))
 	if len(ignored) > 0 {
 		fmt.Println(ui.Faint.Render("     not part of the problem format, left behind: " + strings.Join(ignored, ", ")))
 	}
 	if missing > 0 {
-		fmt.Printf("     %d case(s) without expected output; run `hc cases build %s`\n", missing, p.Slug)
+		fmt.Printf("     %d case(s) without expected output; run `hc cases build %s`\n", missing, a.WS.Ref(p))
 	}
 	return nil
 }
@@ -314,19 +322,6 @@ func newCasesCmd(root *rootOptions) *cobra.Command {
 	return cmd
 }
 
-func withProblemOnly(root *rootOptions, ref string, fn func(a *app.App, p *problem.Problem) error) error {
-	a, err := root.openApp()
-	if err != nil {
-		return err
-	}
-	defer a.Close()
-	p, err := a.WS.Problem(ref)
-	if err != nil {
-		return err
-	}
-	return fn(a, p)
-}
-
 func newCasesListCmd(root *rootOptions) *cobra.Command {
 	var (
 		nums    []int
@@ -339,7 +334,7 @@ func newCasesListCmd(root *rootOptions) *cobra.Command {
 		Short:   "List test cases",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withProblemOnly(root, args[0], func(_ *app.App, p *problem.Problem) error {
+			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
 				cases, err := p.LoadCases()
 				if err != nil {
 					return err
@@ -381,7 +376,7 @@ func newCasesListCmd(root *rootOptions) *cobra.Command {
 				fmt.Println()
 				mode := p.Judge.Compare
 				if !p.Ready() {
-					mode = "not decided yet (hc gen " + p.Slug + ")"
+					mode = "not decided yet (hc gen " + a.WS.Ref(p) + ")"
 				}
 				fmt.Println(ui.Faint.Render(fmt.Sprintf("%d case(s), compare mode %s", len(cases), mode)))
 				return nil
@@ -409,14 +404,14 @@ func newCasesBuildCmd(root *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "build <problem>",
 		Short: "Compute expected outputs by running the reference solution",
-		Long: `Run the reference solution (problems/<dir>/reference/solution.{py,go}) on
+		Long: `Run the reference solution (reference/solution.{py,go} in the problem directory) on
 every case without an expected output and store the results. With --force,
 recompute all expected outputs and report which ones changed. Problems judged
 with any_of are refused: their expected outputs list every acceptable answer,
 so write them by hand.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
+			return withWritableProblem(root, args[0], func(a *app.App, p *problem.Problem) error {
 				res, err := a.BuildCases(cmd.Context(), p, langName, force)
 				if res != nil && res.Filled > 0 {
 					fmt.Printf("%s %d expected output(s) using the %s reference\n", ui.Green.Render("filled"), res.Filled, res.Lang.Name())
@@ -453,7 +448,7 @@ there is one.
   hc cases add two-sum --input '{"nums":[1,4],"target":5}' --expected '[0,1]'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
+			return withWritableProblem(root, args[0], func(a *app.App, p *problem.Problem) error {
 				c, err := parseInput(p, input)
 				if err != nil {
 					return err
@@ -503,7 +498,7 @@ func newCasesRmCmd(root *rootOptions) *cobra.Command {
 		Short: "Remove test cases by number",
 		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withProblemOnly(root, args[0], func(_ *app.App, p *problem.Problem) error {
+			return withWritableProblem(root, args[0], func(_ *app.App, p *problem.Problem) error {
 				cases, err := p.LoadCases()
 				if err != nil {
 					return err
@@ -538,7 +533,7 @@ func newCasesEditCmd(root *rootOptions) *cobra.Command {
 		Short: "Open cases.jsonl in your editor",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
+			return withWritableProblem(root, args[0], func(a *app.App, p *problem.Problem) error {
 				path := filepath.Join(p.Dir, problem.CasesFile)
 				ed, err := editorCommand(a.WS.Config, path)
 				if err != nil {
@@ -547,7 +542,7 @@ func newCasesEditCmd(root *rootOptions) *cobra.Command {
 				if err := ed.Run(); err != nil {
 					return err
 				}
-				return validateProblem(cmd, a, p, false, nil)
+				return validateProblem(cmd, a, p, false, nil, a.WS.Ref(p))
 			})
 		},
 	}
@@ -557,60 +552,91 @@ func newValidateCmd(root *rootOptions) *cobra.Command {
 	var run bool
 	cmd := &cobra.Command{
 		Use:   "validate [problem]...",
-		Short: "Check problems against the protocol (all problems by default)",
-		Long: `Validate problem.yaml, cases.jsonl and starter generation. With --run, also
-run the reference solution on every case and require it to pass.`,
+		Short: "Check packs and problems against the protocol (all by default)",
+		Long: `Validate problem.yaml, cases.jsonl and starter generation, and the identity
+of each problem within its pack (directory name, unique slug and id). Without
+arguments, also check every installed pack's pack.yaml. With --run, also run
+the reference solutions on every case and require them to pass.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, err := root.openApp()
 			if err != nil {
 				return err
 			}
 			defer a.Close()
-			var probs []*problem.Problem
-			if len(args) == 0 {
-				probs, err = a.WS.Problems()
-				if err != nil {
-					fmt.Fprintln(os.Stderr, ui.Red.Render(err.Error()))
-				}
-			} else {
+			bad := 0
+			if len(args) > 0 {
 				for _, arg := range args {
 					p, err := a.WS.Problem(arg)
 					if err != nil {
 						return err
 					}
-					probs = append(probs, p)
+					if validateProblem(cmd, a, p, run, nil, a.WS.Ref(p)) != nil {
+						bad++
+					}
 				}
-			}
-			bad := 0
-			if err != nil {
-				// One *workspace.LoadError per problem that failed to load.
-				bad = 1
-				if joined, ok := err.(interface{ Unwrap() []error }); ok {
-					bad = len(joined.Unwrap())
-				}
-			}
-			bank := probs
-			if len(args) > 0 {
-				bank, _ = a.WS.Problems()
-			}
-			for _, p := range probs {
-				if err := validateProblem(cmd, a, p, run, bank); err != nil {
-					bad++
-				}
+			} else if bad, err = validateAll(cmd, a, run); err != nil {
+				return err
 			}
 			if bad > 0 {
-				return fmt.Errorf("%d problem(s) with errors", bad)
+				return fmt.Errorf("%d pack(s) or problem(s) with errors", bad)
 			}
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&run, "run", false, "run the reference solution on every case")
+	cmd.Flags().BoolVar(&run, "run", false, "run the reference solutions on every case")
 	return cmd
 }
 
-// validateProblem prints the findings for one problem. bank holds the
-// problems of the workspace, to check p against; nil loads them.
-func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run bool, bank []*problem.Problem) error {
+// validateAll validates every pack and problem of the workspace, pack by
+// pack, and returns how many have errors.
+func validateAll(cmd *cobra.Command, a *app.App, run bool) (int, error) {
+	packs, err := a.WS.Packs()
+	if err != nil {
+		return 0, err
+	}
+	all, _ := a.WS.Problems()
+	qualify := workspace.SpansPacks(all)
+	bad := 0
+	fail := func(name string, err error) {
+		bad++
+		fmt.Printf("%s %s\n", ui.Red.Render("FAIL"), name)
+		for _, line := range strings.Split(err.Error(), "\n") {
+			fmt.Printf("     %s %s\n", ui.Red.Render("error:"), line)
+		}
+	}
+	for _, k := range packs {
+		label := "pack " + k.Name
+		if k.Err != nil {
+			fail(label, k.Err)
+			continue
+		}
+		probs, failed, err := k.Problems()
+		if err != nil {
+			return bad, err
+		}
+		if err := k.Manifest.ValidateProblems(probs); err != nil {
+			fail(label, err)
+		}
+		for _, f := range failed {
+			fail(a.WS.Rel(f.Dir), f)
+		}
+		for _, p := range probs {
+			name := p.Slug
+			if qualify {
+				name = p.Ref()
+			}
+			if validateProblem(cmd, a, p, run, probs, name) != nil {
+				bad++
+			}
+		}
+	}
+	return bad, nil
+}
+
+// validateProblem prints the findings for one problem, under name. peers
+// are the problems of its pack, to check its identity against; nil loads
+// them.
+func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run bool, peers []*problem.Problem, name string) error {
 	var errs, warns []string
 	if err := p.Validate(); err != nil {
 		errs = append(errs, strings.Split(err.Error(), "\n")...)
@@ -643,16 +669,16 @@ func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run boo
 		}
 	}
 	if len(cases) == 0 && casesErr == nil {
-		warns = append(warns, "no test cases (hc gen "+p.Slug+")")
+		warns = append(warns, "no test cases (hc gen "+name+")")
 	}
 	if missing > 0 {
-		warns = append(warns, fmt.Sprintf("%d case(s) without expected output (hc cases build %s)", missing, p.Slug))
+		warns = append(warns, fmt.Sprintf("%d case(s) without expected output (hc cases build %s)", missing, name))
 	}
 	if len(cases) > 0 && examples == 0 {
 		warns = append(warns, "no case marked as example; hc test runs the first 3")
 	}
 	if !p.Ready() {
-		warns = append(warns, "judge rule not decided (judge.compare): run `hc gen "+p.Slug+"`, or set it by hand")
+		warns = append(warns, "judge rule not decided (judge.compare): run `hc gen "+name+"`, or set it by hand")
 	}
 	warns = append(warns, imageWarnings(p)...)
 	refs := a.ReferenceLangs(p)
@@ -674,12 +700,14 @@ func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run boo
 			errs, warns = append(errs, e...), append(warns, w...)
 		}
 	}
-	// Conflicts with the rest of the bank come last, so that they do not
+	// Conflicts with the rest of the pack come last, so that they do not
 	// keep the checks above from running.
-	if bank == nil {
-		bank, _ = a.WS.Problems()
+	if peers == nil {
+		if k, err := a.WS.Pack(p.Pack); err == nil {
+			peers, _, _ = k.Problems()
+		}
 	}
-	for _, err := range workspace.BankErrors(p, bank) {
+	for _, err := range pack.IdentityErrors(p, peers) {
 		errs = append(errs, err.Error())
 	}
 	status := ui.Green.Render("ok  ")
@@ -688,7 +716,7 @@ func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run boo
 	} else if len(warns) > 0 {
 		status = ui.Yellow.Render("warn")
 	}
-	fmt.Printf("%s %s %s\n", status, p.Slug, ui.Faint.Render(fmt.Sprintf("(%d cases)", len(cases))))
+	fmt.Printf("%s %s %s\n", status, name, ui.Faint.Render(fmt.Sprintf("(%d cases)", len(cases))))
 	for _, e := range errs {
 		fmt.Printf("     %s %s\n", ui.Red.Render("error:"), indentRest(e, "            "))
 	}
@@ -696,7 +724,7 @@ func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run boo
 		fmt.Printf("     %s %s\n", ui.Yellow.Render("warn:"), indentRest(w, "           "))
 	}
 	if len(errs) > 0 {
-		return errors.New(p.Slug + " is invalid")
+		return errors.New(name + " is invalid")
 	}
 	return nil
 }
@@ -748,18 +776,34 @@ func imageWarnings(p *problem.Problem) []string {
 	return warns
 }
 
-// duplicateID returns the slug of another problem with the same ID, if any.
-func duplicateID(a *app.App, p *problem.Problem) string {
+// duplicateID returns the slug of another problem of pack k with the same
+// ID, if any: ids are unique within a pack.
+func duplicateID(k *workspace.Pack, p *problem.Problem) string {
 	if p.ID == "" {
 		return ""
 	}
-	probs, _ := a.WS.Problems()
+	probs, _, _ := k.Problems()
 	for _, o := range probs {
 		if o.ID == p.ID && o.Slug != p.Slug {
 			return o.Slug
 		}
 	}
 	return ""
+}
+
+// packProblem returns the problem of pack k whose slug is slug, or nil.
+// Slugs are unique within a pack, not across packs.
+func packProblem(k *workspace.Pack, slug string) (*problem.Problem, error) {
+	probs, _, err := k.Problems()
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range probs {
+		if p.Slug == slug {
+			return p, nil
+		}
+	}
+	return nil, nil
 }
 
 // indentRest indents every line of s but the first.
