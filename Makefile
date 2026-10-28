@@ -1,6 +1,6 @@
 BIN      := bin/hc
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS  := -s -w -X github.com/MorePeanuts/handcoding/internal/cli.Version=$(VERSION)
+LDFLAGS  := -s -w -X github.com/MorePeanuts/handcoding/internal/version.Version=$(VERSION)
 
 .PHONY: build install test lint fmt tidy clean
 
