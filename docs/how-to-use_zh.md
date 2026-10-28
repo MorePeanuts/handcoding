@@ -60,6 +60,8 @@ Python 解答在 hc 管理的虚拟环境 `.hc/venv` 中运行。第一次有命
 
 ### 编写题目包
 
+要创建自己的题目包，运行 `hc pack init`：它写入 `pack.yaml`、`.gitignore`、CI 工作流和智能体文件，可以直接提交。创建、检查和发布题目包的指南见[编写题目包](packs_zh.md)。
+
 题目包的检出目录，即包含 `pack.yaml` 的目录（例如克隆下来的题目包仓库），本身就是一个工作区：在它或它下面的任意目录中运行 hc，或者用 `-w` 指向它即可。它不需要 `hc init`，`hc init` 也会拒绝在题目包内的目录中创建工作区。在这种编写用的工作区里，这个题目包是唯一的题目包，并且可写：`hc fetch`、`hc new` 和 `hc import` 把题目加到它的 `problems/` 下，`hc gen`、`hc fix` 和 `hc cases` 修改这些题目。所以编写流程不需要任何参数：`hc fetch two-sum`、`hc gen two-sum`、`hc validate --run`，发布前再运行 `hc pack check`（见[检查题目包](#检查题目包)）。这里没有 `local` 题目包，检出目录中的 `packs/` 目录会被忽略，题目只用 slug 来指代。
 
 ```
@@ -81,7 +83,7 @@ hc.yaml
 pyrightconfig.json
 ```
 
-除非仓库自己有智能体文件，否则把 `.claude/`、`.agents/` 和 `AGENTS.md` 也加进去（hc 只修改它自己安装的技能和 `AGENTS.md` 中它自己的那一段）。
+`hc pack init` 写入的就是这个 `.gitignore`，并且把 `.claude/`、`.agents/` 和 `AGENTS.md` 留在仓库中，让新克隆的仓库能向智能体说明自己。用其他方式创建的题目包，可以把它们也加入忽略列表，或者提交它们（hc 只修改它自己安装的技能和 `AGENTS.md` 中它自己的那一段）。
 
 安装在练习工作区中的题目包（与 `hc.yaml` 同级的 `packs/<name>/`）不是检出目录：在其中运行 hc 时，使用的是外层的工作区，题目包在那里仍然只读。
 
