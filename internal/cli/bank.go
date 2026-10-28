@@ -16,6 +16,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
+	"github.com/MorePeanuts/handcoding/internal/skill"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
@@ -28,8 +29,8 @@ func newInitCmd(_ *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init [dir]",
 		Short: "Create a workspace (default ~/handcoding)",
-		Long: `Create a handcoding workspace with the built-in sample problems, the agent
-skill (.claude/skills/handcoding) and AGENTS.md for Codex.
+		Long: `Create a handcoding workspace with the built-in sample problems and the
+agent skills (see ` + "`hc skill`" + `).
 
 hc finds the workspace from $HC_WORKSPACE, the nearest parent directory with
 hc.yaml, or ~/handcoding — so using the default lets you run hc anywhere.
@@ -62,7 +63,8 @@ python, hc also creates the workspace's Python virtual environment now.`,
 					return err
 				}
 			}
-			if _, err := installSkill(ws.Root); err != nil {
+			opts := skill.Options{Version: version(), Exclusive: true}
+			if _, err := skill.Install(ws.Root, skill.Set(skill.Practice), opts); err != nil {
 				return err
 			}
 			if l, err := app.New(ws).Lang(""); err == nil && l.ID() == "python" {
@@ -287,6 +289,13 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return writeFile(dst, string(data))
+}
+
+func writeFile(path, content string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(content), 0o644)
 }
 
 func newCasesCmd(root *rootOptions) *cobra.Command {

@@ -3,7 +3,9 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -11,8 +13,8 @@ import (
 
 	"github.com/MorePeanuts/handcoding/internal/agent"
 	"github.com/MorePeanuts/handcoding/internal/app"
-	"github.com/MorePeanuts/handcoding/internal/builtin"
 	"github.com/MorePeanuts/handcoding/internal/problem"
+	"github.com/MorePeanuts/handcoding/internal/skill"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 )
 
@@ -45,7 +47,7 @@ func newGenCmd(root *rootOptions) *cobra.Command {
 		Long: `Run a coding agent (Claude Code or Codex, headless) in the workspace to
 decide how a problem is judged (judge.compare, and checker.py when no built-in
 rule fits) and to write a reference
-solution and test cases for it, following the handcoding skill. The agent
+solution and test cases for it, following the ` + skill.Cases + ` skill. The agent
 computes expected outputs with ` + "`hc cases build`" + ` and verifies them with
 ` + "`hc validate --run`" + `. A freshly fetched problem becomes ready to submit this way.`,
 		Args: cobra.ExactArgs(1),
@@ -55,7 +57,7 @@ computes expected outputs with ` + "`hc cases build`" + ` and verifies them with
 				if err != nil {
 					return err
 				}
-				if _, err := installSkill(a.WS.Root); err != nil {
+				if err := syncSkills(a.WS.Root, agent.Skills); err != nil {
 					return err
 				}
 				rel, _ := filepath.Rel(a.WS.Root, p.Dir)
@@ -99,7 +101,7 @@ To fix a case by hand instead: hc cases edit <problem>.`,
 				if err != nil {
 					return err
 				}
-				if _, err := installSkill(a.WS.Root); err != nil {
+				if err := syncSkills(a.WS.Root, agent.Skills); err != nil {
 					return err
 				}
 				solution := ""
@@ -141,75 +143,100 @@ func runAgent(cmd *cobra.Command, a *app.App, ag *agent.Agent, prompt string, dr
 func newSkillCmd(root *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "skill",
-		Short: "Manage the handcoding agent skill",
+		Short: "Manage the agent skills hc installs in the workspace",
+		Long: `hc ships agent skills that teach coding agents its problem protocol and
+workflows. They are installed into the workspace, for Claude Code in
+` + skill.ClaudeDir + ` and for Codex in ` + skill.AgentsDir + `, and listed in a block of
+AGENTS.md. hc manages only the copies it installed, and never touches other
+skills or the rest of AGENTS.md.`,
 	}
-	var global bool
+	var force bool
 	install := &cobra.Command{
-		Use:   "install",
-		Short: "Install the skill into the workspace (or ~/.claude with --global)",
-		Long: `Install the handcoding skill so that Claude Code (and Codex via AGENTS.md)
-know the problem protocol. With --global it goes to ~/.claude/skills, so you
-can ask any Claude Code session to author hc problems.`,
+		Use:   "install [skill...]",
+		Short: "Install or update the workspace's skills",
+		Long: `Install the skills this workspace gets, or only the named ones, and update
+the skill index in AGENTS.md. Outdated skills hc installed are replaced; skills
+you edited are kept unless --force is given. Without names, skills hc
+installed that the workspace no longer gets are removed.`,
+		ValidArgs: skill.Names(),
+		Args:      cobra.OnlyValidArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if global {
-				home, err := os.UserHomeDir()
-				if err != nil {
-					return err
-				}
-				path := filepath.Join(home, ".claude", "skills", "handcoding", "SKILL.md")
-				if err := writeFile(path, builtin.Skill()); err != nil {
-					return err
-				}
-				fmt.Printf("%s %s\n", ui.Green.Render("installed"), path)
-				return nil
-			}
 			a, err := root.openApp()
 			if err != nil {
 				return err
 			}
 			defer a.Close()
-			paths, err := installSkill(a.WS.Root)
-			for _, p := range paths {
-				fmt.Printf("%s %s\n", ui.Green.Render("installed"), p)
+			opts := skill.Options{Version: version(), Force: force}
+			names := args
+			if len(names) == 0 {
+				names, opts.Exclusive = skill.Set(skill.Practice), true
+			}
+			changes, err := skill.Install(a.WS.Root, names, opts)
+			printSkillChanges(os.Stdout, changes)
+			if err == nil && len(changes) == 0 {
+				fmt.Println("skills are up to date")
 			}
 			return err
 		},
 	}
-	install.Flags().BoolVarP(&global, "global", "g", false, "install into ~/.claude/skills")
-	show := &cobra.Command{
-		Use:   "show",
-		Short: "Print the skill",
-		Run:   func(cmd *cobra.Command, args []string) { fmt.Print(builtin.Skill()) },
+	install.Flags().BoolVar(&force, "force", false, "also replace or remove skills you edited")
+	list := &cobra.Command{
+		Use:   "list",
+		Short: "Show the skills and whether they are installed and up to date",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			a, err := root.openApp()
+			if err != nil {
+				return err
+			}
+			defer a.Close()
+			rows := [][]string{{"SKILL", "DIRECTORY", "STATUS", "VERSION"}}
+			for _, in := range skill.List(a.WS.Root) {
+				status, ver := in.State.String(), in.Version
+				if !in.Shipped {
+					status += ", no longer shipped"
+				}
+				if ver == "" {
+					ver = "-"
+				}
+				rows = append(rows, []string{in.Name, path.Dir(in.Dir), status, ver})
+			}
+			_, err = io.WriteString(os.Stdout, formatTable(rows))
+			return err
+		},
 	}
-	cmd.AddCommand(install, show)
+	show := &cobra.Command{
+		Use:       "show <skill>",
+		Short:     "Print a skill's SKILL.md",
+		ValidArgs: skill.Names(),
+		Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
+		Run: func(cmd *cobra.Command, args []string) {
+			s, _ := skill.Get(args[0])
+			_, _ = os.Stdout.Write(s.Files[skill.MainFile])
+		},
+	}
+	cmd.AddCommand(install, list, show)
 	return cmd
 }
 
-// installSkill writes the skill for Claude Code and AGENTS.md for Codex and
-// other agents into the workspace.
-func installSkill(root string) ([]string, error) {
-	skill := builtin.Skill()
-	skillPath := filepath.Join(root, ".claude", "skills", "handcoding", "SKILL.md")
-	if err := writeFile(skillPath, skill); err != nil {
-		return nil, err
-	}
-	body := skill
-	if strings.HasPrefix(body, "---\n") {
-		if end := strings.Index(body[4:], "\n---\n"); end >= 0 {
-			body = body[4+end+5:]
-		}
-	}
-	agents := "<!-- Generated by hc. Re-run `hc skill install` to update. -->\n# AGENTS.md\n\nThis directory is a handcoding (hc) workspace.\n" + body
-	agentsPath := filepath.Join(root, "AGENTS.md")
-	if err := writeFile(agentsPath, agents); err != nil {
-		return nil, err
-	}
-	return []string{skillPath, agentsPath}, nil
+// syncSkills installs the skills an agent needs before it starts, replacing
+// outdated copies hc installed but none the user edited.
+func syncSkills(root string, names []string) error {
+	changes, err := skill.Install(root, names, skill.Options{Version: version()})
+	printSkillChanges(os.Stderr, changes)
+	return err
 }
 
-func writeFile(path, content string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+func printSkillChanges(w io.Writer, changes []skill.Change) {
+	for _, c := range changes {
+		label := ui.Green.Render(c.Action.String())
+		if c.Action == skill.Skipped {
+			label = ui.Yellow.Render(c.Action.String())
+		}
+		if c.Reason != "" {
+			fmt.Fprintf(w, "%s %s: %s\n", label, c.Path, c.Reason)
+		} else {
+			fmt.Fprintf(w, "%s %s\n", label, c.Path)
+		}
 	}
-	return os.WriteFile(path, []byte(content), 0o644)
 }

@@ -2,8 +2,8 @@
 // Claude Code or Codex.
 //
 // Rather than a network protocol (A2A/MCP), hc runs the agent's headless mode
-// as a subprocess in the workspace, with a prompt that points at the
-// handcoding skill installed in the workspace. The agent writes files and
+// as a subprocess in the workspace, with a prompt that points at the hc
+// skills installed in the workspace. The agent writes files and
 // calls back into hc (`hc cases build`, `hc validate --run`) to verify them.
 package agent
 
@@ -14,7 +14,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/MorePeanuts/handcoding/internal/skill"
 )
+
+// Skills lists the skills the prompts rely on; hc installs them before it
+// starts an agent.
+var Skills = []string{skill.Cases}
 
 // Agent is a configured agent command.
 type Agent struct {
@@ -82,10 +88,15 @@ func (a *Agent) Run(ctx context.Context, dir, prompt string) error {
 	return cmd.Run()
 }
 
+// useSkill is the sentence that starts a prompt.
+func useSkill(name, task string) string {
+	return fmt.Sprintf("Use the %s skill (read %s) to %s.\n\n", name, skill.Path(name), task)
+}
+
 // GeneratePrompt asks the agent to write a reference solution and cases.
 func GeneratePrompt(slug, problemDir string, count int, extra string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Use the handcoding skill (.claude/skills/handcoding/SKILL.md; also summarized in AGENTS.md) to generate test cases for the hc problem %q in %s.\n\n", slug, problemDir)
+	b.WriteString(useSkill(skill.Cases, fmt.Sprintf("generate test cases for the hc problem %q in %s", slug, problemDir)))
 	fmt.Fprintf(&b, "Follow the \"generate test cases\" workflow: decide the judge rule (judge.compare, with checker.py when no built-in mode fits) from the statement, write or check reference/solution.py (plus a second reference if several outputs are acceptable), add inputs to cases.jsonl without expected outputs, run `hc cases build %s --lang python`, then `hc validate %s --run` until it passes.\n", slug, slug)
 	if count > 0 {
 		fmt.Fprintf(&b, "Target about %d cases in total.\n", count)
@@ -100,7 +111,7 @@ func GeneratePrompt(slug, problemDir string, count int, extra string) string {
 // FixPrompt asks the agent to investigate and fix test cases.
 func FixPrompt(slug, problemDir string, cases []int, complaint, solutionPath string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Use the handcoding skill (.claude/skills/handcoding/SKILL.md; also summarized in AGENTS.md) to fix test cases of the hc problem %q in %s.\n\n", slug, problemDir)
+	b.WriteString(useSkill(skill.Cases, fmt.Sprintf("fix test cases of the hc problem %q in %s", slug, problemDir)))
 	if len(cases) > 0 {
 		fmt.Fprintf(&b, "Suspicious case number(s): %v (inspect with `hc cases list %s --case N`).\n", cases, slug)
 	}

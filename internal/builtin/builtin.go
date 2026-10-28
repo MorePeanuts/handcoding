@@ -1,5 +1,5 @@
-// Package builtin embeds the sample problems and the agent skill shipped with
-// hc.
+// Package builtin embeds the sample problems and the agent skills shipped
+// with hc.
 package builtin
 
 import (
@@ -16,11 +16,15 @@ import (
 //go:embed all:_problems
 var problems embed.FS
 
-//go:embed skill/SKILL.md
-var skill string
+//go:embed skills
+var skills embed.FS
 
-// Skill returns the agent skill (SKILL.md with front matter).
-func Skill() string { return skill }
+// SkillsFS exposes the embedded agent skills, one directory per skill. The
+// skill package reads its registry from it.
+func SkillsFS() fs.FS {
+	root, _ := fs.Sub(skills, "skills")
+	return root
+}
 
 // InstallProblems copies the sample problems into dst, skipping problems that
 // already exist. It returns the number of problems installed.

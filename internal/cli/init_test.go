@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MorePeanuts/handcoding/internal/skill"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
@@ -85,5 +86,34 @@ func TestInitDefaultsAndRejectsLang(t *testing.T) {
 	}
 	if _, err := os.Stat(bad); err == nil {
 		t.Error("created a workspace for an unsupported language")
+	}
+}
+
+// init installs the workspace's skills, and an agent command reinstalls a
+// missing one before it starts the agent.
+func TestSkillsInstalledForAgents(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	dir := filepath.Join(t.TempDir(), "ws")
+	if err := runHC(t, "init", dir); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range skill.Dirs {
+		if _, err := os.Stat(filepath.Join(dir, d, skill.Cases, skill.MainFile)); err != nil {
+			t.Errorf("init: %v", err)
+		}
+	}
+	agents, err := os.ReadFile(filepath.Join(dir, skill.AgentsFile))
+	if err != nil || !strings.Contains(string(agents), skill.Cases) {
+		t.Errorf("AGENTS.md: %q, %v", agents, err)
+	}
+
+	if err := os.RemoveAll(filepath.Join(dir, skill.ClaudeDir)); err != nil {
+		t.Fatal(err)
+	}
+	if err := runHC(t, "-w", dir, "gen", "two-sum", "--dry-run"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, skill.Path(skill.Cases))); err != nil {
+		t.Errorf("gen did not reinstall the skill: %v", err)
 	}
 }

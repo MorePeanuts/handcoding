@@ -1,6 +1,6 @@
 ---
-name: handcoding
-description: Generate, verify and fix test cases for problems in a handcoding (hc) workspace — a local LeetCode-style judge. Use when asked to create test cases for an hc problem, to fix a wrong test case, to write a reference solution, or to author/import a custom problem in the hc problem format.
+name: hc-cases
+description: Decide how an hc (handcoding) problem is judged and write its test cases. Use when generating or fixing test cases (cases.jsonl) of a problem in an hc workspace, choosing its judge rule (judge.compare in problem.yaml), writing or fixing a reference solution (reference/solution.py or .go), or writing a checker (checker.py); `hc gen` and `hc fix` use it.
 ---
 
 # handcoding test case authoring

@@ -39,7 +39,8 @@ internal/store      submission history (SQLite, pure Go)
 internal/leetcode   LeetCode client and conversion
 internal/termimg    images in the terminal
 internal/agent      coding agent integration
-internal/builtin    embedded sample problems and agent skill
+internal/skill      agent skill registry and managed install
+internal/builtin    embedded sample problems and agent skills
 ```
 
 [CLAUDE.md](CLAUDE.md) describes the architecture in more detail.
@@ -63,7 +64,7 @@ Name branches `<type>/<issue>-<summary>`, with the same types as commit messages
 - Keep each PR to one logical change, and link the issue it closes (`Closes #N`).
 - PR titles follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:` …). The release changelog is grouped by these prefixes.
 - PRs are **squash merged** by default: the PR title becomes the commit on `main`, and the individual commits stay visible on the PR. If a change contains parts that should be separate commits (say, a refactor and a feature built on it), prefer splitting it into separate PRs. Rebase merge is the exception, for a series of commits that must land together and are each clean and conventionally titled. Merge commits are disabled.
-- If you change the CLI or the problem protocol, update `docs/protocol.md` (and its Chinese mirror `docs/protocol_zh.md`) and the agent skill in `internal/builtin/skill/SKILL.md`. Agents follow the skill literally. `README.md` and `docs/how-to-use.md` have Chinese mirrors too.
+- If you change the CLI or the problem protocol, update `docs/protocol.md` (and its Chinese mirror `docs/protocol_zh.md`) and the agent skills in `internal/builtin/skills/`. Agents follow the skills literally; `TestSkillsLint` fails when a skill mentions a command or flag that no longer exists. `README.md` and `docs/how-to-use.md` have Chinese mirrors too.
 - Until 1.0 there is no backward compatibility to preserve. Prefer the cleanest design over migrations or compatibility shims.
 
 ## Versions and releases
