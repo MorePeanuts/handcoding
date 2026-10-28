@@ -36,6 +36,7 @@ func addProblem(t *testing.T, a *app.App, dir, yaml, cases string) *problem.Prob
 
 const removeDupYAML = `slug: remove-dup
 title: Remove Duplicates
+kind: function
 function:
   name: removeDuplicates
   params:
@@ -186,6 +187,7 @@ func TestInPlaceBoard(t *testing.T) {
 
 const echoYAML = `slug: echo
 title: Echo
+kind: function
 function:
   name: echo
   params:
@@ -406,6 +408,7 @@ func TestJudgeDefinedTypes(t *testing.T) {
 
 const anyIndexYAML = `slug: any-index
 title: Any Index
+kind: function
 function:
   name: anyIndex
   params:
@@ -536,7 +539,7 @@ func TestChecker(t *testing.T) {
 func TestBrokenChecker(t *testing.T) {
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
-	yaml := strings.Replace(anyIndexYAML, "  compare: checker\n", "  compare: checker\n  time_limit: 2s\n", 1)
+	yaml := strings.Replace(anyIndexYAML, "  compare: checker\n", "  compare: checker\n  timeout: 2s\n", 1)
 	p := addProblem(t, a, "any-index", yaml,
 		`{"input":{"nums":[1,2],"target":1},"expected":0}`+"\n"+`{"input":{"nums":[1,2],"target":2},"expected":1}`+"\n")
 	tests := []struct {

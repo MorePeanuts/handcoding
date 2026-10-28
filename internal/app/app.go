@@ -265,8 +265,8 @@ func (a *App) Run(ctx context.Context, p *problem.Problem, l lang.Language, sel 
 
 func (a *App) runnerOpts(ctx context.Context, p *problem.Problem, sel []runner.Selected, o RunOptions) (runner.Options, error) {
 	timeout := a.WS.Config.TimeoutDuration()
-	if p.Judge.TimeLimit != "" {
-		if d, err := time.ParseDuration(p.Judge.TimeLimit); err == nil {
+	if p.Judge.Timeout != "" {
+		if d, err := time.ParseDuration(p.Judge.Timeout); err == nil {
 			timeout = d
 		}
 	}

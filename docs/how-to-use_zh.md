@@ -199,7 +199,7 @@ language: go          # 默认解题语言：go | python
 editor: nvim          # 未设置时依次使用 $VISUAL、$EDITOR、vi
 theme: auto           # 题面配色：auto | dark | light
 images: auto          # 题面图片：auto | kitty | blocks | none
-timeout: 10s          # 每次运行的时限
+timeout: 10s          # 每次运行的墙钟时限；题目的 judge.timeout 会覆盖它
 python:
   interpreter: python3.12  # 代替 .hc/venv 使用的 Python 3.10+，也可以是完整路径；默认不设置
 agent:

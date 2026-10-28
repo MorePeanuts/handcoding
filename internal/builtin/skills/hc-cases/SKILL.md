@@ -23,6 +23,12 @@ problems/0001-two-sum/
   checker.py         the checker, only with judge.compare: checker
 ```
 
+The directory name is `<4-digit id>-<slug>` when `id` is a number
+(`0001-two-sum`), otherwise `<slug>`; the user's solutions and history are
+keyed by it. `hc validate` rejects any other name, and an `id` or `slug` that
+another problem also uses. Never rename a problem directory or change its
+`id` or `slug`.
+
 ### problem.yaml
 
 ```yaml
@@ -31,7 +37,7 @@ slug: two-sum
 title: Two Sum
 difficulty: easy            # easy | medium | hard
 tags: [array, hash-table]
-kind: function              # function | class
+kind: function              # function | class — required, never inferred
 function:
   name: twoSum
   params:
@@ -43,6 +49,7 @@ judge:
   # tolerance: 1e-5         # floats; default 1e-5 when returning double
   # output: nums            # in-place problems: judge this param after the call (returns: void)
   # output_length: return   # judge only output[:k], k being the return value
+  # timeout: 10s            # wall-clock limit for a whole run; default: timeout in hc.yaml
 ```
 
 A problem without `judge.compare` is **not ready**: its judge rule has not
@@ -240,8 +247,10 @@ def check(input, output, expected):
   nums[4] = 2"`); users see it with the Wrong Answer.
 - `from hc_runtime import decode, TreeNode` rebuilds structures:
   `decode("TreeNode", output)`. Plain JSON is enough for most checkers.
+  Import only `hc_runtime`'s public names (listed in step 3 of the generate
+  workflow) and the standard library.
 - A checker that raises, returns anything else or runs out of time (it gets
-  `judge.time_limit`) fails the whole run as a broken problem. Validate
+  `judge.timeout`) fails the whole run as a broken problem. Validate
   `output`'s type and shape before using it, so a wrong output is a
   rejection, not a crash.
 
@@ -285,7 +294,12 @@ deterministic calls with it (`reset`).
    Python 3.10, the oldest version hc supports; same shape as LeetCode:
    `class Solution` with the method, or the design class). Annotate with
    `list[int]` and `TreeNode | None`, and if needed start the file with
-   `from hc_runtime import ListNode, TreeNode`.
+   `from hc_runtime import ListNode, TreeNode`. Import nothing from
+   `hc_runtime` but its public names: `ListNode`, `TreeNode`, `GraphNode`,
+   `NaryNode`, `RandomListNode`, `NextTreeNode`, `QuadNode`,
+   `MultilevelNode`, `NestedInteger`, `Employee`, `decode` and `encode`. This
+   holds for references, templates and checkers alike; use only the standard
+   library otherwise.
    Prefer a simple, obviously correct algorithm. If it is too slow for the
    largest inputs, also write a brute force and cross-check both on small
    random inputs before trusting the fast one.
