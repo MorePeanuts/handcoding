@@ -8,7 +8,7 @@ Open an issue before starting on anything non-trivial. Use the bug report or fea
 
 ## Development
 
-You need Go (see `go.mod` for the version) and Python 3.10+. The integration tests compile and run real solutions in both languages; the Python ones are skipped when `python3` is older than 3.10. They use that `python3` directly, never the virtual environment hc manages for users, so they need no network. Solutions, references and drivers must keep working on the oldest versions hc supports (Python 3.10, Go 1.22; see the protocol's language versions): CI runs the tests on Python 3.10, and `TestGoMinimumVersion` builds the Go side at Go 1.22.
+You need Go (see `go.mod` for the version) and Python 3.10+. The integration tests compile and run real solutions in both languages; the Python ones are skipped when `python3` is older than 3.10. They use that `python3` directly, never the virtual environment hc manages for users, so they need no network. Solutions, references and drivers must keep working on the oldest versions hc supports (Python 3.10, Go 1.22; see the protocol's [language versions](docs/protocol.md#language-versions)): CI runs the tests on Python 3.10, and `TestGoMinimumVersion` builds the Go side at Go 1.22.
 
 ```sh
 make build      # bin/hc
@@ -45,6 +45,28 @@ internal/builtin    embedded sample problems and agent skills
 
 [CLAUDE.md](CLAUDE.md) describes the architecture in more detail.
 
+## Adding a language
+
+A solution language is a driver: it turns a problem's signature into starter code, and into a program that runs the user's code on test cases. The contract between hc and its drivers is internal to hc and is not part of the [problem protocol](docs/protocol.md); it can change in any release. What a solution in a language looks like is part of the protocol, though, so a new language also adds a subsection to the protocol's [Solution ABI](docs/protocol.md#solution-abi).
+
+A language implements the `lang.Language` interface in [`internal/lang/lang.go`](internal/lang/lang.go) and is registered in `app.Languages` (`internal/app`). The interface covers the solution file name, starter code, `Prepare` (writes the driver files next to the solution before every run, idempotently), `Build` (returns `*lang.CompileError` for a Compile Error), the run and debug commands, `Toolchain` (detects the compiler or interpreter and its version) and `Setup` (prepares an environment hc manages, such as Python's `.hc/venv`). Each driver declares `MinVersion`, the oldest toolchain it supports; the code it generates and the code problems ship must work on it.
+
+A driver only **decodes the inputs, calls the user's code and encodes the result**. It never judges: all comparison happens in `internal/judge`, on decoded JSON, so a new language does not reimplement it. Decoding includes building the protocol's structure inputs and `Node` structures; encoding includes `returns_ref`, `judge.output` and `output_length`, and the `returns_copy` check.
+
+- `HC_CASES` names a JSON file holding `[{"id": 1, "input": {...}}, ...]`, the inputs as in `cases.jsonl`.
+- `HC_OUT` names a file the driver appends one JSON line to per case:
+
+  ```json
+  {"id": 1, "output": [0,1], "error": "", "elapsed_ns": 1234}
+  ```
+
+  A non-empty `error` is a Runtime Error; keep only the stack frames of the user's code if you can, and start the message with `invalid input:` when the input does not fit its structure. `elapsed_ns` covers only the time spent in the user's code.
+- The user's stdout and stderr go straight to the terminal, so print debugging works.
+- Cases without a result line become Runtime Error, or Time Limit Exceeded when the run timed out (`runner.Run`).
+- Checkers (`judge.compare: checker`) are not the driver's business either: they are Python for every solution language, run through `lang.Checker`, which the Python language implements, and `judge.Checked` turns their results into verdicts.
+
+The existing drivers are good references: `internal/lang/golang` (generated code plus a static runtime) and `internal/lang/python` (a static runtime with the signature embedded as JSON).
+
 ## Branches
 
 `main` is always releasable; releases are tags on `main`, except patch releases from a maintenance branch (see [Versions and releases](#versions-and-releases)). Work happens on short-lived branches that are merged through a pull request and then deleted.
@@ -64,7 +86,7 @@ Name branches `<type>/<issue>-<summary>`, with the same types as commit messages
 - Keep each PR to one logical change, and link the issue it closes (`Closes #N`).
 - PR titles follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:` …). The release changelog is grouped by these prefixes.
 - PRs are **squash merged** by default: the PR title becomes the commit on `main`, and the individual commits stay visible on the PR. If a change contains parts that should be separate commits (say, a refactor and a feature built on it), prefer splitting it into separate PRs. Rebase merge is the exception, for a series of commits that must land together and are each clean and conventionally titled. Merge commits are disabled.
-- If you change the CLI or the problem protocol, update `docs/protocol.md` (and its Chinese mirror `docs/protocol_zh.md`) and the agent skills in `internal/builtin/skills/`. Agents follow the skills literally; `TestSkillsLint` fails when a skill mentions a command or flag that no longer exists. `README.md` and `docs/how-to-use.md` have Chinese mirrors too.
+- If you change the problem protocol, update its spec, `docs/protocol.md`, and the Chinese translation `docs/protocol_zh.md`. Skills cite the spec by section id (`hc docs protocol <id>`), so keep its headings stable. If you change how hc behaves, update `docs/how-to-use.md` and its Chinese mirror. In both cases update the agent skills in `internal/builtin/skills/`: agents follow them literally, and `TestSkillsLint` fails when a skill mentions a command or flag that no longer exists. `README.md` has a Chinese mirror too.
 - Until 1.0 there is no backward compatibility to preserve. Prefer the cleanest design over migrations or compatibility shims.
 
 ## Versions and releases

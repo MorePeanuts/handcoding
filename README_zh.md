@@ -85,7 +85,8 @@ hc debug two-sum -c 4   # 调试第 4 个用例
 文档目前只有英文版：
 
 - [使用指南](docs/how-to-use_zh.md)：交互界面、全部命令、配置、调试和智能体
-- [题目协议](docs/protocol_zh.md)：如何编写自己的题目，以及如何扩展新语言；`hc docs protocol` 可以打印完整协议（英文版）或其中一节
+- [题目协议](docs/protocol_zh.md)：题目格式的规范，编写自己的题目时参考；`hc docs protocol` 可以打印完整协议（英文版）或其中一节
+- [贡献指南](CONTRIBUTING.md)（英文）：开发说明，以及如何扩展新语言
 
 ## 路线图
 

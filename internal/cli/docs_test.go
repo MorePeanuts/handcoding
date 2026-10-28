@@ -30,10 +30,10 @@ func TestProtocolSection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(text, "### Checkers\n") || strings.Contains(text, "\n### ") {
+	if !strings.HasPrefix(text, "## Checkers\n") || strings.Contains(text, "\n## ") {
 		t.Errorf("checkers section:\n%s", text)
 	}
-	if _, err := sectionText(sections, "handcoding-protocols"); err == nil {
+	if _, err := sectionText(sections, "the-handcoding-problem-protocol"); err == nil {
 		t.Error("the document title is a section")
 	}
 	_, err = sectionText(sections, "checker")
