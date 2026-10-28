@@ -197,7 +197,8 @@ case inputs must satisfy their rules as well as the statement's.
    `hc validate <slug> --run` once more with the real reference restored.
 9. In a pack checkout (the workspace has `pack.yaml`), run `hc pack check`
    once you are done with every problem you were asked for: it checks the
-   whole pack as its CI does, and must pass.
+   whole pack as its CI does, and must pass. The `hc-pack` skill says how
+   a problem lands in the pack (groups, commits).
 10. Write the [summary](#summary).
 
 ## Workflow: fix a test case

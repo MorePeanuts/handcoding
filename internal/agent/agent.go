@@ -18,8 +18,8 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/skill"
 )
 
-// Skills lists the skills the prompts rely on; hc installs them before it
-// starts an agent.
+// Skills lists the skills the prompts rely on. Every context's skill set
+// has them, and hc installs the workspace's set before it starts an agent.
 var Skills = []string{skill.Problem, skill.Cases}
 
 // Agent is a configured agent command.

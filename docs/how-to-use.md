@@ -247,7 +247,7 @@ hc gen 3 --agent codex -n 40 -m "more strings of one repeated character"
 hc fix two-sum -c 5 -m "answers in a different order should pass"
 ```
 
-`hc` runs the agent headless in the workspace (`claude -p` or `codex exec`). Before it starts, it installs or updates the skills the agent follows: **`hc-cases`**, and **`hc-problem`** for when the problem's definition itself is wrong (see [Agent skills](#agent-skills)). Following the skill, the agent:
+`hc` runs the agent headless in the workspace (`claude -p` or `codex exec`). Before it starts, it installs or updates the workspace's skills (see [Agent skills](#agent-skills)); the agent follows **`hc-cases`**, and **`hc-problem`** for when the problem's definition itself is wrong. Following the skill, the agent:
 
 1. writes a reference solution, `reference/solution.py`, and a brute-force one to cross-check when that helps;
 2. writes test **inputs** to `cases.jsonl`, covering edge cases, special structures and large inputs;
@@ -263,16 +263,25 @@ agent:
 
 ### Agent skills
 
-hc ships skills that teach coding agents its problem protocol and workflows. `hc init` installs the ones a workspace gets (today `hc-problem`, what a problem is: its signature, statement and templates, and what to check after `hc fetch`; and `hc-cases`, how it is judged: judge rules, reference solutions, checkers and test cases) into `.claude/skills/` for Claude Code and `.agents/skills/` for Codex, and lists them in a block of `AGENTS.md`. Because they live in the workspace, any Claude Code or Codex session started there can use them: ask it to "write an hc problem for ..." or "generate cases for this hc problem". The skills cite the sections of the protocol (`hc docs protocol <section>`) rather than repeating it.
+hc ships skills that teach coding agents its problem protocol and workflows:
+
+| Skill | Covers |
+|---|---|
+| `hc-problem` | what a problem is: its signature, statement and templates, and what to check after `hc fetch` |
+| `hc-cases` | how it is judged: judge rules, reference solutions, checkers and test cases |
+| `hc-pack` | maintaining a pack: landing problems, groups, stable slugs, protocol versions, CI and releases |
+
+Which of them a workspace gets depends on its kind: a practice workspace gets `hc-problem` and `hc-cases`, a pack checkout ([working on a pack](#working-on-a-pack)) all three. They are installed into `.claude/skills/` for Claude Code and `.agents/skills/` for Codex, and listed in a block of `AGENTS.md`: by `hc init` in a new workspace, and by `hc gen`, `hc fix` and `hc skill install` in any. Because they live in the workspace, any Claude Code or Codex session started there can use them: ask it to "write an hc problem for ...", "generate cases for this hc problem" or "add this problem to the pack". The skills cite the sections of the protocol (`hc docs protocol <section>`) rather than repeating it.
 
 ```sh
-hc skill list               # each skill: installed, up to date, outdated or modified, and by which hc version
+hc skill list               # the skills this workspace gets; each one installed, up to date, outdated or modified, and by which hc version
 hc skill install            # install or update the workspace's skills (after upgrading hc)
-hc skill install --force    # also replace the skills you edited
+hc skill install --force    # also replace or remove the skills you edited
+hc skill install hc-pack    # install a skill by name, whether the workspace gets it or not
 hc skill show hc-cases      # print a skill
 ```
 
-hc marks every copy it installs, with its version and a hash of the content (`.hc-skill.json` in the skill's directory), and replaces or removes only those: a skill you edited is kept unless you pass `--force`, and skills hc did not install are never touched. In `AGENTS.md`, hc rewrites only the block between `<!-- hc:begin -->` and `<!-- hc:end -->`; the rest of the file is yours. `hc gen` and `hc fix` install missing or outdated skills before they start the agent, and warn about edited ones instead of replacing them; `hc skill install` without names also removes the skills hc installed that the workspace no longer gets.
+hc marks every copy it installs, with its version and a hash of the content (`.hc-skill.json` in the skill's directory), and replaces or removes only those: a skill you edited is kept unless you pass `--force`, and skills hc did not install are never touched. In `AGENTS.md`, hc rewrites only the block between `<!-- hc:begin -->` and `<!-- hc:end -->`; the rest of the file is yours. `hc gen` and `hc fix` install missing or outdated skills of the workspace's set before they start the agent. `hc skill install` without names brings the workspace to exactly its set: it also removes the skills hc installed that the workspace does not get (a skill installed by name included). Both warn about edited skills instead of replacing or removing them.
 
 ## Debugging
 

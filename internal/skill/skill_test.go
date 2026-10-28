@@ -210,3 +210,61 @@ func TestList(t *testing.T) {
 		}
 	}
 }
+
+func TestSets(t *testing.T) {
+	if got := Set(Practice); !slices.Equal(got, []string{Problem, Cases}) {
+		t.Errorf("practice set: %v", got)
+	}
+	if got := Set(Authoring); !slices.Equal(got, []string{Problem, Cases, Pack}) {
+		t.Errorf("authoring set: %v", got)
+	}
+	for _, ctx := range Contexts {
+		for _, name := range Set(ctx) {
+			if _, ok := Get(name); !ok {
+				t.Errorf("%s: unregistered skill %s", ctx, name)
+			}
+		}
+	}
+}
+
+// Installing a context's set removes the managed skills of another set,
+// except copies the user edited.
+func TestInstallSetRemovesOtherSkills(t *testing.T) {
+	root := t.TempDir()
+	install(t, root, Options{Exclusive: true}, Set(Authoring)...)
+	for _, dir := range Dirs {
+		if s := state(root, dir+"/"+Pack); s != Current {
+			t.Fatalf("%s/%s after the authoring set: %v", dir, Pack, s)
+		}
+	}
+	if !strings.Contains(read(t, filepath.Join(root, AgentsFile)), Pack) {
+		t.Error("AGENTS.md does not list hc-pack")
+	}
+
+	// The user edited one copy.
+	edited := filepath.Join(root, ClaudeDir, Pack, MainFile)
+	write(t, edited, "my notes\n")
+	got := install(t, root, Options{Exclusive: true}, Set(Practice)...)
+	if got[AgentsDir+"/"+Pack] != Removed || got[ClaudeDir+"/"+Pack] != Skipped {
+		t.Errorf("practice set over the authoring set: %v", got)
+	}
+	if _, err := os.Stat(filepath.Join(root, AgentsDir, Pack)); err == nil {
+		t.Error("the unedited copy of hc-pack is still there")
+	}
+	if read(t, edited) != "my notes\n" {
+		t.Error("removed an edited copy without --force")
+	}
+	for _, name := range Set(Practice) {
+		if s := state(root, AgentsDir+"/"+name); s != Current {
+			t.Errorf("%s: %v", name, s)
+		}
+	}
+
+	got = install(t, root, Options{Exclusive: true, Force: true}, Set(Practice)...)
+	if got[ClaudeDir+"/"+Pack] != Removed {
+		t.Errorf("forced practice set: %v", got)
+	}
+	if strings.Contains(read(t, filepath.Join(root, AgentsFile)), Pack) {
+		t.Error("AGENTS.md still lists hc-pack")
+	}
+}

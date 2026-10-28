@@ -166,8 +166,9 @@ type Options struct {
 	Version string
 	// Force replaces and removes managed skills the user edited.
 	Force bool
-	// Exclusive removes the managed skills not among the installed names.
-	// Without it, only managed skills hc no longer ships are removed.
+	// Exclusive removes the managed skills not among the installed names,
+	// so that installing a context's set syncs the workspace to it. Without
+	// it, only managed skills hc no longer ships are removed.
 	Exclusive bool
 }
 
@@ -229,7 +230,7 @@ func Install(root string, names []string, opts Options) ([]Change, error) {
 				continue
 			}
 			if in.State == Modified && !opts.Force {
-				changes = append(changes, Change{Path: in.Dir, Action: Skipped, Reason: "no longer installed here, but edited since hc installed it; `hc skill install --force` removes it"})
+				changes = append(changes, Change{Path: in.Dir, Action: Skipped, Reason: "not a skill this workspace gets, but edited since hc installed it; `hc skill install --force` removes it"})
 				continue
 			}
 			if err := os.RemoveAll(filepath.Join(root, filepath.FromSlash(in.Dir))); err != nil {

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -59,7 +60,7 @@ computes expected outputs with ` + "`hc cases build`" + ` and verifies them with
 				if err != nil {
 					return err
 				}
-				if err := syncSkills(a.WS.Root, agent.Skills); err != nil {
+				if err := syncSkills(a.WS); err != nil {
 					return err
 				}
 				rel, _ := filepath.Rel(a.WS.Root, p.Dir)
@@ -103,7 +104,7 @@ To fix a case by hand instead: hc cases edit <problem>.`,
 				if err != nil {
 					return err
 				}
-				if err := syncSkills(a.WS.Root, agent.Skills); err != nil {
+				if err := syncSkills(a.WS); err != nil {
 					return err
 				}
 				solution := ""
@@ -157,9 +158,10 @@ skills or the rest of AGENTS.md.`,
 		Use:   "install [skill...]",
 		Short: "Install or update the workspace's skills",
 		Long: `Install the skills this workspace gets, or only the named ones, and update
-the skill index in AGENTS.md. Outdated skills hc installed are replaced; skills
-you edited are kept unless --force is given. Without names, skills hc
-installed that the workspace no longer gets are removed.`,
+the skill index in AGENTS.md. A practice workspace gets ` + strings.Join(skill.Set(skill.Practice), ", ") + `; a pack
+checkout gets ` + strings.Join(skill.Set(skill.Authoring), ", ") + `. Outdated skills hc installed are
+replaced; skills you edited are kept unless --force is given. Without names,
+skills hc installed that the workspace does not get are removed.`,
 		ValidArgs: skill.Names(),
 		Args:      cobra.OnlyValidArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -184,7 +186,7 @@ installed that the workspace no longer gets are removed.`,
 	install.Flags().BoolVar(&force, "force", false, "also replace or remove skills you edited")
 	list := &cobra.Command{
 		Use:   "list",
-		Short: "Show the skills and whether they are installed and up to date",
+		Short: "Show the skills, which of them the workspace gets, and whether they are installed and up to date",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, err := root.openApp()
@@ -192,8 +194,15 @@ installed that the workspace no longer gets are removed.`,
 				return err
 			}
 			defer a.Close()
-			rows := [][]string{{"SKILL", "DIRECTORY", "STATUS", "VERSION"}}
+			ctx := skillContext(a.WS)
+			set := skill.Set(ctx)
+			fmt.Printf("This is a %s; it gets %s.\n\n", ctx, strings.Join(set, ", "))
+			rows := [][]string{{"SKILL", "SET", "DIRECTORY", "STATUS", "VERSION"}}
 			for _, in := range skill.List(a.WS.Root) {
+				inSet := "no"
+				if slices.Contains(set, in.Name) {
+					inSet = "yes"
+				}
 				status, ver := in.State.String(), in.Version
 				if !in.Shipped {
 					status += ", no longer shipped"
@@ -201,7 +210,7 @@ installed that the workspace no longer gets are removed.`,
 				if ver == "" {
 					ver = "-"
 				}
-				rows = append(rows, []string{in.Name, path.Dir(in.Dir), status, ver})
+				rows = append(rows, []string{in.Name, inSet, path.Dir(in.Dir), status, ver})
 			}
 			_, err = io.WriteString(os.Stdout, formatTable(rows))
 			return err
@@ -230,10 +239,15 @@ func skillContext(ws *workspace.Workspace) skill.Context {
 	return skill.Practice
 }
 
-// syncSkills installs the skills an agent needs before it starts, replacing
-// outdated copies hc installed but none the user edited.
-func syncSkills(root string, names []string) error {
-	changes, err := skill.Install(root, names, skill.Options{Version: version.String()})
+// syncSkills installs the workspace's skills before an agent starts, as
+// `hc skill install` does without names: missing and outdated copies are
+// written and managed copies of other skills removed, but none the user
+// edited is touched.
+func syncSkills(ws *workspace.Workspace) error {
+	// Not exclusive: a skill the user installed by name stays. Only a bare
+	// hc skill install brings the workspace to exactly its set.
+	opts := skill.Options{Version: version.String()}
+	changes, err := skill.Install(ws.Root, skill.Set(skillContext(ws)), opts)
 	printSkillChanges(os.Stderr, changes)
 	return err
 }
