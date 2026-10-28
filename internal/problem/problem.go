@@ -181,8 +181,11 @@ type Judge struct {
 	// RoundTrip makes a class problem judge an encoder and a decoder
 	// together: decode(encode(x)) is judged, never the encoded value.
 	RoundTrip *RoundTrip `yaml:"round_trip,omitempty" json:"round_trip,omitempty"`
-	// TimeLimit is the wall clock limit for a whole run, e.g. "10s".
-	TimeLimit string `yaml:"time_limit,omitempty" json:"time_limit,omitempty"`
+	// Timeout is the wall clock limit for a whole run, e.g. "10s": it guards
+	// against hangs, and cases without a result when it expires are Time
+	// Limit Exceeded. The checker gets the same limit. Defaults to timeout in
+	// hc.yaml.
+	Timeout string `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
 // OutputLengthReturn judges Output[:k], where k is the return value.
@@ -254,13 +257,6 @@ func (p *Problem) DirName() string {
 // Normalize fills defaults and canonicalizes type names.
 func (p *Problem) Normalize() {
 	p.Difficulty = strings.ToLower(p.Difficulty)
-	if p.Kind == "" {
-		if p.Class != nil {
-			p.Kind = KindClass
-		} else {
-			p.Kind = KindFunction
-		}
-	}
 	norm := func(ps []Param) {
 		for i := range ps {
 			ps[i].Type = NormalizeType(ps[i].Type)
@@ -303,6 +299,10 @@ func (p *Problem) usesDouble() bool {
 	}
 	return false
 }
+
+// errKindRequired is reported for a problem.yaml without kind, which is
+// never inferred from the sections present.
+var errKindRequired = errors.New("kind is required: function or class")
 
 // Validate checks the problem definition for consistency.
 func (p *Problem) Validate() error {
@@ -408,8 +408,10 @@ func (p *Problem) Validate() error {
 		if p.Judge.RoundTrip != nil {
 			errs = append(errs, p.validateRoundTrip()...)
 		}
+	case "":
+		errs = append(errs, errKindRequired)
 	default:
-		errs = append(errs, fmt.Errorf("unknown kind %q", p.Kind))
+		errs = append(errs, fmt.Errorf("unknown kind %q (function or class)", p.Kind))
 	}
 	var variants []string
 	for _, t := range p.BaseTypes() {
@@ -437,9 +439,9 @@ func (p *Problem) Validate() error {
 	case p.Judge.Compare != CompareChecker && checker:
 		errs = append(errs, fmt.Errorf("%s is only used with judge.compare: checker; set it, or remove %s", CheckerFile, CheckerFile))
 	}
-	if tl := p.Judge.TimeLimit; tl != "" {
+	if tl := p.Judge.Timeout; tl != "" {
 		if d, err := time.ParseDuration(tl); err != nil || d <= 0 {
-			errs = append(errs, fmt.Errorf("judge.time_limit %q must be a positive duration such as \"5s\" or \"500ms\"", tl))
+			errs = append(errs, fmt.Errorf("judge.timeout %q must be a positive duration such as \"5s\" or \"500ms\"", tl))
 		}
 	}
 	return errors.Join(errs...)
@@ -558,14 +560,19 @@ func Load(dir string) (*Problem, error) {
 		return nil, err
 	}
 	var p Problem
+	name := filepath.Join(filepath.Base(dir), MetaFile)
 	// Unknown fields are errors: a typo such as "judgee" would otherwise fall
 	// back to the defaults without a word.
 	if err := yaml.UnmarshalWithOptions(data, &p, yaml.DisallowUnknownField()); err != nil {
-		name := filepath.Join(filepath.Base(dir), MetaFile)
 		if flowArrayTypeRE.Match(data) {
 			return nil, fmt.Errorf("%s: %w\nhint: inside {...} or [...] quote array types, e.g. type: \"integer[]\"", name, err)
 		}
 		return nil, fmt.Errorf("%s: %w", name, err)
+	}
+	if p.Kind == "" {
+		// Everything after loading branches on the kind, so a problem without
+		// one is not loaded at all.
+		return nil, fmt.Errorf("%s: %w", name, errKindRequired)
 	}
 	p.Dir = dir
 	p.Normalize()

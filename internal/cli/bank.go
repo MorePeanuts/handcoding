@@ -572,12 +572,19 @@ run the reference solution on every case and require it to pass.`,
 				}
 			}
 			bad := 0
+			if err != nil {
+				// One *workspace.LoadError per problem that failed to load.
+				bad = 1
+				if joined, ok := err.(interface{ Unwrap() []error }); ok {
+					bad = len(joined.Unwrap())
+				}
+			}
 			for _, p := range probs {
 				if err := validateProblem(cmd, a, p, run); err != nil {
 					bad++
 				}
 			}
-			if bad > 0 || err != nil {
+			if bad > 0 {
 				return fmt.Errorf("%d problem(s) with errors", bad)
 			}
 			return nil
@@ -633,9 +640,6 @@ func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run boo
 		warns = append(warns, "judge rule not decided (judge.compare): run `hc gen "+p.Slug+"`, or set it by hand")
 	}
 	warns = append(warns, imageWarnings(p)...)
-	if other := duplicateID(a, p); other != "" {
-		warns = append(warns, fmt.Sprintf("id %s is also used by %s; looking it up by ID is ambiguous", p.ID, other))
-	}
 	refs := a.ReferenceLangs(p)
 	if len(refs) == 0 {
 		warns = append(warns, "no reference solution")
@@ -654,6 +658,12 @@ func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run boo
 			e, w := checkReference(cmd, a, p, l, sel)
 			errs, warns = append(errs, e...), append(warns, w...)
 		}
+	}
+	// Conflicts with the rest of the bank come last, so that they do not
+	// keep the checks above from running.
+	probs, _ := a.WS.Problems()
+	for _, err := range workspace.BankErrors(p, probs) {
+		errs = append(errs, err.Error())
 	}
 	status := ui.Green.Render("ok  ")
 	if len(errs) > 0 {

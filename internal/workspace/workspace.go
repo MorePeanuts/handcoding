@@ -332,6 +332,28 @@ func (w *Workspace) Problem(ref string) (*problem.Problem, error) {
 	return nil, fmt.Errorf("problem %q not found", ref)
 }
 
+// BankErrors reports how p conflicts with the bank probs it belongs to:
+// solutions and history are keyed by the directory name, so it must be
+// p.DirName(), and slug and id (when present) must be unique.
+func BankErrors(p *problem.Problem, probs []*problem.Problem) []error {
+	var errs []error
+	if base := filepath.Base(p.Dir); base != p.DirName() {
+		errs = append(errs, fmt.Errorf("directory %s must be named %s, after id and slug", base, p.DirName()))
+	}
+	for _, o := range probs {
+		if o.Dir == p.Dir {
+			continue
+		}
+		if o.Slug == p.Slug {
+			errs = append(errs, fmt.Errorf("slug %s is also used by %s", p.Slug, filepath.Base(o.Dir)))
+		}
+		if p.ID != "" && o.ID == p.ID {
+			errs = append(errs, fmt.Errorf("id %s is also used by %s", p.ID, o.Slug))
+		}
+	}
+	return errs
+}
+
 // NewProblemDir returns the directory a new problem should be stored in.
 func (w *Workspace) NewProblemDir(p *problem.Problem) string {
 	return filepath.Join(w.ProblemsPath(), p.DirName())

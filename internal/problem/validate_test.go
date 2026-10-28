@@ -107,14 +107,28 @@ func TestParseCasesErrors(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsUnknownFields(t *testing.T) {
-	dir := t.TempDir()
-	yaml := "slug: x\ntitle: X\nfunction:\n  name: f\n  returns: integer\njudgee:\n  compare: unordered\n"
-	if err := os.WriteFile(filepath.Join(dir, MetaFile), []byte(yaml), 0o644); err != nil {
-		t.Fatal(err)
+func TestLoadErrors(t *testing.T) {
+	const fn = "slug: x\ntitle: X\nkind: function\nfunction:\n  name: f\n  returns: integer\n"
+	tests := []struct {
+		yaml, want string
+	}{
+		{fn + "judgee:\n  compare: unordered\n", `unknown field "judgee"`},
+		// The field was renamed to timeout, with no alias.
+		{fn + "judge:\n  compare: exact\n  time_limit: 5s\n", `unknown field "time_limit"`},
+		// kind is never inferred from the function or class section.
+		{strings.Replace(fn, "kind: function\n", "", 1), "problem.yaml: kind is required: function or class"},
 	}
-	if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), `unknown field "judgee"`) {
-		t.Fatalf("Load error = %v, want unknown field", err)
+	for _, tt := range tests {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, MetaFile), []byte(tt.yaml), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("%s: Load error = %v, want %q", tt.yaml, err, tt.want)
+		}
+	}
+	if err := (&Problem{Slug: "x", Title: "X", Function: &Function{Name: "f", Returns: TypeInteger}}).Validate(); err == nil || !strings.Contains(err.Error(), "kind is required") {
+		t.Errorf("Validate without kind: %v", err)
 	}
 }
 
@@ -123,10 +137,10 @@ func TestValidateJudgeOptions(t *testing.T) {
 		return &Problem{Slug: "x", Title: "X", Kind: KindFunction, Function: &Function{Name: "f", Returns: TypeInteger}}
 	}
 	p := base()
-	p.Judge.TimeLimit = "5"
+	p.Judge.Timeout = "5"
 	p.Normalize()
-	if err := p.Validate(); err == nil || !strings.Contains(err.Error(), "judge.time_limit") {
-		t.Errorf("time_limit 5: %v", err)
+	if err := p.Validate(); err == nil || !strings.Contains(err.Error(), "judge.timeout") {
+		t.Errorf("timeout 5: %v", err)
 	}
 	p = base()
 	p.Judge.Compare = CompareUnordered
@@ -310,6 +324,7 @@ func TestValidateStructureCases(t *testing.T) {
 	}
 	cycle := load(`slug: c
 title: C
+kind: function
 function:
   name: detectCycle
   params: [{name: head, type: ListNode, cycle: pos}]
@@ -320,6 +335,7 @@ judge: {compare: exact}
 `)
 	join := load(`slug: j
 title: J
+kind: function
 function:
   name: getIntersectionNode
   params:
@@ -332,6 +348,7 @@ judge: {compare: exact}
 `)
 	clone := load(`slug: k
 title: K
+kind: function
 function:
   name: getTargetCopy
   params:
