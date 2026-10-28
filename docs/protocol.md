@@ -4,19 +4,26 @@ English · [简体中文](protocol_zh.md)
 
 ## Scope and versions
 
-This document specifies the handcoding problem protocol: how a problem is laid out on disk, what its files mean, how its cases are judged, and what the code it ships (reference solutions, templates, checkers) may assume. It is normative. [`docs/protocol_zh.md`](protocol_zh.md) is a translation; where the two differ, this English text applies.
+This document specifies the handcoding problem protocol: how problems are collected in packs, how a problem is laid out on disk, what its files mean, how its cases are judged, and what the code it ships (reference solutions, templates, checkers) may assume. It is normative. [`docs/protocol_zh.md`](protocol_zh.md) is a translation; where the two differ, this English text applies.
 
 MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119. A problem that breaks a MUST is invalid; the [validity rules](#validity-rules) collect every such rule.
 
-This is **protocol 1**. Every field, type and mode below is part of protocol 1 unless it says otherwise. A pack declares the protocol it is written against with `protocol: N` in its manifest (see [Packs](#packs)); a newer protocol may add features, which an older pack does not use.
+This is **protocol 1**. Every field, type and mode below is part of protocol 1 unless it says otherwise. A pack declares the protocol it is written against with `protocol: N` in its manifest (see [pack.yaml](#packyaml)); a newer protocol may add features, which an older pack does not use.
 
-How hc itself behaves (which cases `hc test` runs, how `hc fetch` imports a problem) is documented in `docs/how-to-use.md`, not here. How hc talks to its language drivers is internal to hc, and documented in `CONTRIBUTING.md`.
+How hc itself behaves (which cases `hc test` runs, how `hc fetch` imports a problem, where a workspace keeps its packs) is documented in `docs/how-to-use.md`, not here. How hc talks to its language drivers is internal to hc, and documented in `CONTRIBUTING.md`.
 
 ### Protocol versions
 
+Protocol versions are integers, and are not tied to hc's release versions: an hc release that does not change the protocol does not change what a pack may contain.
+
+- A version that only adds features (a type, a compare mode, a field) keeps every pack written against an earlier version valid, with the same meaning. The spec marks each feature with the version that introduced it (the Since columns).
+- A version that changes or removes a feature is incompatible: from that version on, tools stop reading packs that declare an earlier one, and those packs have to be updated.
+- A pack MUST NOT use a feature introduced after the version it declares, so that every tool reading that version can read the pack.
+- A tool reads the versions from the oldest it still supports to the newest it implements. It MUST refuse a pack outside that range, before reading anything else of it, and say what to do: for a newer pack, upgrade the tool; for an older one, update the pack. hc says "this pack needs protocol 2, hc v0.1.0 supports up to 1, upgrade hc", or "this pack uses protocol 1, which hc v0.5.0 no longer reads, update the pack".
+
 | Version | Changes |
 |---|---|
-| 1 | The initial frozen protocol. |
+| 1 | The initial frozen protocol: packs and `pack.yaml`, problem directories, `problem.yaml`, types, signatures, cases, judging, checkers and the solution ABI, with Go and Python as the solution languages. |
 
 ### Out of scope
 
@@ -29,7 +36,74 @@ Protocol 1 does not define the following. Each would be a later, additive change
 
 ## Packs
 
-This section is a placeholder. Packs and their manifest, `pack.yaml`, are specified for protocol 1 with issue #27. Until then a workspace's `problems/` directory is a single bank, and every rule below that says "bank" applies to it.
+A pack is a set of problems published together, usually as a repository of its own. It is the unit that is installed and updated, and the scope of problem [identity](#identity). A pack is a directory holding:
+
+```
+pack.yaml          the manifest; see pack.yaml
+problems/<dir>/    one problem directory per problem; see Problem directory
+...                anything else is not part of the pack
+```
+
+- `pack.yaml` MUST be at the root of the pack.
+- Every directory directly under `problems/` that holds a `problem.yaml` is a problem of the pack; its name MUST be the problem's canonical name ([Identity](#identity)). Other entries of `problems/` are not part of the pack. A pack without `problems/`, or with an empty one, has no problems, and is valid.
+- Anything else in the pack (a README, a license, CI configuration, agent instructions and skills) is not part of the pack, and tools ignore it. Problems sit under `problems/` so that these files never look like problems.
+
+### pack.yaml
+
+`pack.yaml` is a YAML mapping. Unknown fields are errors, at every level.
+
+| Field | Type | Required | Default | Constraints | Since |
+|---|---|---|---|---|---|
+| `protocol` | integer | yes | | The [protocol version](#protocol-versions) the pack is written against: a positive integer, not a string or a fraction | 1 |
+| `name` | string | yes | | Lower-case letters, digits and single hyphens: `^[a-z0-9]+(-[a-z0-9]+)*$`. Not `local`. The pack's identity (below) | 1 |
+| `title` | string | no | `name` | The display name | 1 |
+| `version` | string | no | none | A SemVer 2.0.0 version without a `v` prefix: `0.3.0`, `1.0.0-alpha.1`. Informational: installs are pinned by commit, not by this field | 1 |
+| `description` | string | no | none | Informational | 1 |
+| `authors` | list of strings | no | `[]` | Informational | 1 |
+| `license` | string | no | none | SHOULD be an SPDX license expression, such as `MIT` | 1 |
+| `homepage` | string | no | none | SHOULD be a URL | 1 |
+| `languages` | list of strings | no | every language of `protocol` | Not empty; language ids of the declared protocol, without duplicates; see below | 1 |
+| `groups` | list of groups | no | `[]` | See [Groups](#groups) | 1 |
+| `groups[].name` | string | yes | | `^[a-z0-9]+(-[a-z0-9]+)*$`, unique among the pack's groups | 1 |
+| `groups[].title` | string | no | the group's `name` | The display name | 1 |
+| `groups[].problems` | list of strings | no | `[]` | Slugs of problems of the pack, without duplicates | 1 |
+
+- `protocol` is read first. A tool that does not read the declared version refuses the pack without reading the rest of it ([Protocol versions](#protocol-versions)), since a newer protocol may add fields it does not know.
+- `name` is the pack's identity. Installed packs, solutions and submission history are keyed by it, so renaming a pack is a breaking change, as renaming a slug is for a problem. `local` is reserved for the problems a workspace holds outside any pack.
+- `languages` lists the languages the pack's problems can be solved in. Solutions in other languages are not supported, and tools MAY refuse to start one. Leaving it out means every language of the declared protocol, so a pack gets the languages a later protocol adds only when it declares that protocol. References may be written in any language of the protocol, whatever `languages` says, since they only compute expected outputs; checkers are Python in any case ([Checkers](#checkers)).
+
+The language ids:
+
+| Id | Language | Since |
+|---|---|---|
+| `go` | Go | 1 |
+| `python` | Python | 1 |
+
+A pack.yaml with every field:
+
+```yaml
+protocol: 1
+name: leetcode
+title: LeetCode
+version: 0.3.0
+description: Classic LeetCode problems with Go and Python references.
+authors: [MorePeanuts]
+license: MIT
+homepage: https://github.com/MorePeanuts/handcoding-leetcode
+languages: [go, python]
+groups:
+  - name: arrays
+    title: Arrays
+    problems: [two-sum, rotate-array]
+```
+
+### Groups
+
+Groups arrange the pack's problems into named lists, such as topics or study plans.
+
+- `groups` is ordered, and so is each group's `problems`: tools show them in this order.
+- A group refers to problems by `slug`, not by id or directory name, and every entry MUST be the slug of a problem of the pack. A group MUST NOT list a problem twice.
+- A problem MAY be in several groups or in none. A group MAY be empty.
 
 ## Problem directory
 
@@ -52,8 +126,8 @@ A problem is a directory holding these entries:
 
 ### Identity
 
-- `slug` is the problem's identity. It MUST be unique in its bank. Solutions and submission history are keyed by it (through the directory name), so renaming a slug is a breaking change.
-- `id` is optional. When present it MUST be unique in its bank. It is used for sorting and lookup.
+- `slug` is the problem's identity within its pack. It MUST be unique in the pack; problems of different packs MAY share a slug. Solutions and submission history are keyed by the pack's name and the slug (through the directory name), so renaming a slug is a breaking change for the pack.
+- `id` is optional. When present it MUST be unique in the pack. It is used for sorting and lookup.
 - The directory MUST have the canonical name: when `id` is a decimal integer n, `<n padded to 4 digits>-<slug>` (`id: "1"`, slug `two-sum`: `0001-two-sum`; `id: "12345"`: `12345-<slug>`); otherwise `<slug>`.
 
 ## problem.yaml
@@ -62,8 +136,8 @@ A problem is a directory holding these entries:
 
 | Field | Type | Required | Default | Constraints | Since |
 |---|---|---|---|---|---|
-| `id` | string | no | none | Unique in the bank; see [Identity](#identity). A YAML integer is read as its decimal text | 1 |
-| `slug` | string | yes | | Letters, digits and single hyphens: `^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$`. SHOULD be lower case. Unique in the bank | 1 |
+| `id` | string | no | none | Unique in the pack; see [Identity](#identity). A YAML integer is read as its decimal text | 1 |
+| `slug` | string | yes | | Letters, digits and single hyphens: `^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$`. SHOULD be lower case. Unique in the pack | 1 |
 | `title` | string | yes | | Not empty | 1 |
 | `difficulty` | string | no | none | `easy`, `medium` or `hard`, in any case | 1 |
 | `tags` | list of strings | no | `[]` | | 1 |
@@ -584,7 +658,7 @@ Reference solutions, templates and checkers MUST work on these versions, languag
 
 ## Validity rules
 
-A valid problem satisfies every rule below. `hc validate` checks the rules on `problem.yaml`, `cases.jsonl` and the bank; `hc validate --run` also checks the rules on reference solutions.
+A valid pack satisfies every rule below, and so does each of its problems. `hc validate` checks the rules on `problem.yaml` and `cases.jsonl`, and the pack's rules on problem directories and identity; `hc validate --run` also checks the rules on reference solutions.
 
 **problem.yaml**
 
@@ -612,10 +686,21 @@ A valid problem satisfies every rule below. `hc validate` checks the rules on `p
 5. In a class case, `ops` and `args` MUST have the same, non-zero length, `ops[0]` MUST be the class name, every other op MUST be a method, and every `args` entry MUST hold exactly the op's arguments, of their types.
 6. `expected`, when present, MUST have the form of the judged value ([Cases](#cases)): for `any_of`, an array of such values; for a class case, one entry per op, `null` for the constructor and `void` methods.
 
-**The bank**
+**pack.yaml**
 
-1. The directory MUST have the canonical name ([Identity](#identity)).
-2. `slug` MUST be unique in the bank, and so MUST `id` when present.
+1. It MUST be valid YAML, and MUST NOT contain unknown fields.
+2. `protocol` MUST be a positive integer, and the pack MUST NOT use a feature introduced after it ([Protocol versions](#protocol-versions)).
+3. `name` MUST match `^[a-z0-9]+(-[a-z0-9]+)*$`, and MUST NOT be `local`.
+4. `version`, when present, MUST be a SemVer 2.0.0 version without a `v` prefix.
+5. `languages`, when present, MUST NOT be empty, and MUST hold language ids of the declared protocol, each once.
+6. Every group MUST have a `name` matching `^[a-z0-9]+(-[a-z0-9]+)*$`, unique among the groups, and MUST NOT list a slug twice.
+
+**The pack**
+
+1. `pack.yaml` MUST be at the root of the pack, and the problems in `problems/` ([Packs](#packs)).
+2. Every problem directory MUST have the canonical name ([Identity](#identity)).
+3. `slug` MUST be unique in the pack, and so MUST `id` when present.
+4. Every entry of a group MUST be the slug of a problem of the pack.
 
 **References, templates and checkers**
 

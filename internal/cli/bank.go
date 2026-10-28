@@ -18,6 +18,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/skill"
 	"github.com/MorePeanuts/handcoding/internal/ui"
+	"github.com/MorePeanuts/handcoding/internal/version"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
@@ -63,7 +64,7 @@ python, hc also creates the workspace's Python virtual environment now.`,
 					return err
 				}
 			}
-			opts := skill.Options{Version: version(), Exclusive: true}
+			opts := skill.Options{Version: version.String(), Exclusive: true}
 			if _, err := skill.Install(ws.Root, skill.Set(skill.Practice), opts); err != nil {
 				return err
 			}

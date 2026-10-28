@@ -16,6 +16,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/skill"
 	"github.com/MorePeanuts/handcoding/internal/ui"
+	"github.com/MorePeanuts/handcoding/internal/version"
 )
 
 type agentFlags struct {
@@ -166,7 +167,7 @@ installed that the workspace no longer gets are removed.`,
 				return err
 			}
 			defer a.Close()
-			opts := skill.Options{Version: version(), Force: force}
+			opts := skill.Options{Version: version.String(), Force: force}
 			names := args
 			if len(names) == 0 {
 				names, opts.Exclusive = skill.Set(skill.Practice), true
@@ -222,7 +223,7 @@ installed that the workspace no longer gets are removed.`,
 // syncSkills installs the skills an agent needs before it starts, replacing
 // outdated copies hc installed but none the user edited.
 func syncSkills(root string, names []string) error {
-	changes, err := skill.Install(root, names, skill.Options{Version: version()})
+	changes, err := skill.Install(root, names, skill.Options{Version: version.String()})
 	printSkillChanges(os.Stderr, changes)
 	return err
 }

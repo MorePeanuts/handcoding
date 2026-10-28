@@ -8,7 +8,7 @@ builds:
     goarch: [amd64, arm64]
     flags: [-trimpath]
     ldflags:
-      - -s -w -X github.com/MorePeanuts/handcoding/internal/cli.Version={{.Version}}
+      - -s -w -X github.com/MorePeanuts/handcoding/internal/version.Version=v{{.Version}}
 
 archives:
   - formats: [tar.gz]
