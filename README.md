@@ -85,6 +85,7 @@ hc debug two-sum -c 4   # debug case 4
 
 - [Usage guide](docs/how-to-use.md): the TUI, every command, configuration, debugging and agents
 - [Problem protocol](docs/protocol.md): the specification of the problem format, for writing your own problems; `hc docs protocol` prints it, or one section of it
+- [Writing packs](docs/packs.md): creating a pack with `hc pack init`, checking it in CI, and publishing it
 - [Contributing](CONTRIBUTING.md): development, and how to add a language
 
 ## Roadmap

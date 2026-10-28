@@ -12,13 +12,14 @@ import (
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/ui"
+	"github.com/MorePeanuts/handcoding/internal/version"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
 func newPackCmd(root *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pack",
-		Short: "Install, update and check packs of problems",
+		Short: "Create, install, update and check packs of problems",
 		Long: `A pack is a directory of problems with a pack.yaml, usually a git
 repository (see ` + "`hc docs protocol packs`" + `). A practice workspace keeps its
 installed packs in packs/<name>/, read-only, and records where each came
@@ -29,6 +30,7 @@ Installing a pack means trusting its code: its reference solutions and
 checkers run on your machine. Install packs only from sources you trust.`,
 	}
 	cmd.AddCommand(
+		newPackInitCmd(),
 		newPackInstallCmd(root),
 		newPackListCmd(root),
 		newPackUpdateCmd(root),
@@ -36,6 +38,77 @@ checkers run on your machine. Install packs only from sources you trust.`,
 		newPackCheckCmd(root),
 	)
 	return cmd
+}
+
+func newPackInitCmd() *cobra.Command {
+	var name, title string
+	cmd := &cobra.Command{
+		Use:   "init [dir]",
+		Short: "Create a pack repository to write problems in",
+		Long: `Scaffold a pack in dir (default: the current directory), created if
+missing: pack.yaml, an empty problems/, a .gitignore for what hc adds to a
+checkout, a GitHub Actions workflow that runs ` + "`hc pack check`" + ` on every push
+and pull request, AGENTS.md and CLAUDE.md for coding agents, and the agent
+skills for writing a pack, in .claude/skills/ and .agents/skills/. Commit
+them all: a fresh clone then describes itself to agents. Afterwards dir is a
+pack checkout, which hc opens as a workspace (see ` + "`hc docs protocol packs`" + `).
+
+The pack is named --name, else after dir: its name in lower case, with every
+run of other characters than letters and digits a hyphen. The workflow
+installs this hc's version, or the latest release when this hc is a
+development build.
+
+dir must not be in a workspace, and hc refuses to overwrite any file: it
+checks them all before it writes one. hc does not run ` + "`git init`" + `.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir := "."
+			if len(args) == 1 {
+				dir = args[0]
+			}
+			res, err := app.InitPack(dir, app.InitPackOptions{Name: name, Title: title, HCVersion: version.String()})
+			if err != nil {
+				return err
+			}
+			fmt.Printf("%s the pack %s at %s\n", ui.Green.Render("Created"), res.Manifest.Name, res.Root)
+			for _, f := range res.Files {
+				fmt.Println(ui.Faint.Render("     " + f))
+			}
+			if !res.Pinned {
+				fmt.Printf("\n%s this hc (%s) is not a release, so %s installs the latest one: pin it to a release.\n",
+					ui.Yellow.Render("note:"), version.String(), app.WorkflowFile)
+			}
+			if res.GitRoot != "" && res.GitRoot != res.Root {
+				fmt.Printf("\n%s it is inside the git repository %s, but GitHub runs only the workflows of a repository's root.\n",
+					ui.Yellow.Render("note:"), res.GitRoot)
+			}
+			fmt.Println("\nNext steps:")
+			if dir != "." {
+				fmt.Printf("  cd %s\n", shellQuote(dir))
+			}
+			if res.GitRoot == "" {
+				fmt.Println("  git init                 make it a git repository, and commit every file above")
+			}
+			fmt.Println("  hc fetch two-sum         fetch a problem from LeetCode")
+			fmt.Println("  hc new my-problem        or write one of your own")
+			fmt.Println("  hc gen two-sum           have an agent write its cases and judge rule")
+			fmt.Println("  hc pack check            check the pack, as its CI does")
+			fmt.Println("  git push                 publish it; tag releases (v0.1.0), with version in pack.yaml")
+			fmt.Println("\nWriting packs: https://github.com/MorePeanuts/handcoding/blob/main/docs/packs.md")
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&name, "name", "", "the pack's name (default: the directory's name in kebab-case)")
+	cmd.Flags().StringVar(&title, "title", "", "the pack's display title")
+	return cmd
+}
+
+// shellQuote quotes s for a shell when it needs it.
+func shellQuote(s string) string {
+	if s != "" && !strings.ContainsAny(s, " \t\n'\"\\$`!*?[]{}()<>|&;#~") {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func newPackInstallCmd(root *rootOptions) *cobra.Command {

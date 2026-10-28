@@ -1,0 +1,55 @@
+# Checks the pack on every push and pull request. Written by `hc pack init`.
+name: Check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      # The oldest Python the protocol supports: the pack's references and
+      # checkers must run on it.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.10"
+<%- if .Pinned %>
+      # The hc the pack is checked with. Bump it on purpose: read what changed
+      # with `hc docs protocol protocol-versions`, then run `hc skill install`
+      # and commit the refreshed skills with the bump.
+<%- else %>
+      # The hc the pack is checked with. `hc pack init` ran on a development
+      # build of hc, so this is the latest release: pin it to one (@vX.Y.Z).
+      # Bump it on purpose: read what changed with
+      # `hc docs protocol protocol-versions`, then run `hc skill install` and
+      # commit the refreshed skills with the bump.
+<%- end %>
+      - name: Install hc
+        run: go install github.com/MorePeanuts/handcoding/cmd/hc@<% .Version %>
+      # hc.yaml is not committed (.gitignore): it holds the settings of a
+      # checkout, here the Python set up above instead of a virtual
+      # environment of hc's.
+      - name: Configure hc
+        run: |
+          printf 'python:\n  interpreter: python3\n' > hc.yaml
+      - name: Check the pack
+        run: hc pack check
+      # --force: the committed copies of hc's skills must be exactly the
+      # pinned hc's, edits included. Keep your own notes in CLAUDE.md or in a
+      # skill of your own, which hc never touches.
+      - name: Check that the committed skills are the pinned hc's
+        run: |
+          hc skill install --force
+          git add --intent-to-add -- AGENTS.md .claude .agents
+          git diff --exit-code -- AGENTS.md .claude .agents || {
+            echo "::error::The committed skills differ from those of the pinned hc: run \`hc skill install\` and commit the result."
+            exit 1
+          }

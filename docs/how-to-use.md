@@ -60,6 +60,8 @@ Consider running `git init` in the workspace to keep a record of your practice. 
 
 ### Working on a pack
 
+To start a pack of your own, run `hc pack init`: it writes `pack.yaml`, a `.gitignore`, a CI workflow and the agent files, ready to commit. [Writing packs](packs.md) is the guide to creating, checking and publishing one.
+
 A pack checkout, that is a directory with `pack.yaml` such as a clone of a pack's repository, is a workspace as it is: run hc in it or in any directory below it, or point `-w` at it. It needs no `hc init`, and `hc init` refuses a directory inside a pack. In this authoring workspace the pack is the only pack, and it is writable: `hc fetch`, `hc new` and `hc import` add problems to its `problems/`, and `hc gen`, `hc fix` and `hc cases` change them. So the authoring flow needs no flags: `hc fetch two-sum`, `hc gen two-sum`, `hc validate --run`, and `hc pack check` before publishing (see [checking a pack](#checking-a-pack)). There is no `local` pack, a `packs/` directory in the checkout is ignored, and problems are named by their slug alone.
 
 ```
@@ -81,7 +83,7 @@ hc.yaml
 pyrightconfig.json
 ```
 
-Add `.claude/`, `.agents/` and `AGENTS.md` too, unless the repository has agent files of its own (hc changes only its own skills and its block of `AGENTS.md`).
+`hc pack init` writes this `.gitignore`, and commits to keeping `.claude/`, `.agents/` and `AGENTS.md` in the repository, so that a fresh clone describes itself to agents. In a pack created otherwise, ignore them too, or commit them (hc changes only its own skills and its block of `AGENTS.md`).
 
 A pack installed in a practice workspace (`packs/<name>/`, beside `hc.yaml`) is not a checkout: hc run inside it uses the enclosing workspace, where the pack stays read-only.
 

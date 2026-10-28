@@ -10,7 +10,8 @@ repository of its own: `pack.yaml` at the root and one directory per
 problem in `problems/<dir>/`. Its checkout is an hc workspace, where the
 pack is the only pack and its problems are yours to edit. Users install
 the pack into their practice workspaces, and their solutions and history
-are keyed by the pack's name and each problem's slug.
+are keyed by the pack's name and each problem's slug. A new pack starts
+with `hc pack init`, which writes `pack.yaml`, its CI and these skills.
 
 This skill covers the pack as a whole. A single problem is written with
 the `hc-problem` skill (what it is) and finished with the `hc-cases` skill
