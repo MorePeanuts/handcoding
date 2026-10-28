@@ -39,6 +39,8 @@ Python 解答在 hc 管理的虚拟环境 `.hc/venv` 中运行。第一次有命
 
 环境中装有 debugpy，用于 headless 调试。下载 Python 和安装 debugpy 需要联网，但只需一次；判题始终离线。如果环境失效（工作区被移动，或者它所用的 Python 被删除），hc 会重新创建。`hc env sync` 可以随时重建它，例如在装好 uv 之后。hc 还会在工作区根目录写入 `pyrightconfig.json`（已有时不覆盖），让 pyright 和 basedpyright 用同一个解释器检查你的解答。如果想用自己的 Python（conda、自行编译的版本），在 `hc.yaml` 中设置 `python.interpreter`，hc 就不再创建虚拟环境。
 
+支持的最低版本是 Python 3.10 和 Go 1.22（见协议的[语言版本](protocol_zh.md#语言版本)）。你自己的解答可以使用工具链支持的任何特性：`hc test`、`hc submit` 和 `hc debug` 会注明所用的工具链（`[Python 3.12.9]`），版本过旧时只给出警告。题目附带的代码必须能在最低版本上运行，所以 `hc cases build` 和 `hc validate --run` 拒绝在过旧的工具链上运行参考解。
+
 建议在工作区里执行 `git init`，记录下自己的练习过程。
 
 ## 交互式题目列表
@@ -74,7 +76,7 @@ Python 解答在 hc 管理的虚拟环境 `.hc/venv` 中运行。第一次有命
 
 ```sh
 hc start two-sum -e                                 # 创建解答并打开编辑器
-hc test two-sum                                     # 运行示例用例
+hc test two-sum                                     # 运行示例用例（没有标记示例时运行前 3 个用例）
 hc test two-sum -c 4 -c 5                           # 运行指定用例
 hc test two-sum --all -v                            # 全部用例，完整输出，不记录
 hc test two-sum -i '{"nums":[1,2,3],"target":5}'    # 自定义输入（有参考解时会算出期望输出）
@@ -105,7 +107,7 @@ hc gen 146                  # 让题目就绪：生成测试用例并决定判�
 
 `hc fetch` 会下载题面及其图片、函数签名、Go 和 Python 的初始代码，以及示例用例。能从题面中解析出期望输出时，也会一并写入。
 
-刚拉取的题目**还不能提交**。LeetCode 只公开示例，也不公开判题方式：顺序是否重要、是否有多个正确答案。在判题规则确定之前，`hc test` 会把你的输出和示例答案并排列出，但不给结论；`hc submit` 会拒绝提交。`hc gen` 会生成完整的测试用例，并根据题面决定判题规则，内置规则都不适用时编写判题程序；你也可以自己设置 `judge.compare`（见[题目协议](protocol_zh.md#problemyaml)）。题目列表会把这类题目标记为"not ready"。
+刚拉取的题目**还不能提交**。LeetCode 只公开示例，也不公开判题方式：顺序是否重要、是否有多个正确答案。在判题规则确定之前，`hc test` 会把你的输出和示例答案并排列出，但不给结论；`hc submit` 会拒绝提交。`hc gen` 会生成完整的测试用例，并根据题面决定判题规则，内置规则都不适用时编写判题程序；你也可以自己设置 `judge.compare`（见协议的[比较方式](protocol_zh.md#比较方式)）。题目列表会把这类题目标记为"not ready"。
 
 会员题目无法获取。签名中使用了 hc 暂不支持的类型（例如交互题中的 `MountainArray`）的题目也无法获取，`hc fetch` 会说明原因。
 
@@ -121,7 +123,11 @@ hc validate my-problem --run        #   每份参考解都必须通过每个用�
 hc import ./my-problems/            # 导入别人分享的题目目录
 ```
 
-[题目协议](protocol_zh.md#手写一道题)完整演示了一道函数题和一道设计题，并说明了参考解的写法。`hc import` 只复制协议中定义的文件；如果题库中已有相同的 slug 或编号，会拒绝导入（`--force` 会替换 slug 相同的题目）。
+题目的格式，从 `problem.yaml` 到参考解，由[题目协议](protocol_zh.md)规定；`hc new` 会生成一个待填写的骨架，内置示例题（`hc init` 会把它们放进题库）则是完整的例子。
+
+- `hc cases build` 运行一个参考解：有 Go 参考解时用 Go，否则用 Python；`-l` 可以指定。判题方式为 `any_of` 的题目会被拒绝，因为它的 `expected` 要列出所有可接受的答案，只能手写。
+- `hc validate` 把每一处违反协议[合法性规则](protocol_zh.md#合法性规则)的地方报为错误，并注明用例编号和字段。加上 `--run` 时，它还会在每个用例上运行每个参考解，有判题程序时交给判题程序判定。以下情况给出警告：判题规则未确定（没有 `judge.compare`）、没有用例、有用例缺少 `expected`、没有用例标记为示例、没有参考解，以及题面引用的图片不存在。
+- `hc import` 只复制协议定义的条目（其余内容，如编辑器文件、`solutions/` 目录，不会被导入）；如果题库中已有相同的 slug 或编号，会拒绝导入（`--force` 会替换 slug 相同的题目）。
 
 hc 内置了与自身版本对应的协议（英文版），离线也能查阅：
 
@@ -227,7 +233,7 @@ leetcode:
 ## 目前的限制
 
 - 交互题暂不支持。
-- `hc fetch` 可以导入带[结构输入](protocol_zh.md#结构输入)的题目（带环链表、相交链表、二叉树的最近公共祖先这类节点引用），结构由 LeetCode 测试数据与初始代码之间的差异推出。不是普通 JSON 的示例输出（如 142 的 "tail connects to node index 1"）留给 `hc gen` 补写。示例题 141、142、160、236、237 和 1379 都属于这类题目。
+- `hc fetch` 可以导入带[结构输入](protocol_zh.md#结构输入)的题目（带环链表、相交链表、二叉树的最近公共祖先这类节点引用），结构由 LeetCode 的元数据（描述它的测试数据）与初始代码（真正的签名）之间的差异推出：初始代码不接收的测试数据成为隐藏输入，初始代码以节点接收的值成为 `ref`，测试数据中没有的节点参数成为 `copy`，`pos` 形成 `cycle`，160 的 `skipA` 和 `skipB` 形成 `join`，返回节点的题目得到 `returns_ref`。示例会对应到新的输入上。不是普通 JSON 的示例输出（如 142 的 "tail connects to node index 1"）留给 `hc gen` 补写。示例题 141、142、160、236、237 和 1379 都属于这类题目。
 - `hc fetch` 可以导入使用 [LeetCode 的 `Node` 类型](protocol_zh.md#leetcode-的-node-类型)、`NestedInteger`、`Employee` 的题目，签名取自 LeetCode 的 Go 初始代码。`returns_copy`（克隆图）留给 `hc gen` 设置；扁平化嵌套列表迭代器这类迭代器题目的示例只给出输入、没有给出调用序列，也留给 `hc gen` 补写。
 - 把一个值编码再解码回来的题目（297、449、535）按[编解码往返题](protocol_zh.md#编解码往返题)评测：只比较解码得到的值，所以对编码本身的要求（449 的"尽可能紧凑"）不会检查。`hc fetch` 可以导入这类题目，编码器、解码器以及二者是否共用一个实例取自 LeetCode 初始代码注释中的调用方式。示例题 297 和 535 分别展示了两种情况。
 - 会统计运行时间，但不限制内存。

@@ -39,6 +39,8 @@ Python solutions run in a virtual environment that hc manages in `.hc/venv`. hc 
 
 The environment holds debugpy for headless debugging. Downloading Python and installing debugpy need network access, once; judging stays offline. If the environment stops working (the workspace was moved, or its Python removed), hc creates it again. `hc env sync` recreates it on demand, for example after installing uv. hc also writes `pyrightconfig.json` at the workspace root, unless you have one, so pyright and basedpyright check your solutions with the same interpreter. To use your own Python instead (conda, a custom build), set `python.interpreter` in `hc.yaml`; hc then creates no environment.
 
+The oldest supported toolchains are Python 3.10 and Go 1.22 (the protocol's [language versions](protocol.md#language-versions)). Your own solutions may use anything your toolchain supports: `hc test`, `hc submit` and `hc debug` name the toolchain they run with (`[Python 3.12.9]`) and only warn when it is older. Code that problems ship must work on the oldest versions, so `hc cases build` and `hc validate --run` refuse to run reference solutions on an older toolchain.
+
 Consider running `git init` in the workspace to keep a record of your practice.
 
 ## The interactive list
@@ -74,7 +76,7 @@ Problems can be referred to by slug, slug prefix, number or directory name: `hc 
 
 ```sh
 hc start two-sum -e                                 # create the solution and open the editor
-hc test two-sum                                     # run the examples
+hc test two-sum                                     # run the examples (or the first 3 cases if none is marked)
 hc test two-sum -c 4 -c 5                           # run chosen cases
 hc test two-sum --all -v                            # all cases, full output, not recorded
 hc test two-sum -i '{"nums":[1,2,3],"target":5}'    # custom input (expected output from the reference, if any)
@@ -105,7 +107,7 @@ hc gen 146                  # make it ready: test cases and the judge rule
 
 `hc fetch` downloads the statement and its images, the signature, the Go and Python starter code, and the examples. Expected outputs are included when they can be parsed from the statement.
 
-A fetched problem is **not ready to submit** yet. LeetCode only publishes the examples, and not how answers are judged: whether order matters, whether several answers are valid. Until that is decided, `hc test` shows your output next to the example's answer without a verdict, and `hc submit` refuses. `hc gen` writes the full test suite and decides the judge rule from the statement, writing a checker when no built-in rule fits; you can also set `judge.compare` yourself (see the [problem protocol](protocol.md#problemyaml)). The list marks such problems as "not ready".
+A fetched problem is **not ready to submit** yet. LeetCode only publishes the examples, and not how answers are judged: whether order matters, whether several answers are valid. Until that is decided, `hc test` shows your output next to the example's answer without a verdict, and `hc submit` refuses. `hc gen` writes the full test suite and decides the judge rule from the statement, writing a checker when no built-in rule fits; you can also set `judge.compare` yourself (see the protocol's [compare modes](protocol.md#compare-modes)). The list marks such problems as "not ready".
 
 Premium problems are not available. Neither are problems whose signature uses types hc does not support yet (such as `MountainArray` in interactive problems); `hc fetch` says so.
 
@@ -121,7 +123,11 @@ hc validate my-problem --run        #   every reference must pass every case
 hc import ./my-problems/            # import problem directories shared by others
 ```
 
-The [problem protocol](protocol.md#writing-a-problem-by-hand) walks through a complete function problem and a design problem, and shows how to write the reference solution. `hc import` copies only the files the protocol defines, and refuses problems whose slug or ID is already in the bank (`--force` replaces a problem with the same slug).
+The format of a problem, from `problem.yaml` to the reference solution, is specified by the [problem protocol](protocol.md); `hc new` scaffolds one to fill in, and the built-in samples (`hc init` puts them in the bank) are complete examples.
+
+- `hc cases build` runs a reference solution: the Go one if there is one, else the Python one; `-l` picks one. It refuses problems judged with `any_of`, whose `expected` lists every acceptable answer and has to be written by hand.
+- `hc validate` reports every break of the protocol's [validity rules](protocol.md#validity-rules) as an error, with the case number and field. With `--run` it also runs every reference solution on every case, and through the checker if there is one. It warns about an undecided judge rule (no `judge.compare`), no cases, cases without `expected`, no case marked as an example, no reference solution, and statement images that do not exist.
+- `hc import` copies only the entries the protocol defines (anything else, such as editor files or a `solutions/` folder, is left behind), and refuses problems whose slug or ID is already in the bank (`--force` replaces a problem with the same slug).
 
 hc carries the protocol (in English) for its own version, so it is at hand offline:
 
@@ -227,7 +233,7 @@ leetcode:
 ## Current limitations
 
 - Interactive problems aren't supported yet.
-- `hc fetch` imports problems with [structure inputs](protocol.md#structure-inputs) (a list with a cycle, intersecting lists, node references such as Lowest Common Ancestor), working out the structures from the difference between LeetCode's test data and its template. Example outputs that are not plain JSON, such as 142's "tail connects to node index 1", are left to `hc gen`. The samples 141, 142, 160, 236, 237 and 1379 show these problems.
+- `hc fetch` imports problems with [structure inputs](protocol.md#structure-inputs) (a list with a cycle, intersecting lists, node references such as Lowest Common Ancestor), working out the structures from the difference between LeetCode's metadata, which describes its test data, and its template, which is the real signature: test data the template does not take becomes a hidden input, a value the template takes as a node becomes a `ref`, a node parameter missing from the test data becomes a `copy`, a `pos` makes a `cycle`, 160's `skipA` and `skipB` make a `join`, and a returned node gets `returns_ref`. The examples are mapped onto the new inputs. Example outputs that are not plain JSON, such as 142's "tail connects to node index 1", are left to `hc gen`. The samples 141, 142, 160, 236, 237 and 1379 show these problems.
 - `hc fetch` imports problems with [LeetCode's `Node` types](protocol.md#leetcodes-node-types), `NestedInteger` and `Employee`, reading their signature from LeetCode's Go template. `returns_copy` (Clone Graph) is left to `hc gen`, and so are the examples of iterator problems such as Flatten Nested List Iterator, which LeetCode gives without the calls.
 - Problems that encode a value and decode it back (297, 449, 535) are judged as [round trips](protocol.md#round-trip-problems): only the decoded value is compared, so requirements on the encoding itself (449: "as compact as possible") are not checked. `hc fetch` imports them, reading the encoder, the decoder and whether they share an instance from the harness in LeetCode's template comment. The samples 297 and 535 show both kinds.
 - Run time is measured, but memory is not limited.
