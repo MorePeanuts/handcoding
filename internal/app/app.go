@@ -132,6 +132,44 @@ func (a *App) Lang(name string) (lang.Language, error) {
 	return a.Langs.Get(name)
 }
 
+// SolutionLang resolves the language to solve p in: name, or the default
+// from hc.yaml. A pack can limit the languages its problems are solved in
+// (pack.yaml's languages): a language it lacks is an error when named, and
+// the default falls back to the pack's first language, with a note saying
+// so.
+func (a *App) SolutionLang(p *problem.Problem, name string) (l lang.Language, note string, err error) {
+	l, err = a.Lang(name)
+	if err != nil {
+		return nil, "", err
+	}
+	err = a.CheckLang(p, l)
+	if err == nil || name != "" {
+		return l, "", err
+	}
+	k, kerr := a.WS.Pack(p.Pack)
+	if kerr != nil {
+		return nil, "", kerr
+	}
+	for _, id := range k.Languages() {
+		if fb, err := a.Langs.Get(id); err == nil {
+			return fb, fmt.Sprintf("pack %s is not solved in %s, using %s", k.Name, l.Name(), fb.Name()), nil
+		}
+	}
+	return nil, "", err
+}
+
+// CheckLang returns an error unless p's pack is solved in l.
+func (a *App) CheckLang(p *problem.Problem, l lang.Language) error {
+	k, err := a.WS.Pack(p.Pack)
+	if err != nil {
+		return err
+	}
+	if langs := k.Languages(); !slices.Contains(langs, l.ID()) {
+		return fmt.Errorf("pack %s is solved in %s, not %s", k.Name, strings.Join(langs, ", "), l.ID())
+	}
+	return nil
+}
+
 // SolutionPath is the file the user edits.
 func (a *App) SolutionPath(p *problem.Problem, l lang.Language) string {
 	return filepath.Join(a.WS.SolutionDir(p, l.ID()), l.SolutionFile())
@@ -145,7 +183,11 @@ func (a *App) HasSolution(p *problem.Problem, l lang.Language) bool {
 
 // Start creates the solution file from the starter template if it does not
 // exist yet, and (re)generates the driver so editors can resolve symbols.
+// The problem's pack must be solved in l (see CheckLang).
 func (a *App) Start(p *problem.Problem, l lang.Language) (path string, created bool, err error) {
+	if err := a.CheckLang(p, l); err != nil {
+		return "", false, err
+	}
 	path = a.SolutionPath(p, l)
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -168,6 +210,9 @@ func (a *App) Start(p *problem.Problem, l lang.Language) (path string, created b
 
 // Reset overwrites the solution with the starter template.
 func (a *App) Reset(p *problem.Problem, l lang.Language) (string, error) {
+	if err := a.CheckLang(p, l); err != nil {
+		return "", err
+	}
 	path := a.SolutionPath(p, l)
 	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return "", err
@@ -189,7 +234,7 @@ func (a *App) Discard(ctx context.Context, p *problem.Problem) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return st.DeleteSlug(ctx, p.Slug)
+	return st.DeleteProblem(ctx, p.Pack, p.Slug)
 }
 
 // Restore writes code (e.g. from a past submission) into the solution file.
@@ -240,8 +285,11 @@ type RunOptions struct {
 
 // Run runs the user's solution against the selected cases.
 func (a *App) Run(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, o RunOptions) (*runner.Report, error) {
+	if err := a.CheckLang(p, l); err != nil {
+		return nil, err
+	}
 	if !a.HasSolution(p, l) {
-		return nil, fmt.Errorf("no %s solution for %s yet; run `hc start %s -l %s`", l.Name(), p.Slug, p.Slug, l.ID())
+		return nil, fmt.Errorf("no %s solution for %s yet; run `hc start %s -l %s`", l.Name(), p.Slug, a.WS.Ref(p), l.ID())
 	}
 	if err := l.Setup(ctx, o.Stderr); err != nil {
 		return nil, err
@@ -318,11 +366,11 @@ func (a *App) Submit(ctx context.Context, p *problem.Problem, l lang.Language, o
 		return nil, nil, err
 	}
 	if len(cases) == 0 {
-		return nil, nil, fmt.Errorf("%s has no test cases; generate some with `hc gen %s`", p.Slug, p.Slug)
+		return nil, nil, fmt.Errorf("%s has no test cases; generate some with `hc gen %s`", p.Slug, a.WS.Ref(p))
 	}
 	for i, c := range cases {
 		if !c.HasExpected() {
-			return nil, nil, fmt.Errorf("case %d has no expected output; run `hc cases build %s` or `hc gen %s`", i+1, p.Slug, p.Slug)
+			return nil, nil, fmt.Errorf("case %d has no expected output; run `hc cases build %s` or `hc gen %s`", i+1, a.WS.Ref(p), a.WS.Ref(p))
 		}
 	}
 	sel, _ := Select(cases, nil, true)
@@ -339,7 +387,7 @@ func (a *App) Submit(ctx context.Context, p *problem.Problem, l lang.Language, o
 		total += c.Elapsed
 	}
 	sub := &store.Submission{
-		Slug: p.Slug, Lang: l.ID(), Verdict: string(rep.Verdict),
+		Pack: p.Pack, Slug: p.Slug, Lang: l.ID(), Verdict: string(rep.Verdict),
 		Passed: rep.Passed, Total: rep.Total, ElapsedMs: total.Milliseconds(), Code: string(code),
 		Details: EncodeReport(p, rep),
 	}
@@ -529,14 +577,14 @@ func (a *App) Statuses(ctx context.Context, probs []*problem.Problem) (map[strin
 	}
 	out := make(map[string]ProblemStatus, len(probs))
 	for _, p := range probs {
-		s := subs[p.Slug]
+		s := subs[p.Ref()]
 		switch {
 		case s.Solved:
-			out[p.Slug] = StatusSolved
+			out[p.Ref()] = StatusSolved
 		case s.Attempts > 0 || slices.ContainsFunc(a.Langs.All(), func(l lang.Language) bool { return a.HasSolution(p, l) }):
-			out[p.Slug] = StatusAttempted
+			out[p.Ref()] = StatusAttempted
 		default:
-			out[p.Slug] = StatusNew
+			out[p.Ref()] = StatusNew
 		}
 	}
 	return out, nil

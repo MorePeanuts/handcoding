@@ -1,10 +1,9 @@
-package builtin_test
+package regression_test
 
 import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -12,22 +11,24 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
+	"github.com/MorePeanuts/handcoding/internal/regression"
 )
 
-// TestProtocolCoverage requires the built-in problems, hc's regression set,
+// TestProtocolCoverage requires the regression set
 // to exercise the whole problem protocol: every type as an input and as an
 // output, every kind, compare mode and round-trip instances value, every
 // field of problem.yaml, the default tolerance and the structure inputs on
 // each node type that allows them. The lists come from the protocol's code
 // wherever they can (the constants of internal/problem, the fields of its
 // structs, its validator), so a new protocol feature fails this test until a
-// built-in problem uses it. Kept by hand: the constant name prefixes, the
+// problem of the set uses it. Kept by hand: the constant name prefixes, the
 // file that declares the judge-defined types (to tell scalars apart), the
-// default tolerance feature and the exemptions. It needs no toolchain: TestBuiltinReferences
+// default tolerance feature and the exemptions. It needs no toolchain: TestRegressionReferences
 // (internal/app) checks that the problems' references pass.
 func TestProtocolCoverage(t *testing.T) {
-	probs := loadBuiltins(t)
+	probs := loadSet(t)
 	consts := protocolConstants(t)
 
 	used := map[string][]string{} // feature -> slugs of the problems using it
@@ -48,11 +49,11 @@ func TestProtocolCoverage(t *testing.T) {
 		}
 	}
 	if len(missing) > 0 {
-		t.Errorf("no built-in problem covers:\n  %s\nadd a problem that needs each (see CLAUDE.md, \"Built-in sample problems\")", strings.Join(missing, "\n  "))
+		t.Errorf("no problem of the regression set covers:\n  %s\nadd a problem that needs each (see CLAUDE.md, \"Regression set\")", strings.Join(missing, "\n  "))
 	}
 }
 
-// exempt lists the protocol features no built-in problem has to use, with
+// exempt lists the protocol features no problem of the set has to use, with
 // the reason. It is kept by hand.
 var exempt = map[string]string{
 	typeAs(problem.TypeEmployee, out):       "LeetCode only passes employees in (690); no problem returns one",
@@ -89,7 +90,7 @@ const (
 	prefixOutputLength = "OutputLength"
 )
 
-// required lists the features the built-in problems must cover.
+// required lists the features the regression set must cover.
 func required(t *testing.T, consts map[string][]constant) []string {
 	var req []string
 	add := func(f string) {
@@ -359,25 +360,37 @@ func setFields(fs map[string]bool, v reflect.Value) {
 	}
 }
 
-func loadBuiltins(t *testing.T) []*problem.Problem {
+// loadSet loads the regression set as hc loads an installed pack, and
+// requires the pack to be valid.
+func loadSet(t *testing.T) []*problem.Problem {
 	t.Helper()
-	entries, err := os.ReadDir("_problems")
+	m, err := pack.Load(regression.Dir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	var probs []*problem.Problem
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
+	if err := m.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if m.Name != regression.Name {
+		t.Fatalf("pack.yaml names the pack %s, want %s", m.Name, regression.Name)
+	}
+	probs, failed, err := pack.LoadProblems(m.ProblemsPath(), m.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range failed {
+		t.Error(f)
+	}
+	if err := m.ValidateProblems(probs); err != nil {
+		t.Error(err)
+	}
+	for _, p := range probs {
+		for _, err := range pack.IdentityErrors(p, probs) {
+			t.Errorf("%s: %v", p.Slug, err)
 		}
-		p, err := problem.Load(filepath.Join("_problems", e.Name()))
-		if err != nil {
-			t.Fatal(err)
-		}
-		probs = append(probs, p)
 	}
 	if len(probs) == 0 {
-		t.Fatal("no built-in problems")
+		t.Fatal("no problems in the regression set")
 	}
 	return probs
 }

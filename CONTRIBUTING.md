@@ -21,6 +21,7 @@ Use a scratch workspace instead of your own `~/handcoding`:
 
 ```sh
 go run ./cmd/hc init /tmp/hc-dev
+cp -R testdata/regression /tmp/hc-dev/packs/    # the regression set, as an installed pack
 go run ./cmd/hc -w /tmp/hc-dev test two-sum
 ```
 
@@ -32,6 +33,8 @@ internal/cli        cobra commands
 internal/tui        bubbletea interface
 internal/app        use cases shared by the CLI and the TUI
 internal/problem    problem protocol: problem.yaml, cases.jsonl, types
+internal/pack       packs: pack.yaml, a pack's problems and their identity
+internal/workspace  the workspace: hc.yaml, its packs, solutions, pack/slug lookup
 internal/lang       language interface; golang/ and python/ drivers
 internal/runner     build, run the driver, collect results
 internal/judge      output comparison
@@ -40,7 +43,9 @@ internal/leetcode   LeetCode client and conversion
 internal/termimg    images in the terminal
 internal/agent      coding agent integration
 internal/skill      agent skill registry and managed install
-internal/builtin    embedded sample problems and agent skills
+internal/builtin    embedded agent skills
+internal/regression locates the regression set for tests
+testdata/regression the regression set: a pack covering the whole protocol
 ```
 
 [CLAUDE.md](CLAUDE.md) describes the architecture in more detail.

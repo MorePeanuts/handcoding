@@ -53,7 +53,7 @@ computes expected outputs with ` + "`hc cases build`" + ` and verifies them with
 ` + "`hc validate --run`" + `. A freshly fetched problem becomes ready to submit this way.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
+			return withWritableProblem(root, args[0], func(a *app.App, p *problem.Problem) error {
 				ag, err := af.resolve(a)
 				if err != nil {
 					return err
@@ -62,7 +62,7 @@ computes expected outputs with ` + "`hc cases build`" + ` and verifies them with
 					return err
 				}
 				rel, _ := filepath.Rel(a.WS.Root, p.Dir)
-				prompt := agent.GeneratePrompt(p.Slug, rel, count, extra)
+				prompt := agent.GeneratePrompt(p.Ref(), rel, count, extra)
 				return runAgent(cmd, a, ag, prompt, dryRun, p)
 			})
 		},
@@ -97,7 +97,7 @@ To fix a case by hand instead: hc cases edit <problem>.`,
 			if len(cases) == 0 && complaint == "" {
 				return errors.New("tell the agent what is wrong: --case and/or --message")
 			}
-			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
+			return withWritableProblem(root, args[0], func(a *app.App, p *problem.Problem) error {
 				ag, err := af.resolve(a)
 				if err != nil {
 					return err
@@ -110,7 +110,7 @@ To fix a case by hand instead: hc cases edit <problem>.`,
 					solution, _ = filepath.Rel(a.WS.Root, a.SolutionPath(p, l))
 				}
 				rel, _ := filepath.Rel(a.WS.Root, p.Dir)
-				prompt := agent.FixPrompt(p.Slug, rel, cases, complaint, solution)
+				prompt := agent.FixPrompt(p.Ref(), rel, cases, complaint, solution)
 				return runAgent(cmd, a, ag, prompt, dryRun, p)
 			})
 		},
@@ -128,17 +128,17 @@ func runAgent(cmd *cobra.Command, a *app.App, ag *agent.Agent, prompt string, dr
 		fmt.Printf("cd %s\n%s\n\nPrompt:\n%s", a.WS.Root, strings.Join(ag.Argv, " "), prompt)
 		return nil
 	}
-	fmt.Fprintf(os.Stderr, "%s %s is working on %s (this can take a few minutes)…\n", ui.Cyan.Render("agent"), ag.Name, p.Slug)
+	fmt.Fprintf(os.Stderr, "%s %s is working on %s (this can take a few minutes)…\n", ui.Cyan.Render("agent"), ag.Name, p.Ref())
 	if err := ag.Run(cmd.Context(), a.WS.Root, prompt); err != nil {
 		return fmt.Errorf("agent: %w", err)
 	}
 	fmt.Fprintln(os.Stderr)
 	// Reload: the agent may have changed problem.yaml.
-	p2, err := a.WS.Problem(p.Slug)
+	p2, err := a.WS.Problem(p.Ref())
 	if err != nil {
 		return err
 	}
-	return validateProblem(cmd, a, p2, false, nil)
+	return validateProblem(cmd, a, p2, false, nil, a.WS.Ref(p2))
 }
 
 func newSkillCmd(root *rootOptions) *cobra.Command {

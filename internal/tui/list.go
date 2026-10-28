@@ -29,7 +29,7 @@ func (m *model) applyFilter() {
 	q := strings.ToLower(strings.TrimSpace(m.search.Value()))
 	m.visible = m.visible[:0]
 	for i, p := range m.probs {
-		st := m.statuses[p.Slug]
+		st := m.statuses[p.Ref()]
 		if m.filter == filterTodo && st == app.StatusSolved || m.filter == filterSolved && st != app.StatusSolved {
 			continue
 		}
@@ -42,7 +42,7 @@ func (m *model) applyFilter() {
 }
 
 func matches(p *problem.Problem, q string) bool {
-	if p.ID == q || strings.Contains(p.Slug, q) || strings.Contains(strings.ToLower(p.Title), q) {
+	if p.ID == q || strings.Contains(p.Ref(), q) || strings.Contains(strings.ToLower(p.Title), q) {
 		return true
 	}
 	for _, t := range p.Tags {
@@ -146,10 +146,24 @@ func (m *model) viewList() string {
 	right := ui.Faint.Render(fmt.Sprintf("lang: %s  filter: %s", m.lang.Name(), m.filter))
 	b.WriteString(padBetween(header, right, m.width) + "\n\n")
 
-	// marker(2) + status(2) + id(7) + title + level(9) + tags
-	titleW := min(max(m.width-60, 20), 48)
-	tagsW := max(m.width-2-2-7-titleW-1-9, 0)
-	cols := fmt.Sprintf("  %s %-6s %s %-8s %s", " ", "#", fit("Title", titleW), "Level", "Tags")
+	// marker(2) + status(2) + [pack] + id(7) + title + level(9) + tags
+	packW := 0
+	if m.multiPack {
+		packW = len("Pack")
+		for _, p := range m.probs {
+			packW = max(packW, runewidth.StringWidth(p.Pack))
+		}
+		packW = min(packW, 16)
+	}
+	pack := func(s string) string {
+		if packW == 0 {
+			return ""
+		}
+		return fit(s, packW) + " "
+	}
+	titleW := min(max(m.width-60-packW, 20), 48)
+	tagsW := max(m.width-2-2-7-titleW-1-9-len(pack("")), 0)
+	cols := fmt.Sprintf("  %s %s%-6s %s %-8s %s", " ", pack("Pack"), "#", fit("Title", titleW), "Level", "Tags")
 	b.WriteString(ui.Faint.Render(cols) + "\n")
 
 	h := m.listHeight()
@@ -162,7 +176,7 @@ func (m *model) viewList() string {
 	for i := m.offset; i < min(m.offset+h, len(m.visible)); i++ {
 		p := m.probs[m.visible[i]]
 		mark := ui.Faint.Render("·")
-		switch m.statuses[p.Slug] {
+		switch m.statuses[p.Ref()] {
 		case app.StatusSolved:
 			mark = ui.Green.Render("✔")
 		case app.StatusAttempted:
@@ -177,7 +191,7 @@ func (m *model) viewList() string {
 				tags = ui.Yellow.Render(notReady) + ui.Faint.Render(fit(strings.Join(p.Tags, ", "), tagsW-len(notReady)))
 			}
 		}
-		row := fmt.Sprintf("%s %-6s %s %s %s", mark, p.ID, fit(p.Title, titleW), padRight(ui.Difficulty(p.Difficulty), 8), tags)
+		row := fmt.Sprintf("%s %s%-6s %s %s %s", mark, ui.Faint.Render(pack(p.Pack)), p.ID, fit(p.Title, titleW), padRight(ui.Difficulty(p.Difficulty), 8), tags)
 		if i == m.cursor {
 			row = cursorStyle.Render("▸") + " " + row
 		} else {
@@ -185,7 +199,10 @@ func (m *model) viewList() string {
 		}
 		b.WriteString(row + "\n")
 	}
-	if len(m.visible) == 0 {
+	switch {
+	case len(m.probs) == 0:
+		b.WriteString(ui.Faint.Render("  no problems yet: add some with hc fetch <slug> or hc new <slug>\n"))
+	case len(m.visible) == 0:
 		b.WriteString(ui.Faint.Render("  no problems match\n"))
 	}
 	for i := max(len(m.visible)-m.offset, 1); i < h; i++ {

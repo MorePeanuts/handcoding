@@ -1,0 +1,17 @@
+protocol: 1
+name: regression
+title: hc regression set
+description: >-
+  hc's own test data: problems that together use every type, kind, compare
+  mode and judge option of the protocol, each with Go and Python references.
+  Not meant for practice.
+license: MIT
+# Groups exercise pack.yaml's groups (hc list --group); their order is
+# deliberately not the order of ids.
+groups:
+  - name: structure-inputs
+    title: Structure inputs
+    problems: [intersection-of-two-linked-lists, linked-list-cycle-ii, linked-list-cycle, find-a-corresponding-node-of-a-binary-tree-in-a-clone-of-that-tree, copy-list-with-random-pointer]
+  - name: design
+    title: Design problems
+    problems: [lru-cache, binary-search-tree-iterator, serialize-and-deserialize-binary-tree, encode-and-decode-tinyurl, flatten-nested-list-iterator]

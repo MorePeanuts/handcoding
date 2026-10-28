@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/MorePeanuts/handcoding/internal/problem"
+	"github.com/MorePeanuts/handcoding/internal/regression"
 )
 
 func TestConvertFunction(t *testing.T) {
@@ -430,11 +431,11 @@ func TestConvertRoundTripFunction(t *testing.T) {
 // For custom-judged problems that pass linked structures, the template's
 // signature differs from metaData, which describes LeetCode's test data; the
 // difference becomes structure inputs. The signatures must be those of the
-// built-in samples.
+// problems of the regression set.
 func TestConvertStructureInputs(t *testing.T) {
 	tests := []struct {
 		slug    string
-		builtin string // the sample with the expected signature
+		builtin string // the regression problem with the expected signature
 		// want is the expected signature, as JSON, without a sample.
 		want, output string
 		examples     int // examples kept
@@ -469,7 +470,7 @@ func TestConvertStructureInputs(t *testing.T) {
 		p := c.Problem
 		want, output := tt.want, tt.output
 		if tt.builtin != "" {
-			b, err := problem.Load(filepath.Join("..", "builtin", "_problems", tt.builtin))
+			b, err := problem.Load(filepath.Join(regression.ProblemsDir(), tt.builtin))
 			if err != nil {
 				t.Fatal(err)
 			}

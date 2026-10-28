@@ -30,7 +30,7 @@ func newStartCmd(root *rootOptions) *cobra.Command {
 		Use:     "start <problem>",
 		Aliases: []string{"s"},
 		Short:   "Create the solution file from the template",
-		Long:    "Create the solution file for a problem (if it does not exist yet) and print its path.\nA problem can be referenced by slug, slug prefix, ID or directory name.",
+		Long:    "Create the solution file for a problem (if it does not exist yet) and print its path.\nA problem can be referenced by slug, slug prefix, ID or directory name, and as\n<pack>/<ref> within one pack. A pack may limit the languages it is solved in.",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return root.withProblem(args[0], langName, func(a *app.App, p *problem.Problem, l lang.Language) error {
@@ -181,7 +181,7 @@ the problem has one.`,
 					return err
 				}
 				if len(sel) == 0 {
-					return fmt.Errorf("%s has no test cases; add some with `hc cases add` or generate them with `hc gen %s`", p.Slug, p.Slug)
+					return fmt.Errorf("%s has no test cases; add some with `hc cases add` or generate them with `hc gen %s`", p.Slug, a.WS.Ref(p))
 				}
 				ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 				defer stop()
@@ -283,7 +283,7 @@ func newSubmitCmd(root *rootOptions) *cobra.Command {
 					return err
 				}
 				ui.PrintReport(os.Stdout, p, rep, ui.ReportOptions{Verbose: verbose})
-				fmt.Println(ui.Faint.Render(fmt.Sprintf("Recorded as submission #%d (hc history %s)", sub.ID, p.Slug)))
+				fmt.Println(ui.Faint.Render(fmt.Sprintf("Recorded as submission #%d (hc history %s)", sub.ID, a.WS.Ref(p))))
 				if rep.Verdict != runner.Accepted {
 					return errSilent
 				}
@@ -322,7 +322,7 @@ server for your editor to attach to:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return root.withProblem(args[0], langName, func(a *app.App, p *problem.Problem, l lang.Language) error {
 				if !a.HasSolution(p, l) {
-					return fmt.Errorf("no %s solution for %s yet; run `hc start %s`", l.Name(), p.Slug, p.Slug)
+					return fmt.Errorf("no %s solution for %s yet; run `hc start %s`", l.Name(), p.Slug, a.WS.Ref(p))
 				}
 				var sel []runner.Selected
 				if input != "" {
@@ -410,7 +410,7 @@ func newDiscardCmd(root *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "discard <problem>",
 		Short: "Delete your solutions and submission history of a problem",
-		Long:  "Delete the solution files (every language) and all submissions of a problem, so it is back to \"not started\". The problem itself stays in the bank.",
+		Long:  "Delete the solution files (every language) and all submissions of a problem, so it is back to \"not started\". The problem itself is kept.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {

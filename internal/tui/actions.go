@@ -65,7 +65,7 @@ func (m *model) problemKey(key string, p *problem.Problem) (tea.Cmd, bool) {
 				return nil
 			}
 			m.message = ui.Green.Render(fmt.Sprintf("discarded %s: solution files and %s removed", p.Slug, plural(int(n), "submission")))
-			if m.run != nil && m.run.slug == p.Slug {
+			if m.run != nil && m.run.ref == p.Ref() {
 				m.run = nil
 			}
 			// Leave screens that showed the discarded state.
@@ -146,7 +146,7 @@ func (m *model) debug(p *problem.Problem) tea.Cmd {
 		return nil
 	}
 	caseNum := m.debugCase(p)
-	cmd := exec.Command(m.opts.Exe, "-w", m.app.WS.Root, "debug", p.Slug, "-l", m.lang.ID(), "-c", strconv.Itoa(caseNum))
+	cmd := exec.Command(m.opts.Exe, "-w", m.app.WS.Root, "debug", p.Ref(), "-l", m.lang.ID(), "-c", strconv.Itoa(caseNum))
 	m.message = fmt.Sprintf("debugged case %d", caseNum)
 	return tea.Exec(&clearScreenCmd{Cmd: cmd}, func(err error) tea.Msg {
 		// The debugger's exit status is not ours to report.
@@ -158,7 +158,7 @@ func (m *model) debug(p *problem.Problem) tea.Cmd {
 }
 
 func (m *model) debugCase(p *problem.Problem) int {
-	if m.run == nil || m.run.report == nil || m.run.slug != p.Slug || m.run.langID != m.lang.ID() {
+	if m.run == nil || m.run.report == nil || m.run.ref != p.Ref() || m.run.langID != m.lang.ID() {
 		return 1
 	}
 	for _, c := range m.run.report.Cases {

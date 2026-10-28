@@ -26,7 +26,7 @@ func (m *model) loadHistory() {
 		m.message = ui.Red.Render(err.Error())
 		return
 	}
-	subs, err := st.List(m.ctx, m.current.Slug)
+	subs, err := st.List(m.ctx, m.current.Pack, m.current.Slug)
 	if err != nil {
 		m.message = ui.Red.Render(err.Error())
 		return

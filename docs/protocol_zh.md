@@ -159,7 +159,7 @@ groups:
 
 > **YAML 的坑。** 在 YAML 的流式写法（`{...}`、`[...]`）中，`[]` 本身是 YAML 语法，所以其中的数组类型必须加引号：`{name: nums, type: "integer[]"}`。用块状写法（`type: integer[]` 单独一行）时，引号可加可不加。
 
-内置示例题 0001：
+题目 0001：
 
 ```yaml
 id: "1"
@@ -240,7 +240,7 @@ LeetCode 把六种不同的结构都叫作 `Node`。协议给每种结构各起�
 
 ### NestedInteger 和 Employee
 
-- `NestedInteger` 存放一个整数，或一个由 `NestedInteger` 组成的列表。JSON：一个整数，或由 `NestedInteger` 值组成的数组：`[1,[4,[6]]]`。`NestedInteger[]` 是它们组成的数组（内置示例题 0341：`[[1,1],2,[1,1]]`）。接口与 LeetCode 一致，所以解答也可以自己构造一个（LeetCode 385）：
+- `NestedInteger` 存放一个整数，或一个由 `NestedInteger` 组成的列表。JSON：一个整数，或由 `NestedInteger` 值组成的数组：`[1,[4,[6]]]`。`NestedInteger[]` 是它们组成的数组（题目 0341：`[[1,1],2,[1,1]]`）。接口与 LeetCode 一致，所以解答也可以自己构造一个（LeetCode 385）：
   - Go：`IsInteger() bool`、`GetInteger() int`、`SetInteger(int)`、`Add(NestedInteger)`、`GetList() []*NestedInteger`。零值是空列表。
   - Python：`NestedInteger(value=None)`（不给值就是空列表）、`isInteger()`、`getInteger()`、`setInteger(value)`、`add(elem)`、`getList()`。
 - `Employee` 的字段是 `Id int`、`Importance int`、`Subordinates []int`（Python：`Employee(id, importance, subordinates)`）。JSON：`[id, importance, [下属 id]]`。`Employee[]` 中的 id 必须互不相同，每个下属都必须是其中之一：`[[1,5,[2,3]],[2,3,[]],[3,3,[]]]`（LeetCode 690）。
@@ -275,7 +275,7 @@ LeetCode 把六种不同的结构都叫作 `Node`。协议给每种结构各起�
 
 一个用例给出一串操作：先是构造函数，然后是对它所创建实例的方法调用。被评判的值是这些操作的结果组成的数组；见[用例](#用例)。设计题没有[结构输入](#结构输入)，也不得有 `judge.output` 或 `judge.output_length`。
 
-内置示例题 0146：
+题目 0146：
 
 ```yaml
 kind: class
@@ -330,7 +330,7 @@ judge:
 
 `returns_ref` 按节点身份编码返回的节点，输出和 `expected` 都这样写：在 `ListNode` 结构中是它按节点顺序的下标（从 0 开始），在 `TreeNode` 结构中是它的值，没有节点时为 `null`。返回不属于该结构的节点算运行错误。
 
-内置示例题 0142（环形链表 II）给出 `head` 和 `pos`，解答只收到 `head`：
+题目 0142（环形链表 II）给出 `head` 和 `pos`，解答只收到 `head`：
 
 ```yaml
 function:
@@ -347,7 +347,7 @@ function:
 {"input": {"head": [3,2,0,-4], "pos": 1}, "expected": 1}
 ```
 
-内置示例题 0160（相交链表）：`headA` 和 `headB` 是包括共享尾部在内的完整链表：
+题目 0160（相交链表）：`headA` 和 `headB` 是包括共享尾部在内的完整链表：
 
 ```yaml
   params:
@@ -364,7 +364,7 @@ function:
 {"input": {"headA": [4,1,8,4,5], "headB": [5,6,1,8,4,5], "skipA": 2, "skipB": 3}, "expected": 2}
 ```
 
-内置示例题 0236（二叉树的最近公共祖先）：`p` 和 `q` 在用例中是值，在解答中是 `root` 的节点：
+题目 0236（二叉树的最近公共祖先）：`p` 和 `q` 在用例中是值，在解答中是 `root` 的节点：
 
 ```yaml
   params:
@@ -379,7 +379,7 @@ function:
 {"input": {"root": [3,5,1,6,2,0,8,null,null,7,4], "p": 5, "q": 1}, "expected": 3}
 ```
 
-内置示例题 0237（删除链表中的节点）引用一个隐藏输入，并评判它：
+题目 0237（删除链表中的节点）引用一个隐藏输入，并评判它：
 
 ```yaml
   params:
@@ -396,7 +396,7 @@ judge:
 {"input": {"head": [4,5,1,9], "node": 5}, "expected": [4,1,9]}
 ```
 
-内置示例题 1379 的用例中没有 `cloned`：
+题目 1379 的用例中没有 `cloned`：
 
 ```yaml
   params:
@@ -419,7 +419,7 @@ judge:
 - 返回类型是 `ListNode`、`TreeNode` 或某种 `Node` 类型。
 - `returns_copy` 与 `returns_ref` 和 `judge.output` 互斥。
 
-内置示例题 0133：
+题目 0133：
 
 ```yaml
 function:
@@ -450,7 +450,7 @@ function:
 - `separate`：`decode` 在第二个实例上运行，与 LeetCode 的 `ser = Codec(); deser = Codec(); deser.deserialize(ser.serialize(root))` 相同，所以解答无法借助实例状态传递这个值。`same`：两次调用在同一个实例上运行（535：`codec.decode(codec.encode(url))`）。
 - 两个实例在同一个进程中。其他方法不会被调用，对编码本身的要求（449 的"尽可能紧凑"）不作评判。
 
-内置示例题 0297（`separate`；0535 是 `same`）：
+题目 0297（`separate`；0535 是 `same`）：
 
 ```yaml
 kind: class
@@ -503,7 +503,7 @@ judge:
 
 `judge.compare: any_of` 时，`expected` 改为由上述形式的所有可接受值组成的数组。`checker` 时，它是一个合法答案。各个值必须使用其声明类型的编码（[类型](#类型)）；`NextTreeNode` 的输出使用按层的形式。
 
-内置示例题 0146：
+题目 0146：
 
 ```json
 {"input": {"ops": ["LRUCache","put","put","get","put","get","put","get","get","get"], "args": [[2],[1,1],[2,2],[1],[3,3],[2],[4,4],[1],[3],[4]]}, "expected": [null,null,null,1,null,-1,null,-1,3,4], "example": true}
@@ -532,10 +532,10 @@ judge:
 
 用于修改输入的函数题：
 
-- `judge.output: <输入>` 指向一个参数或隐藏输入。被评判的值是调用结束后它的值，按它的类型编码，而不是返回值。内置示例题 0189（`rotate`，返回 `void`）评判 `nums`。
+- `judge.output: <输入>` 指向一个参数或隐藏输入。被评判的值是调用结束后它的值，按它的类型编码，而不是返回值。题目 0189（`rotate`，返回 `void`）评判 `nums`。
 - `judge.output_length: return` 只评判 `judge.output` 的前 k 个元素，k 是返回值（LeetCode 的"前 k 个元素之后的内容不重要"）。它要求有 `judge.output`、其类型为数组，并且返回类型为 `integer` 或 `long`。返回的 k 不在 0 到数组长度之间时算运行错误。
 
-内置示例题 0027：
+题目 0027：
 
 ```yaml
 function:
@@ -603,7 +603,7 @@ def check(input, output, expected):
 - 判题程序可以从 `hc_runtime` 导入公开名称（[Python](#python)）来重建结构，如 `decode("TreeNode", output)`；除此之外只能使用标准库。
 - 判题程序必须接受每个正确的输出。对于随机题（LeetCode 384、528），输出要检查分布是否合理，这意味着正确的解答被拒绝的概率必须可以忽略不计。
 
-内置示例题 0005（最长回文子串，`"bab"` 和 `"aba"` 都正确）：
+题目 0005（最长回文子串，`"bab"` 和 `"aba"` 都正确）：
 
 ```python
 def check(input, output, expected):

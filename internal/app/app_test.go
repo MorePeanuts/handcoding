@@ -11,10 +11,11 @@ import (
 	"testing"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
-	"github.com/MorePeanuts/handcoding/internal/builtin"
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/lang/golang"
 	"github.com/MorePeanuts/handcoding/internal/lang/python"
+	"github.com/MorePeanuts/handcoding/internal/pack"
+	"github.com/MorePeanuts/handcoding/internal/regression"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
@@ -25,7 +26,7 @@ func newWorkspace(t *testing.T) *app.App {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := builtin.InstallProblems(ws.ProblemsPath()); err != nil {
+	if err := regression.Install(ws); err != nil {
 		t.Fatal(err)
 	}
 	// The python3 on PATH, rather than a virtual environment that may need
@@ -56,10 +57,10 @@ func requireTools(t *testing.T, tools ...string) {
 	}
 }
 
-// TestBuiltinReferences checks every built-in problem end to end: the shipped
-// expected outputs must be reproduced by both the Python and the Go reference
-// solutions, which exercises both drivers on every supported shape.
-func TestBuiltinReferences(t *testing.T) {
+// TestRegressionReferences checks every problem of the regression set end to
+// end: its expected outputs must be reproduced by both the Python and the Go
+// reference solutions, which exercises both drivers on every supported shape.
+func TestRegressionReferences(t *testing.T) {
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	probs, err := a.WS.Problems()
@@ -67,7 +68,7 @@ func TestBuiltinReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(probs) == 0 {
-		t.Fatal("no builtin problems")
+		t.Fatal("no problems in the regression set")
 	}
 	ctx := context.Background()
 	for _, p := range probs {
@@ -75,7 +76,7 @@ func TestBuiltinReferences(t *testing.T) {
 			if err := p.Validate(); err != nil {
 				t.Fatalf("invalid problem: %v", err)
 			}
-			for _, err := range workspace.BankErrors(p, probs) {
+			for _, err := range pack.IdentityErrors(p, probs) {
 				t.Error(err)
 			}
 			cases, err := p.LoadCases()
@@ -106,10 +107,11 @@ func TestBuiltinReferences(t *testing.T) {
 	}
 }
 
-// TestGoMinimumVersion builds the Go driver with every built-in Go reference
-// at the protocol's minimum Go version: the go directive limits the language,
-// and go vet's stdversion analyzer reports standard library symbols that are
-// too new. A newer local toolchain is enough to check both.
+// TestGoMinimumVersion builds the Go driver with every Go reference of the
+// regression set at the protocol's minimum Go version: the go directive
+// limits the language, and go vet's stdversion analyzer reports standard
+// library symbols that are too new. A newer local toolchain is enough to
+// check both.
 func TestGoMinimumVersion(t *testing.T) {
 	requireTools(t, "go")
 	a := newWorkspace(t)
@@ -184,7 +186,7 @@ func TestStartSubmitWrongAnswer(t *testing.T) {
 		}
 	}
 	st, _ := a.Store()
-	subs, err := st.List(ctx, "two-sum")
+	subs, err := st.List(ctx, regression.Name, "two-sum")
 	if err != nil || len(subs) != 2 {
 		t.Fatalf("history: %d subs, err %v", len(subs), err)
 	}

@@ -55,7 +55,7 @@ func (m *model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "enter":
 		// Back to the latest result, if there is one for this problem.
-		if m.run != nil && m.run.slug == m.current.Slug {
+		if m.run != nil && m.run.ref == m.current.Ref() {
 			m.push(screenResult)
 		}
 		return m, nil
@@ -73,6 +73,9 @@ func (m *model) problemTitle(p *problem.Problem) string {
 	title := titleStyle.Render(fmt.Sprintf("%s. %s", p.ID, p.Title))
 	if p.ID == "" {
 		title = titleStyle.Render(p.Title)
+	}
+	if m.multiPack {
+		title = ui.Faint.Render(p.Pack+" ·") + " " + title
 	}
 	return fmt.Sprintf("%s  %s  %s", title, ui.Difficulty(p.Difficulty), ui.Faint.Render(strings.Join(p.Tags, ", ")))
 }
@@ -106,7 +109,7 @@ func (m *model) viewDetail() string {
 	if len(m.detailImages) > 0 {
 		keys = append([]string{"o open-images"}, keys...)
 	}
-	if m.run != nil && m.run.slug == p.Slug {
+	if m.run != nil && m.run.ref == p.Ref() {
 		keys = append([]string{"enter last-result"}, keys...)
 	}
 	return m.frame(m.problemTitle(p), m.solutionLine(p), m.detail.View(), keys...)

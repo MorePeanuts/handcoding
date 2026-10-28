@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/MorePeanuts/handcoding/internal/builtin"
 	"github.com/MorePeanuts/handcoding/internal/problem"
+	"github.com/MorePeanuts/handcoding/internal/regression"
 )
 
 var (
@@ -70,7 +70,7 @@ func TestRuntimeImports(t *testing.T) {
 }
 
 // TestRuntimePublicAPI checks that the public API of hc_runtime (its
-// __all__) is defined, and that every Python file of the built-in problems
+// __all__) is defined, and that every Python file of the regression set
 // (references, templates, checkers) and every generated starter imports only
 // public names: problem packs rely on exactly these.
 func TestRuntimePublicAPI(t *testing.T) {
@@ -91,10 +91,7 @@ func TestRuntimePublicAPI(t *testing.T) {
 		}
 	}
 
-	dir := t.TempDir()
-	if _, err := builtin.InstallProblems(dir); err != nil {
-		t.Fatal(err)
-	}
+	dir := regression.ProblemsDir()
 	files := 0
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || filepath.Ext(path) != ".py" {
@@ -113,7 +110,7 @@ func TestRuntimePublicAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	if files == 0 {
-		t.Fatal("no Python files in the built-in problems")
+		t.Fatal("no Python files in the regression set")
 	}
 
 	entries, err := os.ReadDir(dir)

@@ -13,22 +13,36 @@
 
 ## 工作区
 
-`hc init` 创建工作区，默认位置是 `~/handcoding`：
+`hc init` 创建一个空的工作区，默认位置是 `~/handcoding`：
 
 ```
 ~/handcoding/
-  hc.yaml                     配置文件
-  problems/0001-two-sum/      题库（见题目协议）
-  solutions/go/0001-two-sum/  你的代码：solution.go，以及自动生成的 go.mod 和 zz_hc_driver.go
-  solutions/python/...        你的代码：solution.py，以及自动生成的 hc_runtime.py 和 _hc_runner.py
-  .hc/hc.db                   提交历史（SQLite）
-  .hc/venv/                   hc 管理的 Python 虚拟环境
-  pyrightconfig.json          让 pyright 使用 .hc/venv
+  hc.yaml                                  配置文件
+  packs/local/problems/0001-two-sum/       你自己的题目（见题目协议）
+  packs/<name>/                            已安装的题目包（只读）
+  solutions/local/go/0001-two-sum/         你的代码：solution.go，以及自动生成的 go.mod 和 zz_hc_driver.go
+  solutions/local/python/0001-two-sum/     你的代码：solution.py，以及自动生成的 hc_runtime.py 和 _hc_runner.py
+  .hc/hc.db                                提交历史（SQLite）
+  .hc/venv/                                hc 管理的 Python 虚拟环境
+  pyrightconfig.json                       让 pyright 使用 .hc/venv
 ```
 
 `hc init --lang python` 把默认解题语言设为 Python（即 `hc.yaml` 中的 `language`，默认为 `go`），并立即创建下文介绍的 Python 环境。如果创建失败，例如既没有 uv 也没有 Python 3.10+，`hc init` 会给出警告，但仍然创建工作区。
 
 `hc` 按以下顺序查找工作区：`-w <dir>`、`$HC_WORKSPACE`、包含 `hc.yaml` 的最近一级父目录、`~/handcoding`。所以在任何目录下都可以运行它。
+
+### 题目包
+
+工作区里的题目按[题目包](protocol_zh.md#题目包)组织，每个题目包是 `packs/` 下的一个目录：
+
+- `packs/local/` 存放你自己的题目，也就是 `hc fetch`、`hc new` 和 `hc import` 添加的题目。它没有 `pack.yaml`（`local` 是保留名称），可以用所有语言作答。
+- 其余每个目录都是一个已安装的题目包：一个 `name` 与目录名相同的 `pack.yaml`，加上它的 `problems/`。已安装的题目包是**只读**的：`hc gen`、`hc fix` 和 `hc cases add|rm|edit|build` 拒绝修改它们，因为更新题目包会覆盖这些修改。`pack.yaml` 列出了 `languages` 的题目包只能用这些语言作答：`hc start -l` 拒绝其他语言；如果你的默认语言不在其中，hc 会改用题目包的第一种语言并给出提示。安装题目包（`hc pack install`）即将推出；在此之前，可以手动把题目包复制到 `packs/` 下。
+
+hc 无法读取的题目包（没有 `pack.yaml`、`pack.yaml` 不合法，或为更新的协议编写，此时会提示升级 hc）会由 `hc validate` 和题目列表报告，它的题目不会被加载；工作区的其余部分照常工作。
+
+解答存放在 `solutions/<pack>/<lang>/<dir>/`，提交历史记录每次提交的题目包和 slug，所以两个题目包里相同的 slug 是两道不同的题。
+
+旧版 hc 创建的工作区把题目放在 `problems/` 而不是 `packs/` 下。hc 遇到这种工作区会停下并说明：用 `hc init <dir>` 新建一个工作区，再把你的题目移到它的 `packs/local/problems/` 下。解答和提交历史不会迁移。
 
 每道 Go 题都是一个独立的 module，驱动文件就放在 `solution.go` 旁边。因此 gopls、`go build` 和 Delve 断点都直接作用在你自己的文件上。自动生成的文件每次运行前都会重写，不要手动修改。`go.mod` 跟随本机的 Go：其中的 `go` 行就是本机工具链的版本（Go 1.27.2 对应 `go 1.27`），所以你的解答可以使用它支持的所有特性。hc 用 `GOTOOLCHAIN=local` 构建，不会下载其他版本的工具链。
 
@@ -52,6 +66,7 @@ Python 解答在 hc 管理的虚拟环境 `.hc/venv` 中运行。第一次有命
 - 调试器会接管终端：启动前清屏，退出后回到界面。如果上次运行有失败的用例，按 `d` 调试的就是那个用例。
 - 题面图片直接画在终端里。kitty 和 Ghostty 显示原图；其他真彩色终端用块字符近似显示，会损失细节，可以按 `o` 用看图软件打开原图。显示方式见 [`images`](#配置)。
 - 题面配色跟随终端背景色。如果颜色不对，在 `hc.yaml` 中设置 `theme`。
+- 题目来自多个题目包时，列表会显示每道题所属的题目包，搜索也会匹配 `pack/slug`（输入 `/local/` 可以找到你自己的题目）。`hc list --pack <name>` 和 `--group <name>` 打开的列表只包含某个题目包或某个题目包里的一个分组。
 
 | 按键 | 操作 | 按键 | 操作 |
 |---|---|---|---|
@@ -68,11 +83,11 @@ Python 解答在 hc 管理的虚拟环境 `.hc/venv` 中运行。第一次有命
 
 ```
 练习          list  start  edit  show  test  submit  debug  reset  discard  history
-题库          init  fetch  new  import  cases  validate  docs
+题目          init  fetch  new  import  cases  validate  docs
 编码智能体    gen  fix  skill
 ```
 
-题目可以用 slug、slug 前缀、编号或目录名指定：`hc test 1`、`hc test two`。
+题目可以用 slug、slug 前缀、编号或目录名指定：`hc test 1`、`hc test two`。这样会在所有题目包中查找；`<pack>/<ref>` 只在一个题目包中查找：`hc test local/two-sum`、`hc test leetcode/1`。如果一个 slug（或编号）出现在多个题目包中，不带题目包的引用会报错并以 `pack/slug` 列出它们；前缀必须在所有题目包中只匹配一个 slug。
 
 ```sh
 hc start two-sum -e                                 # 创建解答并打开编辑器
@@ -83,6 +98,9 @@ hc test two-sum -i '{"nums":[1,2,3],"target":5}'    # 自定义输入（有参�
 hc test lru-cache -l py                             # 用 Python 解题
 hc submit two-sum                                   # 全部用例，记入历史
 
+hc list --plain --pack leetcode --group arrays   # 以表格列出某个题目包的一个分组，按分组中的顺序
+
+hc history                  # 全部提交记录（有多个题目包时，题目显示为 pack/slug）
 hc history two-sum          # 某道题的提交记录
 hc history show 12          # 某次提交的代码和判题报告
 hc history restore 12       # 把某次提交恢复为当前代码
@@ -115,19 +133,20 @@ hc gen 146                  # 让题目就绪：生成测试用例并决定判�
 
 ```sh
 hc new my-problem --kind function   # 生成题目骨架（设计题用 --kind class）
-$EDITOR ~/handcoding/problems/my-problem/problem.yaml
+$EDITOR ~/handcoding/packs/local/problems/my-problem/problem.yaml
 hc validate my-problem              # 边写边检查签名和用例
 hc gen my-problem                   # 让智能体写参考解和用例，或者自己写：
 hc cases build my-problem           #   用 reference/solution.* 生成期望输出
 hc validate my-problem --run        #   每份参考解都必须通过每个用例
-hc import ./my-problems/            # 导入别人分享的题目目录
+hc import ./my-problems/            # 导入别人分享的题目目录，或一个题目包里的题目
 ```
 
-题目的格式，从 `problem.yaml` 到参考解，由[题目协议](protocol_zh.md)规定；`hc new` 会生成一个待填写的骨架，内置示例题（`hc init` 会把它们放进题库）则是完整的例子。
+`hc fetch`、`hc new` 和 `hc import` 都写入 `packs/local/problems/`。题目的格式，从 `problem.yaml` 到参考解，由[题目协议](protocol_zh.md)规定；`hc new` 会生成一个待填写的骨架，hc 的回归测试集（仓库中的 [`testdata/regression`](../testdata/regression)）则包含覆盖每项功能的完整例子。
 
 - `hc cases build` 运行一个参考解：有 Go 参考解时用 Go，否则用 Python；`-l` 可以指定。判题方式为 `any_of` 的题目会被拒绝，因为它的 `expected` 要列出所有可接受的答案，只能手写。
 - `hc validate` 把每一处违反协议[合法性规则](protocol_zh.md#合法性规则)的地方报为错误，并注明用例编号和字段。加上 `--run` 时，它还会在每个用例上运行每个参考解，有判题程序时交给判题程序判定。以下情况给出警告：判题规则未确定（没有 `judge.compare`）、没有用例、有用例缺少 `expected`、没有用例标记为示例、没有参考解，以及题面引用的图片不存在。
-- `hc import` 只复制协议定义的条目（其余内容，如编辑器文件、`solutions/` 目录，不会被导入）；如果题库中已有相同的 slug 或编号，会拒绝导入（`--force` 会替换 slug 相同的题目）。
+- `hc import` 只复制协议定义的条目（其余内容，如编辑器文件、`solutions/` 目录，不会被导入）；如果你自己的题目中已有相同的 slug 或编号，会拒绝导入（`--force` 会替换 slug 相同的题目）。slug 和编号只需在一个题目包内唯一，所以导入一道已安装题目包里也有的题目没有问题。
+- 不带参数的 `hc validate` 还会检查每个已安装题目包的 `pack.yaml`，以及它的分组是否都指向本题目包的题目。每道题的目录名、slug 和编号都会与所在题目包的其他题目对照检查。
 
 hc 内置了与自身版本对应的协议（英文版），离线也能查阅：
 
@@ -233,9 +252,9 @@ leetcode:
 ## 目前的限制
 
 - 交互题暂不支持。
-- `hc fetch` 可以导入带[结构输入](protocol_zh.md#结构输入)的题目（带环链表、相交链表、二叉树的最近公共祖先这类节点引用），结构由 LeetCode 的元数据（描述它的测试数据）与初始代码（真正的签名）之间的差异推出：初始代码不接收的测试数据成为隐藏输入，初始代码以节点接收的值成为 `ref`，测试数据中没有的节点参数成为 `copy`，`pos` 形成 `cycle`，160 的 `skipA` 和 `skipB` 形成 `join`，返回节点的题目得到 `returns_ref`。示例会对应到新的输入上。不是普通 JSON 的示例输出（如 142 的 "tail connects to node index 1"）留给 `hc gen` 补写。示例题 141、142、160、236、237 和 1379 都属于这类题目。
+- `hc fetch` 可以导入带[结构输入](protocol_zh.md#结构输入)的题目（带环链表、相交链表、二叉树的最近公共祖先这类节点引用），结构由 LeetCode 的元数据（描述它的测试数据）与初始代码（真正的签名）之间的差异推出：初始代码不接收的测试数据成为隐藏输入，初始代码以节点接收的值成为 `ref`，测试数据中没有的节点参数成为 `copy`，`pos` 形成 `cycle`，160 的 `skipA` 和 `skipB` 形成 `join`，返回节点的题目得到 `returns_ref`。示例会对应到新的输入上。不是普通 JSON 的示例输出（如 142 的 "tail connects to node index 1"）留给 `hc gen` 补写。回归测试集中的 141、142、160、236、237 和 1379 都属于这类题目。
 - `hc fetch` 可以导入使用 [LeetCode 的 `Node` 类型](protocol_zh.md#leetcode-的-node-类型)、`NestedInteger`、`Employee` 的题目，签名取自 LeetCode 的 Go 初始代码。`returns_copy`（克隆图）留给 `hc gen` 设置；扁平化嵌套列表迭代器这类迭代器题目的示例只给出输入、没有给出调用序列，也留给 `hc gen` 补写。
-- 把一个值编码再解码回来的题目（297、449、535）按[编解码往返题](protocol_zh.md#编解码往返题)评测：只比较解码得到的值，所以对编码本身的要求（449 的"尽可能紧凑"）不会检查。`hc fetch` 可以导入这类题目，编码器、解码器以及二者是否共用一个实例取自 LeetCode 初始代码注释中的调用方式。示例题 297 和 535 分别展示了两种情况。
+- 把一个值编码再解码回来的题目（297、449、535）按[编解码往返题](protocol_zh.md#编解码往返题)评测：只比较解码得到的值，所以对编码本身的要求（449 的"尽可能紧凑"）不会检查。`hc fetch` 可以导入这类题目，编码器、解码器以及二者是否共用一个实例取自 LeetCode 初始代码注释中的调用方式。回归测试集中的 297 和 535 分别展示了两种情况。
 - 会统计运行时间，但不限制内存。
 - 无法获取 LeetCode 会员题目。
-- 合法答案很多、无法全部列出的题目（"返回任意一个合法答案"）和随机题由[判题程序](protocol_zh.md#判题程序)评测，判题程序由 `hc gen` 编写，示例题 5、108、210、324、384 和 528 都带有判题程序。判题程序用 Python 编写，所以即使用 Go 作答，这些题目也需要 Python 3.10 或更新版本；hc 管理的虚拟环境会提供它。
+- 合法答案很多、无法全部列出的题目（"返回任意一个合法答案"）和随机题由[判题程序](protocol_zh.md#判题程序)评测，判题程序由 `hc gen` 编写，回归测试集中的 5、108、210、324、384 和 528 都带有判题程序。判题程序用 Python 编写，所以即使用 Go 作答，这些题目也需要 Python 3.10 或更新版本；hc 管理的虚拟环境会提供它。
