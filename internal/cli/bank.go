@@ -537,7 +537,7 @@ func newCasesEditCmd(root *rootOptions) *cobra.Command {
 				if err := ed.Run(); err != nil {
 					return err
 				}
-				return validateProblem(cmd, a, p, false)
+				return validateProblem(cmd, a, p, false, nil)
 			})
 		},
 	}
@@ -579,8 +579,12 @@ run the reference solution on every case and require it to pass.`,
 					bad = len(joined.Unwrap())
 				}
 			}
+			bank := probs
+			if len(args) > 0 {
+				bank, _ = a.WS.Problems()
+			}
 			for _, p := range probs {
-				if err := validateProblem(cmd, a, p, run); err != nil {
+				if err := validateProblem(cmd, a, p, run, bank); err != nil {
 					bad++
 				}
 			}
@@ -594,8 +598,9 @@ run the reference solution on every case and require it to pass.`,
 	return cmd
 }
 
-// validateProblem prints the findings for one problem.
-func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run bool) error {
+// validateProblem prints the findings for one problem. bank holds the
+// problems of the workspace, to check p against; nil loads them.
+func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run bool, bank []*problem.Problem) error {
 	var errs, warns []string
 	if err := p.Validate(); err != nil {
 		errs = append(errs, strings.Split(err.Error(), "\n")...)
@@ -661,8 +666,10 @@ func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run boo
 	}
 	// Conflicts with the rest of the bank come last, so that they do not
 	// keep the checks above from running.
-	probs, _ := a.WS.Problems()
-	for _, err := range workspace.BankErrors(p, probs) {
+	if bank == nil {
+		bank, _ = a.WS.Problems()
+	}
+	for _, err := range workspace.BankErrors(p, bank) {
 		errs = append(errs, err.Error())
 	}
 	status := ui.Green.Render("ok  ")
