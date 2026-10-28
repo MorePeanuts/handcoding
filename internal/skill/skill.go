@@ -46,12 +46,18 @@ type Context int
 const (
 	// Practice is a practice workspace (a directory with hc.yaml).
 	Practice Context = iota
+	// Authoring is a pack checkout opened as a workspace (a directory with
+	// pack.yaml).
+	Authoring
 )
 
-// sets maps each context to its skills. A new context (pack checkouts) or a
-// new skill is a new entry here.
+// sets maps each context to its skills. A new context or a new skill is a
+// new entry here.
 var sets = map[Context][]string{
 	Practice: {Problem, Cases},
+	// The same as Practice until the pack authoring skill, hc-pack, joins
+	// this set (#42).
+	Authoring: {Problem, Cases},
 }
 
 // Set returns the names of the skills a context gets.

@@ -115,7 +115,8 @@ func Load(dir string) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	name := filepath.Join(filepath.Base(dir), ManifestFile)
+	// Errors name the file pack.yaml; callers say where the pack is.
+	name := ManifestFile
 	// The YAML decoder would turn "1" and 1.5 into the int 1, so the type
 	// of protocol is checked on its own.
 	var head struct {

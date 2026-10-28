@@ -17,6 +17,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/skill"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 	"github.com/MorePeanuts/handcoding/internal/version"
+	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
 type agentFlags struct {
@@ -170,7 +171,7 @@ installed that the workspace no longer gets are removed.`,
 			opts := skill.Options{Version: version.String(), Force: force}
 			names := args
 			if len(names) == 0 {
-				names, opts.Exclusive = skill.Set(skill.Practice), true
+				names, opts.Exclusive = skill.Set(skillContext(a.WS)), true
 			}
 			changes, err := skill.Install(a.WS.Root, names, opts)
 			printSkillChanges(os.Stdout, changes)
@@ -218,6 +219,15 @@ installed that the workspace no longer gets are removed.`,
 	}
 	cmd.AddCommand(install, list, show)
 	return cmd
+}
+
+// skillContext decides which skills `hc skill install` gives ws: a pack
+// checkout gets the authoring set, a practice workspace the practice set.
+func skillContext(ws *workspace.Workspace) skill.Context {
+	if ws.Kind == workspace.Authoring {
+		return skill.Authoring
+	}
+	return skill.Practice
 }
 
 // syncSkills installs the skills an agent needs before it starts, replacing

@@ -53,7 +53,7 @@ Run hc with no arguments to open the interactive problem list.`,
 			return runList(cmd, opts, listOptions{})
 		},
 	}
-	root.PersistentFlags().StringVarP(&opts.workspace, "workspace", "w", "", "workspace directory (default: $HC_WORKSPACE, nearest hc.yaml, ~/handcoding)")
+	root.PersistentFlags().StringVarP(&opts.workspace, "workspace", "w", "", "workspace directory (default: $HC_WORKSPACE, nearest hc.yaml or pack.yaml, ~/handcoding)")
 
 	root.AddGroup(
 		&cobra.Group{ID: "practice", Title: "Practice:"},

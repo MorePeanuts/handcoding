@@ -83,11 +83,11 @@ func TestLoadErrors(t *testing.T) {
 	}{
 		{"protocol: 1\nname: x\nhomepgae: https://example.com\n", `unknown field "homepgae"`},
 		{"protocol: 1\nname: x\ngroups:\n  - name: a\n    problem: [two-sum]\n", `unknown field "problem"`},
-		{"protocol: 1\nname: x\nauthors: MorePeanuts\n", "leetcode/pack.yaml"},
+		{"protocol: 1\nname: x\nauthors: MorePeanuts\n", "pack.yaml"},
 		// The protocol is checked first: a newer protocol may add fields this
 		// hc does not know, and the useful message is the version.
-		{"protocol: 2\nname: x\nnew_field: true\n", "leetcode/pack.yaml: this pack needs protocol 2, hc dev supports up to 1, upgrade hc"},
-		{"protocol: [1\n", "leetcode/pack.yaml"},
+		{"protocol: 2\nname: x\nnew_field: true\n", "pack.yaml: this pack needs protocol 2, hc dev supports up to 1, upgrade hc"},
+		{"protocol: [1\n", "pack.yaml"},
 		// The decoder would read these as 1.
 		{"protocol: \"1\"\nname: x\n", `protocol must be an integer, such as 1, not the string "1"`},
 		{"protocol: 1.5\nname: x\n", "protocol must be an integer, such as 1, not 1.5"},

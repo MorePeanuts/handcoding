@@ -1,6 +1,9 @@
 // Package workspace locates and manages a handcoding workspace: its packs of
 // problems, the user's solutions, configuration and history.
 //
+// A workspace is of one of two kinds (see Kind). A practice workspace has
+// hc.yaml at its root:
+//
 //	<root>/
 //	  hc.yaml                         configuration
 //	  packs/local/problems/<dir>/     the workspace's own problems (see package problem)
@@ -9,10 +12,23 @@
 //	  .hc/hc.db                       submission history
 //	  .hc/venv/                       the Python virtual environment hc manages
 //
-// The workspace's own problems form the pack local, which has no pack.yaml
-// and is the only writable pack. Every other directory in packs/ is an
-// installed pack: read-only, with a pack.yaml that names it after its
-// directory.
+// Its own problems form the pack local, which has no pack.yaml and is the
+// only writable pack. Every other directory in packs/ is an installed pack:
+// read-only, with a pack.yaml that names it after its directory.
+//
+// An authoring workspace is a pack checkout, with pack.yaml at its root. The
+// pack itself is its only pack, and it is writable:
+//
+//	<root>/
+//	  pack.yaml                       the pack's manifest
+//	  problems/<dir>/                 the pack's problems
+//	  hc.yaml                         optional: personal settings only
+//	  solutions/<pack>/<lang>/<dir>/  as in a practice workspace
+//	  .hc/                            as in a practice workspace
+//
+// What hc adds to a checkout (hc.yaml, solutions/, .hc/, pyrightconfig.json,
+// the agent skills) is the author's, not the pack's, and belongs in its
+// .gitignore.
 package workspace
 
 import (
@@ -112,17 +128,32 @@ func (c Config) TimeoutDuration() time.Duration {
 	return 10 * time.Second
 }
 
+// Kind is the kind of a workspace.
+type Kind int
+
+const (
+	// Practice is a practice workspace: hc.yaml at the root, the packs in
+	// packs/, local the writable one.
+	Practice Kind = iota
+	// Authoring is a pack checkout opened as a workspace: pack.yaml at the
+	// root, and the pack itself the only pack, writable.
+	Authoring
+)
+
 // Workspace is an opened workspace.
 type Workspace struct {
-	Root   string
+	Root string
+	Kind Kind
+	// Config is hc.yaml, or the defaults in an authoring workspace without
+	// one.
 	Config Config
 }
 
 // ErrNotFound is returned when no workspace can be located.
 var ErrNotFound = errors.New("no handcoding workspace found (run `hc init` to create one, or set HC_WORKSPACE)")
 
-// Find locates the workspace: explicit dir, $HC_WORKSPACE, the nearest parent
-// of the working directory containing hc.yaml, then ~/handcoding.
+// Find locates the workspace: explicit dir, $HC_WORKSPACE, the workspace the
+// working directory is in (see Lookup), then ~/handcoding.
 func Find(explicit string) (*Workspace, error) {
 	if explicit != "" {
 		return Open(explicit)
@@ -131,13 +162,8 @@ func Find(explicit string) (*Workspace, error) {
 		return Open(env)
 	}
 	if wd, err := os.Getwd(); err == nil {
-		for dir := wd; ; dir = filepath.Dir(dir) {
-			if _, err := os.Stat(filepath.Join(dir, ConfigFile)); err == nil {
-				return Open(dir)
-			}
-			if filepath.Dir(dir) == dir {
-				break
-			}
+		if root, ok := Lookup(wd); ok {
+			return Open(root)
 		}
 	}
 	if home, err := os.UserHomeDir(); err == nil {
@@ -149,32 +175,86 @@ func Find(explicit string) (*Workspace, error) {
 	return nil, ErrNotFound
 }
 
-// Open opens the workspace rooted at dir. A workspace in the layout of an
-// older hc, with problems/ instead of packs/, is an error that says how to
-// move to a new one.
+// kindOf reports which kind of workspace dir would be the root of, if any: a
+// directory with pack.yaml is an authoring workspace, whether or not it has
+// hc.yaml too, and one with hc.yaml alone a practice workspace.
+func kindOf(dir string) (Kind, bool) {
+	switch {
+	case exists(filepath.Join(dir, pack.ManifestFile)):
+		return Authoring, true
+	case exists(filepath.Join(dir, ConfigFile)):
+		return Practice, true
+	}
+	return 0, false
+}
+
+// installedIn returns the root of the practice workspace that dir is an
+// installed pack of: dir holds pack.yaml and sits directly in packs/ of a
+// practice workspace.
+func installedIn(dir string) (string, bool) {
+	if !exists(filepath.Join(dir, pack.ManifestFile)) || filepath.Base(filepath.Dir(dir)) != PacksDir {
+		return "", false
+	}
+	root := filepath.Dir(filepath.Dir(dir))
+	if kind, ok := kindOf(root); ok && kind == Practice {
+		return root, true
+	}
+	return "", false
+}
+
+// Lookup returns the root of the workspace that dir is in: the nearest of
+// dir and its parents that holds hc.yaml or pack.yaml. An installed pack is
+// not a workspace of its own, so the search goes on past it to the
+// enclosing practice workspace.
+func Lookup(dir string) (string, bool) {
+	for {
+		if _, ok := kindOf(dir); ok {
+			if _, installed := installedIn(dir); !installed {
+				return dir, true
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
+	}
+}
+
+// Open opens the workspace rooted at dir: an authoring workspace if it holds
+// pack.yaml, else a practice workspace if it holds hc.yaml (see Kind). An
+// installed pack is not a workspace, and a practice workspace in the layout
+// of an older hc, with problems/ instead of packs/, is an error that says
+// how to move to a new one.
 func Open(dir string) (*Workspace, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(filepath.Join(abs, ConfigFile))
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, fmt.Errorf("%s is not a handcoding workspace: %w", abs, ErrNotFound)
+	kind, ok := kindOf(abs)
+	if !ok {
+		return nil, fmt.Errorf("%s is not a handcoding workspace (it has no %s or %s): %w", abs, ConfigFile, pack.ManifestFile, ErrNotFound)
 	}
-	if err != nil {
-		return nil, err
+	if root, ok := installedIn(abs); ok {
+		return nil, fmt.Errorf("%s is a pack installed in the workspace %s, not a workspace of its own: open %s instead", abs, root, root)
 	}
 	cfg := DefaultConfig()
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("%s: %w", ConfigFile, err)
+	data, err := os.ReadFile(filepath.Join(abs, ConfigFile))
+	switch {
+	case err == nil:
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			return nil, fmt.Errorf("%s: %w", ConfigFile, err)
+		}
+	case !errors.Is(err, os.ErrNotExist):
+		return nil, err
 	}
-	if isDir(filepath.Join(abs, legacyProblemsDir)) && !exists(filepath.Join(abs, PacksDir)) {
+	if kind == Practice && isDir(filepath.Join(abs, legacyProblemsDir)) && !exists(filepath.Join(abs, PacksDir)) {
 		return nil, fmt.Errorf("%s uses the layout of an older hc, with the problems in %s/: "+
 			"create a new workspace with `hc init <dir>` and move your problems into its %s/ "+
 			"(solutions and history are not carried over)",
 			abs, legacyProblemsDir, filepath.Join(PacksDir, pack.LocalName, pack.ProblemsDir))
 	}
-	return &Workspace{Root: abs, Config: cfg}, nil
+	return &Workspace{Root: abs, Kind: kind, Config: cfg}, nil
 }
 
 func isDir(path string) bool {
@@ -187,11 +267,16 @@ func exists(path string) bool {
 	return err == nil
 }
 
-// Create initializes a new workspace at dir whose default solution language
-// is language, or Go if it is empty. The caller validates the language.
+// Create initializes a new practice workspace at dir whose default solution
+// language is language, or Go if it is empty. The caller validates the
+// language. A pack checkout is a workspace as it is, so Create refuses a dir
+// in a pack.
 func Create(dir, language string) (*Workspace, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
+		return nil, err
+	}
+	if err := checkNotInPack(abs); err != nil {
 		return nil, err
 	}
 	if _, err := os.Stat(filepath.Join(abs, ConfigFile)); err == nil {
@@ -219,7 +304,30 @@ func Create(dir, language string) (*Workspace, error) {
 	if err := os.WriteFile(filepath.Join(abs, ".gitignore"), []byte(gitignore), 0o644); err != nil {
 		return nil, err
 	}
-	return &Workspace{Root: abs, Config: cfg}, nil
+	return &Workspace{Root: abs, Kind: Practice, Config: cfg}, nil
+}
+
+// checkNotInPack returns an error if dir is in a pack: the nearest of dir
+// and its parents that holds pack.yaml or hc.yaml holds pack.yaml.
+func checkNotInPack(dir string) error {
+	for d := dir; ; d = filepath.Dir(d) {
+		switch kind, ok := kindOf(d); {
+		case ok && kind == Practice:
+			return nil
+		case ok:
+			if root, installed := installedIn(d); installed {
+				return fmt.Errorf("%s is in %s, a pack installed in the workspace %s: create the workspace elsewhere", dir, d, root)
+			}
+			where := "holds " + pack.ManifestFile
+			if d != dir {
+				where = "is in the pack checkout " + d
+			}
+			return fmt.Errorf("%s %s, and a pack checkout is a workspace as it is: run hc in %s, or with -w %s", dir, where, d, d)
+		}
+		if filepath.Dir(d) == d {
+			return nil
+		}
+	}
 }
 
 // Rel shows path relative to the workspace root, such as
@@ -295,7 +403,7 @@ func (e *PackError) Unwrap() error { return e.Err }
 // packsPath is the directory of the packs.
 func (w *Workspace) packsPath() string { return filepath.Join(w.Root, PacksDir) }
 
-// localPack is the pack of the workspace's own problems.
+// localPack is the pack of a practice workspace's own problems.
 func (w *Workspace) localPack() *Pack {
 	dir := filepath.Join(w.packsPath(), pack.LocalName)
 	return &Pack{
@@ -306,14 +414,37 @@ func (w *Workspace) localPack() *Pack {
 	}
 }
 
-// WritablePack is the pack that new problems go to (hc new, hc import and
-// hc fetch): the workspace's own problems.
-func (w *Workspace) WritablePack() *Pack { return w.localPack() }
+// checkoutPack is the pack an authoring workspace is the checkout of. While
+// its pack.yaml cannot be read, it is named after its directory.
+func (w *Workspace) checkoutPack() *Pack {
+	k := &Pack{Name: filepath.Base(w.Root), Dir: w.Root, Writable: true}
+	m, err := loadManifest(w.Root, "")
+	if err != nil {
+		k.Err = &PackError{Pack: k.Name, Err: err}
+		return k
+	}
+	k.Name, k.Manifest = m.Name, m
+	return k
+}
 
-// Packs lists the workspace's packs: local first, then the installed packs
-// by name. A pack that cannot be read is listed with its Err set. The
+// WritablePack is the pack that new problems go to (hc new, hc import and
+// hc fetch): local in a practice workspace, the pack itself in an authoring
+// one.
+func (w *Workspace) WritablePack() *Pack {
+	if w.Kind == Authoring {
+		return w.checkoutPack()
+	}
+	return w.localPack()
+}
+
+// Packs lists the workspace's packs: in a practice workspace local first,
+// then the installed packs by name; in an authoring workspace the pack
+// itself. A pack that cannot be read is listed with its Err set. The
 // manifests are read anew on every call.
 func (w *Workspace) Packs() ([]*Pack, error) {
+	if w.Kind == Authoring {
+		return []*Pack{w.checkoutPack()}, nil
+	}
 	packs := []*Pack{w.localPack()}
 	entries, err := os.ReadDir(w.packsPath())
 	if errors.Is(err, os.ErrNotExist) {
@@ -334,9 +465,28 @@ func (w *Workspace) Packs() ([]*Pack, error) {
 	return packs, nil
 }
 
-// loadInstalled reads and checks the manifest of the installed pack in dir,
-// before any of its problems: a pack of a newer protocol is refused for that
-// reason, not for fields of its problems that this hc does not know.
+// loadManifest reads and checks the manifest of the pack in dir, which is
+// rel from the workspace root, before any of the pack's problems: a pack of
+// a newer protocol is refused for that reason, not for fields of its
+// problems that this hc does not know.
+func loadManifest(dir, rel string) (*pack.Manifest, error) {
+	m, err := pack.Load(dir)
+	if err == nil {
+		if err = m.Validate(); err != nil {
+			err = fmt.Errorf("%s: %w", pack.ManifestFile, err)
+		}
+	}
+	if err != nil {
+		if rel != "" && !errors.Is(err, os.ErrNotExist) {
+			// pack.Load names the file pack.yaml.
+			err = fmt.Errorf("%s%c%w", rel, filepath.Separator, err)
+		}
+		return nil, err
+	}
+	return m, nil
+}
+
+// loadInstalled reads the installed pack in dir; see loadManifest.
 func loadInstalled(name, dir string) *Pack {
 	k := &Pack{Name: name, Dir: dir}
 	rel := filepath.Join(PacksDir, name)
@@ -344,20 +494,15 @@ func loadInstalled(name, dir string) *Pack {
 		k.Err = &PackError{Pack: name, Err: err}
 		return k
 	}
-	m, err := pack.Load(dir)
+	m, err := loadManifest(dir, rel)
 	if errors.Is(err, os.ErrNotExist) {
 		return fail(fmt.Errorf("%s has no %s: every directory in %s/ but %s is an installed pack", rel, pack.ManifestFile, PacksDir, pack.LocalName))
 	}
 	if err != nil {
-		// pack.Load names the file <name>/pack.yaml.
-		return fail(fmt.Errorf("%s%c%w", PacksDir, filepath.Separator, err))
-	}
-	where := filepath.Join(rel, pack.ManifestFile)
-	if err := m.Validate(); err != nil {
-		return fail(fmt.Errorf("%s: %w", where, err))
+		return fail(err)
 	}
 	if m.Name != name {
-		return fail(fmt.Errorf("%s: the pack is called %s, so it must be installed as %s", where, m.Name, filepath.Join(PacksDir, m.Name)))
+		return fail(fmt.Errorf("%s: the pack is called %s, so it must be installed as %s", filepath.Join(rel, pack.ManifestFile), m.Name, filepath.Join(PacksDir, m.Name)))
 	}
 	k.Manifest = m
 	return k
@@ -522,6 +667,11 @@ func resolve(ref, name string, probs []*problem.Problem, failed []error) (*probl
 		return prefix[0], nil
 	default:
 		return nil, fmt.Errorf("%q is ambiguous: %s", ref, list(prefix))
+	}
+	if len(failed) == 1 {
+		if pe, ok := errors.AsType[*PackError](failed[0]); ok {
+			return nil, fmt.Errorf("problem %q not found: pack %s cannot be read: %w", ref, pe.Pack, pe)
+		}
 	}
 	if len(failed) > 0 {
 		return nil, fmt.Errorf("problem %q not found (%d problem(s) or pack(s) failed to load; run `hc validate` to see why)", ref, len(failed))

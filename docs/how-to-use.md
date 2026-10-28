@@ -29,7 +29,7 @@ English · [简体中文](how-to-use_zh.md)
 
 `hc init --lang python` makes Python the default solution language (`language` in `hc.yaml`; default `go`) and creates the Python environment described below right away. If that fails, for example because neither uv nor Python 3.10+ is installed, `hc init` warns and creates the workspace anyway.
 
-`hc` finds the workspace from `-w <dir>`, then `$HC_WORKSPACE`, then the nearest parent directory containing `hc.yaml`, then `~/handcoding`. You can run it from anywhere.
+`hc` finds the workspace from `-w <dir>`, then `$HC_WORKSPACE`, then the nearest parent directory containing `hc.yaml` or `pack.yaml` (a pack checkout, see [working on a pack](#working-on-a-pack)), then `~/handcoding`. You can run it from anywhere.
 
 ### Packs
 
@@ -56,6 +56,33 @@ The environment holds debugpy for headless debugging. Downloading Python and ins
 The oldest supported toolchains are Python 3.10 and Go 1.22 (the protocol's [language versions](protocol.md#language-versions)). Your own solutions may use anything your toolchain supports: `hc test`, `hc submit` and `hc debug` name the toolchain they run with (`[Python 3.12.9]`) and only warn when it is older. Code that problems ship must work on the oldest versions, so `hc cases build` and `hc validate --run` refuse to run reference solutions on an older toolchain.
 
 Consider running `git init` in the workspace to keep a record of your practice.
+
+### Working on a pack
+
+A pack checkout, that is a directory with `pack.yaml` such as a clone of a pack's repository, is a workspace as it is: run hc in it or in any directory below it, or point `-w` at it. It needs no `hc init`, and `hc init` refuses a directory inside a pack. In this authoring workspace the pack is the only pack, and it is writable: `hc fetch`, `hc new` and `hc import` add problems to its `problems/`, and `hc gen`, `hc fix` and `hc cases` change them. So the authoring flow needs no flags: `hc fetch two-sum`, `hc gen two-sum`, `hc validate --run`. There is no `local` pack, a `packs/` directory in the checkout is ignored, and problems are named by their slug alone.
+
+```
+my-pack/
+  pack.yaml  problems/                     the pack (see the problem protocol)
+  hc.yaml                                  optional: your settings (language, editor, agent, timeout, python)
+  solutions/<pack>/<lang>/<dir>/           your solutions, as in a practice workspace
+  .hc/  pyrightconfig.json                 hc's state, as in a practice workspace
+  .claude/  .agents/  AGENTS.md            the agent skills, once a command installs them
+```
+
+Without `hc.yaml` hc uses the defaults, and it never creates one in a checkout. A `pack.yaml` that hc cannot read, for example one of a newer protocol, does not keep the workspace from opening: `hc validate` says what is wrong. What hc adds is yours, not the pack's, so keep it out of the repository's history:
+
+```
+# .gitignore
+.hc/
+solutions/
+hc.yaml
+pyrightconfig.json
+```
+
+Add `.claude/`, `.agents/` and `AGENTS.md` too, unless the repository has agent files of its own (hc changes only its own skills and its block of `AGENTS.md`).
+
+A pack installed in a practice workspace (`packs/<name>/`, beside `hc.yaml`) is not a checkout: hc run inside it uses the enclosing workspace, where the pack stays read-only.
 
 ## The interactive list
 
