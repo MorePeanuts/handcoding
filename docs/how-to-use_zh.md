@@ -150,14 +150,12 @@ hc gen 3 --agent codex -n 40 -m "more strings of one repeated character"
 hc fix two-sum -c 5 -m "answers in a different order should pass"
 ```
 
-`hc` 在工作区中以无头模式运行智能体（`claude -p` 或 `codex exec`），并在工作区安装 **handcoding skill**：`.claude/skills/handcoding/SKILL.md`，以及供 Codex 使用的 `AGENTS.md`。智能体按照 skill：
+`hc` 在工作区中以无头模式运行智能体（`claude -p` 或 `codex exec`）。启动前，它会安装或更新智能体要遵循的 skill **`hc-cases`**（见[智能体 skill](#智能体-skill)）。智能体按照 skill：
 
 1. 编写参考解 `reference/solution.py`，必要时再写一个暴力解用来交叉验证；
 2. 把测试**输入**写入 `cases.jsonl`，覆盖边界情况、特殊结构和大规模输入；
 3. 运行 `hc cases build`，所以期望输出来自运行参考解，而不是模型自己写的；
 4. 反复运行 `hc validate --run`，直到每份参考解都通过。
-
-执行 `hc skill install --global` 后，也可以在任意 Claude Code 会话中让它"为这道 hc 题生成用例"。
 
 要使用其他智能体，在 `hc.yaml` 中设置它的命令行，`{prompt}` 会被替换为提示词：
 
@@ -165,6 +163,19 @@ hc fix two-sum -c 5 -m "answers in a different order should pass"
 agent:
   command: ["my-agent", "--yes", "{prompt}"]
 ```
+
+### 智能体 skill
+
+hc 自带若干 skill，向编码智能体讲解它的题目协议和工作流程。`hc init` 会把工作区该有的 skill（目前是 `hc-cases`：评判规则、参考解、checker 和测试用例）安装到 `.claude/skills/`（供 Claude Code）和 `.agents/skills/`（供 Codex），并在 `AGENTS.md` 的一个区块中列出它们。由于它们就在工作区里，在工作区中启动的任何 Claude Code 或 Codex 会话都能使用：让它"为这道 hc 题生成用例"即可。
+
+```sh
+hc skill list               # 每个 skill：是否安装、是否最新、是否过期或被修改，以及由哪个 hc 版本安装
+hc skill install            # 安装或更新工作区的 skill（升级 hc 之后）
+hc skill install --force    # 连你修改过的 skill 也一并替换
+hc skill show hc-cases      # 打印一个 skill
+```
+
+hc 会给它安装的每一份副本做标记，记下版本和内容的哈希（skill 目录中的 `.hc-skill.json`），并且只替换或删除这些副本：你修改过的 skill 会保留，除非加上 `--force`；不是 hc 安装的 skill 从不触碰。在 `AGENTS.md` 中，hc 只改写 `<!-- hc:begin -->` 与 `<!-- hc:end -->` 之间的区块，文件的其余部分归你所有。`hc gen` 和 `hc fix` 在启动智能体前会安装缺失或过期的 skill；对于你修改过的 skill，只给出警告而不替换。不带名称运行 `hc skill install` 时，还会删除 hc 曾安装、但工作区已不再需要的 skill。
 
 ## 调试
 

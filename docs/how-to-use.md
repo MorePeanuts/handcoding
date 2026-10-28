@@ -150,14 +150,12 @@ hc gen 3 --agent codex -n 40 -m "more strings of one repeated character"
 hc fix two-sum -c 5 -m "answers in a different order should pass"
 ```
 
-`hc` runs the agent headless in the workspace (`claude -p` or `codex exec`). It also installs the **handcoding skill** there: `.claude/skills/handcoding/SKILL.md`, and `AGENTS.md` for Codex. Following the skill, the agent:
+`hc` runs the agent headless in the workspace (`claude -p` or `codex exec`). Before it starts, it installs or updates the skill the agent follows, **`hc-cases`** (see [Agent skills](#agent-skills)). Following the skill, the agent:
 
 1. writes a reference solution, `reference/solution.py`, and a brute-force one to cross-check when that helps;
 2. writes test **inputs** to `cases.jsonl`, covering edge cases, special structures and large inputs;
 3. runs `hc cases build`, so expected outputs come from running the reference, not from the model;
 4. runs `hc validate --run` until every reference passes.
-
-After `hc skill install --global`, you can also ask any Claude Code session to "generate cases for this hc problem".
 
 To use another agent, set its command line in `hc.yaml`; `{prompt}` is replaced by the prompt:
 
@@ -165,6 +163,19 @@ To use another agent, set its command line in `hc.yaml`; `{prompt}` is replaced 
 agent:
   command: ["my-agent", "--yes", "{prompt}"]
 ```
+
+### Agent skills
+
+hc ships skills that teach coding agents its problem protocol and workflows. `hc init` installs the ones a workspace gets (today `hc-cases`: judge rules, reference solutions, checkers and test cases) into `.claude/skills/` for Claude Code and `.agents/skills/` for Codex, and lists them in a block of `AGENTS.md`. Because they live in the workspace, any Claude Code or Codex session started there can use them: ask it to "generate cases for this hc problem".
+
+```sh
+hc skill list               # each skill: installed, up to date, outdated or modified, and by which hc version
+hc skill install            # install or update the workspace's skills (after upgrading hc)
+hc skill install --force    # also replace the skills you edited
+hc skill show hc-cases      # print a skill
+```
+
+hc marks every copy it installs, with its version and a hash of the content (`.hc-skill.json` in the skill's directory), and replaces or removes only those: a skill you edited is kept unless you pass `--force`, and skills hc did not install are never touched. In `AGENTS.md`, hc rewrites only the block between `<!-- hc:begin -->` and `<!-- hc:end -->`; the rest of the file is yours. `hc gen` and `hc fix` install missing or outdated skills before they start the agent, and warn about edited ones instead of replacing them; `hc skill install` without names also removes the skills hc installed that the workspace no longer gets.
 
 ## Debugging
 

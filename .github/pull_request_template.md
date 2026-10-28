@@ -8,4 +8,4 @@ Closes #
 
 - [ ] `make test` passes
 - [ ] `make lint` passes
-- [ ] CLI or protocol changes are reflected in `docs/protocol.md` and `internal/builtin/skill/SKILL.md`
+- [ ] CLI or protocol changes are reflected in `docs/protocol.md` and the skills in `internal/builtin/skills/`
