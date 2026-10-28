@@ -39,7 +39,8 @@ statement, not from the examples:
   inner lists are free too (subsets, groups: yes; permutations: no, each
   permutation's own order matters);
 - several valid answers that can all be listed, a handful per case:
-  `any_of`;
+  `any_of`, except in a class problem that is not a round trip, whose
+  `expected` holds one entry per op: use `checker` there;
 - many valid answers ("return any of them", "any valid order", any
   height-balanced BST), or a randomized output: `checker`, and write
   `checker.py` ([Checkers](#checkers)). Prefer a built-in mode when one
@@ -53,7 +54,7 @@ Then the options:
 
 - `double` results: the default tolerance usually fits. When the statement
   names one ("answers within 10^-5 of the actual answer are accepted"), set
-  `judge.tolerance` to it.
+  `judge.tolerance` to it; `0` compares exactly.
 - In-place problems: `judge.output` and `output_length` belong to the
   definition and combine with every mode, `checker` included. Keep them
   (`hc docs protocol in-place-output`).

@@ -26,7 +26,7 @@ type Options struct {
 
 // OptionsFor derives comparison options from a problem's judge settings.
 func OptionsFor(p *problem.Problem) Options {
-	return Options{Mode: p.Judge.Compare, Tolerance: p.Judge.Tolerance}
+	return Options{Mode: p.Judge.Compare, Tolerance: p.Tolerance()}
 }
 
 // Equal reports whether got matches expected under opts.

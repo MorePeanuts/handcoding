@@ -16,6 +16,7 @@ package problem
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -168,9 +169,11 @@ type Judge struct {
 	// means the judge rule has not been decided yet (see Ready), as for a
 	// freshly fetched problem.
 	Compare string `yaml:"compare,omitempty" json:"compare,omitempty"`
-	// Tolerance is the absolute/relative tolerance for floating point numbers.
-	// Defaults to 1e-5 when the return type contains double.
-	Tolerance float64 `yaml:"tolerance,omitempty" json:"tolerance,omitempty"`
+	// Tolerance is the absolute/relative tolerance for floating point
+	// numbers, as written in problem.yaml: nil when absent, so that an
+	// explicit 0 (compare exactly) differs from the default. Problem.Tolerance
+	// gives the tolerance in effect.
+	Tolerance *float64 `yaml:"tolerance,omitempty" json:"tolerance,omitempty"`
 	// Output names a parameter whose value after the call is the answer, for
 	// problems that modify their input in place (e.g. "rotate the array").
 	Output string `yaml:"output,omitempty" json:"output,omitempty"`
@@ -280,21 +283,39 @@ func (p *Problem) Normalize() {
 			}
 		}
 	}
-	if p.Judge.Tolerance == 0 && p.usesDouble() {
-		p.Judge.Tolerance = 1e-5
-	}
 }
 
-func (p *Problem) usesDouble() bool {
-	if p.Function != nil {
-		base, _ := SplitArray(p.Function.Returns)
-		return base == TypeDouble
+// DefaultTolerance is the tolerance of a problem that judges doubles and
+// does not set judge.tolerance.
+const DefaultTolerance = 1e-5
+
+// Tolerance is the floating point tolerance the judge compares with:
+// judge.tolerance when set (0 compares exactly), else DefaultTolerance if a
+// judged value has base type double, else 0.
+func (p *Problem) Tolerance() float64 {
+	if t := p.Judge.Tolerance; t != nil {
+		return *t
 	}
-	if p.Class != nil {
+	if p.judgesDouble() {
+		return DefaultTolerance
+	}
+	return 0
+}
+
+// judgesDouble reports whether a judged value has base type double: the
+// judged value of a function or round-trip problem (see judgedType), or the
+// return value of a method of any other class problem.
+func (p *Problem) judgesDouble() bool {
+	types := []string{p.judgedType()}
+	if _, _, ok := p.RoundTripMethods(); !ok && p.Kind == KindClass && p.Class != nil {
+		types = types[:0]
 		for _, m := range p.Class.Methods {
-			if base, _ := SplitArray(m.Returns); base == TypeDouble {
-				return true
-			}
+			types = append(types, m.Returns)
+		}
+	}
+	for _, t := range types {
+		if base, _ := SplitArray(t); base == TypeDouble {
+			return true
 		}
 	}
 	return false
@@ -349,6 +370,9 @@ func (p *Problem) Validate() error {
 		if f.Name == "" {
 			errs = append(errs, errors.New("function.name is required"))
 		}
+		if p.Class != nil {
+			errs = append(errs, errors.New("kind function must not have a class section"))
+		}
 		seen := map[string]bool{}
 		checkParams("function", f.Params, seen)
 		checkParams("function.hidden", f.Hidden, seen)
@@ -393,12 +417,27 @@ func (p *Problem) Validate() error {
 		if c.Name == "" {
 			errs = append(errs, errors.New("class.name is required"))
 		}
+		if p.Function != nil {
+			errs = append(errs, errors.New("kind class must not have a function section"))
+		}
 		checkParams("class constructor", c.Constructor, map[string]bool{})
 		noStructures("class constructor", c.Constructor)
 		if len(c.Methods) == 0 {
 			errs = append(errs, errors.New("class.methods must not be empty"))
 		}
+		// Go capitalizes method names, so "get" and "Get" are one method.
+		methods := map[string]string{}
 		for _, m := range c.Methods {
+			key := strings.ToUpper(m.Name[:min(1, len(m.Name))]) + m.Name[min(1, len(m.Name)):]
+			switch prev, dup := methods[key]; {
+			case m.Name == "":
+				errs = append(errs, errors.New("class.methods: method without name"))
+			case dup && prev == m.Name:
+				errs = append(errs, fmt.Errorf("class.methods: duplicate method %q", m.Name))
+			case dup:
+				errs = append(errs, fmt.Errorf("class.methods: methods %q and %q differ only in the case of their first letter, and are one method in Go", prev, m.Name))
+			}
+			methods[key] = m.Name
 			checkParams("method "+m.Name, m.Params, map[string]bool{})
 			noStructures("method "+m.Name, m.Params)
 			if err := ValidateType(m.Returns, true); err != nil {
@@ -407,6 +446,14 @@ func (p *Problem) Validate() error {
 		}
 		if p.Judge.RoundTrip != nil {
 			errs = append(errs, p.validateRoundTrip()...)
+		} else if p.Judge.Compare == CompareAnyOf {
+			errs = append(errs, errors.New("judge.compare any_of is not usable for a class problem that is not a round trip: its expected holds one entry per op"))
+		}
+		if p.Judge.Output != "" {
+			errs = append(errs, errors.New("judge.output is for function problems only"))
+		}
+		if p.Judge.OutputLength != "" {
+			errs = append(errs, errors.New("judge.output_length is for function problems only"))
 		}
 	case "":
 		errs = append(errs, errKindRequired)
@@ -439,6 +486,9 @@ func (p *Problem) Validate() error {
 	case p.Judge.Compare != CompareChecker && checker:
 		errs = append(errs, fmt.Errorf("%s is only used with judge.compare: checker; set it, or remove %s", CheckerFile, CheckerFile))
 	}
+	if t := p.Judge.Tolerance; t != nil && !(*t >= 0 && !math.IsInf(*t, 1)) {
+		errs = append(errs, fmt.Errorf("judge.tolerance %v must be a finite number, 0 or more (0 compares exactly)", *t))
+	}
 	if tl := p.Judge.Timeout; tl != "" {
 		if d, err := time.ParseDuration(tl); err != nil || d <= 0 {
 			errs = append(errs, fmt.Errorf("judge.timeout %q must be a positive duration such as \"5s\" or \"500ms\"", tl))
@@ -455,7 +505,7 @@ func (p *Problem) judgedType() string {
 	if _, dec, ok := p.RoundTripMethods(); ok {
 		return dec.Returns
 	}
-	if p.Function == nil {
+	if p.Kind != KindFunction || p.Function == nil {
 		return ""
 	}
 	if p.Judge.Output != "" {
