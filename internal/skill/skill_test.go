@@ -192,12 +192,21 @@ func TestList(t *testing.T) {
 	install(t, root, Options{}, Cases)
 	var dirs []string
 	for _, in := range List(root) {
-		if in.State != Current || in.Version != "v0.0.1" || !in.Shipped {
+		want := Missing
+		if in.Name == Cases {
+			want = Current
+		}
+		if in.State != want || !in.Shipped || (want == Current && in.Version != "v0.0.1") {
 			t.Errorf("%+v", in)
 		}
 		dirs = append(dirs, in.Dir)
 	}
-	if !slices.Contains(dirs, ClaudeDir+"/"+Cases) || !slices.Contains(dirs, AgentsDir+"/"+Cases) {
-		t.Errorf("listed %v", dirs)
+	// Every registered skill is listed, installed or not.
+	for _, dir := range Dirs {
+		for _, name := range []string{Problem, Cases} {
+			if !slices.Contains(dirs, dir+"/"+name) {
+				t.Errorf("listed %v, without %s/%s", dirs, dir, name)
+			}
+		}
 	}
 }

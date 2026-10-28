@@ -26,9 +26,15 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/builtin"
 )
 
-// Cases is the skill for judge rules, reference solutions, checkers and test
-// cases.
-const Cases = "hc-cases"
+// The skills hc ships.
+const (
+	// Problem is the skill for what a problem is: its directory, signature,
+	// statement and templates.
+	Problem = "hc-problem"
+	// Cases is the skill for how a problem is judged: judge rules,
+	// reference solutions, checkers and test cases.
+	Cases = "hc-cases"
+)
 
 // Prefix starts the name of every skill hc ships.
 const Prefix = "hc-"
@@ -45,7 +51,7 @@ const (
 // sets maps each context to its skills. A new context (pack checkouts) or a
 // new skill is a new entry here.
 var sets = map[Context][]string{
-	Practice: {Cases},
+	Practice: {Problem, Cases},
 }
 
 // Set returns the names of the skills a context gets.

@@ -12,6 +12,7 @@ import (
 
 	"github.com/MorePeanuts/handcoding/internal/agent"
 	"github.com/MorePeanuts/handcoding/internal/builtin"
+	"github.com/MorePeanuts/handcoding/internal/markdown"
 	"github.com/MorePeanuts/handcoding/internal/skill"
 )
 
@@ -47,7 +48,7 @@ func TestSkillsLint(t *testing.T) {
 func TestSkillsLintCatchesStaleCommands(t *testing.T) {
 	md := "---\nname: hc-x\ndescription: d\n---\n" +
 		"Run `hc cases build <slug> --force` and `hc validate <slug> --run`.\n" +
-		"See [the guide](guide.md).\n" +
+		"See [the guide](guide.md), not `[an example](example.md)`.\n" +
 		"```sh\nhc cases rebuild two-sum   # renamed\nhc test two-sum --quiet\n```\n" +
 		"Then `hc cases list <slug> [--case N]`, and `hc skill show hc-cases`.\n"
 	s := skill.Skill{Name: "hc-x", Files: map[string][]byte{"SKILL.md": []byte(md)}}
@@ -62,6 +63,27 @@ func TestSkillsLintCatchesStaleCommands(t *testing.T) {
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+func TestSkillsLintCatchesStaleSections(t *testing.T) {
+	md := "---\nname: hc-x\ndescription: d\n---\n" +
+		"List them with `hc docs protocol --list`, then read `hc docs protocol <section>`.\n" +
+		"```sh\nhc docs protocol no-such-section   # renamed\n```\n"
+	s := skill.Skill{Name: "hc-x", Files: map[string][]byte{"SKILL.md": []byte(md)}}
+	var got []string
+	for _, err := range lintSkill(newRootCmd(), s) {
+		got = append(got, err.Error())
+	}
+	want := "`hc docs protocol no-such-section`: the protocol has no section no-such-section"
+	if strings.Join(got, "\n") != want {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), want)
+	}
+	// A section of the embedded protocol passes.
+	id := protocolSections()[0].ID
+	s.Files["SKILL.md"] = []byte("---\nname: hc-x\ndescription: d\n---\nRun `hc docs protocol " + id + "`.\n")
+	if errs := lintSkill(newRootCmd(), s); len(errs) != 0 {
+		t.Errorf("hc docs protocol %s: %v", id, errs)
 	}
 }
 
@@ -101,7 +123,8 @@ func lintSkill(root *cobra.Command, s skill.Skill) []error {
 		for _, m := range codeSpan.FindAllStringSubmatch(text, -1) {
 			commands = append(commands, strings.ReplaceAll(m[1], "\n", " "))
 		}
-		for _, m := range mdLink.FindAllStringSubmatch(text, -1) {
+		// A link written in a code span is an example, not a link.
+		for _, m := range mdLink.FindAllStringSubmatch(codeSpan.ReplaceAllString(text, ""), -1) {
 			target, _, _ := strings.Cut(m[1], "#")
 			if target == "" || strings.Contains(target, "://") || strings.HasPrefix(target, "mailto:") {
 				continue
@@ -128,7 +151,23 @@ func lintSkill(root *cobra.Command, s skill.Skill) []error {
 // argCheckers check the arguments of commands whose arguments name things hc
 // defines, keyed by command path, so that a skill cannot cite one that does
 // not exist (the sections of an embedded document, say).
-var argCheckers = map[string]func(args []string) error{}
+var argCheckers = map[string]func(args []string) error{
+	"hc docs protocol": checkProtocolSections,
+}
+
+// checkProtocolSections checks that the sections a skill cites exist in the
+// embedded protocol. A placeholder (<section>) cites none.
+func checkProtocolSections(args []string) error {
+	for _, id := range args {
+		if strings.HasPrefix(id, "<") {
+			continue
+		}
+		if _, ok := markdown.FindSection(protocolSections(), id); !ok {
+			return fmt.Errorf("the protocol has no section %s", id)
+		}
+	}
+	return nil
+}
 
 // checkCommand walks args down the command tree and checks every flag
 // against the command it reaches. Placeholders (<slug>, N) are arguments;

@@ -1,370 +1,236 @@
 ---
 name: hc-cases
-description: Decide how an hc (handcoding) problem is judged and write its test cases. Use when generating or fixing test cases (cases.jsonl) of a problem in an hc workspace, choosing its judge rule (judge.compare in problem.yaml), writing or fixing a reference solution (reference/solution.py or .go), or writing a checker (checker.py); `hc gen` and `hc fix` use it.
+description: Decide how an hc (handcoding) problem is judged and write its test cases. Use when generating or fixing the test cases (cases.jsonl) of a problem in an hc workspace, choosing its judge rule (judge.compare in problem.yaml), writing or fixing a reference solution (reference/solution.py or .go), or writing a checker (checker.py); `hc gen` and `hc fix` use it. For the problem's definition itself (signature, structure inputs, statement, templates), use hc-problem instead.
 ---
 
 # handcoding test case authoring
 
 `hc` is a local judge for LeetCode-style problems. A workspace contains
 `hc.yaml`; problems live in `problems/<dir>/`, the user's own code in
-`solutions/<lang>/<dir>/`. **Never read or modify the user's solutions unless
-asked to diagnose a reported failure — and never change them.**
+`solutions/<lang>/<dir>/`. **Never read or modify the user's solutions
+unless asked to diagnose a reported failure, and never change them.**
 
-## Problem layout
+This skill covers how a problem is judged: its judge rule, its reference
+solutions, its checker and its test cases. What the problem is (directory,
+signature, structure inputs, statement, templates) is the `hc-problem`
+skill. If you find that the definition is wrong (a parameter the template
+does not have, a node that should be a `ref`, a missing `returns_copy`, a
+wrong `Node` type), fix it with `hc-problem` first, then come back.
 
-```
-problems/0001-two-sum/
-  problem.yaml       metadata + signature + judge options
-  description.md     statement
-  assets/            optional images used by the statement: ![](assets/x.png)
-  cases.jsonl        test cases, one JSON object per line
-  reference/         reference solutions (solution.py and/or solution.go)
-  templates/         optional starter code (solution.go, solution.py)
-  checker.py         the checker, only with judge.compare: checker
-```
+## The spec
 
-The directory name is `<4-digit id>-<slug>` when `id` is a number
-(`0001-two-sum`), otherwise `<slug>`; the user's solutions and history are
-keyed by it. `hc validate` rejects any other name, and an `id` or `slug` that
-another problem also uses. Never rename a problem directory or change its
-`id` or `slug`.
+The facts (the case format, compare modes, the checker interface, what a
+reference may import) are in the problem protocol that hc embeds. This
+skill does not repeat them: when a step names a section, read it with
+`hc docs protocol <section>` before you write that part, and follow it
+exactly. `hc docs protocol --list` lists the sections. When this skill and
+the spec seem to disagree, the spec wins.
 
-### problem.yaml
+## Decide the judge rule
 
-```yaml
-id: "1"
-slug: two-sum
-title: Two Sum
-difficulty: easy            # easy | medium | hard
-tags: [array, hash-table]
-kind: function              # function | class — required, never inferred
-function:
-  name: twoSum
-  params:
-    - {name: nums, type: "integer[]"}
-    - {name: target, type: integer}
-  returns: "integer[]"
-judge:
-  compare: unordered        # exact | unordered | unordered_deep | any_of | checker — no default
-  # tolerance: 1e-5         # floats; default 1e-5 when returning double
-  # output: nums            # in-place problems: judge this param after the call (returns: void)
-  # output_length: return   # judge only output[:k], k being the return value
-  # timeout: 10s            # wall-clock limit for a whole run; default: timeout in hc.yaml
-```
+A problem without `judge.compare` is not ready (`hc docs protocol readiness`),
+and deciding it is your job. Write it to problem.yaml even when it is
+`exact`. Read `hc docs protocol compare-modes`, then decide from the
+statement, not from the examples:
 
-A problem without `judge.compare` is **not ready**: its judge rule has not
-been decided, `hc submit` refuses it and `hc test` shows outputs without a
-verdict. `hc fetch` leaves it unset on purpose; deciding it is your job.
+- exactly one correct output: `exact`;
+- "return the answer in any order", "the order does not matter":
+  `unordered` when only the outer list is free, `unordered_deep` when the
+  inner lists are free too (subsets, groups: yes; permutations: no, each
+  permutation's own order matters);
+- several valid answers that can all be listed, a handful per case:
+  `any_of`;
+- many valid answers ("return any of them", "any valid order", any
+  height-balanced BST), or a randomized output: `checker`, and write
+  `checker.py` ([Checkers](#checkers)). Prefer a built-in mode when one
+  fits;
+- a round trip (`judge.round_trip`): `exact`, since the decoded value must
+  equal the input. A requirement on the encoded string (449's "as compact
+  as possible") is not judged; say so in your summary instead of inventing
+  a check.
 
-Class (design) problems:
+Then the options:
 
-```yaml
-kind: class
-class:
-  name: LRUCache
-  constructor: [{name: capacity, type: integer}]
-  methods:
-    - {name: get, params: [{name: key, type: integer}], returns: integer}
-    - {name: put, params: [{name: key, type: integer}, {name: value, type: integer}], returns: void}
-```
+- `double` results: the default tolerance usually fits. When the statement
+  names one ("answers within 10^-5 of the actual answer are accepted"), set
+  `judge.tolerance` to it.
+- In-place problems: `judge.output` and `output_length` belong to the
+  definition and combine with every mode, `checker` included. Keep them
+  (`hc docs protocol in-place-output`).
+- `judge.timeout` guards against hangs, not slow solutions
+  (`hc docs protocol timeout`). Leave it unset; if the reference needs a
+  large part of the default on your largest case, make the case smaller.
 
-### Round trips (class problems)
+## Reference solutions
 
-When a design problem asks for an encoder and a decoder in a format the
-solution chooses, and the judge only checks that decoding the encoded value
-gives it back (297 Serialize and Deserialize Binary Tree, 449 Serialize and
-Deserialize BST, 535 Encode and Decode TinyURL), set `judge.round_trip`:
+Read `hc docs protocol solution-abi`, and `hc docs protocol python` or
+`hc docs protocol go` for the language you write. Expected outputs come
+from running the reference, never from you, so the reference must be
+right.
 
-```yaml
-kind: class
-class:
-  name: Codec
-  constructor: []
-  methods:
-    - {name: serialize, params: [{name: root, type: TreeNode}], returns: string}
-    - {name: deserialize, params: [{name: data, type: string}], returns: TreeNode}
-judge:
-  compare: exact
-  round_trip: {encode: serialize, decode: deserialize, instances: separate}
-```
+- Write `reference/solution.py` first. It must run on Python 3.10, the
+  oldest version hc supports (`hc docs protocol language-versions`); import
+  only the public names of `hc_runtime` and the standard library.
+- Prefer a simple, obviously correct algorithm. If it is too slow for the
+  largest inputs, also write a brute force and cross-check the two on small
+  random inputs with a throwaway script before you trust the fast one.
+- A Go reference starts with `package main` (LeetCode's Go template omits
+  it) and must build with Go 1.22: no newer language features or standard
+  library functions (`slices.Sorted`, `maps.Keys`, range over a function).
+  `hc validate --run` builds it with the installed Go, which is newer and
+  does not catch them, so stay with what you know Go 1.22 has.
 
-- `instances` comes from the template's comment: `separate` when it encodes
-  and decodes with two objects (`ser = Codec(); deser = Codec()`: 297, 449),
-  `same` when one object does both (`codec.decode(codec.encode(url))`: 535,
-  whose codec has to remember its mapping).
-- Cases are not `ops`/`args`: `input` holds encode's parameter by name,
-  `{"root": [1,2,null,3]}` or `{"longUrl": "https://leetcode.com/problems/design-tinyurl"}`,
-  and `expected` is decode's result, filled by `hc cases build` (it equals the
-  input for a correct codec).
-- The judge rule is almost always `exact`. Requirements on the encoded
-  string itself, such as 449's "as compact as possible", are not judged;
-  say so in your summary rather than inventing a check.
-- The constructor takes no parameters, encode takes one value and returns
-  `string`, decode takes that `string` and returns the value's type.
-- `hc fetch` sets `round_trip` from the template's comment; keep it, and
-  still decide `judge.compare`.
-- If you also write `reference/solution.go`, give it another encoding
-  (preorder instead of level order, a hash instead of a counter), so that
-  the cases do not depend on one format.
+**Prove the rule with a second reference.** When more than one output is
+acceptable, also write `reference/solution.go` so that it returns a
+*different* valid answer than the Python one wherever the rule allows:
+another order, another valid answer, another (correct) random algorithm.
+`hc validate --run` runs both against the same expected outputs, so a rule
+that is too strict fails there.
 
-### Structure inputs (function problems only)
+**Round trips:** give the Go reference another encoding than the Python
+one (preorder instead of level order, a hash instead of a counter), so the
+cases do not depend on one format.
 
-When the statement says the judge builds a structure from inputs the
-solution does not receive ("`pos` is not passed as a parameter", "the judge
-creates the linked structure from `skipA`/`skipB`", "`p` and `q` are nodes of
-the tree", "you are given the node to delete, not the head"), describe it
-instead of passing the raw value:
+## Checkers
 
-```yaml
-function:
-  name: getIntersectionNode
-  params:
-    - {name: headA, type: ListNode}
-    - {name: headB, type: ListNode, join: {list: headA, skip: skipB, at: skipA}}
-  hidden:                     # case inputs never passed to the solution
-    - {name: skipA, type: integer}
-    - {name: skipB, type: integer}
-  returns: ListNode
-  returns_ref: headA          # the returned node belongs to headA
-```
+Read `hc docs protocol checkers` for the interface: the arguments, what to
+return, the time limit, what may be imported. Then:
 
-- `hidden`: extra inputs (`{name, type}`); every one must be used by one of
-  the attributes below or by `judge.output`.
-- `cycle: pos` (ListNode param): the tail links to the node at index `pos`, an
-  integer hidden input; `-1` = no cycle (141, 142). Case: `{"head": [3,2,0,-4], "pos": 1}`.
-- `join: {list: A, skip: s, at: a}` (ListNode param B): B keeps its first `s`
-  nodes, then continues with A's nodes from index `a` (160). In cases, A and B
-  are the full lists including the shared tail, so `B[s:] == A[a:]`; no
-  intersection: `a == len(A)` and `s == len(B)`.
-- `ref: X` (ListNode/TreeNode param): the case gives a node **value** (an
-  integer), the solution gets the node of structure X holding it (235/236
-  `p`, `q` with `ref: root`; 237 `node` with `ref: head` where `head` is a
-  hidden ListNode and `judge.output: head`). The value must occur exactly once in X.
-- `copy: X` (ListNode/TreeNode param): not in cases; the solution gets a deep
-  copy of param X (1379 `cloned`).
-- `returns_ref: X` when the function returns a node of structure X. Expected
-  is the node's 0-based **index** in a ListNode X, its **value** in a TreeNode
-  X, and `null` for no node (142: `"expected": 1`; 236: `"expected": 3`).
-  Returning a node outside X is a runtime error.
-
-`params` must match LeetCode's template (the solution's real signature);
-hidden inputs never reach the solution. Keep the input names the statement
-uses (`pos`, `skipA`, `skipB`), and drop inputs the driver does not need
-(160's `intersectVal`). Design problems cannot use them.
-
-`hc fetch` derives these attributes by comparing LeetCode's test data with
-the template (141, 142, 160, 235, 236, 237, 863, 1379), and maps the
-examples onto them. Keep them; check that `params` match
-`templates/solution.*`, fill the example outputs it could not parse in the
-`returns_ref` encoding (142, 160), and still decide `judge.compare`.
-
-### LeetCode's Node types
-
-LeetCode calls six structures `Node`; problem.yaml names the one the template
-means by its fields (one per problem, never in arrays, no structure
-attributes). Solution code still calls it `Node`: Go predefines it, Python
-references start with `from hc_runtime import GraphNode as Node` (etc.).
-Case values and `expected` use these forms:
-
-| Fields in the template | Type | Value |
-|---|---|---|
-| `Neighbors` | `GraphNode` | adjacency list of nodes 1..n (node i has value i), param = node 1: `[[2,4],[1,3],[2,4],[1,3]]`, `[[]]` one node, `[]` none. Write symmetric lists without self loops when the statement says undirected |
-| `Children` | `NaryNode` | level order, `null` after each node's children: `[1,null,3,2,4,null,5,6]` |
-| `Next`, `Random` | `RandomListNode` | `[[val, randomIndex or null], ...]` |
-| `Left`, `Right`, `Next` | `NextTreeNode` | input: TreeNode level order; expected: levels read through next pointers, `[[1],[2,3],[4,5,7]]` (not LeetCode's `[1,#,2,3,#,...]`) |
-| `IsLeaf`, `TopLeft`, ... | `QuadNode` | level order of `[isLeaf, val]` (0/1), four child slots per node: `[[0,1],[1,0],[1,1],[1,1],[1,0]]`; a non-leaf is always output as `[0,1]` |
-| `Prev`, `Next`, `Child` | `MultilevelNode` | LeetCode's serialization: `[1,2,3,4,5,6,null,null,null,7,8,9,10,null,null,11,12]` |
-
-Let `hc cases build` compute `expected` for these as for any other type.
-When the function returns a deep copy of a parameter (133 Clone Graph, 138
-Copy List with Random Pointer), add `returns_copy: <param>` to `function`:
-returning any original node is then a runtime error; `hc fetch` never sets
-it.
-
-### NestedInteger and Employee
-
-Also judge-defined, under LeetCode's names (Python references import them:
-`from hc_runtime import NestedInteger`):
-
-- `NestedInteger`: an integer or an array of NestedInteger values; type
-  `"NestedInteger[]"` for a list of them (341 constructor arg
-  `[[1,1],2,[1,1]]`). A function may return one (385: `"expected":
-  [123,[456,[789]]]` or `324`). Iterator problems (341) are class problems:
-  write `ops` as the statement's test loop, `hasNext` then `next` until
-  `hasNext` is false. `hc fetch` drops their examples, which give only the
-  constructor's input; write them as `example: true` cases.
-- `Employee`: `[id, importance, [subordinate ids]]`; `"Employee[]"` needs
-  distinct ids and known subordinates (690).
-
-Types: `integer long double boolean string character ListNode TreeNode void`,
-the Node types, `NestedInteger`, `Employee`, arrays with `[]` suffix (up to 3
-levels; ListNode, TreeNode, NestedInteger and Employee arrays 1 level; no
-Node arrays).
-Quote array types inside `{...}` / `[...]` (`type: "integer[]"`): unquoted,
-`[]` is YAML syntax. Unknown fields are errors.
-
-### cases.jsonl
-
-One object per line: `{"input": {...}, "expected": <json>, "example": true, "note": "..."}`.
-
-- Function problems: `input` maps every parameter and hidden input name to
-  its value (a `ref` parameter takes the node's value; leave out `copy`
-  parameters).
-- Class problems: `input` is `{"ops": ["LRUCache","put","get"], "args": [[2],[1,1],[1]]}`
-  and `expected` is `[null,null,1]` (null for the constructor and void methods).
-  Round trips: `input` is `{"root": [1,2,3]}` (encode's parameter), `expected`
-  decode's result.
-- ListNode is an array `[1,2,3]`; TreeNode is LeetCode level order `[3,9,20,null,null,15,7]`;
-  character is a 1-char string `"a"`.
-- `expected` may be omitted; `hc cases build` fills it from the reference solution.
-- `any_of` mode: `expected` is an array of all acceptable answers.
-- `checker` mode: `expected` is the reference's answer, filled by `hc cases build`.
-- `example: true` marks the statement examples (run by `hc test`); `hc submit` runs all.
-- `hc validate` checks every value against its declared type, rejects unknown
-  inputs or case fields, requires each op's exact argument count, and checks
-  the shape of `expected`.
-
-### Checkers
-
-`judge.compare: checker` hands the decision to `checker.py` in the problem
-directory (required with this mode, an error with any other). It is Python
-for solutions in every language and must run on Python 3.10:
-
-```python
-def check(input, output, expected):
-    """Return None or True to accept; False or a message string to reject."""
-```
-
-- `input`: the case input as decoded JSON (the parameters and hidden inputs
-  of a function problem; `{"ops": [...], "args": [...]}` for a class problem;
-  encode's parameter for a round trip).
-- `output`: the solution's output as decoded JSON, in the form of `expected`.
-- `expected`: the reference's answer from `hc cases build` — one valid answer
-  among many. Use it for the optimal value instead of solving the problem
-  again: the longest palindrome's length, the size of the largest subset, the
-  minimum sum. Check validity from `input` and optimality against `expected`.
+- Check validity from `input`, and optimality against `expected`, the
+  reference's answer: one valid answer among many. Use it for the optimal
+  value instead of solving the problem again (the longest palindrome's
+  length, the size of the largest subset, the minimum sum).
+- Validate `output`'s type and shape before you use it, so that a wrong
+  output is a rejection, not a crash: a checker that raises fails the
+  whole run as a broken problem.
 - Return a message that says what is wrong (`"nums[3] = 2 is not less than
   nums[4] = 2"`); users see it with the Wrong Answer.
-- `from hc_runtime import decode, TreeNode` rebuilds structures:
-  `decode("TreeNode", output)`. Plain JSON is enough for most checkers.
-  Import only `hc_runtime`'s public names (listed in step 3 of the generate
-  workflow) and the standard library.
-- A checker that raises, returns anything else or runs out of time (it gets
-  `judge.timeout`) fails the whole run as a broken problem. Validate
-  `output`'s type and shape before using it, so a wrong output is a
-  rejection, not a crash.
 
-Randomized problems (Shuffle an Array, Random Pick with Weight, Linked List
-Random Node, `getRandom`) are class problems whose cases make many calls —
-hundreds to a few thousand. The checker checks every output's validity, then
-the distribution: compare observed with expected counts per bucket (value,
-position, index) with generous bounds — a chi-square test at a tiny
-significance level, or at least 5 standard deviations per bucket — so a
-correct solution essentially never fails while an obviously non-random one
-(always the same pick, the identity shuffle) does. Write the false-reject
-probability per case in a comment of the checker, and keep it below 1e-6.
-`expected` of the random calls is just one sample: only compare
-deterministic calls with it (`reset`).
+**Prove the checker rejects wrong answers.** Copy `reference/solution.go`
+aside, replace it with a plausible wrong solution (an invalid answer, a
+valid but not optimal one, always the same random pick), and run
+`hc validate <slug> --run`: it must report Wrong Answer, with a helpful
+message, on the cases you expect. Try each kind of wrong solution, then
+restore the real reference and run it again.
+
+### Randomized problems
+
+Shuffle an Array, Random Pick with Weight, Linked List Random Node and
+`getRandom` are class problems whose cases make many calls, hundreds to a
+few thousand. The spec requires only that a correct solution is
+essentially never rejected; this is how to make sure:
+
+1. Check every output's validity, as for any checker.
+2. Compare deterministic calls (`reset`) with `expected`. The random calls'
+   `expected` is just one sample of the reference: never compare them.
+3. Test the distribution: count outcomes per bucket (value, position,
+   index) and accept each count within a bound derived from a tail bound,
+   not from a guess. With n random calls in the case, a bucket of
+   probability p and k buckets tested, Hoeffding's inequality and a union
+   bound give a false-reject probability of at most δ when every count
+   lies within `n*p ± sqrt(n * ln(2*k/δ) / 2)`. Use δ = 1e-6 or less.
+4. Write the false-reject probability per case in a comment of the
+   checker, with how you derived it.
+5. Make sure the bound still rejects an obviously non-random solution
+   (always the same pick, the identity shuffle): prove it with the wrong
+   solutions above. If it does not, the case needs more calls.
+
+## Test cases
+
+Read `hc docs protocol cases` for the format, and the section of every
+type and structure the problem uses (`hc docs protocol types`,
+`hc docs protocol structure-inputs`, `hc docs protocol round-trip-problems`):
+case inputs must satisfy their rules as well as the statement's.
+
+- Keep existing lines; never drop `"example": true` cases.
+- Write inputs **without** `expected`: `hc cases build` fills it from the
+  reference, `checker` mode included. With `any_of`, write `expected`
+  yourself as the array of every acceptable answer (compute them with a
+  throwaway script); `hc cases build` refuses, since a reference finds only
+  one. That includes the examples.
+- Aim for 15 to 40 cases covering:
+  - every statement example (`"example": true`);
+  - minimum sizes and empty inputs the constraints allow;
+  - boundary values (minimum and maximum values, negative numbers,
+    duplicates);
+  - tricky structures (skewed trees, one node, all equal, sorted and
+    reverse sorted; for structure inputs, no cycle, no intersection, a
+    node at the root or the tail);
+  - a few large inputs near the constraint limits, to catch quadratic
+    solutions.
+- Every input must satisfy the stated constraints and guarantees ("exactly
+  one solution", "all values are unique").
+- Generate large inputs with a throwaway script inside the workspace (you
+  cannot write outside it), and delete it afterwards. Keep cases.jsonl
+  under about 2 MB.
+- Give each non-example case a `note` saying what it targets.
+- Randomized problems: a few cases with many calls (1000 to 3000) are
+  better than many small ones; the checker needs samples.
 
 ## Workflow: generate test cases
 
-1. Read `problem.yaml`, `description.md` and existing `cases.jsonl`. Note the
-   constraints carefully (ranges, lengths, uniqueness, guarantees like
-   "exactly one solution").
-2. **Decide the judge rule** — what counts as a correct output — and write it
-   to `problem.yaml`, even when it is `exact`. Read the statement, not just
-   the examples:
-   - exactly one correct output → `exact` (with `tolerance` for doubles);
-   - "return the answer in any order", "the order … does not matter" →
-     `unordered` if only the outer list is free, `unordered_deep` if inner
-     lists are free too (subsets, groups: yes; permutations: no — each
-     permutation's own order matters);
-   - several valid answers that can all be listed (a handful per case) →
-     `any_of`, with `expected` holding every acceptable answer;
-   - many valid answers ("return any of them", "any valid order", any
-     height-balanced BST), or a randomized output → `checker`, and write
-     `checker.py` (see [Checkers](#checkers)). Prefer a built-in mode when one
-     fits;
-   - in-place problems: `judge.output` (and `output_length: return` when only
-     the first k elements count) come from LeetCode's metadata — keep them;
-     they combine with any mode, `checker` included;
-   - round trips (`judge.round_trip`) → `exact`: the decoded value must equal
-     the input.
-3. Write a **reference solution** in `reference/solution.py` (it must run on
-   Python 3.10, the oldest version hc supports; same shape as LeetCode:
-   `class Solution` with the method, or the design class). Annotate with
-   `list[int]` and `TreeNode | None`, and if needed start the file with
-   `from hc_runtime import ListNode, TreeNode`. Import nothing from
-   `hc_runtime` but its public names: `ListNode`, `TreeNode`, `GraphNode`,
-   `NaryNode`, `RandomListNode`, `NextTreeNode`, `QuadNode`,
-   `MultilevelNode`, `NestedInteger`, `Employee`, `decode` and `encode`. This
-   holds for references, templates and checkers alike; use only the standard
-   library otherwise.
-   Prefer a simple, obviously correct algorithm. If it is too slow for the
-   largest inputs, also write a brute force and cross-check both on small
-   random inputs before trusting the fast one.
-4. **If more than one output is acceptable, prove the rule**: also write
-   `reference/solution.go` so that it returns a *different* valid answer than
-   the Python one wherever the rule allows (another order, another valid
-   answer). `hc validate --run` runs both against the same expected outputs,
-   so a rule that is too strict fails there. For a randomized problem, the
-   two references may use different (correct) random algorithms. A Go reference starts with
-   `package main` (LeetCode's template in `templates/solution.go` omits it)
-   and must build with Go 1.22: no newer language features or standard
-   library functions (e.g. `slices.Sorted`, `maps.Keys`).
-   **Prove a checker rejects wrong answers** too: temporarily replace
-   `reference/solution.go` (keep a copy) with plausible wrong solutions — an
-   invalid answer, a valid but not optimal one, always the same random pick —
-   and check that `hc validate <slug> --run` reports Wrong Answer with a
-   helpful checker message on the cases you expect. Then restore the real
-   reference.
-5. Add inputs to `cases.jsonl` **without** `expected`. Keep existing lines
-   (do not drop `example: true` cases). Aim for 15–40 cases covering:
-   - every statement example (`"example": true`)
-   - minimum sizes / empty inputs allowed by the constraints
-   - boundary values (min/max values, negative numbers, duplicates)
-   - tricky structures (skewed trees, single node, all equal, sorted/reverse sorted)
-   - a few large inputs near the constraint limits to catch O(n²) solutions —
-     generate them with a throwaway script inside the workspace (you cannot
-     write outside it), and delete the script afterwards; keep cases.jsonl
-     under ~2 MB
-   Every input must satisfy the stated constraints and guarantees. Use
-   `note` to say what each non-example case targets.
-   For a randomized problem, a few cases with many calls (around 1000–3000)
-   are better than many small ones: the checker needs samples.
+1. Read `problem.yaml`, `description.md` and the existing `cases.jsonl`.
+   Note the constraints (ranges, lengths, uniqueness) and the guarantees.
+   If the definition looks wrong, switch to `hc-problem`.
+2. [Decide the judge rule](#decide-the-judge-rule) and write it to
+   problem.yaml.
+3. Write `reference/solution.py` ([Reference solutions](#reference-solutions)).
+4. If more than one output is acceptable, write the second reference in
+   `reference/solution.go`. For `checker`, write `checker.py`
+   ([Checkers](#checkers)).
+5. Add the inputs to `cases.jsonl` ([Test cases](#test-cases)).
 6. Run `hc cases build <slug> --lang python` to compute `expected` with the
-   reference (for `checker` too: the checker receives it). For `any_of`, write the `expected` arrays yourself (compute
-   every acceptable answer, e.g. with a throwaway script); `hc cases build`
-   refuses to fill them, because a reference finds only one answer.
-7. Run `hc validate <slug> --run` — it must report no errors, and every
-   reference solution must pass every case.
-8. Summarize what you added (count by category) and the judge rule you chose,
-   with the sentence of the statement it rests on; for a checker, what it
-   verifies (and its false-reject probability for a randomized problem).
+   Python reference. Skip this step with `any_of`, whose `expected` you
+   wrote yourself.
+7. Run `hc validate <slug> --run`. It must report no errors, and every
+   reference must pass every case. Fix and repeat until it does.
+8. For `checker`, [prove it rejects wrong answers](#checkers), and run
+   `hc validate <slug> --run` once more with the real reference restored.
+9. Write the [summary](#summary).
 
 ## Workflow: fix a test case
 
-You will be told the problem, the case number(s) (1-based line among
-non-comment lines; see `hc cases list <slug>`) and the user's complaint.
+You are told the problem, the case numbers (1-based, counting only the
+lines that hold a case) and the user's complaint.
 
-1. Inspect the case with `hc cases list <slug> --case N` and re-read the
-   constraints.
-2. Decide what is wrong: the input violates constraints, the expected output
-   is wrong (reference bug), the judge rule is wrong (e.g. order should not
-   matter; see step 2 of the generate workflow — and if `judge.compare` is
-   unset, decide it), or `checker.py` rejects a valid answer or accepts a
-   wrong one. It is also possible the case is right and the user's solution is
-   wrong — then say so and explain why, without changing anything.
-3. Fix the root cause: correct the reference solution, the input,
-   `judge.compare` or `checker.py`. When you loosen the judge rule, prove it with a second
-   reference as in step 4 of the generate workflow. Then run `hc cases build <slug> --force` to recompute every
-   expected output and `hc validate <slug> --run`.
-4. Report what was wrong and what you changed.
+1. Inspect the cases with `hc cases list <slug> --case N --verbose`, and
+   re-read the constraints.
+2. Decide what is wrong:
+   - the input violates the constraints;
+   - the expected output is wrong (a bug in the reference);
+   - the judge rule is wrong (the order should not matter, several answers
+     are valid), or `judge.compare` is unset: decide it as in
+     [Decide the judge rule](#decide-the-judge-rule);
+   - `checker.py` rejects a valid answer or accepts a wrong one;
+   - the definition is wrong (signature, structure inputs): fix it with
+     `hc-problem`;
+   - nothing: the case is right and the user's solution is wrong. Then say
+     so and explain why, and change nothing.
+3. Fix the root cause: the reference, the input, `judge.compare` or
+   `checker.py`. When you loosen the judge rule, prove it with a second
+   reference. When you change a checker, prove it again with wrong
+   solutions.
+4. Run `hc cases build <slug> --force --lang python` to recompute every
+   expected output (with `any_of`, correct the arrays yourself instead),
+   then `hc validate <slug> --run`.
+5. Report what was wrong and what you changed.
+
+## Summary
+
+Report:
+
+- the cases you added, counted by category;
+- the judge rule, with the sentence of the statement it rests on;
+- for a checker, what it verifies, and for a randomized problem its
+  false-reject probability per case;
+- what the second reference does differently, if there is one;
+- anything the statement requires that hc does not judge.
 
 ## Useful commands
 
-- `hc show <slug>` — statement
-- `hc cases list <slug> [--case N]` — inspect cases
-- `hc cases build <slug> [--force] [--lang python]` — fill expected outputs from the reference
-- `hc validate <slug> --run` — check protocol and run every reference on all cases
-- `hc test <slug> --lang python` — run the user's solution (only when diagnosing)
+- `hc show <slug>`: the statement
+- `hc cases list <slug> [--case N]`: inspect cases
+- `hc cases build <slug> [--force] [--lang python]`: fill expected outputs from the reference
+- `hc validate <slug> --run`: check the problem and run every reference on every case
+- `hc test <slug> --lang python`: run the user's solution (only when diagnosing)
+- `hc docs protocol <section>`: one section of the spec
