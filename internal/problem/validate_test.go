@@ -1,6 +1,7 @@
 package problem
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,6 +36,14 @@ func TestValidateCaseFunction(t *testing.T) {
 		{`{"input":{"nums":[],"root":[],"c":"a","k":1}}`, `unknown input "k" (expected nums, root, c)`},
 		{`{"input":{"nums":[],"root":[]}}`, `missing input "c"`},
 		{`{"input":{"nums":[],"root":[],"c":"a"},"expected":"x"}`, `expected: must be string[]`},
+		// TreeNode level order: each node after the root gets a pair of child
+		// slots, and only nodes have children.
+		{`{"input":{"nums":[],"root":[1,2,3,null,4,5,6,null,null,7],"c":"a"}}`, ""},
+		{`{"input":{"nums":[],"root":[1,null,null],"c":"a"}}`, ""},
+		{`{"input":{"nums":[],"root":[null],"c":"a"}}`, ""},
+		{`{"input":{"nums":[],"root":[1,null,null,null],"c":"a"}}`, `input "root": [3]: is a child of node 2 in level order, but there are only 1 nodes`},
+		{`{"input":{"nums":[],"root":[1,2,null,null,null,3],"c":"a"}}`, `input "root": [5]: is a child of node 3 in level order, but there are only 2 nodes`},
+		{`{"input":{"nums":[],"root":[null,1],"c":"a"}}`, `input "root": [1]: the root is null, so the tree is empty`},
 	}
 	for _, tt := range tests {
 		err := p.ValidateCase(mustParseCase(t, tt.line))
@@ -52,6 +61,34 @@ func TestValidateCaseFunction(t *testing.T) {
 	}
 	if err := p.ValidateCase(mustParseCase(t, `{"input":{"nums":[],"root":[],"c":"a"},"expected":[["x"],["y"]]}`)); err != nil {
 		t.Errorf("any_of: %v", err)
+	}
+}
+
+// TestValidateCaseLevelOrder checks the TreeNode level order wherever a
+// tree occurs: in arrays of trees, in NextTreeNode inputs and in expected.
+func TestValidateCaseLevelOrder(t *testing.T) {
+	p := &Problem{Slug: "f", Title: "F", Kind: KindFunction, Function: &Function{
+		Name:    "f",
+		Params:  []Param{{Name: "trees", Type: "TreeNode[]"}, {Name: "next", Type: TypeNextTreeNode}},
+		Returns: TypeTreeNode,
+	}}
+	p.Normalize()
+	tests := []struct {
+		line, err string
+	}{
+		{`{"input":{"trees":[[1,2],[],null],"next":[1,2,3]},"expected":[1,null,2]}`, ""},
+		{`{"input":{"trees":[[1],[1,null,null,4]],"next":[]}}`, `input "trees": [1][3]: is a child of node 2 in level order, but there are only 1 nodes`},
+		{`{"input":{"trees":[],"next":[1,null,null,2]}}`, `input "next": [3]: is a child of node 2`},
+		{`{"input":{"trees":[],"next":[]},"expected":[1,null,null,2]}`, `expected: [3]: is a child of node 2`},
+	}
+	for _, tt := range tests {
+		err := p.ValidateCase(mustParseCase(t, tt.line))
+		switch {
+		case tt.err == "" && err != nil:
+			t.Errorf("%s: unexpected error %v", tt.line, err)
+		case tt.err != "" && (err == nil || !strings.Contains(err.Error(), tt.err)):
+			t.Errorf("%s: error = %v, want %q", tt.line, err, tt.err)
+		}
 	}
 }
 
@@ -147,6 +184,134 @@ func TestValidateJudgeOptions(t *testing.T) {
 	p.Normalize()
 	if err := p.Validate(); err == nil || !strings.Contains(err.Error(), "needs an array result") {
 		t.Errorf("unordered on integer: %v", err)
+	}
+
+	class := func() *Problem {
+		return &Problem{Slug: "x", Title: "X", Kind: KindClass, Class: &Class{
+			Name: "C", Methods: []Method{{Name: "get", Returns: TypeInteger}},
+		}}
+	}
+	tol := func(v float64) *float64 { return &v }
+	for _, tt := range []struct {
+		name string
+		p    *Problem
+		mut  func(p *Problem)
+		want string
+	}{
+		{"zero tolerance", base(), func(p *Problem) { p.Judge.Tolerance = tol(0) }, ""},
+		{"negative tolerance", base(), func(p *Problem) { p.Judge.Tolerance = tol(-1e-5) }, "judge.tolerance -1e-05 must be a finite number, 0 or more"},
+		{"NaN tolerance", base(), func(p *Problem) { p.Judge.Tolerance = tol(math.NaN()) }, "judge.tolerance NaN must be a finite number"},
+		{"infinite tolerance", base(), func(p *Problem) { p.Judge.Tolerance = tol(math.Inf(1)) }, "judge.tolerance +Inf must be a finite number"},
+		{"class section in a function", base(), func(p *Problem) { p.Class = class().Class }, "kind function must not have a class section"},
+		{"function section in a class", class(), func(p *Problem) { p.Function = base().Function }, "kind class must not have a function section"},
+		{"class with judge.output", class(), func(p *Problem) { p.Judge.Output = "x" }, "judge.output is for function problems only"},
+		{"class with judge.output_length", class(), func(p *Problem) { p.Judge.OutputLength = OutputLengthReturn }, "judge.output_length is for function problems only"},
+		{"class with any_of", class(), func(p *Problem) { p.Judge.Compare = CompareAnyOf }, "any_of is not usable for a class problem that is not a round trip"},
+		{"round trip with any_of", codec(InstancesSame), func(p *Problem) { p.Judge.Compare = CompareAnyOf }, ""},
+		{"duplicate method", class(), func(p *Problem) {
+			p.Class.Methods = append(p.Class.Methods, Method{Name: "get", Params: []Param{{Name: "k", Type: TypeInteger}}, Returns: TypeInteger})
+		}, `class.methods: duplicate method "get"`},
+		{"method without name", class(), func(p *Problem) { p.Class.Methods[0].Name = "" }, "class.methods: method without name"},
+		{"methods equal in Go", class(), func(p *Problem) {
+			p.Class.Methods = append(p.Class.Methods, Method{Name: "Get", Returns: TypeInteger})
+		}, `class.methods: methods "get" and "Get" differ only in the case of their first letter`},
+	} {
+		tt.mut(tt.p)
+		tt.p.Normalize()
+		err := tt.p.Validate()
+		switch {
+		case tt.want == "" && err != nil:
+			t.Errorf("%s: unexpected error %v", tt.name, err)
+		case tt.want != "" && (err == nil || !strings.Contains(err.Error(), tt.want)):
+			t.Errorf("%s: error = %v, want %q", tt.name, err, tt.want)
+		}
+	}
+}
+
+// TestTolerance checks the tolerance in effect: judge.tolerance when set,
+// 0 included, else the default when a judged value is a double.
+func TestTolerance(t *testing.T) {
+	fn := func(returns string, params ...Param) *Problem {
+		return &Problem{Kind: KindFunction, Function: &Function{Name: "f", Params: params, Returns: returns}}
+	}
+	inPlace := fn(TypeVoid, Param{Name: "xs", Type: "double[]"})
+	inPlace.Judge.Output = "xs"
+	// The return value is not judged: only nums is.
+	length := fn(TypeInteger, Param{Name: "nums", Type: "integer[]"}, Param{Name: "x", Type: TypeDouble})
+	length.Judge.Output, length.Judge.OutputLength = "nums", OutputLengthReturn
+	notJudged := fn(TypeDouble, Param{Name: "nums", Type: "integer[]"})
+	notJudged.Judge.Output = "nums"
+	class := &Problem{Kind: KindClass, Class: &Class{Name: "C", Methods: []Method{
+		{Name: "add", Params: []Param{{Name: "x", Type: TypeDouble}}, Returns: TypeVoid},
+		{Name: "mean", Returns: TypeDouble},
+	}}}
+	roundTrip := &Problem{Kind: KindClass, Class: &Class{Name: "Codec", Methods: []Method{
+		{Name: "encode", Params: []Param{{Name: "xs", Type: "double[]"}}, Returns: TypeString},
+		{Name: "decode", Params: []Param{{Name: "s", Type: TypeString}}, Returns: "double[]"},
+	}}}
+	roundTrip.Judge.RoundTrip = &RoundTrip{Encode: "encode", Decode: "decode", Instances: InstancesSeparate}
+	exact := fn(TypeDouble)
+	zero := 0.0
+	exact.Judge.Tolerance = &zero
+	custom := fn(TypeInteger)
+	loose := 0.5
+	custom.Judge.Tolerance = &loose
+	for _, tt := range []struct {
+		name string
+		p    *Problem
+		want float64
+	}{
+		{"double return", fn(TypeDouble), DefaultTolerance},
+		{"double[][] return", fn("double[][]"), DefaultTolerance},
+		{"integer return", fn(TypeInteger, Param{Name: "x", Type: TypeDouble}), 0},
+		{"in-place double[]", inPlace, DefaultTolerance},
+		{"in-place with length", length, 0},
+		{"in-place, double return", notJudged, 0},
+		{"class method", class, DefaultTolerance},
+		{"round trip", roundTrip, DefaultTolerance},
+		{"explicit 0", exact, 0},
+		{"explicit", custom, 0.5},
+	} {
+		tt.p.Normalize()
+		if got := tt.p.Tolerance(); got != tt.want {
+			t.Errorf("%s: Tolerance() = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+// TestToleranceYAML checks that an explicit judge.tolerance: 0 survives
+// loading and saving, and that the default is never written.
+func TestToleranceYAML(t *testing.T) {
+	const yml = "slug: x\ntitle: X\nkind: function\nfunction:\n  name: f\n  returns: double\njudge:\n  compare: exact\n"
+	for _, tt := range []struct {
+		judge, saved string
+		want         float64
+	}{
+		{"", "", DefaultTolerance},
+		{"  tolerance: 0\n", "tolerance: 0", 0},
+		{"  tolerance: 1e-3\n", "tolerance: 0.001", 1e-3},
+	} {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, MetaFile), []byte(yml+tt.judge), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		p, err := Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := p.Tolerance(); got != tt.want {
+			t.Errorf("%q: Tolerance() = %v, want %v", tt.judge, got, tt.want)
+		}
+		if err := p.Save(); err != nil {
+			t.Fatal(err)
+		}
+		data, err := os.ReadFile(filepath.Join(dir, MetaFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(string(data), "tolerance"); got != (tt.saved != "") || !strings.Contains(string(data), tt.saved) {
+			t.Errorf("%q: saved problem.yaml:\n%s\nwant %q", tt.judge, data, tt.saved)
+		}
 	}
 }
 

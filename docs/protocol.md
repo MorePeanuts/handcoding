@@ -71,15 +71,15 @@ A problem is a directory holding these entries:
 | `function` | mapping | with `kind: function` | | See [Function problems](#function-problems) | 1 |
 | `class` | mapping | with `kind: class` | | See [Class problems](#class-problems) | 1 |
 | `judge.compare` | string | no | none | `exact`, `unordered`, `unordered_deep`, `any_of` or `checker`; see [Compare modes](#compare-modes). Without it the problem is not [ready](#readiness) | 1 |
-| `judge.tolerance` | number | no | `1e-5` if the function's return type, or a return type of a method, has base type `double`; `0` otherwise | `0` means the same as leaving it out. See [Compare modes](#compare-modes) | 1 |
-| `judge.output` | string | for a `void` function | none | Function problems: a parameter or hidden input; see [In-place output](#in-place-output). Class problems ignore it | 1 |
-| `judge.output_length` | string | no | none | `return`; see [In-place output](#in-place-output) | 1 |
+| `judge.tolerance` | number | no | `1e-5` if the judged value (in a class problem that is not a round trip, a method's return value) has base type `double`; `0` otherwise | A finite number, 0 or more. `0` compares numbers exactly. See [Compare modes](#compare-modes) | 1 |
+| `judge.output` | string | for a `void` function | none | Function problems only: a parameter or hidden input; see [In-place output](#in-place-output) | 1 |
+| `judge.output_length` | string | no | none | Function problems only: `return`; see [In-place output](#in-place-output) | 1 |
 | `judge.round_trip` | mapping | no | none | Class problems only: `encode`, `decode`, `instances`; see [Round-trip problems](#round-trip-problems) | 1 |
 | `judge.timeout` | string | no | the workspace's `timeout` (10s unless configured) | A positive duration such as `5s` or `500ms`; see [Timeout](#timeout) | 1 |
 | `source.site` | string | no | none | Free text, e.g. `leetcode.com` | 1 |
 | `source.url` | string | no | none | | 1 |
 
-The section that does not match `kind` (`class` in a function problem, `function` in a class problem) is ignored, and SHOULD NOT be present.
+The section that does not match `kind` (`class` in a function problem, `function` in a class problem) MUST NOT be present.
 
 > **YAML pitfall.** Inside YAML's flow syntax (`{...}`, `[...]`), `[]` is YAML syntax, so an array type there MUST be quoted: `{name: nums, type: "integer[]"}`. In block style (`type: integer[]` on its own line) quotes are optional.
 
@@ -143,7 +143,7 @@ Every value in a case, an expected output and a solution's output is JSON. This 
 Go: `type ListNode struct { Val int; Next *ListNode }` and `type TreeNode struct { Val int; Left, Right *TreeNode }`. Python: `ListNode(val=0, next=None)` and `TreeNode(val=0, left=None, right=None)`, with attributes `val`, `next`, `left`, `right`. Node values are integers.
 
 - `ListNode`: the array of the values from the head on, `[1,2,3]`. `[]` is the empty list. In inputs, `null` also means the empty list.
-- `TreeNode`: the level-order array, `null` for a missing child: `[3,9,20,null,null,15,7]`. The first element is the root's value, and each next pair of elements gives the children of the next node (not `null`) in level order. Outputs have trailing `null`s removed. `[]` is the empty tree; in inputs, `null` and an array starting with `null` also mean the empty tree. An array listing children for more nodes than it has is invalid.
+- `TreeNode`: the level-order array, `null` for a missing child: `[3,9,20,null,null,15,7]`. The first element is the root's value, and each next pair of elements gives the children of the next node (not `null`) in level order. Outputs have trailing `null`s removed. `[]` is the empty tree; in inputs, `null` and `[null]` also mean the empty tree. An array listing children for more nodes than it has is invalid, such as `[1,null,null,2]` or `[null,1]`.
 
 ### LeetCode's Node types
 
@@ -193,11 +193,11 @@ The judged value is the return value, or the value of `judge.output` after the c
 | `class.name` | string | yes | | The name of the class the solution defines | 1 |
 | `class.constructor` | list of parameters | no | `[]` | The constructor's parameters | 1 |
 | `class.methods` | list of methods | yes | | At least one | 1 |
-| `class.methods[].name` | string | yes | | | 1 |
+| `class.methods[].name` | string | yes | | Not empty, and unique among the methods, also when their first letters are capitalized (`get` and `Get` are one method in Go) | 1 |
 | `class.methods[].params` | list of parameters | no | `[]` | | 1 |
 | `class.methods[].returns` | type | no | `void` | | 1 |
 
-A case gives a sequence of operations: the constructor, then method calls on the instance it made. The judged value is the array of their results; see [Cases](#cases). Class problems have no [structure inputs](#structure-inputs), and `judge.output` and `judge.output_length` do not apply to them.
+A case gives a sequence of operations: the constructor, then method calls on the instance it made. The judged value is the array of their results; see [Cases](#cases). Class problems have no [structure inputs](#structure-inputs), and MUST NOT have `judge.output` or `judge.output_length`.
 
 Built-in sample 0146:
 
@@ -450,7 +450,7 @@ A case is judged by comparing the solution's output with `expected` under `judge
 - Equality is equality of JSON values: objects by their keys and values, arrays element by element, strings, booleans and `null` exactly. Two numbers that are both integers (written without fraction or exponent, in the signed 64-bit range) are equal when their values are equal. Other pairs of numbers are equal when, with tolerance t (`judge.tolerance`), \|a − b\| ≤ t or \|a − b\| ≤ t · max(\|a\|, \|b\|); with t = 0, when their values are equal (`2` equals `2.0`).
 - The tolerance applies in every mode.
 - `unordered` and `unordered_deep` require the judged value of a function or round-trip problem to be an array type. In a class problem the judged value is the array of results, and its order is what they ignore.
-- `any_of` is not usable for class problems that are not round trips: their `expected` holds one entry per op.
+- A class problem that is not a round trip MUST NOT use `any_of`: its `expected` holds one entry per op.
 
 ### In-place output
 
@@ -590,23 +590,24 @@ A valid problem satisfies every rule below. `hc validate` checks the rules on `p
 
 1. It MUST be valid YAML, and MUST NOT contain unknown fields.
 2. `slug` MUST match `^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$`; `title` MUST NOT be empty; `difficulty`, when present, MUST be `easy`, `medium` or `hard` (in any case).
-3. `kind` MUST be `function` or `class`, and the matching section MUST be present, with a `name`. A class MUST have at least one method.
+3. `kind` MUST be `function` or `class`, the matching section MUST be present, with a `name`, and the other section MUST NOT be present. A class MUST have at least one method, and method names MUST be non-empty and unique, also when their first letters are capitalized.
 4. Parameter names MUST be non-empty and unique: across `function.params` and `function.hidden` together, within the constructor, and within each method.
 5. Every type MUST be a [supported type](#types) within the array limits; `void` MUST only be a return type. A problem MUST NOT use more than one `Node` type.
 6. `cycle`, `join`, `ref` and `copy` MUST only appear on function parameters, at most one per parameter, and MUST follow the [structure input rules](#structure-inputs), as MUST `hidden` and `returns_ref`.
 7. `returns_copy` MUST follow the [returns_copy rules](#returns_copy).
-8. In a function problem, `judge.output`, when present, MUST name a parameter or hidden input without a `cycle`; a `void` function MUST have `judge.output`.
+8. `judge.output` and `judge.output_length` MUST only appear in function problems. `judge.output`, when present, MUST name a parameter or hidden input without a `cycle`; a `void` function MUST have `judge.output`.
 9. `judge.output_length`, when present, MUST be `return`, with `judge.output` naming an array and an `integer` or `long` return type.
 10. `judge.round_trip` MUST only appear in class problems, and MUST follow the [round-trip rules](#round-trip-problems).
-11. `judge.compare`, when present, MUST be one of the [compare modes](#compare-modes). With `unordered` or `unordered_deep`, the judged value of a function or round-trip problem MUST be an array.
-12. `checker.py` MUST be present with `judge.compare: checker`, and absent otherwise.
-13. `judge.timeout`, when present, MUST be a positive duration.
+11. `judge.compare`, when present, MUST be one of the [compare modes](#compare-modes). With `unordered` or `unordered_deep`, the judged value of a function or round-trip problem MUST be an array. A class problem that is not a round trip MUST NOT use `any_of`.
+12. `judge.tolerance`, when present, MUST be a finite number, 0 or more.
+13. `checker.py` MUST be present with `judge.compare: checker`, and absent otherwise.
+14. `judge.timeout`, when present, MUST be a positive duration.
 
 **cases.jsonl**
 
 1. Every line that is not blank or a comment MUST be one JSON object with `input` (an object) and, optionally, `expected`, `example` (a boolean) and `note` (a string), and no other fields.
 2. A function case's `input` MUST have exactly the keys of the parameters (except `copy` parameters) and hidden inputs; a class case's exactly `ops` and `args`; a round-trip case's exactly `encode`'s parameter.
-3. Every value MUST have the encoding of its type ([Types](#types)), including the constraints of the judge-defined types: neighbors in the graph, random indices in the list, well-formed `NaryNode`, `QuadNode` and `MultilevelNode` forms, distinct employee ids and known subordinates. A `ref` value MUST be an integer. (`hc validate` checks a `TreeNode`'s level order only through `--run`.)
+3. Every value MUST have the encoding of its type ([Types](#types)), including the constraints of the tree and judge-defined types: a `TreeNode` level order with children only for its nodes, neighbors in the graph, random indices in the list, well-formed `NaryNode`, `QuadNode` and `MultilevelNode` forms, distinct employee ids and known subordinates. A `ref` value MUST be an integer.
 4. Structure inputs MUST fit: a `cycle` position in the list, joined lists that end with the same values from `skip` and `at`, a `ref` value that occurs exactly once.
 5. In a class case, `ops` and `args` MUST have the same, non-zero length, `ops[0]` MUST be the class name, every other op MUST be a method, and every `args` entry MUST hold exactly the op's arguments, of their types.
 6. `expected`, when present, MUST have the form of the judged value ([Cases](#cases)): for `any_of`, an array of such values; for a class case, one entry per op, `null` for the constructor and `void` methods.

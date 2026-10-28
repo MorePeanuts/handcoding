@@ -73,15 +73,15 @@ hc 自身的行为（`hc test` 运行哪些用例、`hc fetch` 如何导入题�
 | `function` | 映射 | `kind: function` 时 | | 见[函数题](#函数题) | 1 |
 | `class` | 映射 | `kind: class` 时 | | 见[设计题](#设计题) | 1 |
 | `judge.compare` | 字符串 | 否 | 无 | `exact`、`unordered`、`unordered_deep`、`any_of` 或 `checker`；见[比较方式](#比较方式)。没有它，题目就不是[就绪](#就绪)的 | 1 |
-| `judge.tolerance` | 数字 | 否 | 函数的返回类型或某个方法的返回类型的基础类型为 `double` 时为 `1e-5`，否则为 `0` | `0` 与不写相同。见[比较方式](#比较方式) | 1 |
-| `judge.output` | 字符串 | `void` 函数必需 | 无 | 函数题：一个参数或隐藏输入；见[原地修改的输出](#原地修改的输出)。设计题忽略它 | 1 |
-| `judge.output_length` | 字符串 | 否 | 无 | `return`；见[原地修改的输出](#原地修改的输出) | 1 |
+| `judge.tolerance` | 数字 | 否 | 被评判的值（不是编解码往返题的设计题中为方法的返回值）的基础类型为 `double` 时为 `1e-5`，否则为 `0` | 有限的数，不小于 0。`0` 表示精确比较数字。见[比较方式](#比较方式) | 1 |
+| `judge.output` | 字符串 | `void` 函数必需 | 无 | 仅限函数题：一个参数或隐藏输入；见[原地修改的输出](#原地修改的输出) | 1 |
+| `judge.output_length` | 字符串 | 否 | 无 | 仅限函数题：`return`；见[原地修改的输出](#原地修改的输出) | 1 |
 | `judge.round_trip` | 映射 | 否 | 无 | 仅限设计题：`encode`、`decode`、`instances`；见[编解码往返题](#编解码往返题) | 1 |
 | `judge.timeout` | 字符串 | 否 | 工作区的 `timeout`（未配置时为 10s） | 正的时长，如 `5s` 或 `500ms`；见[时限](#时限) | 1 |
 | `source.site` | 字符串 | 否 | 无 | 任意文本，如 `leetcode.com` | 1 |
 | `source.url` | 字符串 | 否 | 无 | | 1 |
 
-与 `kind` 不对应的段（函数题中的 `class`、设计题中的 `function`）会被忽略，不应当出现。
+与 `kind` 不对应的段（函数题中的 `class`、设计题中的 `function`）不得出现。
 
 > **YAML 的坑。** 在 YAML 的流式写法（`{...}`、`[...]`）中，`[]` 本身是 YAML 语法，所以其中的数组类型必须加引号：`{name: nums, type: "integer[]"}`。用块状写法（`type: integer[]` 单独一行）时，引号可加可不加。
 
@@ -145,7 +145,7 @@ judge:
 Go：`type ListNode struct { Val int; Next *ListNode }` 和 `type TreeNode struct { Val int; Left, Right *TreeNode }`。Python：`ListNode(val=0, next=None)` 和 `TreeNode(val=0, left=None, right=None)`，属性为 `val`、`next`、`left`、`right`。节点的值是整数。
 
 - `ListNode`：从头节点开始的值组成的数组，`[1,2,3]`。`[]` 是空链表。在输入中，`null` 也表示空链表。
-- `TreeNode`：层序数组，缺失的子节点为 `null`：`[3,9,20,null,null,15,7]`。第一个元素是根的值，之后每两个元素依次给出层序中下一个（非 `null`）节点的左右子节点。输出会去掉末尾的 `null`。`[]` 是空树；在输入中，`null` 和以 `null` 开头的数组也表示空树。为多于实际节点数的节点列出子节点的数组是不合法的。
+- `TreeNode`：层序数组，缺失的子节点为 `null`：`[3,9,20,null,null,15,7]`。第一个元素是根的值，之后每两个元素依次给出层序中下一个（非 `null`）节点的左右子节点。输出会去掉末尾的 `null`。`[]` 是空树；在输入中，`null` 和 `[null]` 也表示空树。为多于实际节点数的节点列出子节点的数组是不合法的，如 `[1,null,null,2]` 或 `[null,1]`。
 
 ### LeetCode 的 Node 类型
 
@@ -195,11 +195,11 @@ LeetCode 把六种不同的结构都叫作 `Node`。协议给每种结构各起�
 | `class.name` | 字符串 | 是 | | 解答定义的类名 | 1 |
 | `class.constructor` | 参数列表 | 否 | `[]` | 构造函数的参数 | 1 |
 | `class.methods` | 方法列表 | 是 | | 至少一个 | 1 |
-| `class.methods[].name` | 字符串 | 是 | | | 1 |
+| `class.methods[].name` | 字符串 | 是 | | 非空，且在各方法中唯一，首字母大写后也唯一（`get` 和 `Get` 在 Go 中是同一个方法） | 1 |
 | `class.methods[].params` | 参数列表 | 否 | `[]` | | 1 |
 | `class.methods[].returns` | 类型 | 否 | `void` | | 1 |
 
-一个用例给出一串操作：先是构造函数，然后是对它所创建实例的方法调用。被评判的值是这些操作的结果组成的数组；见[用例](#用例)。设计题没有[结构输入](#结构输入)，`judge.output` 和 `judge.output_length` 对它们不适用。
+一个用例给出一串操作：先是构造函数，然后是对它所创建实例的方法调用。被评判的值是这些操作的结果组成的数组；见[用例](#用例)。设计题没有[结构输入](#结构输入)，也不得有 `judge.output` 或 `judge.output_length`。
 
 内置示例题 0146：
 
@@ -452,7 +452,7 @@ judge:
 - 相等指 JSON 值相等：对象按键和值比较，数组逐个元素比较，字符串、布尔值和 `null` 须完全相同。两个数字都是整数（不带小数部分或指数，在有符号 64 位范围内）时，值相等才相等。其他数字对在容差 t（`judge.tolerance`）下满足 \|a − b\| ≤ t 或 \|a − b\| ≤ t · max(\|a\|, \|b\|) 时相等；t = 0 时，值相等才相等（`2` 等于 `2.0`）。
 - 容差适用于所有比较方式。
 - `unordered` 和 `unordered_deep` 要求函数题或编解码往返题被评判的值是数组类型。设计题被评判的值是结果数组，忽略的就是它的顺序。
-- 不是编解码往返题的设计题无法使用 `any_of`：它们的 `expected` 每个操作一项。
+- 不是编解码往返题的设计题不得使用 `any_of`：它们的 `expected` 每个操作一项。
 
 ### 原地修改的输出
 
@@ -592,23 +592,24 @@ def check(input, output, expected):
 
 1. 必须是合法的 YAML，不得包含不认识的字段。
 2. `slug` 必须匹配 `^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$`；`title` 不得为空；有 `difficulty` 时，它必须是 `easy`、`medium` 或 `hard`（大小写不限）。
-3. `kind` 必须是 `function` 或 `class`，并且必须有对应的段，其中有 `name`。类必须至少有一个方法。
+3. `kind` 必须是 `function` 或 `class`，必须有对应的段，其中有 `name`，并且不得有另一个段。类必须至少有一个方法，方法名必须非空且互不相同，首字母大写后也互不相同。
 4. 参数名必须非空且唯一：`function.params` 和 `function.hidden` 合在一起算，构造函数内，以及每个方法内。
 5. 每个类型都必须是[受支持的类型](#类型)，并在数组限制之内；`void` 只能作返回类型。一道题不得使用一种以上的 `Node` 类型。
 6. `cycle`、`join`、`ref` 和 `copy` 只能出现在函数参数上，每个参数最多一个，并且必须遵守[结构输入的规则](#结构输入)；`hidden` 和 `returns_ref` 也必须遵守。
 7. `returns_copy` 必须遵守 [returns_copy 的规则](#returns_copy)。
-8. 在函数题中，有 `judge.output` 时，它必须指向一个不带 `cycle` 的参数或隐藏输入；`void` 函数必须有 `judge.output`。
+8. `judge.output` 和 `judge.output_length` 只能出现在函数题中。有 `judge.output` 时，它必须指向一个不带 `cycle` 的参数或隐藏输入；`void` 函数必须有 `judge.output`。
 9. 有 `judge.output_length` 时，它必须是 `return`，并且 `judge.output` 指向数组、返回类型为 `integer` 或 `long`。
 10. `judge.round_trip` 只能出现在设计题中，并且必须遵守[编解码往返题的规则](#编解码往返题)。
-11. 有 `judge.compare` 时，它必须是一种[比较方式](#比较方式)。使用 `unordered` 或 `unordered_deep` 时，函数题或编解码往返题被评判的值必须是数组。
-12. `judge.compare: checker` 时必须有 `checker.py`，其他情况下不得有。
-13. 有 `judge.timeout` 时，它必须是正的时长。
+11. 有 `judge.compare` 时，它必须是一种[比较方式](#比较方式)。使用 `unordered` 或 `unordered_deep` 时，函数题或编解码往返题被评判的值必须是数组。不是编解码往返题的设计题不得使用 `any_of`。
+12. 有 `judge.tolerance` 时，它必须是有限的数，不小于 0。
+13. `judge.compare: checker` 时必须有 `checker.py`，其他情况下不得有。
+14. 有 `judge.timeout` 时，它必须是正的时长。
 
 **cases.jsonl**
 
 1. 每个非空、非注释的行都必须是一个 JSON 对象，包含 `input`（对象），可选 `expected`、`example`（布尔值）和 `note`（字符串），没有其他字段。
 2. 函数题用例的 `input` 必须恰好以参数（`copy` 参数除外）和隐藏输入为键；设计题用例恰好有 `ops` 和 `args`；编解码往返题用例恰好有 `encode` 的参数。
-3. 每个值都必须使用其类型的编码（[类型](#类型)），包括评测系统定义的类型的约束：邻居在图中、随机下标在链表内、`NaryNode`、`QuadNode` 和 `MultilevelNode` 的形式合法、员工 id 互不相同且下属都已知。`ref` 的值必须是整数。（`TreeNode` 的层序是否合法，`hc validate` 只在加上 `--run` 时才能检查。）
+3. 每个值都必须使用其类型的编码（[类型](#类型)），包括树和评测系统定义的类型的约束：`TreeNode` 的层序只为实际存在的节点列出子节点、邻居在图中、随机下标在链表内、`NaryNode`、`QuadNode` 和 `MultilevelNode` 的形式合法、员工 id 互不相同且下属都已知。`ref` 的值必须是整数。
 4. 结构输入必须吻合：`cycle` 的位置在链表内，被接上的两个链表从 `skip` 和 `at` 开始的值相同，`ref` 的值恰好出现一次。
 5. 在设计题用例中，`ops` 和 `args` 的长度必须相同且不为零，`ops[0]` 必须是类名，其余每个操作都必须是方法，`args` 的每一项都必须恰好包含该操作的参数，且类型相符。
 6. 有 `expected` 时，它必须具有被评判的值的形式（[用例](#用例)）：`any_of` 时为这种值组成的数组；设计题用例中每个操作一项，构造函数和 `void` 方法为 `null`。

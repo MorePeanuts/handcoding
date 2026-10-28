@@ -198,6 +198,29 @@ func checkValue(t string, v any, path string) error {
 				return err
 			}
 		}
+		if base == TypeTreeNode {
+			return checkLevelOrder(arr, path)
+		}
+	}
+	return nil
+}
+
+// checkLevelOrder checks that a TreeNode level order gives children only to
+// nodes it has: after the root, each pair of elements holds the children of
+// the next node, so a tree of n nodes has at most 1 + 2n elements. A null
+// root is the empty tree, so [null] is its only array with a null root.
+func checkLevelOrder(arr []any, path string) error {
+	nodes := 0
+	for i, x := range arr {
+		if i > 0 && (i-1)/2 >= nodes {
+			if nodes == 0 {
+				return fmt.Errorf("%sthe root is null, so the tree is empty and has no children", pathPrefix(fmt.Sprintf("%s[%d]", path, i)))
+			}
+			return fmt.Errorf("%sis a child of node %d in level order, but there are only %d nodes", pathPrefix(fmt.Sprintf("%s[%d]", path, i)), (i-1)/2+1, nodes)
+		}
+		if x != nil {
+			nodes++
+		}
 	}
 	return nil
 }
