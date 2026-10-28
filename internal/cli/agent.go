@@ -139,7 +139,7 @@ func runAgent(cmd *cobra.Command, a *app.App, ag *agent.Agent, prompt string, dr
 	if err != nil {
 		return err
 	}
-	return validateProblem(cmd, a, p2, false, nil, a.WS.Ref(p2))
+	return validateOne(cmd, a, p2)
 }
 
 func newSkillCmd(root *rootOptions) *cobra.Command {

@@ -40,7 +40,7 @@ Command-line clients bring your editor back, but they still send your code to th
 - **Interactive TUI.** A problem list in the style of rustlings, with the statement, its images, test results and submission history in one place. Your editor stays in the next pane.
 - **LeetCode import.** `hc fetch 146` downloads the statement, its images, the signature, starter code and the examples.
 - **Agent-written test cases.** `hc gen` has Claude Code or Codex decide how a problem is judged (any order? several valid answers?) and write a reference solution and test inputs. Expected outputs come from running the reference, not from the model's guess. `hc fix` repairs a wrong case.
-- **Open problem format.** Problems are plain directories: YAML, Markdown and JSON Lines. Write your own and share them.
+- **Open problem format.** Problems are plain directories: YAML, Markdown and JSON Lines. Write your own and share them as packs: git repositories that `hc pack install` installs and `hc pack update` keeps current.
 - **History.** Every submission keeps its code and judge report, so you can review, restore or delete it.
 
 ## Install
@@ -65,7 +65,7 @@ hc gen two-sum          # let a coding agent write its test cases and judge rule
 hc                      # open the problem list
 ```
 
-To solve in Python by default, run `hc init --lang python` instead; it also sets up the Python environment right away. Your problems live in the workspace's `packs/local/problems/`: `hc new` scaffolds one of your own, and `hc import` copies problem directories in. Installed packs of ready-made problems sit beside it in `packs/` (`hc pack install` is coming).
+To solve in Python by default, run `hc init --lang python` instead; it also sets up the Python environment right away. Your problems live in the workspace's `packs/local/problems/`: `hc new` scaffolds one of your own, and `hc import` copies problem directories in. A new workspace starts with no problems: fetch them one by one, or install a pack of ready-made problems with `hc pack install <git-url>`, which clones it into `packs/` beside your own and records it in `hc.yaml` (see [packs](docs/how-to-use.md#packs)).
 
 Press `enter` on a problem. `hc` shows the statement, creates `solution.go` from the template and copies its path to the clipboard. Open it in your editor next door, then press `t` to test and `s` to submit.
 

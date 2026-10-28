@@ -9,7 +9,6 @@
 package regression
 
 import (
-	"os"
 	"path/filepath"
 	"runtime"
 
@@ -37,13 +36,4 @@ func Install(ws *workspace.Workspace) error {
 
 // Copy copies the pack, its pack.yaml and problems/ but nothing else in the
 // set's directory, to dir, which must not hold them yet.
-func Copy(dir string) error {
-	if err := os.CopyFS(filepath.Join(dir, pack.ProblemsDir), os.DirFS(ProblemsDir())); err != nil {
-		return err
-	}
-	data, err := os.ReadFile(filepath.Join(Dir(), pack.ManifestFile))
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(dir, pack.ManifestFile), data, 0o644)
-}
+func Copy(dir string) error { return pack.Copy(Dir(), dir) }

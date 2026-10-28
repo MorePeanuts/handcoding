@@ -12,10 +12,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
-	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
-	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/skill"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 	"github.com/MorePeanuts/handcoding/internal/version"
@@ -71,12 +69,12 @@ python, hc also creates the workspace's Python virtual environment now.`,
 			fmt.Println("  hc fetch two-sum         fetch a problem from LeetCode")
 			fmt.Println("  hc gen two-sum           have an agent write its test cases")
 			fmt.Println("  hc new my-problem        or write a problem of your own")
+			fmt.Println("  hc pack install <url>    or install a pack of ready-made problems")
 			fmt.Println("  hc start two-sum -e      start a problem in your editor")
 			fmt.Println("  hc test two-sum          run the examples")
 			fmt.Println("  hc submit two-sum        judge all cases")
 			fmt.Println("  hc                       open the problem list")
-			fmt.Println("\nPacks of ready-made problems are coming with `hc pack install`.")
-			fmt.Println("Tip: version your progress with `git init` in the workspace.")
+			fmt.Println("\nTip: version your progress with `git init` in the workspace.")
 			return nil
 		},
 	}
@@ -560,7 +558,7 @@ func newCasesEditCmd(root *rootOptions) *cobra.Command {
 				if err := ed.Run(); err != nil {
 					return err
 				}
-				return validateProblem(cmd, a, p, false, nil, a.WS.Ref(p))
+				return validateOne(cmd, a, p)
 			})
 		},
 	}
@@ -581,6 +579,7 @@ the reference solutions on every case and require them to pass.`,
 				return err
 			}
 			defer a.Close()
+			opts := app.ValidateOptions{Run: run, Stderr: os.Stderr}
 			bad := 0
 			if len(args) > 0 {
 				for _, arg := range args {
@@ -588,12 +587,16 @@ the reference solutions on every case and require them to pass.`,
 					if err != nil {
 						return err
 					}
-					if validateProblem(cmd, a, p, run, nil, a.WS.Ref(p)) != nil {
+					if f := a.ValidateProblem(cmd.Context(), p, nil, a.WS.Ref(p), opts); !printFinding(f) {
 						bad++
 					}
 				}
-			} else if bad, err = validateAll(cmd, a, run); err != nil {
-				return err
+			} else {
+				sum, err := a.ValidateWorkspace(cmd.Context(), opts, func(f app.Finding) { printFinding(f) })
+				if err != nil {
+					return err
+				}
+				bad = sum.Failed + sum.PackErrors
 			}
 			if bad > 0 {
 				return fmt.Errorf("%d pack(s) or problem(s) with errors", bad)
@@ -605,193 +608,41 @@ the reference solutions on every case and require them to pass.`,
 	return cmd
 }
 
-// validateAll validates every pack and problem of the workspace, pack by
-// pack, and returns how many have errors.
-func validateAll(cmd *cobra.Command, a *app.App, run bool) (int, error) {
-	packs, err := a.WS.Packs()
-	if err != nil {
-		return 0, err
-	}
-	all, _ := a.WS.Problems()
-	qualify := workspace.SpansPacks(all)
-	bad := 0
-	fail := func(name string, err error) {
-		bad++
-		fmt.Printf("%s %s\n", ui.Red.Render("FAIL"), name)
-		for _, line := range strings.Split(err.Error(), "\n") {
-			fmt.Printf("     %s %s\n", ui.Red.Render("error:"), line)
-		}
-	}
-	for _, k := range packs {
-		label := "pack " + k.Name
-		if k.Err != nil {
-			fail(label, k.Err)
-			continue
-		}
-		probs, failed, err := k.Problems()
-		if err != nil {
-			return bad, err
-		}
-		if err := k.Manifest.ValidateProblems(probs); err != nil {
-			fail(label, err)
-		}
-		for _, f := range failed {
-			fail(a.WS.Rel(f.Dir), f)
-		}
-		for _, p := range probs {
-			name := p.Slug
-			if qualify {
-				name = p.Ref()
-			}
-			if validateProblem(cmd, a, p, run, probs, name) != nil {
-				bad++
-			}
-		}
-	}
-	return bad, nil
-}
-
-// validateProblem prints the findings for one problem, under name. peers
-// are the problems of its pack, to check its identity against; nil loads
-// them.
-func validateProblem(cmd *cobra.Command, a *app.App, p *problem.Problem, run bool, peers []*problem.Problem, name string) error {
-	var errs, warns []string
-	if err := p.Validate(); err != nil {
-		errs = append(errs, strings.Split(err.Error(), "\n")...)
-	}
-	cases, casesErr := p.LoadCases()
-	if casesErr != nil {
-		errs = append(errs, casesErr.Error())
-	}
-	missing, examples := 0, 0
-	if len(errs) == 0 {
-		for i, c := range cases {
-			if err := p.ValidateCase(c); err != nil {
-				errs = append(errs, fmt.Sprintf("case %d: %v", i+1, err))
-			}
-		}
-	}
-	for _, c := range cases {
-		if !c.HasExpected() {
-			missing++
-		}
-		if c.Example {
-			examples++
-		}
-	}
-	if len(errs) == 0 {
-		for _, l := range a.Langs.All() {
-			if _, err := l.Starter(p); err != nil {
-				errs = append(errs, err.Error())
-			}
-		}
-	}
-	if len(cases) == 0 && casesErr == nil {
-		warns = append(warns, "no test cases (hc gen "+name+")")
-	}
-	if missing > 0 {
-		warns = append(warns, fmt.Sprintf("%d case(s) without expected output (hc cases build %s)", missing, name))
-	}
-	if len(cases) > 0 && examples == 0 {
-		warns = append(warns, "no case marked as example; hc test runs the first 3")
-	}
-	if !p.Ready() {
-		warns = append(warns, "judge rule not decided (judge.compare): run `hc gen "+name+"`, or set it by hand")
-	}
-	warns = append(warns, imageWarnings(p)...)
-	refs := a.ReferenceLangs(p)
-	if len(refs) == 0 {
-		warns = append(warns, "no reference solution")
-	} else if run && len(errs) == 0 && len(cases) > 0 {
-		sel, _ := app.Select(cases, nil, true)
-		for _, l := range refs {
-			tc, err := l.Toolchain()
-			if err != nil {
-				warns = append(warns, fmt.Sprintf("%s reference not run: %v", l.Name(), err))
-				continue
-			}
-			if err := tc.Err(); err != nil {
-				errs = append(errs, fmt.Sprintf("%s reference not run: %v", l.Name(), err))
-				continue
-			}
-			e, w := checkReference(cmd, a, p, l, sel)
-			errs, warns = append(errs, e...), append(warns, w...)
-		}
-	}
-	// Conflicts with the rest of the pack come last, so that they do not
-	// keep the checks above from running.
-	if peers == nil {
-		if k, err := a.WS.Pack(p.Pack); err == nil {
-			peers, _, _ = k.Problems()
-		}
-	}
-	for _, err := range pack.IdentityErrors(p, peers) {
-		errs = append(errs, err.Error())
-	}
-	status := ui.Green.Render("ok  ")
-	if len(errs) > 0 {
-		status = ui.Red.Render("FAIL")
-	} else if len(warns) > 0 {
-		status = ui.Yellow.Render("warn")
-	}
-	fmt.Printf("%s %s %s\n", status, name, ui.Faint.Render(fmt.Sprintf("(%d cases)", len(cases))))
-	for _, e := range errs {
-		fmt.Printf("     %s %s\n", ui.Red.Render("error:"), indentRest(e, "            "))
-	}
-	for _, w := range warns {
-		fmt.Printf("     %s %s\n", ui.Yellow.Render("warn:"), indentRest(w, "           "))
-	}
-	if len(errs) > 0 {
+// validateOne validates p, without running references, after a command
+// changed it, and prints the findings.
+func validateOne(cmd *cobra.Command, a *app.App, p *problem.Problem) error {
+	name := a.WS.Ref(p)
+	if !printFinding(a.ValidateProblem(cmd.Context(), p, nil, name, app.ValidateOptions{})) {
 		return errors.New(name + " is invalid")
 	}
 	return nil
 }
 
-// checkReference runs one reference solution on every case. Cases without an
-// expected output only have to run.
-func checkReference(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.Language, sel []runner.Selected) (errs, warns []string) {
-	rep, _, err := a.RunReference(cmd.Context(), p, l.ID(), sel, app.RunOptions{Stderr: os.Stderr})
-	switch {
-	case err != nil:
-		return []string{fmt.Sprintf("%s reference: %v", l.Name(), err)}, nil
-	case rep.Verdict == runner.CompileError:
-		return []string{fmt.Sprintf("%s reference does not compile:\n%s", l.Name(), strings.TrimRight(rep.CompileError, "\n"))}, nil
-	}
-	for _, c := range rep.Cases {
-		switch c.Verdict {
-		case runner.Accepted, runner.NoExpected, runner.NotJudged:
-		case runner.WrongAnswer:
-			e := fmt.Sprintf("%s reference, case %d: Wrong Answer\n%-9s %s\n%-9s %s",
-				l.Name(), c.Index, "output", clip(string(c.Output), 120),
-				strings.ToLower(ui.ExpectedLabel(p)), clip(string(c.Case.Expected), 120))
-			if c.Message != "" {
-				e += fmt.Sprintf("\n%-9s %s", "checker", c.Message)
-			}
-			errs = append(errs, e)
-		default:
-			errs = append(errs, fmt.Sprintf("%s reference, case %d: %s %s", l.Name(), c.Index, c.Verdict, c.Error))
+// printFinding prints what validating a pack or problem found, and reports
+// whether it is valid.
+func printFinding(f app.Finding) bool {
+	if f.Problem == nil {
+		// A pack, or a problem that failed to load.
+		fmt.Printf("%s %s\n", ui.Red.Render("FAIL"), f.Name)
+		for _, e := range f.Errors {
+			fmt.Printf("     %s %s\n", ui.Red.Render("error:"), e)
 		}
+		return f.OK()
 	}
-	return errs, nil
-}
-
-// imageWarnings reports local images in the statement that do not exist.
-func imageWarnings(p *problem.Problem) []string {
-	desc, err := p.Description()
-	if err != nil {
-		return []string{err.Error()}
+	status := ui.Green.Render("ok  ")
+	if !f.OK() {
+		status = ui.Red.Render("FAIL")
+	} else if len(f.Warnings) > 0 {
+		status = ui.Yellow.Render("warn")
 	}
-	var warns []string
-	problem.ReplaceImages(desc, func(_, src string) string {
-		if strings.Contains(src, "://") || strings.HasPrefix(src, "data:") {
-			return ""
-		}
-		if _, err := os.Stat(filepath.Join(p.Dir, filepath.FromSlash(src))); err != nil {
-			warns = append(warns, fmt.Sprintf("%s: image %s not found", problem.DescriptionFile, src))
-		}
-		return ""
-	})
-	return warns
+	fmt.Printf("%s %s %s\n", status, f.Name, ui.Faint.Render(fmt.Sprintf("(%d cases)", f.Cases)))
+	for _, e := range f.Errors {
+		fmt.Printf("     %s %s\n", ui.Red.Render("error:"), indentRest(e, "            "))
+	}
+	for _, w := range f.Warnings {
+		fmt.Printf("     %s %s\n", ui.Yellow.Render("warn:"), indentRest(w, "           "))
+	}
+	return f.OK()
 }
 
 // duplicateID returns the slug of another problem of pack k with the same
