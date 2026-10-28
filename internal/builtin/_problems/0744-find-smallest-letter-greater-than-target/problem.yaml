@@ -1,0 +1,17 @@
+id: "744"
+slug: find-smallest-letter-greater-than-target
+title: Find Smallest Letter Greater Than Target
+difficulty: easy
+tags: [array, binary-search]
+kind: function
+function:
+  name: nextGreatestLetter
+  params:
+    - {name: letters, type: "character[]"}
+    - {name: target, type: character}
+  returns: character
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/find-smallest-letter-greater-than-target/

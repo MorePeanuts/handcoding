@@ -1,0 +1,16 @@
+id: "23"
+slug: merge-k-sorted-lists
+title: Merge k Sorted Lists
+difficulty: hard
+tags: [linked-list, divide-and-conquer, heap-priority-queue, merge-sort]
+kind: function
+function:
+  name: mergeKLists
+  params:
+    - {name: lists, type: "ListNode[]"}
+  returns: ListNode
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/merge-k-sorted-lists/

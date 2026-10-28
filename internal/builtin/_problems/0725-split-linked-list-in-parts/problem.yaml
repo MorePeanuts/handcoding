@@ -1,0 +1,17 @@
+id: "725"
+slug: split-linked-list-in-parts
+title: Split Linked List in Parts
+difficulty: medium
+tags: [linked-list]
+kind: function
+function:
+  name: splitListToParts
+  params:
+    - {name: head, type: ListNode}
+    - {name: k, type: integer}
+  returns: "ListNode[]"
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/split-linked-list-in-parts/

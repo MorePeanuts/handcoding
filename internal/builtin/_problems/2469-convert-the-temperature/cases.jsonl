@@ -1,0 +1,20 @@
+{"input":{"celsius":36.50},"expected":[309.65,97.7],"example":true}
+{"input":{"celsius":122.11},"expected":[395.26,251.798],"example":true}
+{"input":{"celsius":0},"expected":[273.15,32.0],"note":"zero, written as an integer"}
+{"input":{"celsius":0.0},"expected":[273.15,32.0],"note":"zero"}
+{"input":{"celsius":0.01},"expected":[273.15999999999997,32.018],"note":"smallest positive value"}
+{"input":{"celsius":1000},"expected":[1273.15,1832.0],"note":"largest value"}
+{"input":{"celsius":999.99},"expected":[1273.1399999999999,1831.982],"note":"just below the largest value"}
+{"input":{"celsius":100},"expected":[373.15,212.0],"note":"boiling point of water"}
+{"input":{"celsius":37.0},"expected":[310.15,98.60000000000001],"note":"body temperature"}
+{"input":{"celsius":0.1},"expected":[273.25,32.18],"note":"a value with no exact binary form"}
+{"input":{"celsius":0.29},"expected":[273.44,32.522],"note":"another inexact value"}
+{"input":{"celsius":273.15},"expected":[546.3,523.67],"note":"kelvin offset as celsius"}
+{"input":{"celsius":255.67},"expected":[528.8199999999999,492.20599999999996],"note":"random value (1)"}
+{"input":{"celsius":76.26},"expected":[349.40999999999997,169.268],"note":"random value (2)"}
+{"input":{"celsius":590.41},"expected":[863.56,1094.738],"note":"random value (3)"}
+{"input":{"celsius":216.05},"expected":[489.2,420.89000000000004],"note":"random value (4)"}
+{"input":{"celsius":499.08},"expected":[772.23,930.3439999999999],"note":"random value (5)"}
+{"input":{"celsius":404.76},"expected":[677.91,760.568],"note":"random value (6)"}
+{"input":{"celsius":482.57},"expected":[755.72,900.626],"note":"random value (7)"}
+{"input":{"celsius":653.48},"expected":[926.63,1208.2640000000001],"note":"random value (8)"}

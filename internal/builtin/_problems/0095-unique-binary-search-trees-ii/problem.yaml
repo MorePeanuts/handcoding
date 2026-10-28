@@ -1,0 +1,16 @@
+id: "95"
+slug: unique-binary-search-trees-ii
+title: Unique Binary Search Trees II
+difficulty: medium
+tags: [dynamic-programming, backtracking, tree, binary-search-tree, binary-tree]
+kind: function
+function:
+  name: generateTrees
+  params:
+    - {name: "n", type: integer}
+  returns: "TreeNode[]"
+judge:
+  compare: unordered
+source:
+  site: builtin
+  url: https://leetcode.com/problems/unique-binary-search-trees-ii/

@@ -1,0 +1,14 @@
+slug: prefix-sums-3d
+title: 3D Prefix Sums
+difficulty: easy
+tags: [array, matrix, prefix-sum]
+kind: function
+function:
+  name: prefixSums
+  params:
+    - {name: grid, type: "integer[][][]"}
+  returns: "integer[][][]"
+judge:
+  compare: exact
+source:
+  site: builtin
