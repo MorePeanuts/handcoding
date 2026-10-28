@@ -602,7 +602,7 @@ func (p *Problem) Ready() bool { return p.Judge.Compare != "" }
 
 // NotReadyHint tells the user how to make an undecided problem judgeable.
 func (p *Problem) NotReadyHint() string {
-	return fmt.Sprintf("the judge rule of %s is not decided yet: run `hc gen %s`, or set judge.compare in problem.yaml", p.Slug, p.Ref())
+	return fmt.Sprintf("the judge rule of %s is not decided yet: run `hc gen %s`, or set judge.compare in problem.yaml", p.Slug, p.Slug)
 }
 
 // EntryName is the name of the function or class the user implements.
