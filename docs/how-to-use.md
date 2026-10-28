@@ -66,7 +66,7 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 
 ```
 Practice       list  start  edit  show  test  submit  debug  reset  discard  history
-Problem bank   init  fetch  new  import  cases  validate
+Problem bank   init  fetch  new  import  cases  validate  docs
 Coding agent   gen  fix  skill
 ```
 
@@ -122,6 +122,16 @@ hc import ./my-problems/            # import problem directories shared by other
 ```
 
 The [problem protocol](protocol.md#writing-a-problem-by-hand) walks through a complete function problem and a design problem, and shows how to write the reference solution. `hc import` copies only the files the protocol defines, and refuses problems whose slug or ID is already in the bank (`--force` replaces a problem with the same slug).
+
+hc carries the protocol (in English) for its own version, so it is at hand offline:
+
+```sh
+hc docs protocol                    # the whole protocol
+hc docs protocol --list             # its sections
+hc docs protocol structure-inputs   # one section, with its subsections
+```
+
+A section is named by its heading's anchor on GitHub, as in `protocol.md#structure-inputs`. On a terminal the output is rendered like a statement; piped, or with `--raw`, it is Markdown.
 
 ### Test cases
 
