@@ -1,0 +1,16 @@
+id: "1932"
+slug: merge-bsts-to-create-single-bst
+title: Merge BSTs to Create Single BST
+difficulty: hard
+tags: [hash-table, binary-search, tree, depth-first-search, binary-tree]
+kind: function
+function:
+  name: canMerge
+  params:
+    - {name: trees, type: "TreeNode[]"}
+  returns: TreeNode
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/merge-bsts-to-create-single-bst/

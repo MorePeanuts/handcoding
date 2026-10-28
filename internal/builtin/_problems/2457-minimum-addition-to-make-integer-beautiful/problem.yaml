@@ -1,0 +1,17 @@
+id: "2457"
+slug: minimum-addition-to-make-integer-beautiful
+title: Minimum Addition to Make Integer Beautiful
+difficulty: medium
+tags: [math, greedy]
+kind: function
+function:
+  name: makeIntegerBeautiful
+  params:
+    - {name: "n", type: long}
+    - {name: target, type: integer}
+  returns: long
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/minimum-addition-to-make-integer-beautiful/

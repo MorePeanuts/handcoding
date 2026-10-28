@@ -1,0 +1,17 @@
+id: "2469"
+slug: convert-the-temperature
+title: Convert the Temperature
+difficulty: easy
+tags: [math]
+kind: function
+function:
+  name: convertTemperature
+  params:
+    - {name: celsius, type: double}
+  returns: "double[]"
+judge:
+  compare: exact
+  tolerance: 1e-5
+source:
+  site: builtin
+  url: https://leetcode.com/problems/convert-the-temperature/

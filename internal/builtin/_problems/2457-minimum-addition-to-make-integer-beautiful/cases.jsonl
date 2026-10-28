@@ -1,0 +1,26 @@
+{"input":{"n":16,"target":6},"expected":4,"example":true}
+{"input":{"n":467,"target":6},"expected":33,"example":true}
+{"input":{"n":1,"target":1},"expected":0,"example":true}
+{"input":{"n":9,"target":9},"expected":0,"note":"one digit, already beautiful"}
+{"input":{"n":9,"target":1},"expected":1,"note":"one digit, carry to 10"}
+{"input":{"n":10,"target":1},"expected":0,"note":"a power of ten is beautiful with target 1"}
+{"input":{"n":19,"target":1},"expected":81,"note":"two digits, carry to 20 is not enough"}
+{"input":{"n":99,"target":1},"expected":1,"note":"carry through every digit"}
+{"input":{"n":1000000000000,"target":1},"expected":0,"note":"n = 10^12, already beautiful"}
+{"input":{"n":999999999999,"target":1},"expected":1,"note":"12 nines: carry to 10^12"}
+{"input":{"n":899999999999,"target":1},"expected":100000000001,"note":"answer above 32 bits"}
+{"input":{"n":123456789012,"target":1},"expected":876543210988,"note":"12 digits, target 1"}
+{"input":{"n":123456789012,"target":150},"expected":0,"note":"target 150 is always enough"}
+{"input":{"n":123456789012,"target":48},"expected":0,"note":"digit sum exactly target"}
+{"input":{"n":123456789012,"target":47},"expected":8,"note":"digit sum just above target"}
+{"input":{"n":555555555555,"target":30},"expected":4444445,"note":"repeated digits"}
+{"input":{"n":4294967296,"target":10},"expected":5032704,"note":"n = 2^32"}
+{"input":{"n":2147483647,"target":5},"expected":52516353,"note":"n = 2^31 - 1"}
+{"input":{"n":961797726289,"target":2},"expected":38202273711,"note":"random 12-digit n (1)"}
+{"input":{"n":664385420037,"target":9},"expected":35614579963,"note":"random 12-digit n (2)"}
+{"input":{"n":18555974793,"target":16},"expected":44025207,"note":"random 12-digit n (3)"}
+{"input":{"n":511887809264,"target":8},"expected":112190736,"note":"random 12-digit n (4)"}
+{"input":{"n":701263351661,"target":19},"expected":6648339,"note":"random 12-digit n (5)"}
+{"input":{"n":831478275946,"target":4},"expected":168521724054,"note":"random 12-digit n (6)"}
+{"input":{"n":58454105810,"target":17},"expected":545894190,"note":"random 12-digit n (7)"}
+{"input":{"n":62179026833,"target":18},"expected":973167,"note":"random 12-digit n (8)"}

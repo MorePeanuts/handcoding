@@ -1,0 +1,17 @@
+id: "2313"
+slug: minimum-flips-in-binary-tree-to-get-result
+title: Minimum Flips in Binary Tree to Get Result
+difficulty: hard
+tags: [dynamic-programming, tree, depth-first-search, binary-tree]
+kind: function
+function:
+  name: minimumFlips
+  params:
+    - {name: root, type: TreeNode}
+    - {name: result, type: boolean}
+  returns: integer
+judge:
+  compare: exact
+source:
+  site: builtin
+  url: https://leetcode.com/problems/minimum-flips-in-binary-tree-to-get-result/

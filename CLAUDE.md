@@ -52,7 +52,7 @@ Request flow: `internal/cli` (cobra) or `internal/tui` (bubbletea) → `internal
 
 ## Built-in sample problems
 
-`internal/builtin/_problems/` is embedded into the binary. The leading underscore keeps the Go tool from compiling the `reference/*.go` files inside it. `TestBuiltinReferences` requires every case to have an expected output, and requires both the Python and the Go reference to pass. After changing those cases, regenerate expected outputs through a scratch workspace that symlinks the directory:
+`internal/builtin/_problems/` is embedded into the binary. The leading underscore keeps the Go tool from compiling the `reference/*.go` files inside it. `TestBuiltinReferences` requires every case to have an expected output, and requires both the Python and the Go reference to pass. The set is hc's regression set: `TestProtocolCoverage` (`internal/builtin`) fails, naming the feature, unless some problem uses every type and array of node types (as input and output), kind, compare mode, round-trip `instances`, problem.yaml field and structure input, with the lists derived from `internal/problem`, so a new protocol feature needs a built-in problem that uses it. After changing those cases, regenerate expected outputs through a scratch workspace that symlinks the directory:
 
 ```sh
 hc init /tmp/hc-bi --no-samples && rmdir /tmp/hc-bi/problems
