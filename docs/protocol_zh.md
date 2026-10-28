@@ -126,18 +126,18 @@ problems/0001-two-sum/          目录名：id 是数字时为 <4 位编号>-<sl
   checker.py                    判题程序，配合 judge.compare: checker 使用（见[判题程序](#判题程序)）
 ```
 
-`hc import` 只复制以上这些文件和目录，其余内容（编辑器文件、`solutions/` 目录等）不会被导入。
+目录名必须正是这个规范名称，因为你的题解（`solutions/<lang>/<dir>/`）和提交历史都以它为键；`hc validate` 会把其他名称报为错误。`hc new`、`hc fetch` 和 `hc import` 总是使用规范名称。`hc import` 只复制以上这些文件和目录，其余内容（编辑器文件、`solutions/` 目录等）不会被导入。
 
 ### problem.yaml
 
 | 字段 | 含义 |
 |---|---|
 | `id` | 题目编号（字符串，可选），用于排序和查找（`hc test 9001`）。在题库中必须唯一。是数字时也会作为目录名前缀 |
-| `slug` | 唯一标识，短横线格式：字母、数字和单个短横线，建议全部小写（必需） |
+| `slug` | 题目的标识，短横线格式：字母、数字和单个短横线，建议全部小写（必需）。在题库中必须唯一 |
 | `title` | 标题（必需） |
 | `difficulty` | `easy`、`medium` 或 `hard` |
 | `tags` | 标签列表 |
-| `kind` | `function`（单个函数）或 `class`（设计题）。缺省时，有 `class` 段则为 `class`，否则为 `function` |
+| `kind` | `function`（单个函数）或 `class`（设计题）（必需；不会根据出现了哪些段来推断） |
 | `function` | 函数题的签名：`name`、`params`（`{name, type}` 列表，每项最多带 `cycle`、`join`、`ref`、`copy` 之一）、`hidden`（不传给解答的输入）、`returns`（缺省为 `void`）、`returns_ref`、`returns_copy`。见[结构输入](#结构输入)和 [`returns_copy`](#returns_copy) |
 | `class` | 设计题的签名：`name`、`constructor`（`{name, type}` 列表）、`methods`（`{name, params, returns}` 列表） |
 | `judge.compare` | 输出的比较方式（见下文）。没有默认值：不写就表示题目*未就绪*（见下文） |
@@ -145,7 +145,7 @@ problems/0001-two-sum/          目录名：id 是数字时为 <4 位编号>-<sl
 | `judge.output` | 原地修改类题目：调用结束后比较这个参数（或隐藏输入）的值，而不是返回值 |
 | `judge.output_length` | `return`：只判 `judge.output` 的前 k 个元素，k 是函数返回的整数。用于 LeetCode 的"删除重复项"这类题 |
 | `judge.round_trip` | 用于把一个值编码再解码回来的设计题：`encode`、`decode`（方法名）和 `instances`（`separate` 或 `same`）。见[编解码往返题](#编解码往返题) |
-| `judge.time_limit` | 整次运行的时限，写成 `5s`、`500ms` 这样的时长。默认取 hc.yaml 中的 `timeout` |
+| `judge.timeout` | 整次运行的墙钟时限，写成 `5s`、`500ms` 这样的时长。到时后运行被终止，没有结果的用例判为超时（Time Limit Exceeded）。它用来防止卡死和死循环，不评判复杂度。默认取 hc.yaml 中的 `timeout` |
 | `source` | 题目来源：`site`、`url` |
 
 不认识的字段会报错，所以 `judgee:`、`parms:` 这类拼写错误会被指出来，而不是悄悄退回默认值。
@@ -252,7 +252,7 @@ def check(input, output, expected):
 - `input` 是解码后的用例输入：函数题是参数（及隐藏输入）组成的对象，设计题是 `{"ops": [...], "args": [...]}`，[编解码往返题](#编解码往返题)是编码器的参数。
 - `output` 是解码后的题解输出，形式与 `expected` 相同（原地修改的题目是 `judge.output` 的值，设计题是每个操作的结果，编解码往返题是解码器的结果）。
 - `expected` 是用例的期望输出，和其他题目一样由参考解通过 `hc cases build` 计算。它是一个合法答案，所以判题程序可以比较一个派生值，而不必重新求解：最长回文的长度、子集的大小。没有 `expected` 的用例不评判（"No Expected Output"）。
-- 需要重建结构时，导入题解使用的编解码函数和类型：`from hc_runtime import decode, TreeNode`，再 `decode("TreeNode", output)`。
+- 需要重建结构时，导入题解使用的编解码函数和类型：`from hc_runtime import decode, TreeNode`，再 `decode("TreeNode", output)`。判题程序只能从 `hc_runtime` 导入它的公开名称（见[参考解和初始代码](#参考解和初始代码)），除此之外只能用标准库。
 - 被拒绝的用例判为 Wrong Answer，判题程序给出的信息会和它一起显示在 `hc test`、`hc submit`、TUI 和提交历史中。信息要说清哪里错了：`"[1,2] is not a permutation of nums"`、`"length 2, but the longest palindrome has length 3"`。
 
 最长回文子串（5），`"bab"` 和 `"aba"` 都正确：
@@ -268,7 +268,7 @@ def check(input, output, expected):
         return "%r has length %d, but the longest palindrome has length %d" % (output, len(output), len(expected))
 ```
 
-每次运行时，hc 在题解运行完后启动一次判题程序：一个辅助脚本对每个产生了输出的用例调用 `check`（已经判为运行错误或超时的用例不会送去）。判题程序的时间限制与题解相同（`judge.time_limit`）。判题程序无法加载、抛出异常、返回 `None`、布尔值和字符串以外的值，或者超时，都说明题目本身有问题，而不是答案错误：这次运行以错误结束，错误中注明 `checker.py`、用例和调用栈，`hc submit` 也不会记录提交。判题程序打印的内容只在这时显示。
+每次运行时，hc 在题解运行完后启动一次判题程序：一个辅助脚本对每个产生了输出的用例调用 `check`（已经判为运行错误或超时的用例不会送去）。判题程序的时间限制与题解相同（`judge.timeout`）。判题程序无法加载、抛出异常、返回 `None`、布尔值和字符串以外的值，或者超时，都说明题目本身有问题，而不是答案错误：这次运行以错误结束，错误中注明 `checker.py`、用例和调用栈，`hc submit` 也不会记录提交。判题程序打印的内容只在这时显示。
 
 **随机题**（打乱数组、按权重随机选择）是设计题，每个用例包含大量调用，从几百到几千次。判题程序既检查每个输出是否合法，也检查它们的分布是否合理：把观察到的频率和期望频率比较，界限要足够宽松，让正确的题解几乎不可能失败（在判题程序中写明误判概率，例如每个用例低于 1e-6），同时明显不随机的题解（总是选同一个、原样返回数组）会失败。
 
@@ -476,6 +476,7 @@ function:
 | Go | `package main`；`func <function.name>(...)`，参数类型见上面的类型表 | `type <Name> struct`、`func Constructor(...) <Name>`，以及指针接收者的方法，方法名首字母大写（`getMin` → `GetMin`）；编解码往返题的编码器和解码器例外，和 LeetCode 的初始代码一样保留原名（`serialize`） |
 
 - `ListNode` 和 `TreeNode` 已经提供：Python 中用 `from hc_runtime import ListNode, TreeNode` 导入；Go 中已预先定义（字段为 `Val`、`Next`、`Left`、`Right`），不要自己再声明。题目用到的 [`Node`](#leetcode-的-node-类型)、`NestedInteger` 和 `Employee` 也一样：Python 中写 `from hc_runtime import GraphNode as Node` 或 `from hc_runtime import NestedInteger`，Go 中已预先定义。
+- `hc_runtime` 的公开 API 正是它 `__all__` 中的名称：`ListNode`、`TreeNode`、`GraphNode`、`NaryNode`、`RandomListNode`、`NextTreeNode`、`QuadNode`、`MultilevelNode`、`NestedInteger`、`Employee`、`decode` 和 `encode`。参考解、初始代码和判题程序只能从中导入这些名称；其余部分属于 hc 内部，任何版本都可能改变。
 - 两份参考解都存在时，`hc cases build` 先用 Go，再用 Python；可以用 `-l python` 指定。`hc validate --run` 会运行每一份参考解。
 - `templates/solution.go` 和 `templates/solution.py` 会替换自动生成的初始代码。它们必须保持签名不变，因为驱动要按签名调用。
 
@@ -503,11 +504,12 @@ hc validate <slug> --run    # 同时在每个用例上运行每一份参考解�
 
 `hc validate` 会报告以下错误，并指出用例编号和字段：
 
-- `problem.yaml`：语法错误（带行号和列号）、不认识的字段、不合法的 slug、缺少标题、不支持的类型、`judge.output` 不是参数或隐藏输入、`void` 函数没写 `judge.output`、结构输入用法不对（`hidden`、`cycle`、`join`、`ref`、`copy`、`returns_ref`）、`returns_copy` 用法不对、用了多种 `Node` 类型、`judge.output_length` 用法不对、`judge.round_trip` 用法不对、不认识的 `judge.compare`、`judge.compare: checker` 却没有 `checker.py` 以及有 `checker.py` 却用了其他模式、不合法的 `judge.time_limit`；
+- `problem.yaml`：语法错误（带行号和列号）、不认识的字段、不合法的 slug、缺少标题、不支持的类型、`judge.output` 不是参数或隐藏输入、`void` 函数没写 `judge.output`、结构输入用法不对（`hidden`、`cycle`、`join`、`ref`、`copy`、`returns_ref`）、`returns_copy` 用法不对、用了多种 `Node` 类型、`judge.output_length` 用法不对、`judge.round_trip` 用法不对、不认识的 `judge.compare`、`judge.compare: checker` 却没有 `checker.py` 以及有 `checker.py` 却用了其他模式、不合法的 `judge.timeout`、缺少 `kind`；
 - `cases.jsonl`：JSON 不合法、不认识的字段、缺少或多出的输入、值与声明的类型或评测系统定义的类型的形式不符（`input "nums": [1]: must be integer, got string "x"`；邻居不是图中的节点、随机下标超出链表、`null` 的位置不对、下属不存在）、结构输入对不上（环的位置超出链表、相交链表的尾部不同、被引用的值不存在或重复）、设计题中参数个数不对或方法不存在、编解码往返题写了 `ops` 和 `args`、`expected` 的形状不对；
+- 题库：目录名不是 `<4 位编号>-<slug>`（没有数字编号时为 `<slug>`），以及 `id` 或 `slug` 与其他题目重复；
 - 加上 `--run` 时：参考解无法编译、运行出错，或与 `expected` 不一致（会同时显示两个值，以及判题程序的信息）；`checker` 模式下每个参考解输出都经过判题程序，判题程序出错也算错误。
 
-以下情况会给出警告：判题规则未确定（没有 `judge.compare`）、有用例缺少 `expected`、没有标记示例用例、没有参考解、题面引用的图片不存在、编号与其他题目重复。
+以下情况会给出警告：判题规则未确定（没有 `judge.compare`）、有用例缺少 `expected`、没有标记示例用例、没有参考解、题面引用的图片不存在。
 
 ---
 

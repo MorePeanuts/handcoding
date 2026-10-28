@@ -198,7 +198,7 @@ language: go          # default solution language: go | python
 editor: nvim          # falls back to $VISUAL, $EDITOR, then vi
 theme: auto           # statement colors: auto | dark | light
 images: auto          # statement images: auto | kitty | blocks | none
-timeout: 10s          # wall-clock limit per run
+timeout: 10s          # wall-clock limit per run; a problem's judge.timeout overrides it
 python:
   interpreter: python3.12  # Python 3.10+ to use instead of .hc/venv; e.g. a full path. Unset by default
 agent:
