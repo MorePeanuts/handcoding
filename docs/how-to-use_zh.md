@@ -150,7 +150,7 @@ hc gen 3 --agent codex -n 40 -m "more strings of one repeated character"
 hc fix two-sum -c 5 -m "answers in a different order should pass"
 ```
 
-`hc` 在工作区中以无头模式运行智能体（`claude -p` 或 `codex exec`）。启动前，它会安装或更新智能体要遵循的 skill **`hc-cases`**（见[智能体 skill](#智能体-skill)）。智能体按照 skill：
+`hc` 在工作区中以无头模式运行智能体（`claude -p` 或 `codex exec`）。启动前，它会安装或更新智能体要遵循的 skill：**`hc-cases`**，以及在题目定义本身有误时使用的 **`hc-problem`**（见[智能体 skill](#智能体-skill)）。智能体按照 skill：
 
 1. 编写参考解 `reference/solution.py`，必要时再写一个暴力解用来交叉验证；
 2. 把测试**输入**写入 `cases.jsonl`，覆盖边界情况、特殊结构和大规模输入；
@@ -166,7 +166,7 @@ agent:
 
 ### 智能体 skill
 
-hc 自带若干 skill，向编码智能体讲解它的题目协议和工作流程。`hc init` 会把工作区该有的 skill（目前是 `hc-cases`：评判规则、参考解、checker 和测试用例）安装到 `.claude/skills/`（供 Claude Code）和 `.agents/skills/`（供 Codex），并在 `AGENTS.md` 的一个区块中列出它们。由于它们就在工作区里，在工作区中启动的任何 Claude Code 或 Codex 会话都能使用：让它"为这道 hc 题生成用例"即可。
+hc 自带若干 skill，向编码智能体讲解它的题目协议和工作流程。`hc init` 会把工作区该有的 skill（目前有两个：`hc-problem`，题目是什么：签名、题面、模板，以及 `hc fetch` 之后要检查什么；`hc-cases`，题目怎么评判：评判规则、参考解、checker 和测试用例）安装到 `.claude/skills/`（供 Claude Code）和 `.agents/skills/`（供 Codex），并在 `AGENTS.md` 的一个区块中列出它们。由于它们就在工作区里，在工作区中启动的任何 Claude Code 或 Codex 会话都能使用：让它"写一道 hc 题……"或"为这道 hc 题生成用例"即可。skill 引用协议的章节（`hc docs protocol <section>`），而不是重复其内容。
 
 ```sh
 hc skill list               # 每个 skill：是否安装、是否最新、是否过期或被修改，以及由哪个 hc 版本安装

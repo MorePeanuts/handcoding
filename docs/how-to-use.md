@@ -150,7 +150,7 @@ hc gen 3 --agent codex -n 40 -m "more strings of one repeated character"
 hc fix two-sum -c 5 -m "answers in a different order should pass"
 ```
 
-`hc` runs the agent headless in the workspace (`claude -p` or `codex exec`). Before it starts, it installs or updates the skill the agent follows, **`hc-cases`** (see [Agent skills](#agent-skills)). Following the skill, the agent:
+`hc` runs the agent headless in the workspace (`claude -p` or `codex exec`). Before it starts, it installs or updates the skills the agent follows: **`hc-cases`**, and **`hc-problem`** for when the problem's definition itself is wrong (see [Agent skills](#agent-skills)). Following the skill, the agent:
 
 1. writes a reference solution, `reference/solution.py`, and a brute-force one to cross-check when that helps;
 2. writes test **inputs** to `cases.jsonl`, covering edge cases, special structures and large inputs;
@@ -166,7 +166,7 @@ agent:
 
 ### Agent skills
 
-hc ships skills that teach coding agents its problem protocol and workflows. `hc init` installs the ones a workspace gets (today `hc-cases`: judge rules, reference solutions, checkers and test cases) into `.claude/skills/` for Claude Code and `.agents/skills/` for Codex, and lists them in a block of `AGENTS.md`. Because they live in the workspace, any Claude Code or Codex session started there can use them: ask it to "generate cases for this hc problem".
+hc ships skills that teach coding agents its problem protocol and workflows. `hc init` installs the ones a workspace gets (today `hc-problem`, what a problem is: its signature, statement and templates, and what to check after `hc fetch`; and `hc-cases`, how it is judged: judge rules, reference solutions, checkers and test cases) into `.claude/skills/` for Claude Code and `.agents/skills/` for Codex, and lists them in a block of `AGENTS.md`. Because they live in the workspace, any Claude Code or Codex session started there can use them: ask it to "write an hc problem for ..." or "generate cases for this hc problem". The skills cite the sections of the protocol (`hc docs protocol <section>`) rather than repeating it.
 
 ```sh
 hc skill list               # each skill: installed, up to date, outdated or modified, and by which hc version

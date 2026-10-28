@@ -20,7 +20,7 @@ import (
 
 // Skills lists the skills the prompts rely on; hc installs them before it
 // starts an agent.
-var Skills = []string{skill.Cases}
+var Skills = []string{skill.Problem, skill.Cases}
 
 // Agent is a configured agent command.
 type Agent struct {
@@ -93,14 +93,19 @@ func useSkill(name, task string) string {
 	return fmt.Sprintf("Use the %s skill (read %s) to %s.\n\n", name, skill.Path(name), task)
 }
 
+// definitionSkill is the sentence that sends the agent to the hc-problem
+// skill when the problem itself, not its cases, is wrong.
+var definitionSkill = fmt.Sprintf("If the problem's definition itself is wrong (its signature, structure inputs, statement or templates), fix it with the %s skill (read %s) first.\n", skill.Problem, skill.Path(skill.Problem))
+
 // GeneratePrompt asks the agent to write a reference solution and cases.
 func GeneratePrompt(slug, problemDir string, count int, extra string) string {
 	var b strings.Builder
 	b.WriteString(useSkill(skill.Cases, fmt.Sprintf("generate test cases for the hc problem %q in %s", slug, problemDir)))
-	fmt.Fprintf(&b, "Follow the \"generate test cases\" workflow: decide the judge rule (judge.compare, with checker.py when no built-in mode fits) from the statement, write or check reference/solution.py (plus a second reference if several outputs are acceptable), add inputs to cases.jsonl without expected outputs, run `hc cases build %s --lang python`, then `hc validate %s --run` until it passes.\n", slug, slug)
+	fmt.Fprintf(&b, "Follow its \"generate test cases\" workflow: decide the judge rule from the statement, write the reference solutions, add the cases, and finish when `hc validate %s --run` passes.\n", slug)
 	if count > 0 {
 		fmt.Fprintf(&b, "Target about %d cases in total.\n", count)
 	}
+	b.WriteString(definitionSkill)
 	b.WriteString("Do not touch the solutions/ directory.\n")
 	if extra != "" {
 		fmt.Fprintf(&b, "\nAdditional instructions from the user: %s\n", extra)
@@ -121,6 +126,7 @@ func FixPrompt(slug, problemDir string, cases []int, complaint, solutionPath str
 	if solutionPath != "" {
 		fmt.Fprintf(&b, "The user's solution is %s — read it only to understand the dispute, never modify it.\n", solutionPath)
 	}
-	b.WriteString("Follow the \"fix a test case\" workflow. If the test case is correct and the user's solution is wrong, explain why instead of changing anything.\n")
+	b.WriteString("Follow its \"fix a test case\" workflow. If the test case is correct and the user's solution is wrong, explain why instead of changing anything.\n")
+	b.WriteString(definitionSkill)
 	return b.String()
 }
