@@ -76,7 +76,9 @@ func runList(cmd *cobra.Command, root *rootOptions, o listOptions) error {
 		fmt.Fprintln(os.Stderr, ui.Red.Render(loadErr.Error()))
 	}
 	if len(all) == 0 {
-		fmt.Fprintln(os.Stderr, "No problems yet: add some with `hc fetch <slug>` or `hc new <slug>`.")
+		if loadErr == nil {
+			fmt.Fprintln(os.Stderr, "No problems yet: add some with `hc fetch <slug>` or `hc new <slug>`.")
+		}
 		return nil
 	}
 	statuses, err := a.Statuses(cmd.Context(), probs)

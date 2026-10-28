@@ -29,7 +29,7 @@
 
 `hc init --lang python` 把默认解题语言设为 Python（即 `hc.yaml` 中的 `language`，默认为 `go`），并立即创建下文介绍的 Python 环境。如果创建失败，例如既没有 uv 也没有 Python 3.10+，`hc init` 会给出警告，但仍然创建工作区。
 
-`hc` 按以下顺序查找工作区：`-w <dir>`、`$HC_WORKSPACE`、包含 `hc.yaml` 的最近一级父目录、`~/handcoding`。所以在任何目录下都可以运行它。
+`hc` 按以下顺序查找工作区：`-w <dir>`、`$HC_WORKSPACE`、包含 `hc.yaml` 或 `pack.yaml`（题目包的检出目录，见[编写题目包](#编写题目包)）的最近一级父目录、`~/handcoding`。所以在任何目录下都可以运行它。
 
 ### 题目包
 
@@ -56,6 +56,33 @@ Python 解答在 hc 管理的虚拟环境 `.hc/venv` 中运行。第一次有命
 支持的最低版本是 Python 3.10 和 Go 1.22（见协议的[语言版本](protocol_zh.md#语言版本)）。你自己的解答可以使用工具链支持的任何特性：`hc test`、`hc submit` 和 `hc debug` 会注明所用的工具链（`[Python 3.12.9]`），版本过旧时只给出警告。题目附带的代码必须能在最低版本上运行，所以 `hc cases build` 和 `hc validate --run` 拒绝在过旧的工具链上运行参考解。
 
 建议在工作区里执行 `git init`，记录下自己的练习过程。
+
+### 编写题目包
+
+题目包的检出目录，即包含 `pack.yaml` 的目录（例如克隆下来的题目包仓库），本身就是一个工作区：在它或它下面的任意目录中运行 hc，或者用 `-w` 指向它即可。它不需要 `hc init`，`hc init` 也会拒绝在题目包内的目录中创建工作区。在这种编写用的工作区里，这个题目包是唯一的题目包，并且可写：`hc fetch`、`hc new` 和 `hc import` 把题目加到它的 `problems/` 下，`hc gen`、`hc fix` 和 `hc cases` 修改这些题目。所以编写流程不需要任何参数：`hc fetch two-sum`、`hc gen two-sum`、`hc validate --run`。这里没有 `local` 题目包，检出目录中的 `packs/` 目录会被忽略，题目只用 slug 来指代。
+
+```
+my-pack/
+  pack.yaml  problems/                     题目包本身（见题目协议）
+  hc.yaml                                  可选：你的个人设置（language、editor、agent、timeout、python）
+  solutions/<pack>/<lang>/<dir>/           你的解答，与练习工作区相同
+  .hc/  pyrightconfig.json                 hc 的状态，与练习工作区相同
+  .claude/  .agents/  AGENTS.md            智能体技能，在某个命令安装之后出现
+```
+
+没有 `hc.yaml` 时 hc 使用默认设置，并且从不在检出目录中创建它。hc 无法读取的 `pack.yaml`（例如为更新的协议编写）不会妨碍工作区打开：`hc validate` 会指出问题所在。hc 添加的这些内容属于你而不属于题目包，所以不要把它们提交到仓库：
+
+```
+# .gitignore
+.hc/
+solutions/
+hc.yaml
+pyrightconfig.json
+```
+
+除非仓库自己有智能体文件，否则把 `.claude/`、`.agents/` 和 `AGENTS.md` 也加进去（hc 只修改它自己安装的技能和 `AGENTS.md` 中它自己的那一段）。
+
+安装在练习工作区中的题目包（与 `hc.yaml` 同级的 `packs/<name>/`）不是检出目录：在其中运行 hc 时，使用的是外层的工作区，题目包在那里仍然只读。
 
 ## 交互式题目列表
 

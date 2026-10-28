@@ -25,6 +25,8 @@ cp -R testdata/regression /tmp/hc-dev/packs/    # the regression set, as an inst
 go run ./cmd/hc -w /tmp/hc-dev test two-sum
 ```
 
+The regression set is a pack, so it is also a workspace of its own (a pack checkout, see [working on a pack](docs/how-to-use.md#working-on-a-pack)): after changing its cases, `go run ./cmd/hc -w testdata/regression cases build <slug> --force -l python` regenerates their expected outputs in place. Its `.gitignore` keeps hc's state and your solutions out of git.
+
 ## Code layout
 
 ```
@@ -34,7 +36,7 @@ internal/tui        bubbletea interface
 internal/app        use cases shared by the CLI and the TUI
 internal/problem    problem protocol: problem.yaml, cases.jsonl, types
 internal/pack       packs: pack.yaml, a pack's problems and their identity
-internal/workspace  the workspace: hc.yaml, its packs, solutions, pack/slug lookup
+internal/workspace  the workspace (practice, or a pack checkout): its packs, solutions, pack/slug lookup
 internal/lang       language interface; golang/ and python/ drivers
 internal/runner     build, run the driver, collect results
 internal/judge      output comparison

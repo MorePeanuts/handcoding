@@ -34,6 +34,9 @@ them with ` + "`hc fetch`" + ` (from LeetCode), ` + "`hc new`" + ` or ` + "`hc i
 hc finds the workspace from $HC_WORKSPACE, the nearest parent directory with
 hc.yaml, or ~/handcoding — so using the default lets you run hc anywhere.
 
+A pack checkout (a directory with pack.yaml) needs no init: hc opens it as a
+workspace as it is, so init refuses a directory in one.
+
 --lang sets the default solution language (language in hc.yaml). With
 python, hc also creates the workspace's Python virtual environment now.`,
 		Args: cobra.MaximumNArgs(1),
@@ -88,8 +91,9 @@ func newNewCmd(root *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "new <slug>",
 		Short: "Scaffold a problem of your own",
-		Long: `Create packs/local/problems/<slug>/ with a problem.yaml skeleton,
-description.md and an empty cases.jsonl. Edit them, then run
+		Long: `Create packs/local/problems/<slug>/ (problems/<slug>/ in a pack checkout)
+with a problem.yaml skeleton, description.md and an empty cases.jsonl. Edit
+them, then run
 ` + "`hc validate <slug>`" + ` and ` + "`hc gen <slug>`" + ` to have an agent write test cases.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -164,8 +168,8 @@ func newImportCmd(root *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "import <dir>...",
 		Short: "Import custom problems (directories in the hc problem format)",
-		Long: `Copy problems into the workspace's own problems, packs/local/problems/.
-Each argument is a problem directory containing problem.yaml, a directory
+		Long: `Copy problems into the workspace's own problems, packs/local/problems/
+(problems/ in a pack checkout). Each argument is a problem directory containing problem.yaml, a directory
 whose subdirectories are problems, or a pack (a directory with pack.yaml),
 whose problems are copied. See ` + "`hc docs protocol`" + ` for the format.`,
 		Args: cobra.MinimumNArgs(1),
@@ -253,6 +257,9 @@ func importProblem(a *app.App, dir string, force bool) error {
 		return err
 	}
 	if existing != nil {
+		if sameDir(existing.Dir, dir) {
+			return fmt.Errorf("%s is already the problem %s of this workspace", dir, a.WS.Ref(existing))
+		}
 		if !force {
 			return fmt.Errorf("%s already exists (use --force to overwrite)", existing.Ref())
 		}
@@ -290,6 +297,17 @@ func importProblem(a *app.App, dir string, force bool) error {
 		fmt.Printf("     %d case(s) without expected output; run `hc cases build %s`\n", missing, a.WS.Ref(p))
 	}
 	return nil
+}
+
+// sameDir reports whether a and b are the same directory, which importing
+// onto itself with --force would delete.
+func sameDir(a, b string) bool {
+	fa, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	fb, err := os.Stat(b)
+	return err == nil && os.SameFile(fa, fb)
 }
 
 func copyFile(src, dst string) error {

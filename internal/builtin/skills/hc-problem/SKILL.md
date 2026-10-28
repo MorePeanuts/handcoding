@@ -8,7 +8,9 @@ description: Write or fix the definition of an hc (handcoding) problem, what it 
 `hc` is a local judge for LeetCode-style problems. A workspace contains
 `hc.yaml`; its own problems live in `packs/local/problems/<dir>/`, and
 `hc new` and `hc fetch` put new ones there. Other directories of `packs/`
-are installed packs: read-only, so never edit them (hc refuses to). The
+are installed packs: read-only, so never edit them (hc refuses to). A pack
+checkout (a directory with `pack.yaml`) is a workspace too: the pack is its
+only pack, and its problems in `problems/<dir>/` are yours to edit. The
 user's own code is in `solutions/<pack>/<lang>/<dir>/`. **Never read or
 modify the user's solutions unless asked to diagnose a reported failure,
 and never change them.**

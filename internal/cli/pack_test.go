@@ -127,3 +127,55 @@ func TestPackLanguages(t *testing.T) {
 		t.Errorf("start printed %q, want a path ending in %s", out, want)
 	}
 }
+
+// A copy of the regression set is a pack checkout: hc opens it as a
+// workspace whose only pack, the set, is writable.
+func TestPackCheckout(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	dir := filepath.Join(t.TempDir(), "checkout")
+	if err := regression.Copy(dir); err != nil {
+		t.Fatal(err)
+	}
+	err := runHC(t, "init", filepath.Join(dir, "problems"))
+	if err == nil || !strings.Contains(err.Error(), "is in the pack checkout "+dir) {
+		t.Errorf("init in the checkout: %v", err)
+	}
+
+	out, err := capture(t, "-w", dir, "list", "--plain")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "two-sum") || strings.Contains(out, "regression/") {
+		t.Errorf("list shows pack names:\n%s", out)
+	}
+	if _, err := capture(t, "-w", dir, "new", "my-thing"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "problems", "my-thing", "problem.yaml")); err != nil {
+		t.Errorf("new: %v", err)
+	}
+	if _, err := capture(t, "-w", dir, "cases", "add", "my-thing", "--input", `{"nums":[1,2]}`); err != nil {
+		t.Errorf("cases add: %v", err)
+	}
+	if _, err := capture(t, "-w", dir, "gen", "two-sum", "--dry-run"); err != nil {
+		t.Errorf("gen: %v", err)
+	}
+	if _, err := capture(t, "-w", dir, "import", filepath.Join(dir, "problems", "0001-two-sum"), "--force"); err == nil {
+		t.Error("import onto itself succeeded")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "problems", "0001-two-sum", "problem.yaml")); err != nil {
+		t.Errorf("import onto itself deleted the problem: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "hc.yaml")); err == nil {
+		t.Error("hc wrote hc.yaml into the checkout")
+	}
+
+	// A pack.yaml of a newer protocol is reported by validate.
+	if err := os.WriteFile(filepath.Join(dir, "pack.yaml"), []byte("protocol: 2\nname: regression\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err = capture(t, "-w", dir, "validate")
+	if err == nil || !strings.Contains(out, "FAIL pack checkout") || !strings.Contains(out, "pack.yaml: this pack needs protocol 2") {
+		t.Errorf("validate: %v\n%s", err, out)
+	}
+}

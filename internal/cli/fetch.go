@@ -22,9 +22,10 @@ func newFetchCmd(root *rootOptions) *cobra.Command {
 		Aliases: []string{"pull"},
 		Short:   "Import problems from LeetCode",
 		Long: `Download problems from LeetCode's public API into the workspace's own
-problems, packs/local/problems/: statement (with its images, for offline use),
-signature, Go/Python templates and the examples (with expected outputs when
-they can be parsed from the statement). Premium problems are not available.
+problems (packs/local/problems/, or problems/ in a pack checkout): statement
+(with its images, for offline use), signature, Go/Python templates and the
+examples (with expected outputs when they can be parsed from the statement).
+Premium problems are not available.
 
 The problem is not ready to submit yet: LeetCode publishes only the examples
 and not how answers are judged (any order? several valid answers?).

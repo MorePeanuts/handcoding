@@ -266,3 +266,174 @@ func TestRel(t *testing.T) {
 		}
 	}
 }
+
+// newCheckout writes a pack checkout, my-pack, with one problem and returns
+// its root.
+func newCheckout(t *testing.T, manifest string) string {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), "my-pack")
+	writeFile(t, filepath.Join(root, pack.ManifestFile), manifest)
+	writeFile(t, filepath.Join(root, pack.ProblemsDir, "0001-two-sum", problem.MetaFile), problemYAML("1", "two-sum"))
+	return root
+}
+
+// findFrom runs Find in the working directory dir, without -w or
+// $HC_WORKSPACE.
+func findFrom(t *testing.T, dir string) (*Workspace, error) {
+	t.Helper()
+	t.Setenv(EnvWorkspace, "")
+	t.Chdir(dir)
+	return Find("")
+}
+
+func TestAuthoringDiscovery(t *testing.T) {
+	root := newCheckout(t, "protocol: 1\nname: mine\n")
+	// The checkout has no hc.yaml, and needs none.
+	for name, open := range map[string]func() (*Workspace, error){
+		"Open":         func() (*Workspace, error) { return Open(root) },
+		"-w":           func() (*Workspace, error) { return Find(root) },
+		"HC_WORKSPACE": func() (*Workspace, error) { t.Setenv(EnvWorkspace, root); return Find("") },
+		"problem dir":  func() (*Workspace, error) { return findFrom(t, filepath.Join(root, "problems", "0001-two-sum")) },
+	} {
+		w, err := open()
+		if err != nil || w.Root != root || w.Kind != Authoring || w.Config.Language != DefaultConfig().Language {
+			t.Errorf("%s: %+v, %v; want the authoring workspace %s", name, w, err, root)
+		}
+	}
+
+	// With hc.yaml too, it is still an authoring workspace, configured by
+	// it, and its problems/ without packs/ is not the old layout.
+	writeFile(t, filepath.Join(root, ConfigFile), "language: python\n")
+	if w, err := Open(root); err != nil || w.Kind != Authoring || w.Config.Language != "python" {
+		t.Errorf("checkout with hc.yaml: %+v, %v", w, err)
+	}
+
+	// A pack installed in a practice workspace is part of that workspace.
+	ws := newWorkspace(t)
+	installPack(t, ws, "mine", "protocol: 1\nname: mine\n")
+	writeProblem(t, ws, "mine", "0001-two-sum", problemYAML("1", "two-sum"))
+	installed := filepath.Join(ws.Root, PacksDir, "mine")
+	w, err := findFrom(t, filepath.Join(installed, "problems", "0001-two-sum"))
+	if err != nil || w.Root != ws.Root || w.Kind != Practice {
+		t.Errorf("in an installed pack: %+v, %v; want the practice workspace %s", w, err, ws.Root)
+	}
+	if _, err := Open(installed); err == nil || !strings.Contains(err.Error(), "is a pack installed in the workspace "+ws.Root) {
+		t.Errorf("Open(installed pack): %v", err)
+	}
+	// A checkout in a directory called packs/ outside any workspace is a
+	// checkout.
+	other := filepath.Join(t.TempDir(), PacksDir, "mine")
+	writeFile(t, filepath.Join(other, pack.ManifestFile), "protocol: 1\nname: mine\n")
+	if w, err := findFrom(t, other); err != nil || w.Root != other || w.Kind != Authoring {
+		t.Errorf("checkout in packs/: %+v, %v", w, err)
+	}
+
+	if _, err := Open(t.TempDir()); !errors.Is(err, ErrNotFound) {
+		t.Errorf("Open(empty dir): %v", err)
+	}
+}
+
+func TestAuthoringPack(t *testing.T) {
+	root := newCheckout(t, "protocol: 1\nname: mine\nlanguages: [python]\n")
+	// A packs/ directory in a checkout is not the workspace's.
+	writeFile(t, filepath.Join(root, PacksDir, "other", pack.ManifestFile), "protocol: 1\nname: other\n")
+	w, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	packs, err := w.Packs()
+	if err != nil || len(packs) != 1 {
+		t.Fatalf("packs: %+v, %v", packs, err)
+	}
+	k := packs[0]
+	if k.Name != "mine" || k.Dir != root || !k.Writable || k.Err != nil || k.ProblemsPath() != filepath.Join(root, "problems") {
+		t.Errorf("pack %+v", k)
+	}
+	if langs := k.Languages(); !slices.Equal(langs, []string{"python"}) {
+		t.Errorf("languages %v", langs)
+	}
+	if wk := w.WritablePack(); wk.Name != "mine" || wk.Dir != root {
+		t.Errorf("writable pack %+v", wk)
+	}
+	p, err := w.Problem("two-sum")
+	if err != nil || p.Pack != "mine" {
+		t.Fatalf("two-sum: %+v, %v", p, err)
+	}
+	if p, err := w.Problem("mine/1"); err != nil || p.Slug != "two-sum" {
+		t.Errorf("mine/1: %+v, %v", p, err)
+	}
+	if _, err := w.Problem("other/two-sum"); err == nil {
+		t.Error("other/two-sum found")
+	}
+	if err := w.CheckWritable(p); err != nil {
+		t.Errorf("CheckWritable: %v", err)
+	}
+	if got := w.Ref(p); got != "two-sum" {
+		t.Errorf("Ref = %s", got)
+	}
+	if got, want := w.SolutionDir(p, "python"), filepath.Join(root, "solutions", "mine", "python", "0001-two-sum"); got != want {
+		t.Errorf("SolutionDir = %s, want %s", got, want)
+	}
+	q := &problem.Problem{ID: "2", Slug: "add-two-numbers"}
+	if got, want := w.NewProblemDir(q), filepath.Join(root, "problems", "0002-add-two-numbers"); got != want {
+		t.Errorf("NewProblemDir = %s, want %s", got, want)
+	}
+}
+
+// A checkout whose pack.yaml cannot be read still opens, so that hc validate
+// can say what is wrong with it.
+func TestAuthoringBrokenManifest(t *testing.T) {
+	for manifest, msg := range map[string]string{
+		"protocol: 2\nname: mine\nfuture: x\n": "pack.yaml: this pack needs protocol 2",
+		"protocol: 1\nname: Mine\n":            `pack.yaml: name "Mine" must be lower-case kebab-case`,
+		"protocol: 1\nname: local\n":           "pack.yaml: name local is reserved",
+		"protocol: [1\n":                       "pack.yaml:",
+	} {
+		root := newCheckout(t, manifest)
+		w, err := Open(root)
+		if err != nil {
+			t.Errorf("%q: Open: %v", manifest, err)
+			continue
+		}
+		packs, err := w.Packs()
+		if err != nil || len(packs) != 1 {
+			t.Fatalf("packs: %+v, %v", packs, err)
+		}
+		k := packs[0]
+		if _, ok := errors.AsType[*PackError](k.Err); !ok || !strings.HasPrefix(k.Err.Error(), msg) || k.Name != "my-pack" {
+			t.Errorf("%q: pack %s, error %v; want my-pack, %q", manifest, k.Name, k.Err, msg)
+		}
+		want := `problem "two-sum" not found: pack my-pack cannot be read: ` + msg
+		if _, err := w.Problem("two-sum"); err == nil || !strings.HasPrefix(err.Error(), want) {
+			t.Errorf("%q: Problem: %v, want %q", manifest, err, want)
+		}
+		if _, _, err := w.WritablePack().Problems(); err == nil {
+			t.Errorf("%q: the writable pack's problems load", manifest)
+		}
+	}
+}
+
+func TestCreateRefusesPack(t *testing.T) {
+	root := newCheckout(t, "protocol: 1\nname: mine\n")
+	for dir, msg := range map[string]string{
+		root:                          root + " holds pack.yaml, and a pack checkout is a workspace as it is",
+		filepath.Join(root, "sub"):    "is in the pack checkout " + root,
+		filepath.Join(root, "a", "b"): "is in the pack checkout " + root,
+	} {
+		if _, err := Create(dir, ""); err == nil || !strings.Contains(err.Error(), msg) {
+			t.Errorf("Create(%s): %v, want %q", dir, err, msg)
+		}
+	}
+	ws := newWorkspace(t)
+	installPack(t, ws, "mine", "protocol: 1\nname: mine\n")
+	if _, err := Create(filepath.Join(ws.Root, PacksDir, "mine", "sub"), ""); err == nil || !strings.Contains(err.Error(), "a pack installed in the workspace") {
+		t.Errorf("Create in an installed pack: %v", err)
+	}
+	if exists(filepath.Join(root, ConfigFile)) || exists(filepath.Join(root, "sub")) {
+		t.Error("Create wrote into the checkout")
+	}
+	// A workspace nested in a practice workspace is still allowed.
+	if _, err := Create(filepath.Join(ws.Root, "nested"), ""); err != nil {
+		t.Errorf("Create in a practice workspace: %v", err)
+	}
+}
