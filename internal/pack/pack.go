@@ -176,6 +176,39 @@ func (m *Manifest) SolutionLanguages() []string {
 	return problem.Languages(m.Protocol)
 }
 
+// CheckName checks a pack's name: required, lower-case kebab-case, and not
+// local.
+func CheckName(name string) error {
+	switch {
+	case name == "":
+		return errors.New("name is required")
+	case !nameRE.MatchString(name):
+		return fmt.Errorf("name %q must be lower-case kebab-case: lower-case letters, digits and single hyphens", name)
+	case name == LocalName:
+		return fmt.Errorf("name %s is reserved for a workspace's own problems", LocalName)
+	}
+	return nil
+}
+
+// Copy copies the pack in src, its pack.yaml and problems/ but nothing else,
+// to dst, which must not hold them yet.
+func Copy(src, dst string) error {
+	data, err := os.ReadFile(filepath.Join(src, ManifestFile))
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dst, 0o755); err != nil {
+		return err
+	}
+	problems := filepath.Join(src, ProblemsDir)
+	if fi, err := os.Stat(problems); err == nil && fi.IsDir() {
+		if err := os.CopyFS(filepath.Join(dst, ProblemsDir), os.DirFS(problems)); err != nil {
+			return err
+		}
+	}
+	return os.WriteFile(filepath.Join(dst, ManifestFile), data, 0o644)
+}
+
 // Validate checks the manifest on its own. ValidateProblems checks it
 // against the pack's problems.
 func (m *Manifest) Validate() error {
@@ -188,13 +221,8 @@ func (m *Manifest) Validate() error {
 	if protoErr != nil {
 		errs = append(errs, protoErr)
 	}
-	switch {
-	case m.Name == "":
-		errs = append(errs, errors.New("name is required"))
-	case !nameRE.MatchString(m.Name):
-		errs = append(errs, fmt.Errorf("name %q must be lower-case kebab-case: lower-case letters, digits and single hyphens", m.Name))
-	case m.Name == LocalName:
-		errs = append(errs, fmt.Errorf("name %s is reserved for a workspace's own problems", LocalName))
+	if err := CheckName(m.Name); err != nil {
+		errs = append(errs, err)
 	}
 	if m.Version != "" && !semverRE.MatchString(m.Version) {
 		hint := ""

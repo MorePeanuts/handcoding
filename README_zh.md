@@ -40,7 +40,7 @@
 - **交互界面**：rustlings 风格的题目列表，题面、配图、测试结果和提交历史都在同一个界面里，编辑器开在旁边的窗格。
 - **导入 LeetCode 题目**：`hc fetch 146` 下载题面、配图、函数签名、起始模板和示例。
 - **智能体生成测试用例**：`hc gen` 让 Claude Code 或 Codex 判断题目该怎么判（顺序是否重要？是否有多个正确答案？），并写参考解和测试输入。期望输出由 hc 运行参考解得到，而不是让模型猜。用例有错时，用 `hc fix` 修复。
-- **开放的题目格式**：一道题就是一个普通目录，由 YAML、Markdown 和 JSON Lines 文件组成。可以自己出题，也可以分享给别人。
+- **开放的题目格式**：一道题就是一个普通目录，由 YAML、Markdown 和 JSON Lines 文件组成。可以自己出题，并以题目包的形式分享：题目包是 git 仓库，用 `hc pack install` 安装，用 `hc pack update` 更新。
 - **提交历史**：每次提交都保存代码和判题结果，可以回看、恢复或删除。
 
 ## 安装
@@ -65,7 +65,7 @@ hc gen two-sum          # 让编码智能体生成测试用例和判题规则
 hc                      # 打开题目列表
 ```
 
-如果默认用 Python 解题，改为执行 `hc init --lang python`，它还会立即创建 Python 环境。你的题目存放在工作区的 `packs/local/problems/` 下：`hc new` 生成一道自己的题目，`hc import` 把题目目录复制进来。现成题目组成的题目包安装在旁边的 `packs/` 下（`hc pack install` 即将推出）。
+如果默认用 Python 解题，改为执行 `hc init --lang python`，它还会立即创建 Python 环境。你的题目存放在工作区的 `packs/local/problems/` 下：`hc new` 生成一道自己的题目，`hc import` 把题目目录复制进来。新建的工作区里没有题目：可以逐道获取，也可以用 `hc pack install <git-url>` 安装一个现成的题目包，它会被克隆到旁边的 `packs/` 下，并记录在 `hc.yaml` 中（见[题目包](docs/how-to-use_zh.md#题目包)）。
 
 在列表里选一道题按 `enter`：hc 会显示题面，按模板生成 `solution.go`，并把文件路径复制到剪贴板。在旁边的编辑器里打开它，写完后按 `t` 测试、按 `s` 提交。
 

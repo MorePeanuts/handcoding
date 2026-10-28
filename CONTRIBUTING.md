@@ -21,7 +21,7 @@ Use a scratch workspace instead of your own `~/handcoding`:
 
 ```sh
 go run ./cmd/hc init /tmp/hc-dev
-cp -R testdata/regression /tmp/hc-dev/packs/    # the regression set, as an installed pack
+go run ./cmd/hc -w /tmp/hc-dev pack install testdata/regression   # the regression set, copied as an installed pack
 go run ./cmd/hc -w /tmp/hc-dev test two-sum
 ```
 
@@ -33,11 +33,12 @@ The regression set is a pack, so it is also a workspace of its own (a pack check
 cmd/hc              entry point
 internal/cli        cobra commands
 internal/tui        bubbletea interface
-internal/app        use cases shared by the CLI and the TUI
+internal/app        use cases shared by the CLI and the TUI, including validation and pack management (hc pack)
 internal/problem    problem protocol: problem.yaml, cases.jsonl, types
 internal/pack       packs: pack.yaml, a pack's problems and their identity
 internal/workspace  the workspace (practice, or a pack checkout): its packs, solutions, pack/slug lookup
 internal/lang       language interface; golang/ and python/ drivers
+internal/git        runs the git executable to install and update packs
 internal/runner     build, run the driver, collect results
 internal/judge      output comparison
 internal/store      submission history (SQLite, pure Go)

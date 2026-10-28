@@ -166,6 +166,16 @@ func (s *Store) DeleteProblem(ctx context.Context, pack, slug string) (int64, er
 	return res.RowsAffected()
 }
 
+// DeletePack removes every submission of the problems of the pack called
+// pack and returns how many were deleted.
+func (s *Store) DeletePack(ctx context.Context, pack string) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM submissions WHERE pack = ?`, pack)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // Status summarizes the best result per problem.
 type Status struct {
 	Attempts int

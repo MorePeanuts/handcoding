@@ -86,6 +86,7 @@ Run hc with no arguments to open the interactive problem list.`,
 		newImportCmd(opts),
 		newCasesCmd(opts),
 		newValidateCmd(opts),
+		newPackCmd(opts),
 		newDocsCmd(opts),
 	)
 	add("agent",

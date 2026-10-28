@@ -84,6 +84,38 @@ type Config struct {
 	Agent AgentConfig `yaml:"agent,omitempty"`
 	// LeetCode configures fetching problems.
 	LeetCode LeetCodeConfig `yaml:"leetcode,omitempty"`
+	// Packs are the packs that hc pack install put in packs/, so that a
+	// workspace can be reproduced from hc.yaml. Only a practice workspace
+	// has them; hc changes them with SavePacks.
+	Packs []PackSource `yaml:"packs,omitempty"`
+}
+
+// PackSource records an installed pack in hc.yaml: where it came from and
+// what is installed.
+type PackSource struct {
+	// Name is the pack's name, and its directory in packs/.
+	Name string `yaml:"name"`
+	// Source is a git URL, or the absolute path of a directory: a git
+	// repository, cloned like a URL, or a plain directory, copied.
+	Source string `yaml:"source"`
+	// Ref is the tag or branch to follow; empty follows the default branch.
+	Ref string `yaml:"ref,omitempty"`
+	// Commit is the installed commit. A copied directory has none.
+	Commit string `yaml:"commit,omitempty"`
+}
+
+// Copied reports whether the pack was copied from a directory rather than
+// cloned with git.
+func (s PackSource) Copied() bool { return s.Commit == "" }
+
+// PackSource returns the hc.yaml entry of the pack called name, if any.
+func (c Config) PackSource(name string) (PackSource, bool) {
+	for _, s := range c.Packs {
+		if s.Name == name {
+			return s, true
+		}
+	}
+	return PackSource{}, false
 }
 
 // PythonConfig configures Python.
@@ -245,6 +277,9 @@ func Open(dir string) (*Workspace, error) {
 		if err := yaml.Unmarshal(data, &cfg); err != nil {
 			return nil, fmt.Errorf("%s: %w", ConfigFile, err)
 		}
+		if err := checkPacks(data, kind, cfg.Packs); err != nil {
+			return nil, fmt.Errorf("%s: %w", filepath.Join(abs, ConfigFile), err)
+		}
 	case !errors.Is(err, os.ErrNotExist):
 		return nil, err
 	}
@@ -300,7 +335,9 @@ func Create(dir, language string) (*Workspace, error) {
 	if err := os.WriteFile(filepath.Join(abs, ConfigFile), append([]byte(header), data...), 0o644); err != nil {
 		return nil, err
 	}
-	gitignore := "# handcoding local state\n.hc/\n"
+	// Installed packs are git checkouts of their own, reproduced from the
+	// packs list in hc.yaml.
+	gitignore := "# handcoding local state\n.hc/\n# installed packs (hc pack install reinstalls them from hc.yaml)\n/packs/*\n!/packs/local/\n"
 	if err := os.WriteFile(filepath.Join(abs, ".gitignore"), []byte(gitignore), 0o644); err != nil {
 		return nil, err
 	}
@@ -400,12 +437,9 @@ type PackError struct {
 func (e *PackError) Error() string { return e.Err.Error() }
 func (e *PackError) Unwrap() error { return e.Err }
 
-// packsPath is the directory of the packs.
-func (w *Workspace) packsPath() string { return filepath.Join(w.Root, PacksDir) }
-
 // localPack is the pack of a practice workspace's own problems.
 func (w *Workspace) localPack() *Pack {
-	dir := filepath.Join(w.packsPath(), pack.LocalName)
+	dir := filepath.Join(w.PacksPath(), pack.LocalName)
 	return &Pack{
 		Name:     pack.LocalName,
 		Dir:      dir,
@@ -446,7 +480,7 @@ func (w *Workspace) Packs() ([]*Pack, error) {
 		return []*Pack{w.checkoutPack()}, nil
 	}
 	packs := []*Pack{w.localPack()}
-	entries, err := os.ReadDir(w.packsPath())
+	entries, err := os.ReadDir(w.PacksPath())
 	if errors.Is(err, os.ErrNotExist) {
 		return packs, nil
 	}
@@ -455,7 +489,7 @@ func (w *Workspace) Packs() ([]*Pack, error) {
 	}
 	for _, e := range entries {
 		name := e.Name()
-		dir := filepath.Join(w.packsPath(), name)
+		dir := filepath.Join(w.PacksPath(), name)
 		// isDir follows symbolic links, so a linked pack counts.
 		if name == pack.LocalName || strings.HasPrefix(name, ".") || !isDir(dir) {
 			continue

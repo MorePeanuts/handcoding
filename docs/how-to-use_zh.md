@@ -6,6 +6,7 @@
 - [交互式题目列表](#交互式题目列表)
 - [命令](#命令)
 - [获取题目](#获取题目)
+- [题目包](#题目包)
 - [用编码智能体生成用例](#用编码智能体生成用例)
 - [调试](#调试)
 - [配置](#配置)
@@ -17,7 +18,7 @@
 
 ```
 ~/handcoding/
-  hc.yaml                                  配置文件
+  hc.yaml                                  配置文件，以及已安装题目包的列表
   packs/local/problems/0001-two-sum/       你自己的题目（见题目协议）
   packs/<name>/                            已安装的题目包（只读）
   solutions/local/go/0001-two-sum/         你的代码：solution.go，以及自动生成的 go.mod 和 zz_hc_driver.go
@@ -31,12 +32,12 @@
 
 `hc` 按以下顺序查找工作区：`-w <dir>`、`$HC_WORKSPACE`、包含 `hc.yaml` 或 `pack.yaml`（题目包的检出目录，见[编写题目包](#编写题目包)）的最近一级父目录、`~/handcoding`。所以在任何目录下都可以运行它。
 
-### 题目包
+### 工作区中的题目包
 
 工作区里的题目按[题目包](protocol_zh.md#题目包)组织，每个题目包是 `packs/` 下的一个目录：
 
 - `packs/local/` 存放你自己的题目，也就是 `hc fetch`、`hc new` 和 `hc import` 添加的题目。它没有 `pack.yaml`（`local` 是保留名称），可以用所有语言作答。
-- 其余每个目录都是一个已安装的题目包：一个 `name` 与目录名相同的 `pack.yaml`，加上它的 `problems/`。已安装的题目包是**只读**的：`hc gen`、`hc fix` 和 `hc cases add|rm|edit|build` 拒绝修改它们，因为更新题目包会覆盖这些修改。`pack.yaml` 列出了 `languages` 的题目包只能用这些语言作答：`hc start -l` 拒绝其他语言；如果你的默认语言不在其中，hc 会改用题目包的第一种语言并给出提示。安装题目包（`hc pack install`）即将推出；在此之前，可以手动把题目包复制到 `packs/` 下。
+- 其余每个目录都是一个已安装的题目包：一个 `name` 与目录名相同的 `pack.yaml`，加上它的 `problems/`。已安装的题目包是**只读**的：`hc gen`、`hc fix` 和 `hc cases add|rm|edit|build` 拒绝修改它们，因为更新题目包会覆盖这些修改。`pack.yaml` 列出了 `languages` 的题目包只能用这些语言作答：`hc start -l` 拒绝其他语言；如果你的默认语言不在其中，hc 会改用题目包的第一种语言并给出提示。`hc pack install` 负责安装题目包（见[题目包](#题目包)）；手动复制到 `packs/` 下的题目包也能用，`hc pack list` 会把它显示为 unmanaged（未托管）。
 
 hc 无法读取的题目包（没有 `pack.yaml`、`pack.yaml` 不合法，或为更新的协议编写，此时会提示升级 hc）会由 `hc validate` 和题目列表报告，它的题目不会被加载；工作区的其余部分照常工作。
 
@@ -55,11 +56,11 @@ Python 解答在 hc 管理的虚拟环境 `.hc/venv` 中运行。第一次有命
 
 支持的最低版本是 Python 3.10 和 Go 1.22（见协议的[语言版本](protocol_zh.md#语言版本)）。你自己的解答可以使用工具链支持的任何特性：`hc test`、`hc submit` 和 `hc debug` 会注明所用的工具链（`[Python 3.12.9]`），版本过旧时只给出警告。题目附带的代码必须能在最低版本上运行，所以 `hc cases build` 和 `hc validate --run` 拒绝在过旧的工具链上运行参考解。
 
-建议在工作区里执行 `git init`，记录下自己的练习过程。
+建议在工作区里执行 `git init`，记录下自己的练习过程。`hc init` 写入的 `.gitignore` 排除了 `.hc/` 和已安装的题目包，后者可以由 `hc pack install` 根据 `hc.yaml` 重新安装。
 
 ### 编写题目包
 
-题目包的检出目录，即包含 `pack.yaml` 的目录（例如克隆下来的题目包仓库），本身就是一个工作区：在它或它下面的任意目录中运行 hc，或者用 `-w` 指向它即可。它不需要 `hc init`，`hc init` 也会拒绝在题目包内的目录中创建工作区。在这种编写用的工作区里，这个题目包是唯一的题目包，并且可写：`hc fetch`、`hc new` 和 `hc import` 把题目加到它的 `problems/` 下，`hc gen`、`hc fix` 和 `hc cases` 修改这些题目。所以编写流程不需要任何参数：`hc fetch two-sum`、`hc gen two-sum`、`hc validate --run`。这里没有 `local` 题目包，检出目录中的 `packs/` 目录会被忽略，题目只用 slug 来指代。
+题目包的检出目录，即包含 `pack.yaml` 的目录（例如克隆下来的题目包仓库），本身就是一个工作区：在它或它下面的任意目录中运行 hc，或者用 `-w` 指向它即可。它不需要 `hc init`，`hc init` 也会拒绝在题目包内的目录中创建工作区。在这种编写用的工作区里，这个题目包是唯一的题目包，并且可写：`hc fetch`、`hc new` 和 `hc import` 把题目加到它的 `problems/` 下，`hc gen`、`hc fix` 和 `hc cases` 修改这些题目。所以编写流程不需要任何参数：`hc fetch two-sum`、`hc gen two-sum`、`hc validate --run`，发布前再运行 `hc pack check`（见[检查题目包](#检查题目包)）。这里没有 `local` 题目包，检出目录中的 `packs/` 目录会被忽略，题目只用 slug 来指代。
 
 ```
 my-pack/
@@ -110,7 +111,7 @@ pyrightconfig.json
 
 ```
 练习          list  start  edit  show  test  submit  debug  reset  discard  history
-题目          init  fetch  new  import  cases  validate  docs
+题目          init  fetch  new  import  cases  validate  pack  docs
 编码智能体    gen  fix  skill
 ```
 
@@ -193,6 +194,50 @@ hc cases add 3 -i '{"s":"abba"}'    # 追加一个用例（有参考解时会算
 hc cases edit 3                     # 在编辑器中编辑 cases.jsonl
 hc cases build 3                    # 用参考解补全缺失的期望输出（--force：全部重算）
 ```
+
+## 题目包
+
+[题目包](protocol_zh.md#题目包)是一个带有 `pack.yaml` 的现成题目目录，通常是一个 git 仓库。hc 调用 PATH 上的 `git` 来安装和更新题目包。
+
+```sh
+hc pack install https://github.com/someone/handcoding-pack.git   # 把题目包克隆到 packs/<name>/
+hc pack install ../my-pack --ref v1.2.0                          # 本地 git 仓库，指定 tag 或分支
+hc pack list                                # 题目包、版本、commit、来源和你的进度
+hc pack update                              # 更新所有题目包（也可以指定名字）
+hc pack update leetcode --ref main          # 改为跟随另一个 tag 或分支
+hc pack remove leetcode                     # 删除题目包；你的解答和提交历史保留
+hc pack remove leetcode --purge             # ……连同它们一起删除
+```
+
+> [!WARNING]
+> 安装题目包意味着信任它的代码：测试、提交或校验时，它的参考解和 checker 会在你的机器上运行。只从你信任的来源安装题目包。
+
+- **`hc pack install <source>`** 接受 git URL 或目录。本身是 git 仓库的目录会像 URL 一样被克隆；其他包含 `pack.yaml` 的目录会被复制（只复制 `pack.yaml` 和 `problems/`）。`--ref` 安装 git 来源的某个 tag 或分支，而不是默认分支。题目包安装到 `packs/<name>/`，名字取自它的 `pack.yaml`。hc 拒绝不合法的 `pack.yaml`、为它不支持的协议版本编写的 `pack.yaml`（并说明该升级 hc 还是题目包），以及与 `packs/` 中已有题目包重名的题目包。加载失败的题目会被报告，但不会阻止安装。
+- **`hc pack list`** 显示每个题目包的名字、版本、题目数、进度（有通过提交的题目数）、已安装的 commit 和来源。`packs/` 中 `hc.yaml` 没有列出的目录（例如手动复制进来的）标为 *unmanaged*（未托管）；`hc.yaml` 列出了但 `packs/` 中没有的题目包标为 *missing*（缺失）。
+- **`hc pack update [name]...`** 拉取每个题目包，并检出它的 ref 的最新 commit：分支会前进，tag 保持不动（除非上游移动了它），`--ref` 改为跟随另一个 ref。复制安装的题目包会重新复制。已安装的题目包是只读的，所以有本地修改的题目包会被拒绝更新；`--force` 丢弃这些修改。如果更新后 hc 无法读取 `pack.yaml`，或者题目包改了名，更新会被撤销。更新后 hc 列出新增和删除的题目。你的解答和提交历史按题目的目录名和 slug 关联，所以被删除的题目（或目录被改名的题目）的解答和历史会保留，但不再属于任何题目：hc 会说明这一点，不会删除任何东西。
+- **`hc pack remove <name>`** 删除 `packs/<name>/` 和它在 `hc.yaml` 中的条目。你的解答（`solutions/<name>/`）和提交历史保留，重新安装题目包后它们又会出现；`--purge` 会在确认后把它们一并删除（`--yes` 跳过确认）。`local` 不能删除。
+
+### packs 列表
+
+hc 把它安装的每个题目包记录在 `hc.yaml` 中，每次 `hc pack update` 都会更新对应条目：
+
+```yaml
+packs:
+  - name: leetcode
+    source: https://github.com/someone/handcoding-leetcode.git
+    ref: v0.3.0        # 跟随的 tag 或分支；不写则跟随默认分支
+    commit: 3f2a9c1…   # 已安装的 commit
+  - name: mine
+    source: /home/me/my-pack   # 复制安装的目录：没有 commit
+```
+
+hc 只修改这个列表，`hc.yaml` 的其余部分保留原有的注释和顺序。本地来源记录为绝对路径。
+
+要在别处**复现一个工作区**，把它的 `hc.yaml` 复制到一个新工作区（或者用 git 管理工作区：`hc init` 写入的 `.gitignore` 排除了已安装的题目包），然后不带参数运行 `hc pack install`：它会把列表中缺失的题目包按记录的 commit 安装回来，复制安装的目录则重新复制。
+
+### 检查题目包
+
+`hc pack check` 是题目包的 CI 在发布前运行的检查。在题目包的检出目录中运行它（见[编写题目包](#编写题目包)），或者传入它的目录：`hc pack check ./my-pack`。它检查 `pack.yaml` 合法且协议版本受支持，分组中列出的都是本包的题目，并且每道题都能加载、合法、目录名规范、slug 和 ID 唯一、已就绪（设置了 `judge.compare`）、有用例且每个用例都有期望输出、有参考解，并通过 `hc validate --run`：每个参考解都通过每个用例。因此它需要 Go 和 Python 3.10+，无法运行的参考解也算错误。它为每道题输出一行，最后输出汇总，任何一项失败都以非零状态退出。
 
 ## 用编码智能体生成用例
 

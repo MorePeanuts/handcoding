@@ -6,6 +6,7 @@ English · [简体中文](how-to-use_zh.md)
 - [The interactive list](#the-interactive-list)
 - [Commands](#commands)
 - [Getting problems](#getting-problems)
+- [Packs](#packs)
 - [Test cases from a coding agent](#test-cases-from-a-coding-agent)
 - [Debugging](#debugging)
 - [Configuration](#configuration)
@@ -17,7 +18,7 @@ English · [简体中文](how-to-use_zh.md)
 
 ```
 ~/handcoding/
-  hc.yaml                                  configuration
+  hc.yaml                                  configuration, and the list of installed packs
   packs/local/problems/0001-two-sum/       your own problems (see the problem protocol)
   packs/<name>/                            installed packs (read-only)
   solutions/local/go/0001-two-sum/         your code: solution.go, plus generated go.mod and zz_hc_driver.go
@@ -31,12 +32,12 @@ English · [简体中文](how-to-use_zh.md)
 
 `hc` finds the workspace from `-w <dir>`, then `$HC_WORKSPACE`, then the nearest parent directory containing `hc.yaml` or `pack.yaml` (a pack checkout, see [working on a pack](#working-on-a-pack)), then `~/handcoding`. You can run it from anywhere.
 
-### Packs
+### Packs in a workspace
 
 The problems of a workspace come in [packs](protocol.md#packs), each a directory of `packs/`:
 
 - `packs/local/` holds your own problems: what `hc fetch`, `hc new` and `hc import` add. It has no `pack.yaml` (`local` is a reserved name), and is solved in every language.
-- Every other directory is an installed pack: a `pack.yaml` whose `name` is the directory's name, and its `problems/`. Installed packs are **read-only**: `hc gen`, `hc fix` and `hc cases add|rm|edit|build` refuse to change them, since updating the pack would replace the change. A pack whose `pack.yaml` lists `languages` can only be solved in those: `hc start -l` refuses the others, and if your default language is not among them, hc uses the pack's first language and says so. Installing packs (`hc pack install`) is coming; until then a pack can be copied into `packs/` by hand.
+- Every other directory is an installed pack: a `pack.yaml` whose `name` is the directory's name, and its `problems/`. Installed packs are **read-only**: `hc gen`, `hc fix` and `hc cases add|rm|edit|build` refuse to change them, since updating the pack would replace the change. A pack whose `pack.yaml` lists `languages` can only be solved in those: `hc start -l` refuses the others, and if your default language is not among them, hc uses the pack's first language and says so. `hc pack install` installs them (see [Packs](#packs)); a pack copied into `packs/` by hand works too, and `hc pack list` shows it as unmanaged.
 
 A pack that hc cannot read (no `pack.yaml`, an invalid one, or one written for a newer protocol, which says to upgrade hc) is reported by `hc validate` and the list, and its problems are left out; the rest of the workspace works.
 
@@ -55,11 +56,11 @@ The environment holds debugpy for headless debugging. Downloading Python and ins
 
 The oldest supported toolchains are Python 3.10 and Go 1.22 (the protocol's [language versions](protocol.md#language-versions)). Your own solutions may use anything your toolchain supports: `hc test`, `hc submit` and `hc debug` name the toolchain they run with (`[Python 3.12.9]`) and only warn when it is older. Code that problems ship must work on the oldest versions, so `hc cases build` and `hc validate --run` refuse to run reference solutions on an older toolchain.
 
-Consider running `git init` in the workspace to keep a record of your practice.
+Consider running `git init` in the workspace to keep a record of your practice. The `.gitignore` that `hc init` writes leaves out `.hc/` and the installed packs, which `hc pack install` reinstalls from `hc.yaml`.
 
 ### Working on a pack
 
-A pack checkout, that is a directory with `pack.yaml` such as a clone of a pack's repository, is a workspace as it is: run hc in it or in any directory below it, or point `-w` at it. It needs no `hc init`, and `hc init` refuses a directory inside a pack. In this authoring workspace the pack is the only pack, and it is writable: `hc fetch`, `hc new` and `hc import` add problems to its `problems/`, and `hc gen`, `hc fix` and `hc cases` change them. So the authoring flow needs no flags: `hc fetch two-sum`, `hc gen two-sum`, `hc validate --run`. There is no `local` pack, a `packs/` directory in the checkout is ignored, and problems are named by their slug alone.
+A pack checkout, that is a directory with `pack.yaml` such as a clone of a pack's repository, is a workspace as it is: run hc in it or in any directory below it, or point `-w` at it. It needs no `hc init`, and `hc init` refuses a directory inside a pack. In this authoring workspace the pack is the only pack, and it is writable: `hc fetch`, `hc new` and `hc import` add problems to its `problems/`, and `hc gen`, `hc fix` and `hc cases` change them. So the authoring flow needs no flags: `hc fetch two-sum`, `hc gen two-sum`, `hc validate --run`, and `hc pack check` before publishing (see [checking a pack](#checking-a-pack)). There is no `local` pack, a `packs/` directory in the checkout is ignored, and problems are named by their slug alone.
 
 ```
 my-pack/
@@ -110,7 +111,7 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 
 ```
 Practice       list  start  edit  show  test  submit  debug  reset  discard  history
-Problems       init  fetch  new  import  cases  validate  docs
+Problems       init  fetch  new  import  cases  validate  pack  docs
 Coding agent   gen  fix  skill
 ```
 
@@ -193,6 +194,50 @@ hc cases add 3 -i '{"s":"abba"}'    # append a case (expected output from the re
 hc cases edit 3                     # edit cases.jsonl in your editor
 hc cases build 3                    # fill in missing expected outputs from the reference (--force: all)
 ```
+
+## Packs
+
+A [pack](protocol.md#packs) is a directory of ready-made problems with a `pack.yaml`, usually a git repository. hc runs the `git` on your PATH to install and update packs.
+
+```sh
+hc pack install https://github.com/someone/handcoding-pack.git   # clone a pack into packs/<name>/
+hc pack install ../my-pack --ref v1.2.0                          # a local git repository, at a tag or branch
+hc pack list                                # packs, versions, commits, sources and your progress
+hc pack update                              # update every pack (or name some)
+hc pack update leetcode --ref main          # follow another tag or branch
+hc pack remove leetcode                     # delete the pack; your solutions and history stay
+hc pack remove leetcode --purge             # ... and delete them too
+```
+
+> [!WARNING]
+> Installing a pack means trusting its code: its reference solutions and checkers run on your machine when you test, submit or validate. Install packs only from sources you trust.
+
+- **`hc pack install <source>`** takes a git URL, or a directory. A directory that is a git repository is cloned like a URL; any other directory holding `pack.yaml` is copied (its `pack.yaml` and `problems/` only). `--ref` installs a tag or branch of a git source instead of its default branch. The pack goes into `packs/<name>/`, named after its `pack.yaml`. hc refuses a `pack.yaml` that is invalid or written for a protocol it does not read (and says whether to upgrade hc or the pack), and a name that another pack in `packs/` has. Problems that fail to load are reported, but do not keep the pack from being installed.
+- **`hc pack list`** shows each pack's name, version, number of problems, progress (problems with an accepted submission), installed commit and source. A directory of `packs/` that `hc.yaml` does not list, such as one copied by hand, is *unmanaged*; a pack that `hc.yaml` lists but `packs/` lacks is *missing*.
+- **`hc pack update [name]...`** fetches each pack and checks out the latest commit of its ref: a branch moves on, a tag stays put unless it was moved upstream, and `--ref` switches to another one. A copied pack is copied again. Installed packs are read-only, so a pack with local changes is refused; `--force` discards them. An update whose `pack.yaml` hc cannot read, or that renames the pack, is undone. Afterwards hc lists the problems added and removed. Your solutions and history are keyed by the problem's directory and slug, so those of a removed problem, or of one whose directory was renamed, are kept but no problem uses them: hc says so, and deletes nothing.
+- **`hc pack remove <name>`** deletes `packs/<name>/` and its entry in `hc.yaml`. Your solutions (`solutions/<name>/`) and its history stay, so installing the pack again brings them back; `--purge` deletes them too, after asking (`--yes` skips the question). `local` cannot be removed.
+
+### The packs list
+
+hc records every pack it installs in `hc.yaml`, and updates the entry on every `hc pack update`:
+
+```yaml
+packs:
+  - name: leetcode
+    source: https://github.com/someone/handcoding-leetcode.git
+    ref: v0.3.0        # the tag or branch followed; absent: the default branch
+    commit: 3f2a9c1…   # the commit installed
+  - name: mine
+    source: /home/me/my-pack   # a copied directory: no commit
+```
+
+hc edits only this list, so the rest of `hc.yaml` keeps its comments and order. A local source is recorded as an absolute path.
+
+To **reproduce a workspace** elsewhere, copy its `hc.yaml` into a new workspace (or keep the workspace in git: the `.gitignore` of `hc init` leaves the installed packs out) and run `hc pack install` with no argument: it installs every listed pack that is missing, at its recorded commit, and copies copied directories again.
+
+### Checking a pack
+
+`hc pack check` is what a pack's CI runs before publishing. Run it in a pack checkout ([working on a pack](#working-on-a-pack)), or pass its directory: `hc pack check ./my-pack`. It checks that `pack.yaml` is valid and of a supported protocol, that its groups name problems of the pack, and that every problem loads, is valid, has a canonical directory name and a unique slug and ID, is ready (`judge.compare` is set), has cases that all have an expected output and a reference solution, and passes `hc validate --run`: every reference solution passes every case. So it needs Go and Python 3.10+, and a reference that cannot be run is an error. It prints one line per problem and a summary, and exits non-zero on any failure.
 
 ## Test cases from a coding agent
 

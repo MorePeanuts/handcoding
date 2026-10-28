@@ -195,7 +195,10 @@ case inputs must satisfy their rules as well as the statement's.
    reference must pass every case. Fix and repeat until it does.
 8. For `checker`, [prove it rejects wrong answers](#checkers), and run
    `hc validate <slug> --run` once more with the real reference restored.
-9. Write the [summary](#summary).
+9. In a pack checkout (the workspace has `pack.yaml`), run `hc pack check`
+   once you are done with every problem you were asked for: it checks the
+   whole pack as its CI does, and must pass.
+10. Write the [summary](#summary).
 
 ## Workflow: fix a test case
 
@@ -241,5 +244,8 @@ Report:
 - `hc cases list <slug> [--case N]`: inspect cases
 - `hc cases build <slug> [--force] [--lang python]`: fill expected outputs from the reference
 - `hc validate <slug> --run`: check the problem and run every reference on every case
+- `hc pack check`: in a pack checkout, check the whole pack as its CI does
+  (every problem valid, ready and passing `--run`); run it when you have
+  finished the problems you were asked for
 - `hc test <slug> --lang python`: run the user's solution (only when diagnosing)
 - `hc docs protocol <section>`: one section of the spec
