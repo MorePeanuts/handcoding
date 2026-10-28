@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -37,10 +38,16 @@ func TestSkillsLint(t *testing.T) {
 			t.Errorf("skill %s: %v", s.Name, err)
 		}
 	}
-	// Every skill a set or a prompt names is registered.
-	for _, name := range append(skill.Set(skill.Practice), agent.Skills...) {
+	// Every skill a prompt names is registered, and in every set: hc gen
+	// and hc fix run in either kind of workspace.
+	for _, name := range agent.Skills {
 		if !seen[name] {
 			t.Errorf("unregistered skill %s is used", name)
+		}
+		for _, ctx := range skill.Contexts {
+			if !slices.Contains(skill.Set(ctx), name) {
+				t.Errorf("the prompts use %s, which a %s does not get", name, ctx)
+			}
 		}
 	}
 }

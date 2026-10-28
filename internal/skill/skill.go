@@ -34,6 +34,9 @@ const (
 	// Cases is the skill for how a problem is judged: judge rules,
 	// reference solutions, checkers and test cases.
 	Cases = "hc-cases"
+	// Pack is the skill for maintaining a pack: adding problems, groups,
+	// protocol versions and releases.
+	Pack = "hc-pack"
 )
 
 // Prefix starts the name of every skill hc ships.
@@ -51,13 +54,24 @@ const (
 	Authoring
 )
 
+func (c Context) String() string {
+	switch c {
+	case Practice:
+		return "practice workspace"
+	case Authoring:
+		return "pack checkout"
+	}
+	return fmt.Sprintf("Context(%d)", int(c))
+}
+
+// Contexts lists every context.
+var Contexts = []Context{Practice, Authoring}
+
 // sets maps each context to its skills. A new context or a new skill is a
 // new entry here.
 var sets = map[Context][]string{
-	Practice: {Problem, Cases},
-	// The same as Practice until the pack authoring skill, hc-pack, joins
-	// this set (#42).
-	Authoring: {Problem, Cases},
+	Practice:  {Problem, Cases},
+	Authoring: {Problem, Cases, Pack},
 }
 
 // Set returns the names of the skills a context gets.
