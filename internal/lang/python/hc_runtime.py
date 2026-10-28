@@ -11,6 +11,24 @@ import sys
 import time
 import traceback
 
+# The public API of the problem protocol: solutions, references, templates and
+# checkers may import these names and nothing else. Everything else here is
+# hc's own and may change in any release.
+__all__ = [
+    "ListNode",
+    "TreeNode",
+    "GraphNode",
+    "NaryNode",
+    "RandomListNode",
+    "NextTreeNode",
+    "QuadNode",
+    "MultilevelNode",
+    "NestedInteger",
+    "Employee",
+    "decode",
+    "encode",
+]
+
 
 class ListNode:
     def __init__(self, val=0, next=None):

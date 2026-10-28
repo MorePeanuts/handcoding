@@ -75,6 +75,9 @@ func TestBuiltinReferences(t *testing.T) {
 			if err := p.Validate(); err != nil {
 				t.Fatalf("invalid problem: %v", err)
 			}
+			for _, err := range workspace.BankErrors(p, probs) {
+				t.Error(err)
+			}
 			cases, err := p.LoadCases()
 			if err != nil {
 				t.Fatal(err)

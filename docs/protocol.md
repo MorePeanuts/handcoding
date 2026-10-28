@@ -126,18 +126,18 @@ problems/0001-two-sum/          directory name: <4-digit number>-<slug> when id 
   checker.py                    the checker, with judge.compare: checker (see [Checkers](#checkers))
 ```
 
-`hc import` copies only these entries; anything else in the directory (editor files, a `solutions/` folder, ...) is left behind.
+The directory name must be exactly that canonical name, because your solutions (`solutions/<lang>/<dir>/`) and the submission history are keyed by it; `hc validate` reports any other name as an error. `hc new`, `hc fetch` and `hc import` always use it. `hc import` copies only these entries; anything else in the directory (editor files, a `solutions/` folder, ...) is left behind.
 
 ### problem.yaml
 
 | Field | Meaning |
 |---|---|
 | `id` | Problem ID (a string, optional), used for sorting and lookup (`hc test 9001`). Must be unique in the bank. A number also prefixes the directory name |
-| `slug` | Unique identifier in kebab-case: letters, digits and single hyphens, preferably lower case (required) |
+| `slug` | The problem's identity, in kebab-case: letters, digits and single hyphens, preferably lower case (required). Must be unique in the bank |
 | `title` | Title (required) |
 | `difficulty` | `easy`, `medium` or `hard` |
 | `tags` | List of tags |
-| `kind` | `function` (one function) or `class` (a design problem). Defaults to `class` when there is a `class` section, otherwise `function` |
+| `kind` | `function` (one function) or `class` (a design problem) (required; it is never inferred from the sections present) |
 | `function` | Signature of a function problem: `name`, `params` (a list of `{name, type}`, each with at most one of `cycle`, `join`, `ref`, `copy`), `hidden` (inputs not passed to the solution), `returns` (defaults to `void`), `returns_ref`, `returns_copy`. See [structure inputs](#structure-inputs) and [`returns_copy`](#returns_copy) |
 | `class` | Signature of a design problem: `name`, `constructor` (a list of `{name, type}`), `methods` (a list of `{name, params, returns}`) |
 | `judge.compare` | How outputs are compared (see below). No default: a problem without it is *not ready* (see below) |
@@ -145,7 +145,7 @@ problems/0001-two-sum/          directory name: <4-digit number>-<slug> when id 
 | `judge.output` | For in-place problems: the judge compares this parameter's (or hidden input's) value after the call instead of the return value |
 | `judge.output_length` | `return`: judge only the first k elements of `judge.output`, k being the (integer) return value. LeetCode's "remove duplicates" problems |
 | `judge.round_trip` | For design problems that encode a value and decode it back: `encode`, `decode` (method names) and `instances` (`separate` or `same`). See [round-trip problems](#round-trip-problems) |
-| `judge.time_limit` | Time limit for a whole run, as a duration such as `5s` or `500ms`. Defaults to `timeout` in hc.yaml |
+| `judge.timeout` | Wall clock limit for a whole run, as a duration such as `5s` or `500ms`. When it expires the run is killed, and cases without a result are Time Limit Exceeded. It guards against hangs and infinite loops; it does not judge complexity. Defaults to `timeout` in hc.yaml |
 | `source` | Where the problem comes from: `site`, `url` |
 
 Unknown fields are errors, so a typo such as `judgee:` or `parms:` is reported instead of silently falling back to the defaults.
@@ -252,7 +252,7 @@ def check(input, output, expected):
 - `input` is the case's input as decoded JSON: the object of parameters (and hidden inputs) for function problems, `{"ops": [...], "args": [...]}` for design problems, the encoder's parameter for [round trips](#round-trip-problems).
 - `output` is the solution's output as decoded JSON, in the same form as `expected` (the value of `judge.output` for in-place problems, one result per operation for design problems, the decoder's result for round trips).
 - `expected` is the case's expected output, computed by the reference solution with `hc cases build` as for any other problem. It is one valid answer, so a checker can compare a derived value instead of solving the problem again: the length of the longest palindrome, the size of a subset. A case without `expected` is not judged ("No Expected Output").
-- To rebuild a structure, import the codecs and types solutions use: `from hc_runtime import decode, TreeNode` and `decode("TreeNode", output)`.
+- To rebuild a structure, import the codecs and types solutions use: `from hc_runtime import decode, TreeNode` and `decode("TreeNode", output)`. A checker may import only the public names of `hc_runtime` (listed in [Reference solutions and templates](#reference-solutions-and-templates)), and otherwise only the standard library.
 - A rejected case is a Wrong Answer, and the message is shown with it in `hc test`, `hc submit`, the TUI and the submission history. Write messages that say what is wrong: `"[1,2] is not a permutation of nums"`, `"length 2, but the longest palindrome has length 3"`.
 
 Longest Palindromic Substring (5), where `"bab"` and `"aba"` are both right:
@@ -268,7 +268,7 @@ def check(input, output, expected):
         return "%r has length %d, but the longest palindrome has length %d" % (output, len(output), len(expected))
 ```
 
-hc runs the checker once per run, after the solution: a helper calls `check` on every case that produced an output (cases that already failed with a runtime error or time limit are not sent). It gets the same time limit as the solution (`judge.time_limit`). A checker that cannot be loaded, raises, returns anything but `None`, a bool or a string, or runs out of time is a broken problem rather than a wrong answer: the run fails with an error naming `checker.py`, the case and the traceback, and `hc submit` records nothing. What the checker prints is shown only then.
+hc runs the checker once per run, after the solution: a helper calls `check` on every case that produced an output (cases that already failed with a runtime error or time limit are not sent). It gets the same time limit as the solution (`judge.timeout`). A checker that cannot be loaded, raises, returns anything but `None`, a bool or a string, or runs out of time is a broken problem rather than a wrong answer: the run fails with an error naming `checker.py`, the case and the traceback, and `hc submit` records nothing. What the checker prints is shown only then.
 
 **Randomized problems** (Shuffle an Array, Random Pick with Weight) are design problems whose cases make many calls, from hundreds to a few thousand. The checker checks that every output is valid and that their distribution is plausible: compare the observed frequencies with the expected ones with bounds generous enough that a correct solution essentially never fails (state the false-reject probability in the checker, e.g. below 1e-6 per case), while an obviously non-random solution (always the same pick, the identity shuffle) fails.
 
@@ -476,6 +476,7 @@ A reference solution is written exactly like a user's solution, in `reference/so
 | Go | `package main`; `func <function.name>(...)` with the Go types from the table above | `type <Name> struct`, `func Constructor(...) <Name>`, and methods with pointer receivers whose names start with an upper-case letter (`getMin` → `GetMin`), except the encoder and decoder of a round trip, which keep their names as in LeetCode's templates (`serialize`) |
 
 - `ListNode` and `TreeNode` are provided: in Python, `from hc_runtime import ListNode, TreeNode`; in Go they are predefined (`Val`, `Next`, `Left`, `Right`), so don't declare them. So are the problem's [`Node`](#leetcodes-node-types), `NestedInteger` and `Employee`: `from hc_runtime import GraphNode as Node` or `from hc_runtime import NestedInteger` in Python, predefined in Go.
+- The public API of `hc_runtime` is exactly the names in its `__all__`: `ListNode`, `TreeNode`, `GraphNode`, `NaryNode`, `RandomListNode`, `NextTreeNode`, `QuadNode`, `MultilevelNode`, `NestedInteger`, `Employee`, `decode` and `encode`. References, templates and checkers may import these and nothing else from it; the rest is hc's own and may change in any release.
 - With both references present, `hc cases build` uses Go, then Python; pick one with `-l python`. `hc validate --run` runs every reference.
 - `templates/solution.go` and `templates/solution.py` replace the generated starter code. They must keep the signature, because the driver calls it.
 
@@ -503,11 +504,12 @@ hc validate <slug> --run    # also run every reference solution on every case; a
 
 `hc validate` reports, with the case number and field:
 
-- `problem.yaml`: syntax errors (with line and column), unknown fields, invalid slug, missing title, unsupported types, a `judge.output` that is not a parameter or hidden input, a `void` function without `judge.output`, misused structure inputs (`hidden`, `cycle`, `join`, `ref`, `copy`, `returns_ref`), a misused `returns_copy`, more than one `Node` type, a misused `judge.output_length`, a misused `judge.round_trip`, unknown `judge.compare`, `judge.compare: checker` without `checker.py` and `checker.py` with another mode, an invalid `judge.time_limit`;
+- `problem.yaml`: syntax errors (with line and column), unknown fields, invalid slug, missing title, unsupported types, a `judge.output` that is not a parameter or hidden input, a `void` function without `judge.output`, misused structure inputs (`hidden`, `cycle`, `join`, `ref`, `copy`, `returns_ref`), a misused `returns_copy`, more than one `Node` type, a misused `judge.output_length`, a misused `judge.round_trip`, unknown `judge.compare`, `judge.compare: checker` without `checker.py` and `checker.py` with another mode, an invalid `judge.timeout`, a missing `kind`;
 - `cases.jsonl`: invalid JSON, unknown fields, missing or unknown inputs, values that don't match their declared type (`input "nums": [1]: must be integer, got string "x"`) or the form of a judge-defined type (a neighbor that is not a node, a random index outside the list, a misplaced `null`, an unknown subordinate), structure inputs that don't fit (a cycle position outside the list, joined lists whose tails differ, a referenced value that is missing or repeated), wrong argument counts and unknown methods in design problems, `ops` and `args` in a round trip, and an `expected` of the wrong shape;
+- the bank: a directory not named `<4-digit id>-<slug>` (or `<slug>` without a numeric id), and an `id` or `slug` that another problem also uses;
 - with `--run`: reference solutions that don't compile, crash, or disagree with `expected` (both values are shown, and the checker's message); with `checker`, every reference output goes through the checker, and a broken checker is an error.
 
-It warns about an undecided judge rule (no `judge.compare`), cases without `expected`, no case marked as an example, no reference solution, missing statement images and an ID used by another problem.
+It warns about an undecided judge rule (no `judge.compare`), cases without `expected`, no case marked as an example, no reference solution and missing statement images.
 
 ---
 
