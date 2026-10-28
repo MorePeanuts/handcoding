@@ -66,7 +66,7 @@ Python 解答在 hc 管理的虚拟环境 `.hc/venv` 中运行。第一次有命
 
 ```
 练习          list  start  edit  show  test  submit  debug  reset  discard  history
-题库          init  fetch  new  import  cases  validate
+题库          init  fetch  new  import  cases  validate  docs
 编码智能体    gen  fix  skill
 ```
 
@@ -122,6 +122,16 @@ hc import ./my-problems/            # 导入别人分享的题目目录
 ```
 
 [题目协议](protocol_zh.md#手写一道题)完整演示了一道函数题和一道设计题，并说明了参考解的写法。`hc import` 只复制协议中定义的文件；如果题库中已有相同的 slug 或编号，会拒绝导入（`--force` 会替换 slug 相同的题目）。
+
+hc 内置了与自身版本对应的协议（英文版），离线也能查阅：
+
+```sh
+hc docs protocol                    # 完整协议
+hc docs protocol --list             # 列出各节
+hc docs protocol structure-inputs   # 某一节，包括其下的小节
+```
+
+每一节用英文版标题在 GitHub 上的锚点命名，如 `protocol.md#structure-inputs`。在终端中输出会像题面一样渲染；通过管道输出或加上 `--raw` 时输出 Markdown 原文。
 
 ### 测试用例
 

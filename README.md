@@ -83,7 +83,7 @@ hc debug two-sum -c 4   # debug case 4
 ## Documentation
 
 - [Usage guide](docs/how-to-use.md): the TUI, every command, configuration, debugging and agents
-- [Problem protocol](docs/protocol.md): how to write your own problems, and how to add a language
+- [Problem protocol](docs/protocol.md): how to write your own problems, and how to add a language; `hc docs protocol` prints it, or one section of it
 
 ## Roadmap
 
