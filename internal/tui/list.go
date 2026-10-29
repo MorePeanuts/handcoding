@@ -174,9 +174,12 @@ func (m *model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		return m, tea.Quit
 	case "esc":
-		if m.search.Value() != "" {
+		switch {
+		case m.search.Value() != "":
 			m.search.SetValue("")
 			m.applyFilter()
+		case m.fromPicker():
+			m.backToPicker()
 		}
 	case "up", "k":
 		m.cursor = max(m.cursor-1, 0)
@@ -395,6 +398,9 @@ func (m *model) viewList() string {
 	}
 	if m.localeLabel(m.pack) != "" {
 		keys = slices.Insert(keys, len(keys)-1, "i locale")
+	}
+	if m.fromPicker() {
+		keys = slices.Insert(keys, 1, "esc packs")
 	}
 	if m.multiPack {
 		keys = slices.Insert(keys, 1, "tab pack")

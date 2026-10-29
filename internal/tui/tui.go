@@ -58,6 +58,7 @@ type screen int
 
 const (
 	screenList screen = iota
+	screenPacks
 	screenDetail
 	screenResult
 	screenHistory
@@ -106,6 +107,8 @@ type model struct {
 	// cursor, 0 being every problem of the pack.
 	picking     bool
 	groupCursor int
+	// packCursor is the cursor of the pack picker, an index into tabs.
+	packCursor int
 	// multiPack is set when the list has several tabs: the detail screen
 	// then names the problem's pack.
 	multiPack bool
@@ -174,7 +177,11 @@ func newModel(ctx context.Context, a *app.App, opts Options) (*model, error) {
 	if err := m.start(); err != nil {
 		return nil, err
 	}
-	return m, m.reload()
+	if err := m.reload(); err != nil {
+		return nil, err
+	}
+	m.pickPack()
+	return m, nil
 }
 
 // start chooses the pack and group shown first: those of the options, else
@@ -292,9 +299,10 @@ func (m *model) reload() error {
 			}
 		}
 		// A pack without problems, such as the local pack before hc new or
-		// hc fetch, has no tab unless it is the one shown. A pack that
-		// cannot be read has none either: the error says why.
-		if k.Err == nil && (len(t.probs) > 0 || k.Name == m.pack) {
+		// hc fetch, has no tab unless --pack names it; only when no pack
+		// has problems does the list show the first, empty. A pack that
+		// cannot be read has no tab either: the error says why.
+		if k.Err == nil && (len(t.probs) > 0 || k.Name == m.opts.Pack) {
 			tabs = append(tabs, t)
 		}
 	}
@@ -369,6 +377,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.top() {
 		case screenList:
 			return m.updateList(msg)
+		case screenPacks:
+			return m.updatePacks(msg)
 		case screenDetail:
 			return m.updateDetail(msg)
 		case screenResult:
@@ -457,6 +467,8 @@ func (m *model) View() string {
 		return m.viewHistory()
 	case screenSubmission:
 		return m.viewSubmission()
+	case screenPacks:
+		return m.viewPacks()
 	}
 	return m.viewList()
 }
