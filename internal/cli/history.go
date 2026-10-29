@@ -118,7 +118,7 @@ func newHistoryShowCmd(root *rootOptions) *cobra.Command {
 					ui.VerdictStyle(runner.Verdict(s.Verdict)).Render(s.Verdict), s.Passed, s.Total, s.CreatedAt.Format("2006-01-02 15:04:05"))
 				if rep := app.DecodeReport(s.Details); rep != nil {
 					if p, err := a.WS.Problem(s.Ref()); err == nil {
-						ui.PrintReport(os.Stderr, p, rep, ui.ReportOptions{})
+						ui.PrintReport(os.Stderr, p, rep, ui.ReportOptions{Ref: a.WS.Ref(p)})
 						fmt.Fprintln(os.Stderr)
 					}
 				}

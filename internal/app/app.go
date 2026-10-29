@@ -359,7 +359,7 @@ func (a *App) checker(ctx context.Context, p *problem.Problem, w io.Writer) (lan
 // Submit runs all cases and records the submission.
 func (a *App) Submit(ctx context.Context, p *problem.Problem, l lang.Language, o RunOptions) (*runner.Report, *store.Submission, error) {
 	if !p.Ready() {
-		return nil, nil, errors.New("cannot submit: " + p.NotReadyHint() + "; `hc test` shows your output meanwhile")
+		return nil, nil, errors.New("cannot submit: " + p.NotReadyHint(a.WS.Ref(p)) + "; `hc test` shows your output meanwhile")
 	}
 	cases, err := p.LoadCases()
 	if err != nil {

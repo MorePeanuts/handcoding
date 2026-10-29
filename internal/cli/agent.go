@@ -64,7 +64,7 @@ computes expected outputs with ` + "`hc cases build`" + ` and verifies them with
 					return err
 				}
 				rel, _ := filepath.Rel(a.WS.Root, p.Dir)
-				prompt := agent.GeneratePrompt(p.Ref(), rel, count, extra)
+				prompt := ag.GeneratePrompt(p.Ref(), rel, count, extra)
 				return runAgent(cmd, a, ag, prompt, dryRun, p)
 			})
 		},
@@ -112,7 +112,7 @@ To fix a case by hand instead: hc cases edit <problem>.`,
 					solution, _ = filepath.Rel(a.WS.Root, a.SolutionPath(p, l))
 				}
 				rel, _ := filepath.Rel(a.WS.Root, p.Dir)
-				prompt := agent.FixPrompt(p.Ref(), rel, cases, complaint, solution)
+				prompt := ag.FixPrompt(p.Ref(), rel, cases, complaint, solution)
 				return runAgent(cmd, a, ag, prompt, dryRun, p)
 			})
 		},

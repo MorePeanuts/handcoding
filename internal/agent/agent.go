@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -27,6 +28,9 @@ type Agent struct {
 	Name string
 	// Argv is the command line; "{prompt}" is replaced by the prompt.
 	Argv []string
+	// SkillDir is the directory of the skill copies the agent reads,
+	// relative to the workspace root.
+	SkillDir string
 }
 
 // Presets maps agent names to their headless command lines. Both keep writes
@@ -44,10 +48,12 @@ var Presets = map[string][]string{
 	"codex": {"codex", "exec", "--full-auto", "{prompt}"},
 }
 
-// Resolve returns the agent for a preset name or a custom command.
+// Resolve returns the agent for a preset name or a custom command. Claude
+// Code reads the skills in .claude/skills; Codex, and any other command,
+// those in .agents/skills.
 func Resolve(name string, command []string) (*Agent, error) {
 	if len(command) > 0 {
-		return &Agent{Name: command[0], Argv: command}, nil
+		return &Agent{Name: command[0], Argv: command, SkillDir: skillDir(filepath.Base(command[0]))}, nil
 	}
 	if name == "" {
 		name = "claude"
@@ -56,7 +62,14 @@ func Resolve(name string, command []string) (*Agent, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown agent %q (presets: claude, codex; or set agent.command in hc.yaml)", name)
 	}
-	return &Agent{Name: name, Argv: argv}, nil
+	return &Agent{Name: name, Argv: argv, SkillDir: skillDir(name)}, nil
+}
+
+func skillDir(command string) string {
+	if command == "claude" {
+		return skill.ClaudeDir
+	}
+	return skill.AgentsDir
 }
 
 // Run executes the agent in dir with the prompt, streaming its output.
@@ -88,26 +101,33 @@ func (a *Agent) Run(ctx context.Context, dir, prompt string) error {
 	return cmd.Run()
 }
 
+// skillPath is the path of a skill's SKILL.md in the agent's copy.
+func (a *Agent) skillPath(name string) string {
+	return path.Join(a.SkillDir, name, skill.MainFile)
+}
+
 // useSkill is the sentence that starts a prompt.
-func useSkill(name, task string) string {
-	return fmt.Sprintf("Use the %s skill (read %s) to %s.\n\n", name, skill.Path(name), task)
+func (a *Agent) useSkill(name, task string) string {
+	return fmt.Sprintf("Use the %s skill (read %s) to %s.\n\n", name, a.skillPath(name), task)
 }
 
 // definitionSkill is the sentence that sends the agent to the hc-problem
 // skill when the problem itself, not its cases, is wrong.
-var definitionSkill = fmt.Sprintf("If the problem's definition itself is wrong (its signature, structure inputs, statement or templates), fix it with the %s skill (read %s) first.\n", skill.Problem, skill.Path(skill.Problem))
+func (a *Agent) definitionSkill() string {
+	return fmt.Sprintf("If the problem's definition itself is wrong (its signature, structure inputs, statement or templates), fix it with the %s skill (read %s) first.\n", skill.Problem, a.skillPath(skill.Problem))
+}
 
 // GeneratePrompt asks the agent to write a reference solution and cases for
 // the problem ref (pack/slug) in problemDir, relative to the workspace.
-func GeneratePrompt(ref, problemDir string, count int, extra string) string {
+func (a *Agent) GeneratePrompt(ref, problemDir string, count int, extra string) string {
 	var b strings.Builder
-	b.WriteString(useSkill(skill.Cases, fmt.Sprintf("generate test cases for the hc problem %s in %s", ref, problemDir)))
+	b.WriteString(a.useSkill(skill.Cases, fmt.Sprintf("generate test cases for the hc problem %s in %s", ref, problemDir)))
 	fmt.Fprintf(&b, "Name the problem %s in hc commands.\n", ref)
 	fmt.Fprintf(&b, "Follow its \"generate test cases\" workflow: decide the judge rule from the statement, write the reference solutions, add the cases, and finish when `hc validate %s --run` passes.\n", ref)
 	if count > 0 {
 		fmt.Fprintf(&b, "Target about %d cases in total.\n", count)
 	}
-	b.WriteString(definitionSkill)
+	b.WriteString(a.definitionSkill())
 	b.WriteString("Do not touch the solutions/ directory.\n")
 	if extra != "" {
 		fmt.Fprintf(&b, "\nAdditional instructions from the user: %s\n", extra)
@@ -117,9 +137,9 @@ func GeneratePrompt(ref, problemDir string, count int, extra string) string {
 
 // FixPrompt asks the agent to investigate and fix test cases of the problem
 // ref (pack/slug) in problemDir.
-func FixPrompt(ref, problemDir string, cases []int, complaint, solutionPath string) string {
+func (a *Agent) FixPrompt(ref, problemDir string, cases []int, complaint, solutionPath string) string {
 	var b strings.Builder
-	b.WriteString(useSkill(skill.Cases, fmt.Sprintf("fix test cases of the hc problem %s in %s", ref, problemDir)))
+	b.WriteString(a.useSkill(skill.Cases, fmt.Sprintf("fix test cases of the hc problem %s in %s", ref, problemDir)))
 	fmt.Fprintf(&b, "Name the problem %s in hc commands.\n", ref)
 	if len(cases) > 0 {
 		fmt.Fprintf(&b, "Suspicious case number(s): %v (inspect with `hc cases list %s --case N`).\n", cases, ref)
@@ -131,6 +151,6 @@ func FixPrompt(ref, problemDir string, cases []int, complaint, solutionPath stri
 		fmt.Fprintf(&b, "The user's solution is %s — read it only to understand the dispute, never modify it.\n", solutionPath)
 	}
 	b.WriteString("Follow its \"fix a test case\" workflow. If the test case is correct and the user's solution is wrong, explain why instead of changing anything.\n")
-	b.WriteString(definitionSkill)
+	b.WriteString(a.definitionSkill())
 	return b.String()
 }

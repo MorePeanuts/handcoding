@@ -190,7 +190,7 @@ the problem has one.`,
 				if err != nil {
 					return err
 				}
-				ui.PrintReport(os.Stdout, p, rep, ui.ReportOptions{Verbose: o.verbose})
+				ui.PrintReport(os.Stdout, p, rep, ui.ReportOptions{Verbose: o.verbose, Ref: a.WS.Ref(p)})
 				if rep.Verdict != runner.Accepted && !rep.Verdict.Unjudged() {
 					return errSilent
 				}
@@ -273,7 +273,7 @@ func newSubmitCmd(root *rootOptions) *cobra.Command {
 			}
 			return root.withProblem(args[0], langName, func(a *app.App, p *problem.Problem, l lang.Language) error {
 				if !p.Ready() {
-					return errors.New("cannot submit: " + p.NotReadyHint() + "; `hc test` shows your output meanwhile")
+					return errors.New("cannot submit: " + p.NotReadyHint(a.WS.Ref(p)) + "; `hc test` shows your output meanwhile")
 				}
 				ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 				defer stop()
@@ -282,7 +282,7 @@ func newSubmitCmd(root *rootOptions) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				ui.PrintReport(os.Stdout, p, rep, ui.ReportOptions{Verbose: verbose})
+				ui.PrintReport(os.Stdout, p, rep, ui.ReportOptions{Verbose: verbose, Ref: a.WS.Ref(p)})
 				fmt.Println(ui.Faint.Render(fmt.Sprintf("Recorded as submission #%d (hc history %s)", sub.ID, a.WS.Ref(p))))
 				if rep.Verdict != runner.Accepted {
 					return errSilent

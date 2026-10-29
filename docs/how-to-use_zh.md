@@ -263,6 +263,8 @@ agent:
   command: ["my-agent", "--yes", "{prompt}"]
 ```
 
+提示词让智能体读 `.agents/skills/` 下的 skill；命令是 `claude` 时读 `.claude/skills/` 下的。
+
 ### 智能体 skill
 
 hc 自带若干 skill，向编码智能体讲解它的题目协议和工作流程：
