@@ -93,9 +93,9 @@ func (m *model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "f":
 		m.filter = (m.filter + 1) % 3
 		m.applyFilter()
-	case "enter", "v", " ":
+	case "enter", " ", "v":
 		if p != nil {
-			m.openDetail(p)
+			m.openDetail(p, key != "v")
 		}
 	default:
 		if p != nil {
@@ -132,7 +132,7 @@ func (m *model) listHeight() int {
 
 func (m *model) viewList() string {
 	var b strings.Builder
-	solved, attempted := 0, 0
+	solved, attempted, notReady := 0, 0, 0
 	for _, s := range m.statuses {
 		switch s {
 		case app.StatusSolved:
@@ -141,8 +141,16 @@ func (m *model) viewList() string {
 			attempted++
 		}
 	}
+	for _, p := range m.probs {
+		if !p.Ready() {
+			notReady++
+		}
+	}
 	header := fmt.Sprintf("%s  %d problems  %s  %s", titleStyle.Render("handcoding"), len(m.probs),
 		ui.Green.Render(fmt.Sprintf("✔ %d solved", solved)), ui.Yellow.Render(fmt.Sprintf("● %d attempted", attempted)))
+	if notReady > 0 {
+		header += "  " + ui.Cyan.Render(fmt.Sprintf("? %d not ready", notReady))
+	}
 	right := ui.Faint.Render(fmt.Sprintf("lang: %s  filter: %s", m.lang.Name(), m.filter))
 	b.WriteString(padBetween(header, right, m.width) + "\n\n")
 
@@ -175,22 +183,18 @@ func (m *model) viewList() string {
 	}
 	for i := m.offset; i < min(m.offset+h, len(m.visible)); i++ {
 		p := m.probs[m.visible[i]]
+		// A problem that cannot be submitted shows that rather than its
+		// attempts, which could not be judged.
 		mark := ui.Faint.Render("·")
-		switch m.statuses[p.Ref()] {
-		case app.StatusSolved:
+		switch status := m.statuses[p.Ref()]; {
+		case status == app.StatusSolved:
 			mark = ui.Green.Render("✔")
-		case app.StatusAttempted:
+		case !p.Ready():
+			mark = ui.Cyan.Render("?")
+		case status == app.StatusAttempted:
 			mark = ui.Yellow.Render("●")
 		}
 		tags := ui.Faint.Render(fit(strings.Join(p.Tags, ", "), tagsW))
-		if !p.Ready() {
-			const notReady = "not ready · "
-			if tagsW <= len(notReady) {
-				tags = ui.Yellow.Render(fit(notReady, tagsW))
-			} else {
-				tags = ui.Yellow.Render(notReady) + ui.Faint.Render(fit(strings.Join(p.Tags, ", "), tagsW-len(notReady)))
-			}
-		}
 		row := fmt.Sprintf("%s %s%-6s %s %s %s", mark, ui.Faint.Render(pack(p.Pack)), p.ID, fit(p.Title, titleW), padRight(ui.Difficulty(p.Difficulty), 8), tags)
 		if i == m.cursor {
 			row = cursorStyle.Render("▸") + " " + row
@@ -220,7 +224,7 @@ func (m *model) viewList() string {
 		b.WriteString(ui.Faint.Render("search: " + m.search.Value() + " (esc to clear)"))
 	}
 	b.WriteString("\n")
-	b.WriteString(keyHelp(m.width, "↑↓ move", "enter open", "e edit", "t test", "s submit", "d debug", "h history",
+	b.WriteString(keyHelp(m.width, "↑↓ move", "enter open", "v view", "e edit", "t test", "s submit", "d debug", "h history",
 		"y copy-path", "r reset", "D discard", "f filter", "/ search", "L lang", "q quit"))
 	return b.String()
 }

@@ -92,7 +92,7 @@ A pack installed in a practice workspace (`packs/<name>/`, beside `hc.yaml`) is 
 
 Run `hc` (or `hc list`) to open the problem list. It works best with the terminal split in two: `hc` on one side, your editor on the other.
 
-- Press `enter` on a problem to open it. The statement is shown, the solution file is created from the template, and its absolute path is **copied to the clipboard**. In the editor, `:e <paste>` and start writing.
+- Press `enter` on a problem to open it. The statement is shown, the solution file is created from the template, and its absolute path is **copied to the clipboard**. In the editor, `:e <paste>` and start writing. To read a statement without starting the problem, press `v` instead: nothing is created or copied until an action such as `e`, `t` or `y` needs the solution.
 - Test, submit, debug and history are all available from the statement. Results appear in the TUI, with your program's own output listed separately below them.
 - The debugger takes over the terminal. The screen is cleared before it starts, and the TUI comes back when it exits. If the last run had a failing case, `d` debugs that case.
 - Statement images are drawn in the terminal. kitty and Ghostty show the original image. Other truecolor terminals show a block-character approximation that loses detail; press `o` to open the original in your image viewer. See [`images`](#configuration) to choose the mode.
@@ -107,7 +107,7 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 | `y` | Copy the solution path again | `L` | Switch language |
 | `r` | Reset to the template | `D` | Discard: delete the solution and its history, back to not started |
 | `/` | Search | `f` | Filter: all / unsolved / solved |
-| `o` | Open the statement's images (statement view) | | |
+| `v` | View the statement only | `o` | Open the statement's images (statement view) |
 | `esc` / `q` | Back; `q` on the list quits | `ctrl+c` | Quit |
 
 ## Commands
@@ -156,7 +156,7 @@ hc gen 146                  # make it ready: test cases and the judge rule
 
 `hc fetch` downloads the statement and its images, the signature, the Go and Python starter code, and the examples. Expected outputs are included when they can be parsed from the statement.
 
-A fetched problem is **not ready to submit** yet. LeetCode only publishes the examples, and not how answers are judged: whether order matters, whether several answers are valid. Until that is decided, `hc test` shows your output next to the example's answer without a verdict, and `hc submit` refuses. `hc gen` writes the full test suite and decides the judge rule from the statement, writing a checker when no built-in rule fits; you can also set `judge.compare` yourself (see the protocol's [compare modes](protocol.md#compare-modes)). The list marks such problems as "not ready".
+A fetched problem is **not ready to submit** yet. LeetCode only publishes the examples, and not how answers are judged: whether order matters, whether several answers are valid. Until that is decided, `hc test` shows your output next to the example's answer without a verdict, and `hc submit` refuses. `hc gen` writes the full test suite and decides the judge rule from the statement, writing a checker when no built-in rule fits; you can also set `judge.compare` yourself (see the protocol's [compare modes](protocol.md#compare-modes)). The list marks such problems with `?` in the status column, where solved problems show `✔` and attempted ones `●`.
 
 Premium problems are not available. Neither are problems whose signature uses types hc does not support yet (such as `MountainArray` in interactive problems); `hc fetch` says so.
 

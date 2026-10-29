@@ -196,6 +196,34 @@ func TestEnterOpensDetailAndCopiesPath(t *testing.T) {
 	}
 }
 
+// v shows the statement without starting the problem, also in another
+// language; an action that needs the solution creates it.
+func TestViewDoesNotStart(t *testing.T) {
+	h := newHarness(t)
+	p := h.m.selected()
+	h.press("v")
+	if h.m.top() != screenDetail {
+		t.Fatalf("screen %v, want detail", h.m.top())
+	}
+	h.press("L")
+	for _, l := range h.m.app.Langs.All() {
+		if h.m.app.HasSolution(p, l) {
+			t.Fatalf("viewing created the %s solution", l.Name())
+		}
+	}
+	if len(h.copied) != 0 || !strings.Contains(h.view(), "(not created)") {
+		t.Fatalf("copied %v; view:\n%s", h.copied, h.view())
+	}
+	h.press("y")
+	if !h.m.app.HasSolution(p, h.m.lang) || len(h.copied) != 1 {
+		t.Fatalf("y did not create and copy the solution: copied %v", h.copied)
+	}
+	h.press("esc")
+	if h.m.statuses[p.Ref()] != app.StatusAttempted {
+		t.Errorf("status %v after y", h.m.statuses[p.Ref()])
+	}
+}
+
 func TestDetailOpensStatementImages(t *testing.T) {
 	h := newHarness(t)
 	var opened []string
@@ -204,7 +232,7 @@ func TestDetailOpensStatementImages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h.m.openDetail(p)
+	h.m.openDetail(p, true)
 	view := h.view()
 	// No image protocol in tests: the images show as labels.
 	for _, want := range []string{"[image: rev1ex1.jpg]", "o open-images"} {
@@ -219,7 +247,7 @@ func TestDetailOpensStatementImages(t *testing.T) {
 	}
 
 	h.press("esc")
-	h.m.openDetail(h.m.probs[0]) // two-sum has no images
+	h.m.openDetail(h.m.probs[0], true) // two-sum has no images
 	if strings.Contains(h.view(), "open-images") {
 		t.Error("open-images offered for a statement without images")
 	}
@@ -342,7 +370,7 @@ func TestNotReadyProblem(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.m.refresh()
-	if !strings.Contains(h.view(), "not ready") {
+	if !strings.Contains(h.view(), "? 1 not ready") {
 		t.Fatalf("list does not mark the problem:\n%s", h.view())
 	}
 

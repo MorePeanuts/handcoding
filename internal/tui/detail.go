@@ -16,12 +16,16 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/ui"
 )
 
-// openDetail shows the statement of p. The solution file is created if
-// needed and its path copied, ready to be opened in an editor next door.
-func (m *model) openDetail(p *problem.Problem) {
+// openDetail shows the statement of p. To start it, the solution file is
+// created if needed and its path copied, ready to be opened in an editor
+// next door; otherwise the problem is only viewed.
+func (m *model) openDetail(p *problem.Problem, start bool) {
 	m.current = p
-	if path, ok := m.ensureSolution(p); ok {
-		m.copyPath(path)
+	m.viewing = !start
+	if start {
+		if path, ok := m.ensureSolution(p); ok {
+			m.copyPath(path)
+		}
 	}
 	m.push(screenDetail)
 	m.detail.GotoTop()

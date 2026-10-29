@@ -99,7 +99,10 @@ type model struct {
 	multiPack bool
 
 	// current is the problem shown by the detail, result and history screens.
-	current      *problem.Problem
+	current *problem.Problem
+	// viewing is set when the detail screen only shows the statement: hc
+	// creates no solution file until an action needs one.
+	viewing      bool
 	detail       viewport.Model
 	detailImages []string // local images of the current statement
 

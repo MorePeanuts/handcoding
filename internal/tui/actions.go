@@ -117,8 +117,10 @@ func (m *model) switchLang() {
 	}
 	m.message = "language: " + m.lang.Name()
 	if m.top() == screenDetail && m.current != nil {
-		if path, ok := m.ensureSolution(m.current); ok {
-			m.copyPath(path)
+		if !m.viewing {
+			if path, ok := m.ensureSolution(m.current); ok {
+				m.copyPath(path)
+			}
 		}
 		m.renderDetail()
 	}
