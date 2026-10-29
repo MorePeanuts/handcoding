@@ -81,3 +81,47 @@ func TestOldSchema(t *testing.T) {
 		t.Fatalf("Open: %v, want ErrOldSchema", err)
 	}
 }
+
+// TestPrefs checks that preferences are kept per pack and for the
+// workspace, survive reopening, and go with a purged pack.
+func TestPrefs(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hc.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	for _, p := range [][3]string{{"", "pack", "leetcode"}, {"leetcode", "locale", "en"}, {"leetcode", "locale", "zh-CN"}, {"local", "locale", "en"}} {
+		if err := s.SetPref(ctx, p[0], p[1], p[2]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s.Close()
+	if s, err = Open(path); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	pref := func(pack, key string) string {
+		t.Helper()
+		v, err := s.Pref(ctx, pack, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	if got := [3]string{pref("", "pack"), pref("leetcode", "locale"), pref("local", "locale")}; got != [3]string{"leetcode", "zh-CN", "en"} {
+		t.Errorf("prefs after reopening: %q", got)
+	}
+	if pref("", "locale") != "" || pref("regression", "locale") != "" {
+		t.Error("an unset preference is not empty")
+	}
+	if _, err := s.DeletePack(ctx, "leetcode"); err != nil {
+		t.Fatal(err)
+	}
+	if pref("leetcode", "locale") != "" || pref("local", "locale") != "en" || pref("", "pack") != "leetcode" {
+		t.Error("DeletePack removed the wrong preferences")
+	}
+	if err := s.SetPref(ctx, "local", "locale", ""); err != nil || pref("local", "locale") != "" {
+		t.Errorf("SetPref to empty did not remove it: %v", err)
+	}
+}

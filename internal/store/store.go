@@ -1,4 +1,5 @@
-// Package store persists submission history in SQLite.
+// Package store persists submission history, and the preferences hc
+// remembers across runs, in SQLite.
 package store
 
 import (
@@ -56,6 +57,16 @@ CREATE TABLE IF NOT EXISTS submissions (
 
 const index = `CREATE INDEX IF NOT EXISTS submissions_problem ON submissions(pack, slug, created_at)`
 
+// prefs holds what hc remembers between runs, such as the pack the TUI
+// showed last: per pack, or for the workspace when pack is "".
+const prefs = `
+CREATE TABLE IF NOT EXISTS prefs (
+	pack  TEXT NOT NULL,
+	key   TEXT NOT NULL,
+	value TEXT NOT NULL,
+	PRIMARY KEY (pack, key)
+)`
+
 // ErrOldSchema is returned for a database written by an older hc.
 var ErrOldSchema = errors.New("the submission history was written by an older hc, which this one does not read; delete the file to start a new history")
 
@@ -81,7 +92,10 @@ func create(db *sql.DB) error {
 	if _, err := db.Exec(`SELECT ` + columns + ` FROM submissions LIMIT 0`); err != nil {
 		return fmt.Errorf("%w (%w)", ErrOldSchema, err)
 	}
-	_, err := db.Exec(index)
+	if _, err := db.Exec(index); err != nil {
+		return err
+	}
+	_, err := db.Exec(prefs)
 	return err
 }
 
@@ -167,13 +181,42 @@ func (s *Store) DeleteProblem(ctx context.Context, pack, slug string) (int64, er
 }
 
 // DeletePack removes every submission of the problems of the pack called
-// pack and returns how many were deleted.
+// pack, and its preferences, and returns how many submissions were deleted.
 func (s *Store) DeletePack(ctx context.Context, pack string) (int64, error) {
+	if pack == "" {
+		return 0, errors.New("no pack named")
+	}
 	res, err := s.db.ExecContext(ctx, `DELETE FROM submissions WHERE pack = ?`, pack)
 	if err != nil {
 		return 0, err
 	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM prefs WHERE pack = ?`, pack); err != nil {
+		return 0, err
+	}
 	return res.RowsAffected()
+}
+
+// Pref returns the preference key of the pack, or of the workspace when
+// pack is "". It is "" when unset.
+func (s *Store) Pref(ctx context.Context, pack, key string) (string, error) {
+	var v string
+	err := s.db.QueryRowContext(ctx, `SELECT value FROM prefs WHERE pack = ? AND key = ?`, pack, key).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return v, err
+}
+
+// SetPref sets the preference key of the pack, or of the workspace when pack
+// is ""; an empty value removes it.
+func (s *Store) SetPref(ctx context.Context, pack, key, value string) error {
+	if value == "" {
+		_, err := s.db.ExecContext(ctx, `DELETE FROM prefs WHERE pack = ? AND key = ?`, pack, key)
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO prefs (pack, key, value) VALUES (?, ?, ?)
+		ON CONFLICT (pack, key) DO UPDATE SET value = excluded.value`, pack, key, value)
+	return err
 }
 
 // Status summarizes the best result per problem.
