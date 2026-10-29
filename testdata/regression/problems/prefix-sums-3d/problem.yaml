@@ -1,5 +1,6 @@
 slug: prefix-sums-3d
 title: 3D Prefix Sums
+titles: {zh-CN: 三维前缀和}
 difficulty: easy
 tags: [array, matrix, prefix-sum]
 kind: function

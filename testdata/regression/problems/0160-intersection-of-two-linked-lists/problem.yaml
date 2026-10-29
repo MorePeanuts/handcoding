@@ -1,6 +1,7 @@
 id: "160"
 slug: intersection-of-two-linked-lists
 title: Intersection of Two Linked Lists
+titles: {zh-CN: 相交链表}
 difficulty: easy
 tags: [hash-table, linked-list, two-pointers]
 kind: function

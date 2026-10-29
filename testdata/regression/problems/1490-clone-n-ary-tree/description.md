@@ -1,8 +1,8 @@
-# 1490. 克隆 N 叉树
+# 1490. Clone N-ary Tree
 
-给你一棵 N 叉树的根节点 `root`，返回这棵树的**深拷贝**：一棵结构和值都相同的新树，其中每个节点都是新建的，不能与原树共用任何节点。
+You are given `root`, the root of an N-ary tree. Return a **deep copy** of the tree: a tree with the same shape and the same values, built entirely from new nodes. No node of the copy may be a node of the original tree.
 
-N 叉树的节点有一个值 `val` 和一个子节点列表 `children`：
+Each node holds an integer `val` and a list of its children, `children`:
 
 ```
 class Node {
@@ -11,23 +11,24 @@ class Node {
 }
 ```
 
-**N 叉树格式：** 输入输出按层序遍历序列化，先写根节点的值，之后每个节点的子节点为一组，每组后面跟一个 `null`。
+**N-ary tree format:** trees are written in level order. The root's value comes first, followed by `null`; then the children of each node, in level order, as a group that ends with `null`.
 
-**示例 1：**
-
-```
-输入：root = [1,null,3,2,4,null,5,6]
-输出：[1,null,3,2,4,null,5,6]
-```
-
-**示例 2：**
+**Example 1:**
 
 ```
-输入：root = [1,null,2,3,4,5,null,null,6,7,null,8,null,9,10,null,null,11,null,12,null,13,null,null,14]
-输出：[1,null,2,3,4,5,null,null,6,7,null,8,null,9,10,null,null,11,null,12,null,13,null,null,14]
+Input: root = [1,null,3,2,4,null,5,6]
+Output: [1,null,3,2,4,null,5,6]
 ```
 
-**提示：**
+**Example 2:**
 
-- 树的深度不超过 `1000`
-- 节点总数在 `[0, 10^4]` 范围内
+```
+Input: root = []
+Output: []
+Explanation: the copy of an empty tree is empty.
+```
+
+**Constraints:**
+
+- The tree has between `0` and `10^4` nodes.
+- The depth of the tree is at most `1000`.

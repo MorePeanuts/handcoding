@@ -1,23 +1,33 @@
-# 49. 字母异位词分组
+# 49. Group Anagrams
 
-给你一个字符串数组，请你将**字母异位词**组合在一起。可以按任意顺序返回结果列表（组内顺序也任意）。
+Given an array of strings `strs`, group the anagrams together. You can return the answer in **any order**.
 
-**示例 1：**
+**Example 1:**
 
-```
-输入：strs = ["eat", "tea", "tan", "ate", "nat", "bat"]
-输出：[["bat"],["nat","tan"],["ate","eat","tea"]]
-```
+**Input:** strs = \["eat","tea","tan","ate","nat","bat"]
 
-**示例 2：**
+**Output:** \[\["bat"],\["nat","tan"],\["ate","eat","tea"]]
 
-```
-输入：strs = [""]
-输出：[[""]]
-```
+**Explanation:**
 
-**提示：**
+- There is no string in strs that can be rearranged to form `"bat"`.
+- The strings `"nat"` and `"tan"` are anagrams as they can be rearranged to form each other.
+- The strings `"ate"`, `"eat"`, and `"tea"` are anagrams as they can be rearranged to form each other.
+
+**Example 2:**
+
+**Input:** strs = \[""]
+
+**Output:** \[\[""]]
+
+**Example 3:**
+
+**Input:** strs = \["a"]
+
+**Output:** \[\["a"]]
+
+**Constraints:**
 
 - `1 <= strs.length <= 10^4`
 - `0 <= strs[i].length <= 100`
-- `strs[i]` 仅包含小写字母
+- `strs[i]` consists of lowercase English letters.

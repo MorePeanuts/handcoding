@@ -29,6 +29,10 @@ func addProblem(t *testing.T, a *app.App, dir, yaml, cases string) *problem.Prob
 	if err := os.WriteFile(filepath.Join(d, problem.CasesFile), []byte(cases), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// The local pack's locale, en, needs a statement.
+	if err := os.WriteFile(filepath.Join(d, problem.DescriptionFile), []byte("# "+dir+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	p, err := problem.Load(d)
 	if err == nil {
 		p.Pack = local.Name

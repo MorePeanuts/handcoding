@@ -1,6 +1,7 @@
 id: "430"
 slug: flatten-a-multilevel-doubly-linked-list
 title: Flatten a Multilevel Doubly Linked List
+titles: {zh-CN: 扁平化多级双向链表}
 difficulty: medium
 tags: [depth-first-search, linked-list, doubly-linked-list]
 kind: function

@@ -1,6 +1,7 @@
 id: "108"
 slug: convert-sorted-array-to-binary-search-tree
 title: Convert Sorted Array to Binary Search Tree
+titles: {zh-CN: 将有序数组转换为二叉搜索树}
 difficulty: easy
 tags: [tree, binary-search-tree, array, divide-and-conquer, binary-tree]
 kind: function

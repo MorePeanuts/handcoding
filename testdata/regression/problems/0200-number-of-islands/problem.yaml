@@ -1,6 +1,7 @@
 id: "200"
 slug: number-of-islands
 title: Number of Islands
+titles: {zh-CN: 岛屿数量}
 difficulty: medium
 tags: [array, depth-first-search, breadth-first-search, union-find, matrix]
 kind: function

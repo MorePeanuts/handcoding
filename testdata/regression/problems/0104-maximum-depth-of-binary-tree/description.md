@@ -1,26 +1,26 @@
-# 104. 二叉树的最大深度
+# 104. Maximum Depth of Binary Tree
 
-给定一个二叉树 `root`，返回其最大深度。
+Given the `root` of a binary tree, return *its maximum depth*.
 
-二叉树的**最大深度**是指从根节点到最远叶子节点的最长路径上的节点数。
+A binary tree's **maximum depth** is the number of nodes along the longest path from the root node down to the farthest leaf node.
 
-二叉树以层序遍历数组表示，`null` 表示空节点。
+**Example 1:**
 
-**示例 1：**
-
-```
-输入：root = [3,9,20,null,null,15,7]
-输出：3
-```
-
-**示例 2：**
+![](assets/tmp-tree.jpg)
 
 ```
-输入：root = [1,null,2]
-输出：2
+Input: root = [3,9,20,null,null,15,7]
+Output: 3
 ```
 
-**提示：**
+**Example 2:**
 
-- 树中节点的数量在 `[0, 10^4]` 区间内
+```
+Input: root = [1,null,2]
+Output: 2
+```
+
+**Constraints:**
+
+- The number of nodes in the tree is in the range `[0, 10^4]`.
 - `-100 <= Node.val <= 100`

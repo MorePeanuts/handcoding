@@ -1,6 +1,7 @@
 id: "237"
 slug: delete-node-in-a-linked-list
 title: Delete Node in a Linked List
+titles: {zh-CN: 删除链表中的节点}
 difficulty: medium
 tags: [linked-list]
 kind: function

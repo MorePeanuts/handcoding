@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -110,9 +111,10 @@ func (a *App) ValidateWorkspace(ctx context.Context, o ValidateOptions, report f
 func lines(err error) []string { return strings.Split(err.Error(), "\n") }
 
 // ValidateProblem validates p against the protocol: problem.yaml,
-// cases.jsonl, starter generation, its statement's images and its identity
-// among peers, the problems of its pack (nil loads them). name is how hints
-// name the problem. With o.Run, every reference runs on every case.
+// cases.jsonl, starter generation, its statements and titles in the pack's
+// locales, their images and its identity among peers, the problems of its
+// pack (nil loads them). name is how hints name the problem. With o.Run,
+// every reference runs on every case.
 func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*problem.Problem, name string, o ValidateOptions) Finding {
 	f := Finding{Name: name, Problem: p}
 	var errs, warns []string
@@ -203,10 +205,15 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 	}
 	// Conflicts with the rest of the pack come last, so that they do not
 	// keep the checks above from running.
-	if peers == nil {
-		if k, err := a.WS.Pack(p.Pack); err == nil {
-			peers, _, _ = k.Problems()
+	k, err := a.WS.Pack(p.Pack)
+	if err == nil {
+		// Statements and titles in the pack's locales.
+		if err := p.ValidateLocales(k.Manifest.Locales); err != nil {
+			errs = append(errs, lines(err)...)
 		}
+	}
+	if peers == nil && k != nil {
+		peers, _, _ = k.Problems()
 	}
 	for _, err := range pack.IdentityErrors(p, peers) {
 		errs = append(errs, err.Error())
@@ -255,21 +262,33 @@ func clip(s string, n int) string {
 	return s[:n] + fmt.Sprintf("… (+%d bytes)", len(s)-n)
 }
 
-// imageWarnings reports local images in the statement that do not exist.
+// imageWarnings reports local images in the statements, in every locale,
+// that do not exist.
 func imageWarnings(p *problem.Problem) []string {
-	desc, err := p.Description()
-	if err != nil {
-		return []string{err.Error()}
+	files := []string{problem.DescriptionFile}
+	translations, _ := p.Translations()
+	for _, l := range translations {
+		files = append(files, problem.TranslationFile(l))
 	}
 	var warns []string
-	problem.ReplaceImages(desc, func(_, src string) string {
-		if strings.Contains(src, "://") || strings.HasPrefix(src, "data:") {
+	for _, file := range files {
+		data, err := os.ReadFile(filepath.Join(p.Dir, file))
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			warns = append(warns, err.Error())
+			continue
+		}
+		problem.ReplaceImages(string(data), func(_, src string) string {
+			if strings.Contains(src, "://") || strings.HasPrefix(src, "data:") {
+				return ""
+			}
+			if _, err := os.Stat(filepath.Join(p.Dir, filepath.FromSlash(src))); err != nil {
+				warns = append(warns, fmt.Sprintf("%s: image %s not found", file, src))
+			}
 			return ""
-		}
-		if _, err := os.Stat(filepath.Join(p.Dir, filepath.FromSlash(src))); err != nil {
-			warns = append(warns, fmt.Sprintf("%s: image %s not found", problem.DescriptionFile, src))
-		}
-		return ""
-	})
+		})
+	}
 	return warns
 }

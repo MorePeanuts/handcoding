@@ -1,6 +1,7 @@
 id: "23"
 slug: merge-k-sorted-lists
 title: Merge k Sorted Lists
+titles: {zh-CN: 合并 K 个升序链表}
 difficulty: hard
 tags: [linked-list, divide-and-conquer, heap-priority-queue, merge-sort]
 kind: function

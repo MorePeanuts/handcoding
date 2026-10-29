@@ -1,6 +1,7 @@
 id: "558"
 slug: logical-or-of-two-binary-grids-represented-as-quad-trees
 title: Logical OR of Two Binary Grids Represented as Quad-Trees
+titles: {zh-CN: 四叉树交集}
 difficulty: medium
 tags: [divide-and-conquer, tree]
 kind: function

@@ -1,6 +1,7 @@
 id: "173"
 slug: binary-search-tree-iterator
 title: Binary Search Tree Iterator
+titles: {zh-CN: 二叉搜索树迭代器}
 difficulty: medium
 tags: [stack, tree, design, binary-search-tree, binary-tree, iterator]
 kind: class

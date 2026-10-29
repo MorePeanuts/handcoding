@@ -14,6 +14,7 @@ import (
 	"github.com/goccy/go-yaml/parser"
 
 	"github.com/MorePeanuts/handcoding/internal/pack"
+	"github.com/MorePeanuts/handcoding/internal/problem"
 )
 
 // packsKey is the key of Config.Packs in hc.yaml.
@@ -46,6 +47,28 @@ func checkPacks(data []byte, kind Kind, list []PackSource) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// localesKey is the key of Config.Locales in hc.yaml.
+const localesKey = "locales"
+
+// checkLocales checks the locales of hc.yaml, data, which are the local
+// pack's: a pack checkout has no local pack, and its locales are in its
+// pack.yaml.
+func checkLocales(data []byte, kind Kind, locales []string) error {
+	if kind == Authoring {
+		var keys map[string]any
+		if yaml.Unmarshal(data, &keys) == nil {
+			if _, ok := keys[localesKey]; ok {
+				return errors.New("locales: are the locales of a practice workspace's own problems, and a pack checkout's are in its pack.yaml: remove it from this hc.yaml")
+			}
+		}
+		return nil
+	}
+	if locales == nil {
+		return nil
+	}
+	return problem.CheckLocales(locales)
 }
 
 // PacksPath is the directory of the packs, packs/ (in a practice workspace).

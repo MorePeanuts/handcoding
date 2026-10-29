@@ -1,6 +1,7 @@
 id: "104"
 slug: maximum-depth-of-binary-tree
 title: Maximum Depth of Binary Tree
+titles: {zh-CN: 二叉树的最大深度}
 difficulty: easy
 tags: [tree, depth-first-search, breadth-first-search, binary-tree]
 kind: function

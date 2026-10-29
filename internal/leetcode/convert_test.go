@@ -37,7 +37,7 @@ func TestConvertFunction(t *testing.T) {
 		Code     string `json:"code"`
 	}{"golang", "func twoSum(nums []int, target int) []int {\n\n}"})
 
-	c, err := Convert(q, SiteCom, false)
+	c, err := Convert(q, SiteCom)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,8 +56,8 @@ func TestConvertFunction(t *testing.T) {
 	if string(c.Cases[1].Input["target"]) != "6" {
 		t.Fatalf("input: %s", c.Cases[1].Input["target"])
 	}
-	if !strings.Contains(c.Description, "10^4") {
-		t.Errorf("superscript lost in description:\n%s", c.Description)
+	if desc := c.Statements[LocaleEnglish]; !strings.Contains(desc, "10^4") {
+		t.Errorf("superscript lost in description:\n%s", desc)
 	}
 	if _, ok := c.Templates["solution.go"]; !ok {
 		t.Error("go template missing")
@@ -73,7 +73,7 @@ func TestConvertClassAndInPlace(t *testing.T) {
 			"return":{"type":"boolean"},"systemdesign":true}`,
 		ExampleTestcases: `["LRUCache","get"]` + "\n" + `[[2],[1]]`,
 	}
-	c, err := Convert(q, SiteCom, false)
+	c, err := Convert(q, SiteCom)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestConvertClassAndInPlace(t *testing.T) {
 		QuestionFrontendID: "189", Title: "Rotate Array", TitleSlug: "rotate-array", Difficulty: "Medium",
 		MetaData: `{"name":"rotate","params":[{"name":"nums","type":"integer[]"},{"name":"k","type":"integer"}],"return":{"type":"void"},"output":{"paramindex":0}}`,
 	}
-	c, err = Convert(q, SiteCom, false)
+	c, err = Convert(q, SiteCom)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestConvertSkipsLanguageOnlyParams(t *testing.T) {
 			"return":{"type":"boolean"},"systemdesign":true}`,
 		ExampleTestcases: `["KthLargest","add"]` + "\n" + `[[3,[4,5,8,2]],[3]]`,
 	}
-	c, err := Convert(q, SiteCom, false)
+	c, err := Convert(q, SiteCom)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestConvertSkipsLanguageOnlyParams(t *testing.T) {
 		QuestionFrontendID: "1", Title: "Sum", TitleSlug: "sum", Difficulty: "Easy",
 		MetaData: `{"name":"sum","params":[{"name":"nums","type":"integer[]"},{"name":"numsSize","type":"integer","lang":"c"}],"return":{"type":"integer"}}`,
 	}
-	c, err = Convert(q, SiteCom, false)
+	c, err = Convert(q, SiteCom)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestConvertUnsupported(t *testing.T) {
 		}, "real signature g(n int) cannot be driven by hc: the template defines g, not f"},
 	}
 	for _, tt := range tests {
-		_, err := Convert(tt.q, SiteCom, false)
+		_, err := Convert(tt.q, SiteCom)
 		if !errors.Is(err, ErrUnsupported) || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("%s: error = %v, want ErrUnsupported with %q", tt.name, err, tt.want)
 		}
@@ -176,7 +176,7 @@ func TestConvertOutputLength(t *testing.T) {
 		Content:          "<pre><strong>Output:</strong> 2, nums = [1,2,_]\n</pre>",
 		ExampleTestcases: "[1,1,2]",
 	}
-	c, err := Convert(q, SiteCom, false)
+	c, err := Convert(q, SiteCom)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,15 +193,57 @@ func TestConvertChineseOnly(t *testing.T) {
 		MetaData:          `{"name":"trainningPlan","params":[{"name":"head","type":"ListNode"}],"return":{"type":"ListNode"}}`,
 		ExampleTestcases:  "[1,2]",
 	}
-	c, err := Convert(q, SiteCN, false)
+	c, err := Convert(q, SiteCN)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(c.Description, "反转链表") {
-		t.Errorf("description should fall back to Chinese:\n%s", c.Description)
+	if c.Has(LocaleEnglish) || !c.Has(LocaleChinese) {
+		t.Errorf("statements: %v", c.Statements)
+	}
+	// A pack whose default is English cannot have it; one without locales
+	// takes the Chinese statement.
+	if missing := c.Localize([]string{"en", "zh-CN"}, "en"); !slices.Equal(missing, []string{"en"}) {
+		t.Errorf("missing = %q", missing)
+	}
+	if missing := c.Localize(nil, ""); missing != nil || !strings.Contains(c.Description, "反转链表") || c.Problem.Title != "训练计划 III" {
+		t.Errorf("missing = %q, description:\n%s", missing, c.Description)
 	}
 	if len(c.Cases) != 1 || string(c.Cases[0].Expected) != "[2,1]" {
 		t.Errorf("cases = %+v", c.Cases)
+	}
+}
+
+// leetcode.cn has the English statement and its Chinese translation;
+// Localize picks those of the pack, the default as description.md.
+func TestConvertLocales(t *testing.T) {
+	q := &Question{
+		QuestionFrontendID: "70", Title: "Climbing Stairs", TitleSlug: "climbing-stairs",
+		TranslatedTitle:   "爬楼梯",
+		MetaData:          `{"name":"climbStairs","params":[{"name":"n","type":"integer"}],"return":{"type":"integer"}}`,
+		Content:           "<p>Climb.</p>",
+		TranslatedContent: "<p>爬。</p>",
+		ExampleTestcases:  "2",
+	}
+	c, err := Convert(q, SiteCN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if missing := c.Localize([]string{"en", "zh-CN", "fr"}, "en"); !slices.Equal(missing, []string{"fr"}) {
+		t.Errorf("missing = %q", missing)
+	}
+	if p := c.Problem; p.Title != "Climbing Stairs" || p.Titles["zh-CN"] != "爬楼梯" || len(p.Titles) != 1 {
+		t.Errorf("titles: %q %v", p.Title, p.Titles)
+	}
+	if c.Description != "# 70. Climbing Stairs\n\nClimb.\n" || c.Translations["zh-CN"] != "# 70. 爬楼梯\n\n爬。\n" {
+		t.Errorf("statements: %q %q", c.Description, c.Translations)
+	}
+
+	c, err = Convert(q, SiteCN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if missing := c.Localize([]string{"zh-CN"}, "zh-CN"); missing != nil || c.Problem.Title != "爬楼梯" || c.Problem.Titles != nil || c.Translations != nil {
+		t.Errorf("zh-CN only: missing %q, %+v", missing, c.Problem)
 	}
 }
 
@@ -212,7 +254,7 @@ func TestConvertDropsMismatchedExpected(t *testing.T) {
 		Content:          "<pre><strong>Output:</strong> [2]\n</pre>",
 		ExampleTestcases: "2",
 	}
-	c, err := Convert(q, SiteCom, false)
+	c, err := Convert(q, SiteCom)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +329,7 @@ func TestConvertJudgeDefinedTypes(t *testing.T) {
 		{"flatten-nested-list-iterator", "NestedIterator(nestedList NestedInteger[]); next() integer; hasNext() boolean", 0, 0},
 	}
 	for _, tt := range tests {
-		c, err := Convert(loadQuestion(t, tt.slug), SiteCom, false)
+		c, err := Convert(loadQuestion(t, tt.slug), SiteCom)
 		if err != nil {
 			t.Errorf("%s: %v", tt.slug, err)
 			continue
@@ -339,7 +381,7 @@ func TestConvertUnsupportedTemplates(t *testing.T) {
 	for _, tt := range tests {
 		q := &Question{QuestionFrontendID: "1", TitleSlug: "x", MetaData: `{"name":"f","params":[{"name":"root","type":"integer"}],"return":{"type":"integer"},"manual":true}`,
 			CodeSnippets: goSnippet(tt.template)}
-		_, err := Convert(q, SiteCom, false)
+		_, err := Convert(q, SiteCom)
 		if !errors.Is(err, ErrUnsupported) || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("%s: error = %v, want ErrUnsupported with %q", tt.name, err, tt.want)
 		}
@@ -363,7 +405,7 @@ func TestConvertRoundTrip(t *testing.T) {
 			`{"longUrl":"https://leetcode.com/problems/design-tinyurl"}`, `"https://leetcode.com/problems/design-tinyurl"`, problem.RoundTrip{Encode: "encode", Decode: "decode", Instances: problem.InstancesSame}},
 	}
 	for _, tt := range tests {
-		c, err := Convert(loadQuestion(t, tt.slug), SiteCom, false)
+		c, err := Convert(loadQuestion(t, tt.slug), SiteCom)
 		if err != nil {
 			t.Errorf("%s: %v", tt.slug, err)
 			continue
@@ -423,7 +465,7 @@ func TestHarnessRoundTrip(t *testing.T) {
 func TestConvertRoundTripFunction(t *testing.T) {
 	q := &Question{QuestionFrontendID: "1", Title: "X", TitleSlug: "x", MetaData: `{"name":"f","params":[{"name":"s","type":"string"}],"return":{"type":"string"},"manual":true}`,
 		CodeSnippets: goSnippet("func f(s string) string {\n\n}\n\n/**\n * data := c.encode(s)\n * ans := c.decode(data)\n */")}
-	if _, err := Convert(q, SiteCom, false); err == nil || !strings.Contains(err.Error(), "judge.round_trip is for class problems only") {
+	if _, err := Convert(q, SiteCom); err == nil || !strings.Contains(err.Error(), "judge.round_trip is for class problems only") {
 		t.Errorf("error = %v", err)
 	}
 }
@@ -462,7 +504,7 @@ func TestConvertStructureInputs(t *testing.T) {
 			first: `{"original":[7,4,3,null,null,6,19],"target":3}`},
 	}
 	for _, tt := range tests {
-		c, err := Convert(loadQuestion(t, tt.slug), SiteCom, false)
+		c, err := Convert(loadQuestion(t, tt.slug), SiteCom)
 		if err != nil {
 			t.Errorf("%s: %v", tt.slug, err)
 			continue
@@ -510,7 +552,7 @@ func TestConvertStructureInputsUnsupported(t *testing.T) {
 		{"find-in-mountain-array", "the template's mountainArr is *MountainArray, which hc does not support"},
 	}
 	for _, tt := range tests {
-		_, err := Convert(loadQuestion(t, tt.slug), SiteCom, false)
+		_, err := Convert(loadQuestion(t, tt.slug), SiteCom)
 		if !errors.Is(err, ErrUnsupported) || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("%s: error = %v, want ErrUnsupported with %q", tt.slug, err, tt.want)
 		}

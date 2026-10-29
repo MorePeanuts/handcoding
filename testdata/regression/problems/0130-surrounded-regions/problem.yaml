@@ -1,6 +1,7 @@
 id: "130"
 slug: surrounded-regions
 title: Surrounded Regions
+titles: {zh-CN: 被围绕的区域}
 difficulty: medium
 tags: [depth-first-search, breadth-first-search, union-find, array, matrix]
 kind: function

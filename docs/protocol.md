@@ -56,16 +56,19 @@ problems/<dir>/    one problem directory per problem; see Problem directory
 |---|---|---|---|---|---|
 | `protocol` | integer | yes | | The [protocol version](#protocol-versions) the pack is written against: a positive integer, not a string or a fraction | 1 |
 | `name` | string | yes | | Lower-case letters, digits and single hyphens: `^[a-z0-9]+(-[a-z0-9]+)*$`. Not `local`. The pack's identity (below) | 1 |
-| `title` | string | no | `name` | The display name | 1 |
+| `title` | string | no | `name` | The display name, in the default locale | 1 |
+| `titles` | mapping | no | `{}` | The display name in the other locales, by locale; see [Locales](#locales) | 1 |
 | `version` | string | no | none | A SemVer 2.0.0 version without a `v` prefix: `0.3.0`, `1.0.0-alpha.1`. Informational: installs are pinned by commit, not by this field | 1 |
 | `description` | string | no | none | Informational | 1 |
 | `authors` | list of strings | no | `[]` | Informational | 1 |
 | `license` | string | no | none | SHOULD be an SPDX license expression, such as `MIT` | 1 |
 | `homepage` | string | no | none | SHOULD be a URL | 1 |
 | `languages` | list of strings | no | every language of `protocol` | Not empty; language ids of the declared protocol, without duplicates; see below | 1 |
+| `locales` | list of strings | no | none: one unnamed language | Not empty; BCP 47 language tags, without duplicates. The first is the default locale. See [Locales](#locales) | 1 |
 | `groups` | list of groups | no | `[]` | See [Groups](#groups) | 1 |
 | `groups[].name` | string | yes | | `^[a-z0-9]+(-[a-z0-9]+)*$`, unique among the pack's groups | 1 |
-| `groups[].title` | string | no | the group's `name` | The display name | 1 |
+| `groups[].title` | string | no | the group's `name` | The display name, in the default locale | 1 |
+| `groups[].titles` | mapping | no | `{}` | The display name in the other locales, by locale | 1 |
 | `groups[].problems` | list of strings | no | `[]` | Slugs of problems of the pack, without duplicates | 1 |
 
 - `protocol` is read first. A tool that does not read the declared version refuses the pack without reading the rest of it ([Protocol versions](#protocol-versions)), since a newer protocol may add fields it does not know.
@@ -85,15 +88,18 @@ A pack.yaml with every field:
 protocol: 1
 name: leetcode
 title: LeetCode
+titles: {zh-CN: 力扣}
 version: 0.3.0
 description: Classic LeetCode problems with Go and Python references.
 authors: [MorePeanuts]
 license: MIT
 homepage: https://github.com/MorePeanuts/handcoding-leetcode
 languages: [go, python]
+locales: [en, zh-CN]
 groups:
   - name: arrays
     title: Arrays
+    titles: {zh-CN: 数组}
     problems: [two-sum, rotate-array]
 ```
 
@@ -105,6 +111,17 @@ Groups arrange the pack's problems into named lists, such as topics or study pla
 - A group refers to problems by `slug`, not by id or directory name, and every entry MUST be the slug of a problem of the pack. A group MUST NOT list a problem twice.
 - A problem MAY be in several groups or in none. A group MAY be empty.
 
+### Locales
+
+A pack MAY give its statements in several languages. "Language" here means the language of the statement, not the solution language (`languages`).
+
+- `locales` lists them as BCP 47 language tags, such as `en` or `zh-CN`, each once (tags are compared ignoring case). Statement files and the keys of `titles` spell a tag exactly as `locales` does. The first is the pack's **default locale**. Which locales a pack has, and which is the default, is its author's decision.
+- `description.md` and `title` are in the default locale. The statement in another locale is `description.<locale>.md`, such as `description.zh-CN.md`, and its title is `titles.<locale>` in `problem.yaml`: `titles: {zh-CN: 两数之和}`. The pack's and each group's `titles` work the same way, and are optional.
+- A pack that declares a locale MUST give every problem a statement and a title in it: `description.md` for the default locale, `description.<locale>.md` and `titles.<locale>` for the others.
+- `description.<locale>.md` files and the keys of `titles` MUST name locales the pack declares, other than the default, whose statement and title are `description.md` and `title`.
+- Without `locales`, the statements are in one unnamed language: `description.md` and `title` alone, with no `description.<locale>.md` and no `titles`.
+- Every statement uses the same `assets/`. Signatures, cases, templates, references and checkers do not depend on the locale.
+
 ## Problem directory
 
 A problem is a directory holding these entries:
@@ -112,15 +129,16 @@ A problem is a directory holding these entries:
 | Entry | Required | Content |
 |---|---|---|
 | `problem.yaml` | yes | Metadata, signature and judge options; see [problem.yaml](#problemyaml) |
-| `description.md` | no | The statement, in Markdown |
-| `assets/` | no | Files the statement refers to, such as images |
+| `description.md` | in a pack with `locales` | The statement, in Markdown, in the pack's default locale |
+| `description.<locale>.md` | for each other locale of the pack | The statement in that locale; see [Locales](#locales) |
+| `assets/` | no | Files the statements refer to, such as images |
 | `cases.jsonl` | no | The test cases; see [Cases](#cases) |
 | `reference/solution.py`, `reference/solution.go` | no | Reference solutions, any subset of the languages |
 | `templates/solution.py`, `templates/solution.go` | no | Starter code, replacing the one generated from the signature |
 | `checker.py` | with `judge.compare: checker` only | The checker; see [Checkers](#checkers) |
 
-- A problem without `description.md` has an empty statement, and one without `cases.jsonl` has no cases. Both are valid, but such a problem cannot be practised meaningfully.
-- The statement refers to local files by paths relative to the problem directory, and those files MUST be under `assets/`: `![](assets/rev1ex1.jpg)`.
+- In a pack without `locales`, a problem without `description.md` has an empty statement. A problem without `cases.jsonl` has no cases. Both are valid, but such a problem cannot be practised meaningfully.
+- A statement refers to local files by paths relative to the problem directory, and those files MUST be under `assets/`: `![](assets/rev1ex1.jpg)`.
 - Other entries are not part of the problem. Tools MAY ignore or drop them.
 - What reference solutions, templates and checkers may contain is specified in [Solution ABI](#solution-abi) and [Checkers](#checkers).
 
@@ -138,7 +156,8 @@ A problem is a directory holding these entries:
 |---|---|---|---|---|---|
 | `id` | string | no | none | Unique in the pack; see [Identity](#identity). A YAML integer is read as its decimal text | 1 |
 | `slug` | string | yes | | Letters, digits and single hyphens: `^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$`. SHOULD be lower case. Unique in the pack | 1 |
-| `title` | string | yes | | Not empty | 1 |
+| `title` | string | yes | | Not empty. In the pack's default locale | 1 |
+| `titles` | mapping | no | `{}` | The title in the pack's other locales, by locale: one for each, not empty; see [Locales](#locales) | 1 |
 | `difficulty` | string | no | none | `easy`, `medium` or `hard`, in any case | 1 |
 | `tags` | list of strings | no | `[]` | | 1 |
 | `kind` | string | yes | | `function` or `class`. Never inferred from the sections present | 1 |
@@ -163,6 +182,7 @@ Problem 0001:
 id: "1"
 slug: two-sum
 title: Two Sum
+titles: {zh-CN: 两数之和}
 difficulty: easy
 tags: [array, hash-table]
 kind: function
@@ -658,7 +678,7 @@ Reference solutions, templates and checkers MUST work on these versions, languag
 
 ## Validity rules
 
-A valid pack satisfies every rule below, and so does each of its problems. `hc validate` checks the rules on `problem.yaml` and `cases.jsonl`, and the pack's rules on problem directories and identity; `hc validate --run` also checks the rules on reference solutions.
+A valid pack satisfies every rule below, and so does each of its problems. `hc validate` checks the rules on `problem.yaml` and `cases.jsonl`, and the pack's rules on problem directories, identity and locales; `hc validate --run` also checks the rules on reference solutions.
 
 **problem.yaml**
 
@@ -694,6 +714,7 @@ A valid pack satisfies every rule below, and so does each of its problems. `hc v
 4. `version`, when present, MUST be a SemVer 2.0.0 version without a `v` prefix.
 5. `languages`, when present, MUST NOT be empty, and MUST hold language ids of the declared protocol, each once.
 6. Every group MUST have a `name` matching `^[a-z0-9]+(-[a-z0-9]+)*$`, unique among the groups, and MUST NOT list a slug twice.
+7. `locales`, when present, MUST NOT be empty, and MUST hold BCP 47 language tags, each once. The keys of `titles`, the pack's and each group's, MUST be locales of the pack other than the default, with titles that are not empty.
 
 **The pack**
 
@@ -701,6 +722,8 @@ A valid pack satisfies every rule below, and so does each of its problems. `hc v
 2. Every problem directory MUST have the canonical name ([Identity](#identity)).
 3. `slug` MUST be unique in the pack, and so MUST `id` when present.
 4. Every entry of a group MUST be the slug of a problem of the pack.
+5. In a pack with `locales`, every problem MUST have a statement and a title in each of them: `description.md` and `title` in the default locale, `description.<locale>.md` and a non-empty `titles.<locale>` in the others ([Locales](#locales)).
+6. A problem's `description.<locale>.md` files and the keys of its `titles` MUST be locales of the pack other than the default; in a pack without `locales`, a problem MUST have neither.
 
 **References, templates and checkers**
 

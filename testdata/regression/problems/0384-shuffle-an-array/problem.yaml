@@ -1,6 +1,7 @@
 id: "384"
 slug: shuffle-an-array
 title: Shuffle an Array
+titles: {zh-CN: 打乱数组}
 difficulty: medium
 tags: [design, array, math, randomized]
 kind: class

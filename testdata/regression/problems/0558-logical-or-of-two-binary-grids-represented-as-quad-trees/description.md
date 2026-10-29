@@ -1,11 +1,17 @@
-# 558. 四叉树交集
+# 558. Logical OR of Two Binary Grids Represented as Quad-Trees
 
-`quadTree1` 和 `quadTree2` 是两棵四叉树，各自表示一个 `n * n` 的二进制矩阵（元素只有 0 和 1）。返回一棵四叉树，表示这两个矩阵逐位**逻辑或**的结果。
+A Binary Matrix is a matrix in which all the elements are either **0** or **1**.
 
-四叉树的每个内部节点恰好有四个子节点，每个节点有两个属性：
+Given `quadTree1` and `quadTree2`. `quadTree1` represents a `n * n` binary matrix and `quadTree2` represents another `n * n` binary matrix.
 
-- `val`：叶子节点所代表区域的值，1 为 True，0 为 False。`isLeaf` 为 False 时 `val` 可以取任意值。
-- `isLeaf`：节点是叶子时为 True，有四个子节点时为 False。
+Return *a Quad-Tree* representing the `n * n` binary matrix which is the result of **logical bitwise OR** of the two binary matrixes represented by `quadTree1` and `quadTree2`.
+
+Notice that you can assign the value of a node to **True** or **False** when `isLeaf` is **False**, and both are **accepted** in the answer.
+
+A Quad-Tree is a tree data structure in which each internal node has exactly four children. Besides, each node has two attributes:
+
+- `val`: True if the node represents a grid of 1's or False if the node represents a grid of 0's.
+- `isLeaf`: True if the node is leaf node on the tree or False if the node has the four children.
 
 ```
 class Node {
@@ -18,34 +24,48 @@ class Node {
 }
 ```
 
-由矩阵构建四叉树的规则：如果当前区域的值全部相同，它就是一个叶子，`val` 为该值；否则它是内部节点，把区域等分为左上、右上、左下、右下四块，分别递归构建。因此结果中四个值相同的叶子必须合并成一个叶子。
+We can construct a Quad-Tree from a two-dimensional area using the following steps:
+
+1. If the current grid has the same value (i.e all `1's` or all `0's`) set `isLeaf` True and set `val` to the value of the grid and set the four children to Null and stop.
+2. If the current grid has different values, set `isLeaf` to False and set `val` to any value and divide the current grid into four sub-grids as shown in the photo.
+3. Recurse for each of the children with the proper sub-grid.
 
 ![](assets/new_top.png)
 
-**四叉树格式：** 输入输出按层序遍历序列化，每个节点写作 `[isLeaf, val]`（True 为 1，False 为 0），每个节点有四个子节点位置，`null` 表示该位置没有节点。
+If you want to know more about the Quad-Tree, you can refer to the [wiki](https://en.wikipedia.org/wiki/Quadtree).
 
-**hc 说明：** 内部节点在输出中总是写作 `[0,1]`，无论它的 `val` 是什么；下面的示例已按此写出。
+**Quad-Tree format:**
 
-**示例 1：**
+The input/output represents the serialized format of a Quad-Tree using level order traversal, where `null` signifies a path terminator where no node exists below.
+
+It is very similar to the serialization of the binary tree. The only difference is that the node is represented as a list `[isLeaf, val]`.
+
+If the value of `isLeaf` or `val` is True we represent it as **1** in the list `[isLeaf, val]` and if the value of `isLeaf` or `val` is False we represent it as **0**.
+
+**Example 1:**
 
 ![](assets/qt1.png) ![](assets/qt2.png)
 
 ```
-输入：quadTree1 = [[0,1],[1,1],[1,1],[1,0],[1,0]]
+Input: quadTree1 = [[0,1],[1,1],[1,1],[1,0],[1,0]]
 , quadTree2 = [[0,1],[1,1],[0,1],[1,1],[1,0],null,null,null,null,[1,0],[1,0],[1,1],[1,1]]
-输出：[[0,1],[1,1],[1,1],[1,1],[1,0]]
-解释：两棵树表示的矩阵逐位取或之后，右上块全为 1，于是合并成一个叶子。
+Output: [[0,0],[1,1],[1,1],[1,1],[1,0]]
+Explanation: quadTree1 and quadTree2 are shown above. You can see the binary matrix which is represented by each Quad-Tree.
+If we apply logical bitwise OR on the two binary matrices we get the binary matrix below which is represented by the result Quad-Tree.
+Notice that the binary matrices shown are only for illustration, you don't have to construct the binary matrix to get the result tree.
+
 ```
 
-**示例 2：**
+**Example 2:**
 
 ```
-输入：quadTree1 = [[1,0]], quadTree2 = [[1,0]]
-输出：[[1,0]]
-解释：两个 1 x 1 的矩阵都是 0，结果也是 0。
+Input: quadTree1 = [[1,0]], quadTree2 = [[1,0]]
+Output: [[1,0]]
+Explanation: Each tree represents a binary matrix of size 1*1. Each matrix contains only zero.
+The resulting matrix is of size 1*1 with also zero.
 ```
 
-**提示：**
+**Constraints:**
 
-- `quadTree1` 和 `quadTree2` 都是合法的四叉树，表示同样大小的 `n * n` 矩阵
-- `n == 2^x`，其中 `0 <= x <= 9`
+- `quadTree1` and `quadTree2` are both **valid** Quad-Trees each representing a `n * n` grid.
+- `n == 2^x` where `0 <= x <= 9`.

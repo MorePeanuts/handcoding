@@ -1,42 +1,43 @@
-# 690. 员工的重要性
+# 690. Employee Importance
 
-你有一个保存员工信息的数据结构，它包含了员工唯一的 id ，重要度和直系下属的 id 。
+You have a data structure of employee information, including the employee's unique ID, importance value, and direct subordinates' IDs.
 
-给定一个员工数组 `employees`，其中：
+You are given an array of employees `employees` where:
 
-- `employees[i].id` 是第 `i` 个员工的 ID。
-- `employees[i].importance` 是第 `i` 个员工的重要度。
-- `employees[i].subordinates` 是第 `i` 名员工的直接下属的 ID 列表。
+- `employees[i].id` is the ID of the `i^th` employee.
+- `employees[i].importance` is the importance value of the `i^th` employee.
+- `employees[i].subordinates` is a list of the IDs of the direct subordinates of the `i^th` employee.
 
-给定一个整数 `id` 表示一个员工的 ID，返回这个员工和他所有下属的重要度的 **总和**。
+Given an integer `id` that represents an employee's ID, return *the **total** importance value of this employee and all their direct and indirect subordinates*.
 
-**示例 1：**
+**Example 1:**
 
-**![](assets/1716170448-dKZffb-image.png)**
-
-```
-输入：employees = [[1,5,[2,3]],[2,3,[]],[3,3,[]]], id = 1
-输出：11
-解释：
-员工 1 自身的重要度是 5 ，他有两个直系下属 2 和 3 ，而且 2 和 3 的重要度均为 3 。因此员工 1 的总重要度是 5 + 3 + 3 = 11 。
-```
-
-**示例 2：**
-
-**![](assets/1716170929-dkWpra-image.png)**
+![](assets/emp1-tree.jpg)
 
 ```
-输入：employees = [[1,2,[5]],[5,-3,[]]], id = 5
-输出：-3
-解释：员工 5 的重要度为 -3 并且没有直接下属。
-因此，员工 5 的总重要度为 -3。
+Input: employees = [[1,5,[2,3]],[2,3,[]],[3,3,[]]], id = 1
+Output: 11
+Explanation: Employee 1 has an importance value of 5 and has two direct subordinates: employee 2 and employee 3.
+They both have an importance value of 3.
+Thus, the total importance value of employee 1 is 5 + 3 + 3 = 11.
 ```
 
-**提示：**
+**Example 2:**
+
+![](assets/emp2-tree.jpg)
+
+```
+Input: employees = [[1,2,[5]],[5,-3,[]]], id = 5
+Output: -3
+Explanation: Employee 5 has an importance value of -3 and has no direct subordinates.
+Thus, the total importance value of employee 5 is -3.
+```
+
+**Constraints:**
 
 - `1 <= employees.length <= 2000`
 - `1 <= employees[i].id <= 2000`
-- 所有的 `employees[i].id` **互不相同**。
+- All `employees[i].id` are **unique**.
 - `-100 <= employees[i].importance <= 100`
-- 一名员工最多有一名直接领导，并可能有多名下属。
-- `employees[i].subordinates` 中的 ID 都有效。
+- One employee has at most one direct leader and may have several subordinates.
+- The IDs in `employees[i].subordinates` are valid IDs.

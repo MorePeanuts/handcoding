@@ -1,6 +1,7 @@
 id: "690"
 slug: employee-importance
 title: Employee Importance
+titles: {zh-CN: 员工的重要性}
 difficulty: medium
 tags: [tree, depth-first-search, breadth-first-search, array, hash-table]
 kind: function

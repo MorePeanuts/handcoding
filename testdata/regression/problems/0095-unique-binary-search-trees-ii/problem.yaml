@@ -1,6 +1,7 @@
 id: "95"
 slug: unique-binary-search-trees-ii
 title: Unique Binary Search Trees II
+titles: {zh-CN: 不同的二叉搜索树 II}
 difficulty: medium
 tags: [dynamic-programming, backtracking, tree, binary-search-tree, binary-tree]
 kind: function

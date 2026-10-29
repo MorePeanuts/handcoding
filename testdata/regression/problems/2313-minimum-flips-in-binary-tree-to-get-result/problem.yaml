@@ -1,6 +1,7 @@
 id: "2313"
 slug: minimum-flips-in-binary-tree-to-get-result
 title: Minimum Flips in Binary Tree to Get Result
+titles: {zh-CN: 二叉树中得到结果所需的最少翻转次数}
 difficulty: hard
 tags: [dynamic-programming, tree, depth-first-search, binary-tree]
 kind: function

@@ -1,6 +1,7 @@
 id: "5"
 slug: longest-palindromic-substring
 title: Longest Palindromic Substring
+titles: {zh-CN: 最长回文子串}
 difficulty: medium
 tags: [two-pointers, string, dynamic-programming]
 kind: function

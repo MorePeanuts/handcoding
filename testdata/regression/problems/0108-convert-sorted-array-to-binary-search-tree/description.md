@@ -1,29 +1,30 @@
-# 108. 将有序数组转换为二叉搜索树
+# 108. Convert Sorted Array to Binary Search Tree
 
-给你一个整数数组 `nums` ，其中元素已经按 **升序** 排列，请你将其转换为一棵 平衡 二叉搜索树。
+Given an integer array `nums` where the elements are sorted in **ascending order**, convert *it to a *height-balanced** *binary search tree*.
 
-**示例 1：**
+**Example 1:**
 
 ![](assets/btree1.jpg)
 
 ```
-输入：nums = [-10,-3,0,5,9]
-输出：[0,-3,9,-10,null,5]
-解释：[0,-10,5,null,-3,null,9] 也将被视为正确答案：
+Input: nums = [-10,-3,0,5,9]
+Output: [0,-3,9,-10,null,5]
+Explanation: [0,-10,5,null,-3,null,9] is also accepted:
+
 ```
 
-**示例 2：**
+**Example 2:**
 
 ![](assets/btree.jpg)
 
 ```
-输入：nums = [1,3]
-输出：[3,1]
-解释：[1,null,3] 和 [3,1] 都是高度平衡二叉搜索树。
+Input: nums = [1,3]
+Output: [3,1]
+Explanation: [1,null,3] and [3,1] are both height-balanced BSTs.
 ```
 
-**提示：**
+**Constraints:**
 
 - `1 <= nums.length <= 10^4`
 - `-10^4 <= nums[i] <= 10^4`
-- `nums` 按 **严格递增** 顺序排列
+- `nums` is sorted in a **strictly increasing** order.

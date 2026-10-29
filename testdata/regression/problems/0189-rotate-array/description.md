@@ -1,26 +1,35 @@
-# 189. 轮转数组
+# 189. Rotate Array
 
-给定一个整数数组 `nums`，将数组中的元素向右轮转 `k` 个位置，其中 `k` 是非负数。
+Given an integer array `nums`, rotate the array to the right by `k` steps, where `k` is non-negative.
 
-要求**原地**修改数组，不需要返回值（判题时比较调用结束后的 `nums`）。
-
-**示例 1：**
+**Example 1:**
 
 ```
-输入：nums = [1,2,3,4,5,6,7], k = 3
-输出：[5,6,7,1,2,3,4]
+Input: nums = [1,2,3,4,5,6,7], k = 3
+Output: [5,6,7,1,2,3,4]
+Explanation:
+rotate 1 steps to the right: [7,1,2,3,4,5,6]
+rotate 2 steps to the right: [6,7,1,2,3,4,5]
+rotate 3 steps to the right: [5,6,7,1,2,3,4]
 ```
 
-**示例 2：**
+**Example 2:**
 
 ```
-输入：nums = [-1,-100,3,99], k = 2
-输出：[3,99,-1,-100]
+Input: nums = [-1,-100,3,99], k = 2
+Output: [3,99,-1,-100]
+Explanation: 
+rotate 1 steps to the right: [99,-1,-100,3]
+rotate 2 steps to the right: [3,99,-1,-100]
 ```
 
-**提示：**
+**Constraints:**
 
 - `1 <= nums.length <= 10^5`
+- `-2^31 <= nums[i] <= 2^31 - 1`
 - `0 <= k <= 10^5`
 
-**进阶：**你可以使用空间复杂度为 `O(1)` 的原地算法解决这个问题吗？
+**Follow up:**
+
+- Try to come up with as many solutions as you can. There are at least **three** different ways to solve this problem.
+- Could you do it in-place with `O(1)` extra space?

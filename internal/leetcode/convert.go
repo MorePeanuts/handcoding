@@ -52,17 +52,92 @@ type metaData struct {
 	Manual       bool `json:"manual"`
 }
 
+// The locales of LeetCode's statements: content is English on both sites,
+// and leetcode.cn translates it into Chinese (translatedContent).
+const (
+	LocaleEnglish = "en"
+	LocaleChinese = "zh-CN"
+)
+
 // Converted is a LeetCode question turned into a handcoding problem.
 type Converted struct {
-	Problem     *problem.Problem
-	Description string
-	Cases       []problem.Case
-	Templates   map[string]string // file name -> code
-	// Assets are files referenced by the description (path in the problem
+	Problem *problem.Problem
+	// Statements are the statements LeetCode has, in Markdown, by locale
+	// (LocaleEnglish, LocaleChinese), and Titles their titles.
+	Statements map[string]string
+	Titles     map[string]string
+	// Description is the statement in the pack's default locale, and
+	// Translations those in its other locales, by locale. Localize sets
+	// them, and the problem's titles.
+	Description  string
+	Translations map[string]string
+	Cases        []problem.Case
+	Templates    map[string]string // file name -> code
+	// Assets are files referenced by the statements (path in the problem
 	// directory -> content), filled by Client.DownloadImages.
 	Assets map[string][]byte
+	// Existing are the files already in the problem's assets/ (path in the
+	// problem directory -> content) when statements are added to a problem
+	// fetched before: DownloadImages reuses them and picks other names.
+	Existing map[string][]byte
 	// Warnings explain what could not be converted automatically.
 	Warnings []string
+}
+
+// statementLocale returns the locale of LeetCode's statement that serves
+// locale, a locale of a pack, or "" when LeetCode has none in it.
+func statementLocale(locale string) string {
+	for _, l := range []string{LocaleEnglish, LocaleChinese} {
+		if strings.EqualFold(locale, l) {
+			return l
+		}
+	}
+	return ""
+}
+
+// Has reports whether LeetCode has a statement in locale.
+func (c *Converted) Has(locale string) bool {
+	_, ok := c.Statements[statementLocale(locale)]
+	return ok
+}
+
+// Localize makes the statements in locales, where def is the pack's default
+// locale, those of the problem: def's becomes Description and the title,
+// the others Translations and the problem's titles. With no def, the pack
+// declares no locales, and its one statement is the English one, or the
+// Chinese one of a problem only in Chinese. It returns the locales LeetCode
+// has no statement in, which are left out.
+func (c *Converted) Localize(locales []string, def string) (missing []string) {
+	if def == "" {
+		def = LocaleEnglish
+		if !c.Has(def) {
+			def = LocaleChinese
+		}
+		locales = []string{def}
+	}
+	c.Description, c.Translations = "", nil
+	for _, l := range locales {
+		src := statementLocale(l)
+		text, ok := c.Statements[src]
+		if !ok {
+			missing = append(missing, l)
+			continue
+		}
+		if l == def {
+			c.Description = text
+			c.Problem.Title = c.Titles[src]
+			continue
+		}
+		if c.Translations == nil {
+			c.Translations = map[string]string{}
+		}
+		if c.Problem.Titles == nil {
+			c.Problem.Titles = map[string]string{}
+		}
+		c.Translations[l] = text
+		c.Problem.Titles[l] = c.Titles[src]
+	}
+	return missing
 }
 
 // ErrUnsupported marks problems hc cannot drive yet.
@@ -72,14 +147,15 @@ var ErrUnsupported = errors.New("not supported by hc yet")
 // problems that only exist in Chinese (LCR, LCP, ...).
 const englishPlaceholder = "English description is not available"
 
-// Convert maps a question to the problem protocol. preferTranslated selects
-// the translated title/statement (leetcode.cn).
+// Convert maps a question to the problem protocol, with every statement
+// LeetCode has: the English one, unless the problem exists only in Chinese,
+// and on leetcode.cn the Chinese one. Localize picks those of the pack.
 //
 // Convert records only what LeetCode states for certain: the signature, the
 // in-place output and its length. It leaves judge.compare unset, because
 // whether several answers are acceptable can only be read from the
 // statement; hc gen decides it.
-func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) {
+func Convert(q *Question, site Site) (*Converted, error) {
 	if q.IsPaidOnly && q.Content == "" && q.TranslatedContent == "" {
 		return nil, fmt.Errorf("%s is a premium problem; its content is not available without a subscription", q.TitleSlug)
 	}
@@ -188,21 +264,32 @@ func Convert(q *Question, site Site, preferTranslated bool) (*Converted, error) 
 		return nil, fmt.Errorf("%s cannot be judged by hc: %w", p.Slug, err)
 	}
 
-	content := english
-	if (preferTranslated || content == "") && q.TranslatedContent != "" {
-		content = q.TranslatedContent
-		if q.TranslatedTitle != "" {
-			p.Title = q.TranslatedTitle
+	conv.Statements, conv.Titles = map[string]string{}, map[string]string{}
+	addStatement := func(locale, title, content string) error {
+		desc, err := toMarkdown(content)
+		if err != nil {
+			return err
 		}
-		if !preferTranslated {
-			conv.Warnings = append(conv.Warnings, "no English statement on LeetCode; using the Chinese one")
+		conv.Statements[locale] = fmt.Sprintf("# %s. %s\n\n%s\n", p.ID, title, strings.TrimSpace(desc))
+		conv.Titles[locale] = title
+		return nil
+	}
+	// A problem without any statement keeps an English one, with its
+	// title alone.
+	if english != "" || q.TranslatedContent == "" {
+		if err := addStatement(LocaleEnglish, q.Title, english); err != nil {
+			return nil, err
 		}
 	}
-	desc, err := toMarkdown(content)
-	if err != nil {
-		return nil, err
+	if q.TranslatedContent != "" {
+		title := q.TranslatedTitle
+		if title == "" {
+			title = q.Title
+		}
+		if err := addStatement(LocaleChinese, title, q.TranslatedContent); err != nil {
+			return nil, err
+		}
 	}
-	conv.Description = fmt.Sprintf("# %s. %s\n\n%s\n", p.ID, p.Title, strings.TrimSpace(desc))
 
 	cases, warn := examples(p, q, english, exampleKeys)
 	if warn != "" {
@@ -374,17 +461,8 @@ func (c *Converted) Save(dir string) error {
 	if err := c.Problem.Save(); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, problem.DescriptionFile), []byte(c.Description), 0o644); err != nil {
+	if err := c.writeStatements(dir, true); err != nil {
 		return err
-	}
-	for rel, data := range c.Assets {
-		target := filepath.Join(dir, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return err
-		}
-		if err := os.WriteFile(target, data, 0o644); err != nil {
-			return err
-		}
 	}
 	if len(c.Templates) > 0 {
 		if err := os.MkdirAll(filepath.Join(dir, problem.TemplatesDir), 0o755); err != nil {
@@ -397,4 +475,53 @@ func (c *Converted) Save(dir string) error {
 		}
 	}
 	return c.Problem.SaveCases(c.Cases)
+}
+
+// AddTo adds the statements Localize picked to p, a problem fetched before
+// that lacks them, with their titles and images; the rest of p is left as
+// it is.
+func (c *Converted) AddTo(p *problem.Problem) error {
+	if err := c.writeStatements(p.Dir, false); err != nil {
+		return err
+	}
+	if len(c.Problem.Titles) == 0 {
+		return nil
+	}
+	if p.Titles == nil {
+		p.Titles = map[string]string{}
+	}
+	for l, t := range c.Problem.Titles {
+		if _, ok := p.Titles[l]; !ok {
+			p.Titles[l] = t
+		}
+	}
+	return p.Save()
+}
+
+// writeStatements writes the statements into dir, with the images they
+// need: description.md (always with withDefault, else only when Localize
+// picked it) and the translations.
+func (c *Converted) writeStatements(dir string, withDefault bool) error {
+	files := map[string]string{}
+	if withDefault || c.Description != "" {
+		files[problem.DescriptionFile] = c.Description
+	}
+	for l, text := range c.Translations {
+		files[problem.TranslationFile(l)] = text
+	}
+	for name, text := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(text), 0o644); err != nil {
+			return err
+		}
+	}
+	for rel, data := range c.Assets {
+		target := filepath.Join(dir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(target, data, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }

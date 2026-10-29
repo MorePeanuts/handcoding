@@ -100,11 +100,19 @@ func newShowCmd(root *rootOptions) *cobra.Command {
 	var (
 		raw     bool
 		doPause bool
+		locale  string
 	)
 	cmd := &cobra.Command{
 		Use:   "show <problem>",
 		Short: "Show the problem statement",
-		Args:  cobra.ExactArgs(1),
+		Long: `Show the statement of a problem. When its pack has statements in several
+languages (locales in pack.yaml, or in hc.yaml for your own problems),
+--locale chooses one; the default is the one last chosen in the TUI (key i),
+else the pack's default locale.
+
+  hc show two-sum
+  hc show two-sum --locale zh-CN`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, err := root.openApp()
 			if err != nil {
@@ -115,12 +123,27 @@ func newShowCmd(root *rootOptions) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			desc, err := p.Description()
+			k, err := a.WS.Pack(p.Pack)
 			if err != nil {
 				return err
 			}
+			if locale != "" {
+				if err := app.CheckLocale(k, locale); err != nil {
+					return err
+				}
+			} else if locale, err = a.Locale(cmd.Context(), k); err != nil {
+				return err
+			}
+			st, err := app.StatementIn(p, locale, k.Manifest.DefaultLocale())
+			if err != nil {
+				return err
+			}
+			if st.Missing != "" {
+				fmt.Fprintf(os.Stderr, "%s %s has no %s statement; showing %s\n", ui.Yellow.Render("note:"), p.Slug, st.Missing, st.Locale)
+			}
+			desc := st.Text
 			if desc == "" {
-				desc = "# " + p.Title + "\n\n_No description._\n"
+				desc = "# " + app.TitleIn(p, st.Locale, k.Manifest.DefaultLocale()) + "\n\n_No description._\n"
 			}
 			meta := fmt.Sprintf("%s · %s", ui.Difficulty(p.Difficulty), ui.Faint.Render(strings.Join(p.Tags, ", ")))
 			if p.Source.URL != "" {
@@ -141,6 +164,7 @@ func newShowCmd(root *rootOptions) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&raw, "raw", false, "print raw Markdown")
+	cmd.Flags().StringVar(&locale, "locale", "", "the statement's locale, such as en or zh-CN (default: the one last chosen, else the pack's default)")
 	cmd.Flags().BoolVar(&doPause, "pause", false, "wait for Enter before exiting")
 	_ = cmd.Flags().MarkHidden("pause")
 	return cmd

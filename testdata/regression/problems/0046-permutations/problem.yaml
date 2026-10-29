@@ -1,6 +1,7 @@
 id: "46"
 slug: permutations
 title: Permutations
+titles: {zh-CN: 全排列}
 difficulty: medium
 tags: [array, backtracking]
 kind: function

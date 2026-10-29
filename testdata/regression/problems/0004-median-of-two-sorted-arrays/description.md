@@ -1,25 +1,30 @@
-# 4. 寻找两个正序数组的中位数
+# 4. Median of Two Sorted Arrays
 
-给定两个大小分别为 `m` 和 `n` 的正序（从小到大）数组 `nums1` 和 `nums2`。请你找出并返回这两个正序数组的**中位数**。
+Given two sorted arrays `nums1` and `nums2` of size `m` and `n` respectively, return **the median** of the two sorted arrays.
 
-算法的时间复杂度应该为 `O(log (m+n))`。
+The overall run time complexity should be `O(log (m+n))`.
 
-**示例 1：**
-
-```
-输入：nums1 = [1,3], nums2 = [2]
-输出：2.00000
-```
-
-**示例 2：**
+**Example 1:**
 
 ```
-输入：nums1 = [1,2], nums2 = [3,4]
-输出：2.50000
+Input: nums1 = [1,3], nums2 = [2]
+Output: 2.00000
+Explanation: merged array = [1,2,3] and median is 2.
 ```
 
-**提示：**
+**Example 2:**
 
-- `0 <= m, n <= 1000`
+```
+Input: nums1 = [1,2], nums2 = [3,4]
+Output: 2.50000
+Explanation: merged array = [1,2,3,4] and median is (2 + 3) / 2 = 2.5.
+```
+
+**Constraints:**
+
+- `nums1.length == m`
+- `nums2.length == n`
+- `0 <= m <= 1000`
+- `0 <= n <= 1000`
 - `1 <= m + n <= 2000`
 - `-10^6 <= nums1[i], nums2[i] <= 10^6`

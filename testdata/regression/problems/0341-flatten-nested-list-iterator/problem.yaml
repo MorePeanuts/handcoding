@@ -1,6 +1,7 @@
 id: "341"
 slug: flatten-nested-list-iterator
 title: Flatten Nested List Iterator
+titles: {zh-CN: 扁平化嵌套列表迭代器}
 difficulty: medium
 tags: [stack, tree, depth-first-search, design, queue, iterator]
 kind: class

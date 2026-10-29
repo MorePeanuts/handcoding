@@ -1,6 +1,7 @@
 id: "2457"
 slug: minimum-addition-to-make-integer-beautiful
 title: Minimum Addition to Make Integer Beautiful
+titles: {zh-CN: 美丽整数的最小增量}
 difficulty: medium
 tags: [math, greedy]
 kind: function

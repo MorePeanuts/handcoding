@@ -41,7 +41,9 @@ CLAUDE.md                     @AGENTS.md，以及留给 Claude Code 的备注
 
 此后这个目录就是题目包的检出目录，hc 直接把它作为工作区打开（见[编写题目包](how-to-use_zh.md#编写题目包)）：在其中运行的每个 hc 命令都作用于这个题目包。
 
-`pack.yaml` 能写的不止 `hc pack init` 写入的这些：`version`、`description`、`authors`、`license`、`homepage`、题目可以用哪些语言解答的 `languages`，以及把题目编排成有序列表（如专题或学习计划）的 `groups`。`hc docs protocol packyaml` 打印这些字段，`hc docs protocol groups` 打印分组的规则。
+`pack.yaml` 能写的不止 `hc pack init` 写入的这些：`version`、`description`、`authors`、`license`、`homepage`、题目可以用哪些语言解答的 `languages`、题面使用哪些语言的 `locales`，以及把题目编排成有序列表（如专题或学习计划）的 `groups`。`hc docs protocol packyaml` 打印这些字段，`hc docs protocol groups` 打印分组的规则。
+
+**多语言题面。** 题目包可以用多种语言提供题面：`locales: [en, zh-CN]`。用哪些语言、哪个排在第一，由你决定：第一个是默认语言区域，也就是每道题 `description.md` 和 `title` 的语言。其他每个语言区域，每道题都需要一个 `description.<locale>.md`，以及 `problem.yaml` 中的 `titles.<locale>`；题目包和分组的 `title`、`titles` 是可选的。`hc docs protocol locales` 列出这些规则。`hc fetch` 按题目包的语言区域写入 LeetCode 提供的题面（两个站点都有英文，leetcode.cn 还有中文），`hc validate` 和 `hc pack check` 会报告缺少的或未声明的语言区域。hc 中没有任何东西会翻译题面，遵循 hc 的 skill 的智能体也不会：LeetCode 没有的，要你自己写。
 
 ## 添加题目
 

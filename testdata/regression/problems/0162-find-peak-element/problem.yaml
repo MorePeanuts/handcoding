@@ -1,6 +1,7 @@
 id: "162"
 slug: find-peak-element
 title: Find Peak Element
+titles: {zh-CN: 寻找峰值}
 difficulty: medium
 tags: [array, binary-search]
 kind: function

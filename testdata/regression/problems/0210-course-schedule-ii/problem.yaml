@@ -1,6 +1,7 @@
 id: "210"
 slug: course-schedule-ii
 title: Course Schedule II
+titles: {zh-CN: 课程表 II}
 difficulty: medium
 tags: [depth-first-search, breadth-first-search, graph, topological-sort]
 kind: function

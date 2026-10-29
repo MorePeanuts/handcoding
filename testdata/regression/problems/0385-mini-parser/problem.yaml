@@ -1,6 +1,7 @@
 id: "385"
 slug: mini-parser
 title: Mini Parser
+titles: {zh-CN: 迷你语法分析器}
 difficulty: medium
 tags: [stack, depth-first-search, string]
 kind: function

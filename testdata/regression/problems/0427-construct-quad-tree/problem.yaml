@@ -1,6 +1,7 @@
 id: "427"
 slug: construct-quad-tree
 title: Construct Quad Tree
+titles: {zh-CN: 建立四叉树}
 difficulty: medium
 tags: [tree, array, divide-and-conquer, matrix]
 kind: function

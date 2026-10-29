@@ -37,7 +37,7 @@
 
 工作区里的题目按[题目包](protocol_zh.md#题目包)组织，每个题目包是 `packs/` 下的一个目录：
 
-- `packs/local/` 存放你自己的题目，也就是 `hc fetch`、`hc new` 和 `hc import` 添加的题目。它没有 `pack.yaml`（`local` 是保留名称），可以用所有语言作答。
+- `packs/local/` 存放你自己的题目，也就是 `hc fetch`、`hc new` 和 `hc import` 添加的题目。它没有 `pack.yaml`（`local` 是保留名称），可以用所有语言作答。它的题面使用 `hc.yaml` 中 `locales` 设置的[语言区域](#多语言题面)，默认为英文（`[en]`）。
 - 其余每个目录都是一个已安装的题目包：一个 `name` 与目录名相同的 `pack.yaml`，加上它的 `problems/`。已安装的题目包是**只读**的：`hc gen`、`hc fix` 和 `hc cases add|rm|edit|build` 拒绝修改它们，因为更新题目包会覆盖这些修改。`pack.yaml` 列出了 `languages` 的题目包只能用这些语言作答：`hc start -l` 拒绝其他语言；如果你的默认语言不在其中，hc 会改用题目包的第一种语言并给出提示。`hc pack install` 负责安装题目包（见[题目包](#题目包)）；手动复制到 `packs/` 下的题目包也能用，`hc pack list` 会把它显示为 unmanaged（未托管）。
 
 hc 无法读取的题目包（没有 `pack.yaml`、`pack.yaml` 不合法，或为更新的协议编写，此时会提示升级 hc）会由 `hc validate` 和题目列表报告，它的题目不会被加载；工作区的其余部分照常工作。
@@ -74,7 +74,7 @@ my-pack/
   .claude/  .agents/  AGENTS.md            智能体技能，在某个命令安装之后出现
 ```
 
-没有 `hc.yaml` 时 hc 使用默认设置，并且从不在检出目录中创建它。hc 无法读取的 `pack.yaml`（例如为更新的协议编写）不会妨碍工作区打开：`hc validate` 会指出问题所在。hc 添加的这些内容属于你而不属于题目包，所以不要把它们提交到仓库：
+没有 `hc.yaml` 时 hc 使用默认设置，并且从不在检出目录中创建它。检出目录的 `locales` 来自 `pack.yaml`，所以其中的 `hc.yaml` 不得设置它，就像不得列出 `packs` 一样。hc 无法读取的 `pack.yaml`（例如为更新的协议编写）不会妨碍工作区打开：`hc validate` 会指出问题所在。hc 添加的这些内容属于你而不属于题目包，所以不要把它们提交到仓库：
 
 ```
 # .gitignore
@@ -100,6 +100,7 @@ pyrightconfig.json
 - 列表一次显示一个题目包。有多个题目包时，顶部的标签栏列出每个题目包及其进度（已通过/总数），用 `tab` / `shift+tab` 切换题目包；终端较窄时，标签栏会滚动，让当前题目包保持可见。没有题目的题目包（例如还没添加题目时的 `local`）不显示标签。
 - 按 `c` 选择题目包中的一个分组，或者全部题目，每一项都显示进度。分组按分组中的顺序列出题目。搜索和筛选作用于当前显示的题目包和分组。
 - `hc` 打开上次所在的题目包，每个题目包打开上次选择的分组。`hc list --pack <name>` 打开该题目包的标签，`--group <name>` 打开该分组（只有一个题目包使用的分组名不需要 `--pack`）。
+- 题目包的题面有[多种语言](#多语言题面)时，按 `i` 切换题面语言：列表中的标题和详情页的题面都会切换。列表顶部和题面的标题行会显示当前使用的语言区域。
 
 | 按键 | 操作 | 按键 | 操作 |
 |---|---|---|---|
@@ -111,7 +112,8 @@ pyrightconfig.json
 | `/` | 搜索 | `f` | 筛选：全部 / 未通过 / 已通过 |
 | `tab` / `shift+tab` | 下一个 / 上一个题目包 | `c` | 选择题目包中的分组 |
 | `v` | 只查看题面 | `o` | 打开题面中的图片（题面页面） |
-| `esc` / `q` | 返回；在列表页按 `q` 退出 | `ctrl+c` | 退出 |
+| `i` | 切换题面语言 | `esc` / `q` | 返回；在列表页按 `q` 退出 |
+| `ctrl+c` | 退出 | | |
 
 ## 命令
 
@@ -151,13 +153,23 @@ hc discard two-sum          # 删除解答及其全部提交记录
 
 ```sh
 hc fetch 3 146 lru-cache    # 按编号、slug 或 URL，从 leetcode.com 获取
-hc fetch --site cn 1        # 从 leetcode.cn 获取（默认中文题面）
+hc fetch --site cn 1        # 从 leetcode.cn 获取，它还有中文题面
 hc fetch https://leetcode.cn/problems/two-sum/description/   # 任意题目 URL，站点由 URL 决定
 hc fetch --site cn "LCR 001"                                  # leetcode.cn 的 LCR/LCP 等编号
 hc gen 146                  # 让题目就绪：生成测试用例并决定判题规则
 ```
 
 `hc fetch` 会下载题面及其图片、函数签名、Go 和 Python 的初始代码，以及示例用例。能从题面中解析出期望输出时，也会一并写入。
+
+它按目标题目包的语言区域写入题面：你自己的题目由 `hc.yaml` 中的 `locales` 决定（见[多语言题面](#多语言题面)）。两个站点都有英文题面；只有 leetcode.cn 有中文题面和中文标题：
+
+| `hc.yaml` 中的 `locales` | leetcode.com | leetcode.cn |
+|---|---|---|
+| `[en]`（默认） | `description.md`：英文 | `description.md`：英文 |
+| `[en, zh-CN]` | `description.md`：英文；没有中文题面，并给出提示 | 两者都有：英文写入 `description.md`，中文写入 `description.zh-CN.md`，以及两个标题 |
+| `[zh-CN]` | 拒绝：leetcode.com 没有中文题面 | `description.md`：中文 |
+
+从另一个站点再次拉取同一道题，会补上它缺少的题面，不需要 `--force`，也不会改动其他内容：先 `hc fetch two-sum`，再 `hc fetch --site cn two-sum`，题目就有了两种题面。题面共用 `assets/`，两者都用到的图片只保存一份。只有中文的题目（LCR、LCP）无法拉取到默认语言区域为 `en` 的题目包。
 
 刚拉取的题目**还不能提交**。LeetCode 只公开示例，也不公开判题方式：顺序是否重要、是否有多个正确答案。在判题规则确定之前，`hc test` 会把你的输出和示例答案并排列出，但不给结论；`hc submit` 会拒绝提交。`hc gen` 会生成完整的测试用例，并根据题面决定判题规则，内置规则都不适用时编写判题程序；你也可以自己设置 `judge.compare`（见协议的[比较方式](protocol_zh.md#比较方式)）。题目列表会在状态列用 `?` 标记这类题目，已通过的题目在这一列显示 `✔`，尝试过的显示 `●`。
 
@@ -179,7 +191,7 @@ hc import ./my-problems/            # 导入别人分享的题目目录，或一
 
 - `hc cases build` 运行一个参考解：有 Go 参考解时用 Go，否则用 Python；`-l` 可以指定。判题方式为 `any_of` 的题目会被拒绝，因为它的 `expected` 要列出所有可接受的答案，只能手写。
 - `hc validate` 把每一处违反协议[合法性规则](protocol_zh.md#合法性规则)的地方报为错误，并注明用例编号和字段。加上 `--run` 时，它还会在每个用例上运行每个参考解，有判题程序时交给判题程序判定。以下情况给出警告：判题规则未确定（没有 `judge.compare`）、没有用例、有用例缺少 `expected`、没有用例标记为示例、没有参考解，以及题面引用的图片不存在。`hc test`、`hc submit` 和 `hc debug` 拒绝运行违反这些规则的用例，并指出是哪一个。
-- `hc import` 只复制协议定义的条目（其余内容，如编辑器文件、`solutions/` 目录，不会被导入）；如果你自己的题目中已有相同的 slug 或编号，会拒绝导入（`--force` 会替换 slug 相同的题目）。slug 和编号只需在一个题目包内唯一，所以导入一道已安装题目包里也有的题目没有问题。
+- `hc import` 只复制协议定义的条目（其余内容，如编辑器文件、`solutions/` 目录，不会被导入）；如果你自己的题目中已有相同的 slug 或编号，会拒绝导入（`--force` 会替换 slug 相同的题目）。slug 和编号只需在一个题目包内唯一，所以导入一道已安装题目包里也有的题目没有问题。题面和标题与你自己题目的语言区域不符的题目也会被拒绝，就像 `hc validate` 会报告的那样：缺少某个语言区域的题面，或者有其他语言区域的题面。
 - 不带参数的 `hc validate` 还会检查每个已安装题目包的 `pack.yaml`，以及它的分组是否都指向本题目包的题目。每道题的目录名、slug 和编号都会与所在题目包的其他题目对照检查。
 
 hc 内置了与自身版本对应的协议（英文版），离线也能查阅：
@@ -191,6 +203,20 @@ hc docs protocol structure-inputs   # 某一节，包括其下的小节
 ```
 
 每一节用英文版标题在 GitHub 上的锚点命名，如 `protocol.md#structure-inputs`。在终端中输出会像题面一样渲染；通过管道输出或加上 `--raw` 时输出 Markdown 原文。
+
+### 多语言题面
+
+题目包可以用多种语言提供题面，即它的[语言区域](protocol_zh.md#语言区域)：在 `pack.yaml` 中写 `locales: [en, zh-CN]`。第一个是题目包的默认语言区域，也就是 `description.md` 和 `title` 的语言；其他语言区域的题面在 `description.<locale>.md` 中，标题在 `problem.yaml` 的 `titles` 中。题目包有哪些语言区域、哪个排在第一，由题目包的作者决定。你自己的题目，作者就是你，由 `hc.yaml` 中的 `locales` 设置，未设置时为 `[en]`：
+
+```yaml
+locales: [en, zh-CN]   # 你自己的题目：英文优先，也有中文
+```
+
+- 在列表中按 `i` 切换题目包的语言区域，hc 会在 `.hc/` 中为每个题目包记住这个选择。第一次打开的题目包显示其默认语言区域。
+- `hc show <problem> --locale zh-CN` 显示某个语言区域的题面；不带 `--locale` 时，显示你上次在列表中选择的那个。
+- 题目缺少所选语言区域的题面时（只有不合法的题目包才会这样），hc 显示默认语言区域的题面，并加以说明。
+- `hc validate` 会报告缺少某个语言区域的题面或标题的题目，以及使用了题目包未声明的语言区域的题面或标题。`hc pack check` 也会因此失败。
+- hc 不翻译任何内容。`hc fetch` 写入 LeetCode 提供的题面（见[上文](#从-leetcode-获取)）；你自己的题目，每种语言的题面都要自己写。`hc gen` 和 `hc fix` 只读取默认语言区域的题面，也从不写入题面。
 
 ### 测试用例
 
@@ -332,6 +358,7 @@ agent:
   name: claude        # claude | codex，或者设置 command（见上文）
 leetcode:
   site: com           # com | cn
+locales: [en]         # 你自己题目的题面语言，默认的排在第一
 ```
 
 `images: auto` 在 kitty、Ghostty 和 [herdr](https://herdr.dev) 中选择 `kitty`，在其他真彩色终端中选择 `blocks`，其余情况为 `none`。

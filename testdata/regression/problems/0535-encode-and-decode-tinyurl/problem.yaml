@@ -1,6 +1,7 @@
 id: "535"
 slug: encode-and-decode-tinyurl
 title: Encode and Decode TinyURL
+titles: {zh-CN: TinyURL 的加密与解密}
 difficulty: medium
 tags: [hash-table, string, design, hash-function]
 kind: class

@@ -179,7 +179,11 @@ case inputs must satisfy their rules as well as the statement's.
 
 1. Read `problem.yaml`, `description.md` and the existing `cases.jsonl`.
    Note the constraints (ranges, lengths, uniqueness) and the guarantees.
-   If the definition looks wrong, switch to `hc-problem`.
+   If the definition looks wrong, switch to `hc-problem`. `description.md`
+   is the statement in the pack's default locale; the statements in other
+   locales (`description.<locale>.md`) are not yours to read or write.
+   `hc validate` errors about a missing locale are the user's to fix:
+   report them, and never translate a statement or a title.
 2. [Decide the judge rule](#decide-the-judge-rule) and write it to
    problem.yaml.
 3. Write `reference/solution.py` ([Reference solutions](#reference-solutions)).

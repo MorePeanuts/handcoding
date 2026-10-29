@@ -1,36 +1,36 @@
-# 114. 二叉树展开为链表
+# 114. Flatten Binary Tree to Linked List
 
-给你二叉树的根结点 `root` ，请你将它展开为一个单链表：
+Given the `root` of a binary tree, flatten the tree into a "linked list":
 
-- 展开后的单链表应该同样使用 `TreeNode` ，其中 `right` 子指针指向链表中下一个结点，而左子指针始终为 `null` 。
-- 展开后的单链表应该与二叉树 [**先序遍历**](https://baike.baidu.com/item/%E5%85%88%E5%BA%8F%E9%81%8D%E5%8E%86/6442839?fr=aladdin) 顺序相同。
+- The "linked list" should use the same `TreeNode` class where the `right` child pointer points to the next node in the list and the `left` child pointer is always `null`.
+- The "linked list" should be in the same order as a [**pre-order traversal**](https://en.wikipedia.org/wiki/Tree_traversal#Pre-order,_NLR) of the binary tree.
 
-**示例 1：**
+**Example 1:**
 
 ![](assets/flaten.jpg)
 
 ```
-输入：root = [1,2,5,3,4,null,6]
-输出：[1,null,2,null,3,null,4,null,5,null,6]
+Input: root = [1,2,5,3,4,null,6]
+Output: [1,null,2,null,3,null,4,null,5,null,6]
 ```
 
-**示例 2：**
+**Example 2:**
 
 ```
-输入：root = []
-输出：[]
+Input: root = []
+Output: []
 ```
 
-**示例 3：**
+**Example 3:**
 
 ```
-输入：root = [0]
-输出：[0]
+Input: root = [0]
+Output: [0]
 ```
 
-**提示：**
+**Constraints:**
 
-- 树中结点数在范围 `[0, 2000]` 内
+- The number of nodes in the tree is in the range `[0, 2000]`.
 - `-100 <= Node.val <= 100`
 
-**进阶：**你可以使用原地算法（`O(1)` 额外空间）展开这棵树吗？
+**Follow up:** Can you flatten the tree in-place (with `O(1)` extra space)?

@@ -84,6 +84,10 @@ type Config struct {
 	Agent AgentConfig `yaml:"agent,omitempty"`
 	// LeetCode configures fetching problems.
 	LeetCode LeetCodeConfig `yaml:"leetcode,omitempty"`
+	// Locales are the locales of the local pack's statements, as locales in
+	// a pack.yaml (the default first); see LocalLocales. Only a practice
+	// workspace has them: a pack checkout's are in its pack.yaml.
+	Locales []string `yaml:"locales,omitempty"`
 	// Packs are the packs that hc pack install put in packs/, so that a
 	// workspace can be reproduced from hc.yaml. Only a practice workspace
 	// has them; hc changes them with SavePacks.
@@ -150,6 +154,18 @@ func DefaultConfig() Config {
 		Agent:    AgentConfig{Name: "claude"},
 		LeetCode: LeetCodeConfig{Site: "com"},
 	}
+}
+
+// DefaultLocales are the local pack's locales when hc.yaml sets none.
+var DefaultLocales = []string{"en"}
+
+// LocalLocales are the locales of the local pack: Locales, or
+// DefaultLocales when unset.
+func (c Config) LocalLocales() []string {
+	if len(c.Locales) > 0 {
+		return c.Locales
+	}
+	return DefaultLocales
 }
 
 // TimeoutDuration parses Timeout, defaulting to 10s.
@@ -280,6 +296,9 @@ func Open(dir string) (*Workspace, error) {
 		if err := checkPacks(data, kind, cfg.Packs); err != nil {
 			return nil, fmt.Errorf("%s: %w", filepath.Join(abs, ConfigFile), err)
 		}
+		if err := checkLocales(data, kind, cfg.Locales); err != nil {
+			return nil, fmt.Errorf("%s: %w", filepath.Join(abs, ConfigFile), err)
+		}
 	case !errors.Is(err, os.ErrNotExist):
 		return nil, err
 	}
@@ -331,7 +350,7 @@ func Create(dir, language string) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	header := "# handcoding workspace configuration\n# agent.name: claude | codex   (or set agent.command for a custom agent)\n# leetcode.site: com | cn\n# theme: auto | dark | light   (set it if statements look wrong in your terminal)\n# images: auto | kitty | blocks | none   (kitty: kitty, Ghostty, herdr; blocks: any truecolor terminal)\n# python.interpreter: a Python 3.10+ to use instead of the virtual environment hc manages in .hc/venv\n"
+	header := "# handcoding workspace configuration\n# agent.name: claude | codex   (or set agent.command for a custom agent)\n# leetcode.site: com | cn\n# locales: the languages of your own problems' statements, the default first, e.g. [en, zh-CN] (default [en])\n# theme: auto | dark | light   (set it if statements look wrong in your terminal)\n# images: auto | kitty | blocks | none   (kitty: kitty, Ghostty, herdr; blocks: any truecolor terminal)\n# python.interpreter: a Python 3.10+ to use instead of the virtual environment hc manages in .hc/venv\n"
 	if err := os.WriteFile(filepath.Join(abs, ConfigFile), append([]byte(header), data...), 0o644); err != nil {
 		return nil, err
 	}
@@ -402,7 +421,8 @@ type Pack struct {
 	// as a whole when they are updated.
 	Writable bool
 	// Manifest is the pack's pack.yaml. The local pack has none, and gets
-	// one of the newest protocol, with every language. Nil when Err is set.
+	// one of the newest protocol, with every language and the locales of
+	// hc.yaml (Config.LocalLocales). Nil when Err is set.
 	Manifest *pack.Manifest
 	// Err is why the pack cannot be read, a *PackError: its pack.yaml is
 	// missing or invalid, or of a protocol this hc does not read.
@@ -444,7 +464,7 @@ func (w *Workspace) localPack() *Pack {
 		Name:     pack.LocalName,
 		Dir:      dir,
 		Writable: true,
-		Manifest: &pack.Manifest{Protocol: problem.Protocol, Name: pack.LocalName, Dir: dir},
+		Manifest: &pack.Manifest{Protocol: problem.Protocol, Name: pack.LocalName, Locales: w.Config.LocalLocales(), Dir: dir},
 	}
 }
 

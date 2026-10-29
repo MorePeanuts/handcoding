@@ -1,6 +1,7 @@
 id: "589"
 slug: n-ary-tree-preorder-traversal
 title: N-ary Tree Preorder Traversal
+titles: {zh-CN: N 叉树的前序遍历}
 difficulty: easy
 tags: [stack, tree, depth-first-search]
 kind: function

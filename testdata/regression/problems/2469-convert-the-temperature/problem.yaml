@@ -1,6 +1,7 @@
 id: "2469"
 slug: convert-the-temperature
 title: Convert the Temperature
+titles: {zh-CN: 温度转换}
 difficulty: easy
 tags: [math]
 kind: function
