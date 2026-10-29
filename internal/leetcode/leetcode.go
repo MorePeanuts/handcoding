@@ -94,48 +94,61 @@ var ErrNotFound = errors.New("problem not found on LeetCode")
 
 // Question fetches a question by slug.
 func (c *Client) Question(ctx context.Context, slug string) (*Question, error) {
+	var data struct {
+		Question *Question `json:"question"`
+	}
+	if err := c.graphql(ctx, "questionData", questionQuery, map[string]any{"titleSlug": slug}, "/problems/"+slug+"/", &data); err != nil {
+		return nil, err
+	}
+	if data.Question == nil {
+		return nil, fmt.Errorf("%w: %s", ErrNotFound, slug)
+	}
+	return data.Question, nil
+}
+
+// graphql runs a query, sent from the page at referer, and decodes its data
+// into out.
+func (c *Client) graphql(ctx context.Context, op, query string, vars map[string]any, referer string, out any) error {
 	body, _ := json.Marshal(map[string]any{
-		"operationName": "questionData",
-		"query":         questionQuery,
-		"variables":     map[string]string{"titleSlug": slug},
+		"operationName": op,
+		"query":         query,
+		"variables":     vars,
 	})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Site.Base+"/graphql/", bytes.NewReader(body))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Referer", c.Site.Base+"/problems/"+slug+"/")
+	req.Header.Set("Referer", c.Site.Base+referer)
 	req.Header.Set("User-Agent", userAgent)
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer resp.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("leetcode: HTTP %d: %s", resp.StatusCode, snippet(data))
+		return fmt.Errorf("leetcode: HTTP %d: %s", resp.StatusCode, snippet(data))
 	}
-	var out struct {
-		Data struct {
-			Question *Question `json:"question"`
-		} `json:"data"`
+	var r struct {
+		Data   json.RawMessage `json:"data"`
 		Errors []struct {
 			Message string `json:"message"`
 		} `json:"errors"`
 	}
-	if err := json.Unmarshal(data, &out); err != nil {
-		return nil, fmt.Errorf("leetcode: decode response: %w (%s)", err, snippet(data))
+	if err := json.Unmarshal(data, &r); err != nil {
+		return fmt.Errorf("leetcode: decode response: %w (%s)", err, snippet(data))
 	}
-	if len(out.Errors) > 0 {
-		return nil, fmt.Errorf("leetcode: %s", out.Errors[0].Message)
+	if len(r.Errors) > 0 {
+		return fmt.Errorf("leetcode: %s", r.Errors[0].Message)
 	}
-	if out.Data.Question == nil {
-		return nil, fmt.Errorf("%w: %s", ErrNotFound, slug)
+	if err := json.Unmarshal(r.Data, out); err != nil {
+		return fmt.Errorf("leetcode: decode response: %w (%s)", err, snippet(data))
 	}
-	return out.Data.Question, nil
+	return nil
 }
 
 func snippet(b []byte) string {
@@ -190,6 +203,12 @@ func (c *Client) ResolveSlug(ctx context.Context, ref string) (string, error) {
 	if !idRE.MatchString(ref) {
 		return ref, nil
 	}
+	// leetcode.com refuses the problem list (HTTP 403) and pages its GraphQL
+	// list by 100, but its search finds a question by frontend ID.
+	// leetcode.cn has no such query.
+	if c.Site.Name == SiteCom.Name {
+		return c.searchID(ctx, ref)
+	}
 	entries, err := c.problemList(ctx)
 	if err != nil {
 		return "", err
@@ -200,6 +219,34 @@ func (c *Client) ResolveSlug(ctx context.Context, ref string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("%w: id %s", ErrNotFound, ref)
+}
+
+const searchQuery = `query problemsetQuestionList($searchKeywords: String) {
+  questionList(categorySlug: "", limit: 100, skip: 0, filters: {searchKeywords: $searchKeywords}) {
+    data { questionFrontendId titleSlug }
+  }
+}`
+
+// searchID finds the question whose frontend ID is id among those the
+// search for it returns.
+func (c *Client) searchID(ctx context.Context, id string) (string, error) {
+	var data struct {
+		QuestionList struct {
+			Data []struct {
+				ID   string `json:"questionFrontendId"`
+				Slug string `json:"titleSlug"`
+			} `json:"data"`
+		} `json:"questionList"`
+	}
+	if err := c.graphql(ctx, "problemsetQuestionList", searchQuery, map[string]any{"searchKeywords": id}, "/problemset/", &data); err != nil {
+		return "", err
+	}
+	for _, q := range data.QuestionList.Data {
+		if strings.EqualFold(q.ID, id) {
+			return q.Slug, nil
+		}
+	}
+	return "", fmt.Errorf("%w: id %s", ErrNotFound, id)
 }
 
 func (c *Client) problemList(ctx context.Context) ([]listEntry, error) {
