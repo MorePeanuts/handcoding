@@ -98,6 +98,7 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 - Statement images are drawn in the terminal. kitty and Ghostty show the original image. Other truecolor terminals show a block-character approximation that loses detail; press `o` to open the original in your image viewer. See [`images`](#configuration) to choose the mode.
 - Statement colors follow the terminal background. If they look wrong, set `theme` in `hc.yaml`.
 - The list shows one pack at a time. With more than one pack, a tab bar at the top names each pack with its progress (solved/total), and `tab` / `shift+tab` switch packs; on a narrow terminal the bar scrolls to keep the current pack in view. A pack without problems, such as `local` before you add one, gets no tab, unless no pack has problems yet.
+- `m` stars a problem you want to come back to, and `m` again unstars it. Starred problems show `★` in the list and the statement's title, and the `f` filter can list only them. Stars are kept in `.hc/hc.db`, and survive discarding a problem's solution.
 - `c` chooses a group of the pack, or all of its problems, and shows the progress of each. A group lists its problems in the group's order. Search and the filter apply to the pack and group shown.
 - With more than one pack that has problems, `hc` opens on a pack picker that lists them with their progress, the pack you were in last under the cursor. `enter` opens a pack's list, and `esc` on the list comes back to the picker. With one such pack, `hc` opens its list directly.
 - `hc --pack <name>` (or `hc list --pack <name>`) skips the picker and opens that pack, even an empty one, and `--group <name>` that group (a group name that only one pack uses needs no `--pack`). Each pack opens on the group you chose last.
@@ -110,11 +111,11 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 | `d` | Debug (the last failing case, if any) | `h` | Submission history: code, judge details, restore, delete |
 | `y` | Copy the solution path again | `L` | Switch language |
 | `r` | Reset to the template | `D` | Discard: delete the solution and its history, back to not started |
-| `/` | Search | `f` | Filter: all / unsolved / solved |
+| `/` | Search | `f` | Filter: all / unsolved / solved / starred |
 | `tab` / `shift+tab` | Next / previous pack | `c` | Choose a group of the pack |
 | `v` | View the statement only | `o` | Open the statement's images (statement view) |
 | `i` | Switch the statement language | `esc` / `q` | Back (`esc` on the list: to the pack picker); `q` on the list quits |
-| `ctrl+c` | Quit | | |
+| `m` | Star or unstar the problem (`★` in the list) | `ctrl+c` | Quit |
 
 ## Commands
 

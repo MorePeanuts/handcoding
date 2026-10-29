@@ -38,6 +38,9 @@ func (m *model) problemKey(key string, p *problem.Problem) (tea.Cmd, bool) {
 			m.copyPath(path)
 		}
 		return nil, true
+	case "m":
+		m.toggleStar(p)
+		return nil, true
 	case "L":
 		m.switchLang()
 		return nil, true
@@ -84,6 +87,28 @@ func (m *model) problemKey(key string, p *problem.Problem) (tea.Cmd, bool) {
 		return nil, true
 	}
 	return nil, false
+}
+
+// toggleStar stars p, or unstars it.
+func (m *model) toggleStar(p *problem.Problem) {
+	starred := !m.stars[p.Ref()]
+	st, err := m.app.Store()
+	if err == nil {
+		err = st.SetStar(m.ctx, p.Pack, p.Slug, starred)
+	}
+	if err != nil {
+		m.message = ui.Red.Render(err.Error())
+		return
+	}
+	m.stars[p.Ref()] = starred
+	if starred {
+		m.message = ui.Yellow.Render("★") + " starred " + p.Slug
+	} else {
+		m.message = "unstarred " + p.Slug
+	}
+	if m.filter == filterStarred {
+		m.applyFilter()
+	}
 }
 
 // ensureSolution creates the solution file if needed and returns its path.

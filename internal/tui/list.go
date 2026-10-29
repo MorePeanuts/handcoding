@@ -22,10 +22,12 @@ const (
 	filterAll filter = iota
 	filterTodo
 	filterSolved
+	filterStarred
+	filters // the number of filters
 )
 
 func (f filter) String() string {
-	return [...]string{"all", "todo", "solved"}[f]
+	return [...]string{"all", "todo", "solved", "starred"}[f]
 }
 
 // packTab is a pack the list has a tab for, with its problems in id order.
@@ -130,7 +132,8 @@ func (m *model) applyFilter() {
 	m.visible = m.visible[:0]
 	for i, p := range m.probs {
 		st := m.statuses[p.Ref()]
-		if m.filter == filterTodo && st == app.StatusSolved || m.filter == filterSolved && st != app.StatusSolved {
+		if m.filter == filterTodo && st == app.StatusSolved || m.filter == filterSolved && st != app.StatusSolved ||
+			m.filter == filterStarred && !m.stars[p.Ref()] {
 			continue
 		}
 		if q != "" && !matches(p, q) {
@@ -197,7 +200,7 @@ func (m *model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.searching = true
 		return m, m.search.Focus()
 	case "f":
-		m.filter = (m.filter + 1) % 3
+		m.filter = (m.filter + 1) % filters
 		m.applyFilter()
 	case "tab":
 		m.switchPack(1)
@@ -341,8 +344,11 @@ func (m *model) viewList() string {
 	if m.multiPack {
 		b.WriteString(m.tabBar() + "\n")
 	}
-	solved, attempted, notReady := 0, 0, 0
+	solved, attempted, notReady, starred := 0, 0, 0, 0
 	for _, p := range m.probs {
+		if m.stars[p.Ref()] {
+			starred++
+		}
 		switch m.statuses[p.Ref()] {
 		case app.StatusSolved:
 			solved++
@@ -362,6 +368,9 @@ func (m *model) viewList() string {
 		ui.Green.Render(fmt.Sprintf("✔ %d solved", solved)), ui.Yellow.Render(fmt.Sprintf("● %d attempted", attempted)))
 	if notReady > 0 {
 		header += "  " + ui.Cyan.Render(fmt.Sprintf("? %d not ready", notReady))
+	}
+	if starred > 0 {
+		header += "  " + ui.Yellow.Render(fmt.Sprintf("★ %d starred", starred))
 	}
 	right := ui.Faint.Render(fmt.Sprintf("lang: %s  filter: %s", m.lang.Name(), m.filter))
 	if l := m.localeLabel(m.pack); l != "" {
@@ -392,7 +401,7 @@ func (m *model) viewList() string {
 		return b.String()
 	}
 	keys := []string{"↑↓ move", "enter open", "v view", "e edit", "t test", "s submit", "d debug", "h history",
-		"y copy-path", "r reset", "D discard", "f filter", "/ search", "L lang", "q quit"}
+		"y copy-path", "m star", "r reset", "D discard", "f filter", "/ search", "L lang", "q quit"}
 	if t := m.tab(); t != nil && len(t.groups()) > 0 {
 		keys = slices.Insert(keys, 1, "c group")
 	}
@@ -411,10 +420,10 @@ func (m *model) viewList() string {
 
 // viewProblems writes the column header and h rows of problems.
 func (m *model) viewProblems(b *strings.Builder, h int) {
-	// marker(2) + status(2) + id(7) + title + level(9) + tags
-	titleW := min(max(m.width-60, 20), 48)
-	tagsW := max(m.width-2-2-7-titleW-1-9, 0)
-	cols := fmt.Sprintf("  %s %-6s %s %-8s %s", " ", "#", fit("Title", titleW), "Level", "Tags")
+	// marker(2) + status(2) + star(2) + id(7) + title + level(9) + tags
+	titleW := min(max(m.width-62, 20), 48)
+	tagsW := max(m.width-2-2-2-7-titleW-1-9, 0)
+	cols := fmt.Sprintf("  %s %s %-6s %s %-8s %s", " ", " ", "#", fit("Title", titleW), "Level", "Tags")
 	b.WriteString(ui.Faint.Render(cols) + "\n")
 
 	if m.cursor < m.offset {
@@ -437,7 +446,11 @@ func (m *model) viewProblems(b *strings.Builder, h int) {
 			mark = ui.Yellow.Render("●")
 		}
 		tags := ui.Faint.Render(fit(strings.Join(p.Tags, ", "), tagsW))
-		row := fmt.Sprintf("%s %-6s %s %s %s", mark, p.ID, fit(m.title(p), titleW), padRight(ui.Difficulty(p.Difficulty), 8), tags)
+		star := " "
+		if m.stars[p.Ref()] {
+			star = ui.Yellow.Render("★")
+		}
+		row := fmt.Sprintf("%s %s %-6s %s %s %s", mark, star, p.ID, fit(m.title(p), titleW), padRight(ui.Difficulty(p.Difficulty), 8), tags)
 		if i == m.cursor {
 			row = cursorStyle.Render("▸") + " " + row
 		} else {

@@ -81,6 +81,9 @@ func (m *model) problemTitle(p *problem.Problem) string {
 	if m.multiPack {
 		title = ui.Faint.Render(p.Pack+" ·") + " " + title
 	}
+	if m.stars[p.Ref()] {
+		title += " " + ui.Yellow.Render("★")
+	}
 	// The slug is what commands take, and the only name a problem without
 	// an ID, or with an ID such as "LCR 001", is easy to type by.
 	line := fmt.Sprintf("%s  %s  %s  %s", title, ui.Faint.Render(p.Slug), ui.Difficulty(p.Difficulty), ui.Faint.Render(strings.Join(p.Tags, ", ")))
@@ -115,7 +118,7 @@ func clipLeft(s string, width int) string {
 
 func (m *model) viewDetail() string {
 	p := m.current
-	keys := []string{"↑↓ scroll", "t test", "s submit", "d debug", "e edit", "h history", "y copy-path", "L lang", "r reset", "D discard", "esc back"}
+	keys := []string{"↑↓ scroll", "esc back", "t test", "s submit", "d debug", "e edit", "h history", "y copy-path", "m star", "L lang", "r reset", "D discard"}
 	if m.localeLabel(p.Pack) != "" {
 		keys = append(keys, "i locale")
 	}

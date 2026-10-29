@@ -125,3 +125,44 @@ func TestPrefs(t *testing.T) {
 		t.Errorf("SetPref to empty did not remove it: %v", err)
 	}
 }
+
+// TestStars checks that stars are kept per problem, survive reopening, and
+// go with a purged pack but not with a problem's history.
+func TestStars(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hc.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	for _, p := range [][2]string{{"local", "two-sum"}, {"leetcode", "two-sum"}, {"leetcode", "lru-cache"}, {"leetcode", "lru-cache"}} {
+		if err := s.SetStar(ctx, p[0], p[1], true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.SetStar(ctx, "leetcode", "two-sum", false); err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	if s, err = Open(path); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	stars := func() map[string]bool {
+		t.Helper()
+		m, err := s.Stars(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m
+	}
+	if got := stars(); len(got) != 2 || !got["local/two-sum"] || !got["leetcode/lru-cache"] {
+		t.Errorf("stars after reopening: %v", got)
+	}
+	if _, err := s.DeleteProblem(ctx, "local", "two-sum"); err != nil || !stars()["local/two-sum"] {
+		t.Errorf("DeleteProblem removed the star: %v", err)
+	}
+	if _, err := s.DeletePack(ctx, "leetcode"); err != nil || stars()["leetcode/lru-cache"] {
+		t.Errorf("DeletePack kept the star: %v", err)
+	}
+}

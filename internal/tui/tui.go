@@ -95,8 +95,10 @@ type model struct {
 	groups map[string]string
 	// probs are the problems of the pack and group shown; statuses hold
 	// every problem's.
-	probs     []*problem.Problem
-	statuses  map[string]app.ProblemStatus
+	probs    []*problem.Problem
+	statuses map[string]app.ProblemStatus
+	// stars are the starred problems, by pack/slug.
+	stars     map[string]bool
 	visible   []int // indexes into probs
 	cursor    int
 	offset    int
@@ -288,6 +290,13 @@ func (m *model) reload() error {
 	}
 	statuses, err := m.app.Statuses(m.ctx, probs)
 	if err != nil {
+		return err
+	}
+	st, err := m.app.Store()
+	if err != nil {
+		return err
+	}
+	if m.stars, err = st.Stars(m.ctx); err != nil {
 		return err
 	}
 	var tabs []packTab
