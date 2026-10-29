@@ -126,12 +126,18 @@ To fix a case by hand instead: hc cases edit <problem>.`,
 }
 
 func runAgent(cmd *cobra.Command, a *app.App, ag *agent.Agent, prompt string, dryRun bool, p *problem.Problem) error {
+	env := agentEnv(a.WS)
 	if dryRun {
-		fmt.Printf("cd %s\n%s\n\nPrompt:\n%s", a.WS.Root, strings.Join(ag.Argv, " "), prompt)
+		fmt.Printf("cd %s\n%s %s\n\nPrompt:\n%s", a.WS.Root, strings.Join(env, " "), strings.Join(ag.Argv, " "), prompt)
 		return nil
 	}
+	// The agent's sandbox could not create the Python environment: uv
+	// writes its cache in the home directory and downloads Python.
+	for _, l := range a.Langs.All() {
+		setupEnv(cmd.Context(), l)
+	}
 	fmt.Fprintf(os.Stderr, "%s %s is working on %s (this can take a few minutes)…\n", ui.Cyan.Render("agent"), ag.Name, p.Ref())
-	if err := ag.Run(cmd.Context(), a.WS.Root, prompt); err != nil {
+	if err := ag.Run(cmd.Context(), a.WS.Root, prompt, env); err != nil {
 		return fmt.Errorf("agent: %w", err)
 	}
 	fmt.Fprintln(os.Stderr)
@@ -141,6 +147,18 @@ func runAgent(cmd *cobra.Command, a *app.App, ag *agent.Agent, prompt string, dr
 		return err
 	}
 	return validateOne(cmd, a, p2)
+}
+
+// agentEnv moves the caches of the toolchains hc runs into the workspace's
+// state directory. Agents run commands in sandboxes that write only to the
+// workspace and temporary directories, where Go builds and uv fail on their
+// caches in the home directory.
+func agentEnv(ws *workspace.Workspace) []string {
+	cache := filepath.Join(ws.StatePath(), "cache")
+	return []string{
+		"GOCACHE=" + filepath.Join(cache, "go-build"),
+		"UV_CACHE_DIR=" + filepath.Join(cache, "uv"),
+	}
 }
 
 func newSkillCmd(root *rootOptions) *cobra.Command {
