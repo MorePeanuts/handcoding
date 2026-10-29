@@ -86,8 +86,7 @@ right.
 - A Go reference starts with `package main` (LeetCode's Go template omits
   it) and must build with Go 1.22: no newer language features or standard
   library functions (`slices.Sorted`, `maps.Keys`, range over a function).
-  `hc validate --run` builds it with the installed Go, which is newer and
-  does not catch them, so stay with what you know Go 1.22 has.
+  `hc validate --run` checks this and names what is too new.
 
 **Prove the rule with a second reference.** When more than one output is
 acceptable, also write `reference/solution.go` so that it returns a

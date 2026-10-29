@@ -15,6 +15,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/lang/golang"
 	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/pack"
+	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/regression"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
@@ -107,11 +108,8 @@ func TestRegressionReferences(t *testing.T) {
 	}
 }
 
-// TestGoMinimumVersion builds the Go driver with every Go reference of the
-// regression set at the protocol's minimum Go version: the go directive
-// limits the language, and go vet's stdversion analyzer reports standard
-// library symbols that are too new. A newer local toolchain is enough to
-// check both.
+// TestGoMinimumVersion checks every Go reference of the regression set at
+// the protocol's minimum Go version, as hc validate --run does.
 func TestGoMinimumVersion(t *testing.T) {
 	requireTools(t, "go")
 	a := newWorkspace(t)
@@ -126,27 +124,41 @@ func TestGoMinimumVersion(t *testing.T) {
 			continue
 		}
 		t.Run(p.Slug, func(t *testing.T) {
-			dir := t.TempDir()
-			code, err := os.ReadFile(ref)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(dir, l.SolutionFile()), code, 0o644); err != nil {
-				t.Fatal(err)
-			}
-			if err := l.Prepare(dir, p); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(dir, "go.mod"), golang.GoMod(golang.MinVersion), 0o644); err != nil {
-				t.Fatal(err)
-			}
-			cmd := exec.Command("go", "vet", ".")
-			cmd.Dir = dir
-			cmd.Env = append(os.Environ(), "GOTOOLCHAIN=local")
-			if out, err := cmd.CombinedOutput(); err != nil {
-				t.Errorf("go vet at go %s: %v\n%s", golang.MinVersion, err, out)
+			if err := l.CheckMinVersion(context.Background(), p, ref); err != nil {
+				t.Error(err)
 			}
 		})
+	}
+}
+
+// TestValidateGoMinimumVersion checks that hc validate --run fails a Go
+// reference that passes its cases on the local toolchain but uses a
+// standard library symbol newer than the protocol's minimum Go version.
+func TestValidateGoMinimumVersion(t *testing.T) {
+	requireTools(t, "go")
+	a := newWorkspace(t)
+	yaml := "slug: total\ntitle: Total\nkind: function\nfunction:\n  name: total\n  params:\n    - name: nums\n      type: integer[]\n  returns: integer\njudge:\n  compare: exact\n"
+	p := addProblem(t, a, "total", yaml, `{"input":{"nums":[1,2]},"expected":3,"example":true}`+"\n")
+	ref := filepath.Join(p.Dir, problem.ReferenceDir, "solution.go")
+	if err := os.MkdirAll(filepath.Dir(ref), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct{ loop, err string }{
+		{"range nums", ""},
+		{"range slices.Repeat(nums, 1)", "slices.Repeat requires go1.23"},
+	} {
+		code := "package main\n\nimport \"slices\"\n\nvar _ = slices.Contains[[]int]\n\nfunc total(nums []int) int {\n\ts := 0\n\tfor _, v := " + tt.loop + " {\n\t\ts += v\n\t}\n\treturn s\n}\n"
+		if err := os.WriteFile(ref, []byte(code), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		f := a.ValidateProblem(context.Background(), p, nil, "total", app.ValidateOptions{Run: true})
+		got := strings.Join(f.Errors, "\n")
+		switch {
+		case tt.err == "" && got != "":
+			t.Errorf("%s: unexpected errors\n%s", tt.loop, got)
+		case tt.err != "" && (!strings.Contains(got, "Go reference does not work on Go 1.22") || !strings.Contains(got, tt.err)):
+			t.Errorf("%s: errors\n%s\nwant %q", tt.loop, got, tt.err)
+		}
 	}
 }
 

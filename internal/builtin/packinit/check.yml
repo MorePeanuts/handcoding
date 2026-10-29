@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      # Any Go builds hc; hc pack check vets the Go references against the
+      # oldest Go the protocol supports itself.
       - uses: actions/setup-go@v7
         with:
           go-version: stable

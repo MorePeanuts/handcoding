@@ -75,6 +75,14 @@ type Language interface {
 	Setup(ctx context.Context, w io.Writer) error
 }
 
+// MinVersionChecker is a Language that can check, with any supported
+// toolchain, that code works on the oldest one (the Toolchain's Min).
+type MinVersionChecker interface {
+	// CheckMinVersion checks the solution file of problem p. The error
+	// says what is too new.
+	CheckMinVersion(ctx context.Context, p *problem.Problem, file string) error
+}
+
 // Checker runs a problem's checker.py (judge.compare: checker) for solutions
 // in every language. Python implements it.
 type Checker interface {
