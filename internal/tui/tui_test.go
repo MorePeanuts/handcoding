@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -83,6 +84,8 @@ func keyMsg(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyEnter}
 	case "esc":
 		return tea.KeyMsg{Type: tea.KeyEsc}
+	case "tab":
+		return tea.KeyMsg{Type: tea.KeyTab}
 	}
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
 }
@@ -145,24 +148,203 @@ func TestListEmptyWorkspace(t *testing.T) {
 	}
 }
 
-// With problems in several packs, the list shows each problem's pack and
-// search matches pack/slug.
-func TestListPacks(t *testing.T) {
-	h := newHarness(t)
-	if strings.Contains(h.view(), "Pack") {
-		t.Error("a pack column with a single pack")
-	}
-	dir := filepath.Join(h.m.app.WS.WritablePack().ProblemsPath(), "0001-two-sum")
-	if err := os.CopyFS(dir, os.DirFS(filepath.Join(regression.ProblemsDir(), "0001-two-sum"))); err != nil {
+// addLocal copies a problem of the regression set into the local pack, so
+// that the workspace has two packs.
+func addLocal(t *testing.T, m *model, dir string) {
+	t.Helper()
+	dst := filepath.Join(m.app.WS.WritablePack().ProblemsPath(), dir)
+	if err := os.CopyFS(dst, os.DirFS(filepath.Join(regression.ProblemsDir(), dir))); err != nil {
 		t.Fatal(err)
 	}
-	h.m.refresh()
-	if view := h.view(); !strings.Contains(view, "Pack") || !strings.Contains(view, "regression") {
-		t.Errorf("no pack column:\n%s", view)
+	m.refresh()
+}
+
+// openModel opens a second TUI on h's workspace, as a new session would.
+func (h *harness) openModel(opts Options) *model {
+	h.t.Helper()
+	opts.Lang, opts.Theme = h.m.lang, "dark"
+	m, err := newModel(context.Background(), h.m.app, opts)
+	if err != nil {
+		h.t.Fatal(err)
 	}
-	h.press("/", "l", "o", "c", "a", "l", "/", "enter")
-	if len(h.m.visible) != 1 || h.m.selected().Ref() != "local/two-sum" {
-		t.Fatalf("search local/: %d visible", len(h.m.visible))
+	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	return m
+}
+
+// With a single pack, there is no tab bar (the empty local pack has no tab).
+func TestListSinglePack(t *testing.T) {
+	h := newHarness(t)
+	view := h.view()
+	if first, _, _ := strings.Cut(view, "\n"); !strings.HasPrefix(first, "handcoding") {
+		t.Errorf("first line %q, want the header", first)
+	}
+	if strings.Contains(view, "tab pack") || len(h.m.tabs) != 1 || h.m.pack != regression.Name {
+		t.Errorf("tabs %d, pack %s:\n%s", len(h.m.tabs), h.m.pack, view)
+	}
+	h.press("tab")
+	if h.m.pack != regression.Name {
+		t.Errorf("tab switched to %s", h.m.pack)
+	}
+}
+
+// With several packs, the list shows one at a time under a tab bar with
+// their progress, tab and shift+tab switch packs, and search applies to the
+// pack shown.
+func TestListPackTabs(t *testing.T) {
+	h := newHarness(t)
+	addLocal(t, h.m, "0001-two-sum")
+	view := h.view()
+	first, _, _ := strings.Cut(view, "\n")
+	if !strings.Contains(first, "local 0/1") || !strings.Contains(first, "regression 0/") {
+		t.Errorf("tab bar %q", first)
+	}
+	if got := strings.Count(view, "\n") + 1; got != 30 {
+		t.Errorf("list view has %d lines, want 30", got)
+	}
+	if strings.Contains(view, "Pack") || !strings.Contains(view, "tab pack") {
+		t.Errorf("pack column or no tab key:\n%s", view)
+	}
+	// The pack shown stays shown when another one gets a tab.
+	if h.m.pack != regression.Name || len(h.m.probs) <= 1 || h.m.probs[0].Pack != regression.Name {
+		t.Fatalf("pack %s with %d problems", h.m.pack, len(h.m.probs))
+	}
+	h.press("/", "t", "w", "o", "-", "s", "u", "m", "enter")
+	if len(h.m.visible) != 1 || h.m.selected().Ref() != "regression/two-sum" {
+		t.Fatalf("search in regression: %d visible", len(h.m.visible))
+	}
+	h.press("tab") // wraps around to local
+	if h.m.pack != "local" || len(h.m.visible) != 1 || h.m.selected().Ref() != "local/two-sum" {
+		t.Fatalf("after tab: pack %s, %d visible", h.m.pack, len(h.m.visible))
+	}
+	h.press("esc")
+	if len(h.m.probs) != 1 {
+		t.Fatalf("local lists %d problems", len(h.m.probs))
+	}
+
+	// The next session opens the pack shown last.
+	if m := h.openModel(Options{}); m.pack != "local" {
+		t.Errorf("reopened on %s, want local", m.pack)
+	}
+	h.m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	if h.m.pack != regression.Name {
+		t.Fatalf("after shift+tab: pack %s", h.m.pack)
+	}
+	if m := h.openModel(Options{}); m.pack != regression.Name {
+		t.Errorf("reopened on %s, want %s", m.pack, regression.Name)
+	}
+}
+
+// The tab bar keeps the current tab visible on a narrow terminal.
+func TestListTabBarScrolls(t *testing.T) {
+	h := newHarness(t)
+	addLocal(t, h.m, "0001-two-sum")
+	h.m.Update(tea.WindowSizeMsg{Width: 20, Height: 30})
+	if bar := h.m.tabBar(); strings.Contains(bar, "local") || !strings.Contains(bar, "regression") || !strings.HasPrefix(bar, "‹") {
+		t.Errorf("tab bar on regression: %q", bar)
+	}
+	h.press("tab")
+	if bar := h.m.tabBar(); !strings.Contains(bar, "local") || strings.Contains(bar, "regression") || !strings.HasSuffix(bar, "›") {
+		t.Errorf("tab bar on local: %q", bar)
+	}
+	h.m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	if bar, want := h.m.tabBar(), " local 0/1 │ regression 0/"+strconv.Itoa(len(h.m.tabs[1].probs))+" "; bar != want {
+		t.Errorf("wide tab bar: %q", bar)
+	}
+}
+
+// c chooses a group of the pack, or every problem, each with its progress;
+// each pack remembers its group.
+func TestListGroups(t *testing.T) {
+	h := newHarness(t)
+	all := len(h.m.probs)
+	h.press("c")
+	view := h.view()
+	for _, want := range []string{"All problems", "0/" + strconv.Itoa(all), "Design problems", "0/5", "design", "Structure inputs", "enter choose"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("group picker missing %q:\n%s", want, view)
+		}
+	}
+	h.press("j", "j", "enter") // design, the second group
+	if h.m.picking || h.m.group() == nil || h.m.group().Name != "design" {
+		t.Fatalf("group %v", h.m.group())
+	}
+	if len(h.m.probs) != 5 || h.m.probs[0].Slug != "lru-cache" {
+		t.Fatalf("design lists %d problems, the first %s", len(h.m.probs), h.m.probs[0].Slug)
+	}
+	if !strings.Contains(h.view(), "Design problems  5 problems") {
+		t.Errorf("header does not name the group:\n%s", h.view())
+	}
+	// Filters apply to the group.
+	h.press("/", "c", "a", "c", "h", "e", "enter")
+	if len(h.m.visible) != 1 {
+		t.Fatalf("search in the group: %d visible", len(h.m.visible))
+	}
+	h.press("esc")
+
+	// Other packs have their own group; the next session opens this one.
+	addLocal(t, h.m, "0001-two-sum")
+	if h.m.pack != regression.Name || h.m.group().Name != "design" {
+		t.Fatalf("after adding a pack: %s %v", h.m.pack, h.m.group())
+	}
+	h.press("tab")
+	if h.m.group() != nil || len(h.m.probs) != 1 {
+		t.Fatalf("local shows group %v", h.m.group())
+	}
+	h.press("c")
+	if h.m.picking || !strings.Contains(h.m.message, "no groups") {
+		t.Errorf("c in a pack without groups: %q", h.m.message)
+	}
+	h.press("tab")
+	if g := h.m.group(); g == nil || g.Name != "design" {
+		t.Fatalf("back in regression: group %v", g)
+	}
+	m := h.openModel(Options{})
+	if g := m.group(); m.pack != regression.Name || g == nil || g.Name != "design" || len(m.probs) != 5 {
+		t.Fatalf("reopened on %s, group %v", m.pack, g)
+	}
+
+	// Choosing every problem again is remembered too.
+	h.press("c", "g", "enter")
+	if h.m.group() != nil || len(h.m.probs) != all {
+		t.Fatalf("all: group %v, %d problems", h.m.group(), len(h.m.probs))
+	}
+	if m := h.openModel(Options{}); m.group() != nil {
+		t.Errorf("reopened on group %v", m.group())
+	}
+}
+
+// --pack and --group open that pack's tab, and that group in it; a
+// remembered pack or group that no longer exists falls back silently.
+func TestListOptionsAndFallback(t *testing.T) {
+	h := newHarness(t)
+	addLocal(t, h.m, "0001-two-sum")
+	if m := h.openModel(Options{Pack: regression.Name}); m.pack != regression.Name || m.group() != nil {
+		t.Errorf("--pack: %s %v", m.pack, m.group())
+	}
+	m := h.openModel(Options{Group: "structure-inputs"})
+	if g := m.group(); m.pack != regression.Name || g == nil || g.Name != "structure-inputs" || len(m.probs) != 5 {
+		t.Fatalf("--group: %s %v", m.pack, g)
+	}
+	if m := h.openModel(Options{}); m.pack != regression.Name || m.group() == nil {
+		t.Errorf("--group not remembered: %s %v", m.pack, m.group())
+	}
+	if _, err := newModel(context.Background(), h.m.app, Options{Lang: h.m.lang, Theme: "dark", Group: "nope"}); err == nil {
+		t.Error("an unknown group without --pack")
+	}
+
+	st, _ := h.m.app.Store()
+	ctx := context.Background()
+	if err := st.SetPref(ctx, regression.Name, prefGroup, "gone"); err != nil {
+		t.Fatal(err)
+	}
+	if m := h.openModel(Options{}); m.pack != regression.Name || m.group() != nil || len(m.probs) != len(m.tab().probs) {
+		t.Errorf("a removed group: %s %v", m.pack, m.group())
+	}
+	if err := st.SetPref(ctx, "", prefPack, "gone"); err != nil {
+		t.Fatal(err)
+	}
+	if m := h.openModel(Options{}); m.pack != "local" {
+		t.Errorf("a removed pack: opened %s, want the first", m.pack)
 	}
 }
 

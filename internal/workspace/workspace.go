@@ -737,23 +737,9 @@ func (w *Workspace) Filter(probs []*problem.Problem, packName, group string) ([]
 			return nil, err
 		}
 	} else {
-		packs, err := w.Packs()
-		if err != nil {
+		var err error
+		if k, err = w.GroupPack(group); err != nil {
 			return nil, err
-		}
-		var found []string
-		for _, c := range packs {
-			if c.Manifest != nil && slices.ContainsFunc(c.Manifest.Groups, func(g pack.Group) bool { return g.Name == group }) {
-				k = c
-				found = append(found, c.Name)
-			}
-		}
-		switch len(found) {
-		case 0:
-			return nil, fmt.Errorf("no pack has a group %q", group)
-		case 1:
-		default:
-			return nil, fmt.Errorf("group %q is in several packs (%s); choose one with --pack", group, strings.Join(found, ", "))
 		}
 	}
 	var out []*problem.Problem
@@ -782,6 +768,30 @@ func (w *Workspace) Filter(probs []*problem.Problem, packName, group string) ([]
 		}
 	}
 	return out, nil
+}
+
+// GroupPack returns the one pack that has a group called group.
+func (w *Workspace) GroupPack(group string) (*Pack, error) {
+	packs, err := w.Packs()
+	if err != nil {
+		return nil, err
+	}
+	var k *Pack
+	var found []string
+	for _, c := range packs {
+		if c.Manifest != nil && slices.ContainsFunc(c.Manifest.Groups, func(g pack.Group) bool { return g.Name == group }) {
+			k = c
+			found = append(found, c.Name)
+		}
+	}
+	switch len(found) {
+	case 0:
+		return nil, fmt.Errorf("no pack has a group %q", group)
+	case 1:
+		return k, nil
+	default:
+		return nil, fmt.Errorf("group %q is in several packs (%s); choose one with --pack", group, strings.Join(found, ", "))
+	}
 }
 
 // NewProblemDir returns the directory a new problem is stored in, in the

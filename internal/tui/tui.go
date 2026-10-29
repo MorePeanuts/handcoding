@@ -48,8 +48,9 @@ type Options struct {
 	Theme string
 	// Images draws statement images; nil means configure from hc.yaml.
 	Images *termimg.Renderer
-	// Pack and Group limit the list to a pack, or a group of a pack (see
-	// workspace.Filter).
+	// Pack and Group choose the pack, or the group of a pack, that the list
+	// shows first (see workspace.Filter). By default it shows the pack and
+	// group shown last.
 	Pack, Group string
 }
 
@@ -86,6 +87,13 @@ type model struct {
 	confirm       *confirmation
 
 	// list screen
+	tabs []packTab
+	// pack is the name of the pack shown, and groups the group shown in
+	// each pack by name ("" or missing: every problem of the pack).
+	pack   string
+	groups map[string]string
+	// probs are the problems of the pack and group shown; statuses hold
+	// every problem's.
 	probs     []*problem.Problem
 	statuses  map[string]app.ProblemStatus
 	visible   []int // indexes into probs
@@ -94,8 +102,12 @@ type model struct {
 	filter    filter
 	search    textinput.Model
 	searching bool
-	// multiPack is set when the problems come from several packs, which
-	// the list then shows.
+	// picking is set while the group picker is shown; groupCursor is its
+	// cursor, 0 being every problem of the pack.
+	picking     bool
+	groupCursor int
+	// multiPack is set when the list has several tabs: the detail screen
+	// then names the problem's pack.
 	multiPack bool
 
 	// current is the problem shown by the detail, result and history screens.
@@ -152,12 +164,84 @@ func newModel(ctx context.Context, a *app.App, opts Options) (*model, error) {
 	}
 	m.search = textinput.New()
 	m.search.Prompt = "/"
-	m.search.Placeholder = "search title, pack/slug, id or tag"
+	m.search.Placeholder = "search title, slug, id or tag"
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Dot))
 	m.detail = viewport.New(0, 0)
 	m.result = viewport.New(0, 0)
 	m.subView = viewport.New(0, 0)
+	if err := m.start(); err != nil {
+		return nil, err
+	}
 	return m, m.reload()
+}
+
+// start chooses the pack and group shown first: those of the options, else
+// the ones shown last. reload falls back to the first pack, and to every
+// problem of it, when they no longer exist.
+func (m *model) start() error {
+	st, err := m.app.Store()
+	if err != nil {
+		return err
+	}
+	m.groups = map[string]string{}
+	switch {
+	case m.opts.Group != "":
+		m.pack = m.opts.Pack
+		if m.pack == "" {
+			k, err := m.app.WS.GroupPack(m.opts.Group)
+			if err != nil {
+				return err
+			}
+			m.pack = k.Name
+		}
+		m.groups[m.pack] = m.opts.Group
+	case m.opts.Pack != "":
+		m.pack = m.opts.Pack
+	default:
+		if m.pack, err = st.Pref(m.ctx, "", prefPack); err != nil {
+			return err
+		}
+	}
+	if err := m.loadGroup(m.pack); err != nil {
+		return err
+	}
+	if m.opts.Pack != "" || m.opts.Group != "" {
+		return m.remember()
+	}
+	return nil
+}
+
+// The preferences that remember the list's state: prefPack of the
+// workspace, prefGroup of each pack.
+const (
+	prefPack  = "pack"
+	prefGroup = "group"
+)
+
+// loadGroup reads the group shown last in the pack called name, unless it
+// is known already.
+func (m *model) loadGroup(name string) error {
+	if _, ok := m.groups[name]; ok || name == "" {
+		return nil
+	}
+	st, err := m.app.Store()
+	if err != nil {
+		return err
+	}
+	m.groups[name], err = st.Pref(m.ctx, name, prefGroup)
+	return err
+}
+
+// remember stores the pack shown, and its group, for the next session.
+func (m *model) remember() error {
+	st, err := m.app.Store()
+	if err != nil {
+		return err
+	}
+	if err := st.SetPref(m.ctx, "", prefPack, m.pack); err != nil {
+		return err
+	}
+	return st.SetPref(m.ctx, m.pack, prefGroup, m.groups[m.pack])
 }
 
 func (m *model) top() screen { return m.stack[len(m.stack)-1] }
@@ -176,8 +260,8 @@ func (m *model) pop() {
 	m.layout()
 }
 
-// reload re-reads problems and statuses, keeping the cursor on the same
-// problem.
+// reload re-reads packs, problems and statuses, keeping the cursor on the
+// same problem.
 func (m *model) reload() error {
 	probs, err := m.app.WS.Problems()
 	if err != nil && probs == nil && !loadFailed(err) {
@@ -186,20 +270,45 @@ func (m *model) reload() error {
 	if err != nil {
 		m.message = ui.Red.Render(err.Error())
 	}
-	if probs, err = m.app.WS.Filter(probs, m.opts.Pack, m.opts.Group); err != nil {
+	packs, err := m.app.WS.Packs()
+	if err != nil {
 		return err
 	}
-	m.multiPack = workspace.SpansPacks(probs)
 	statuses, err := m.app.Statuses(m.ctx, probs)
 	if err != nil {
 		return err
+	}
+	var tabs []packTab
+	for _, k := range packs {
+		t := packTab{pack: k}
+		for _, p := range probs {
+			if p.Pack == k.Name {
+				t.probs = append(t.probs, p)
+			}
+		}
+		// A pack without problems, such as the local pack before hc new or
+		// hc fetch, has no tab unless it is the one shown. A pack that
+		// cannot be read has none either: the error says why.
+		if k.Err == nil && (len(t.probs) > 0 || k.Name == m.pack) {
+			tabs = append(tabs, t)
+		}
+	}
+	if len(tabs) == 0 && len(packs) > 0 && packs[0].Err == nil {
+		tabs = append(tabs, packTab{pack: packs[0]})
+	}
+	m.tabs, m.statuses = tabs, statuses
+	m.multiPack = len(tabs) > 1
+	if m.tab() == nil && len(tabs) > 0 {
+		m.pack = tabs[0].pack.Name
+		if err := m.loadGroup(m.pack); err != nil {
+			return err
+		}
 	}
 	var current string
 	if p := m.selected(); p != nil {
 		current = p.Ref()
 	}
-	m.probs, m.statuses = probs, statuses
-	m.applyFilter()
+	m.selectProblems()
 	for i, idx := range m.visible {
 		if m.probs[idx].Ref() == current {
 			m.cursor = i
