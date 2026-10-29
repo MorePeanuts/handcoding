@@ -29,17 +29,23 @@ func newListCmd(root *rootOptions) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "Browse problems (interactive in a terminal)",
-		Long: `Browse the problems of every pack in the workspace, or only those of one
-pack (--pack), or of one group of a pack (--group), in the group's order. A
-group name that only one pack uses needs no --pack.`,
+		Long: `Browse the problems of the workspace.
+
+In a terminal, the list shows one pack at a time, with a tab for each pack,
+and opens on the pack and group shown last. --pack opens a pack's tab, and
+--group a group of a pack, in the group's order.
+
+With --plain, or when not in a terminal, it prints a table of every pack's
+problems, or only those of one pack (--pack), or of one group of a pack
+(--group). A group name that only one pack uses needs no --pack.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runList(cmd, root, o)
 		},
 	}
 	cmd.Flags().BoolVar(&o.plain, "plain", false, "print a plain table instead of the interactive list")
-	cmd.Flags().StringVar(&o.pack, "pack", "", "only the problems of this pack")
-	cmd.Flags().StringVar(&o.group, "group", "", "only the problems of this group of a pack")
+	cmd.Flags().StringVar(&o.pack, "pack", "", "show this pack")
+	cmd.Flags().StringVar(&o.group, "group", "", "show this group of a pack")
 	langFlag(cmd, &o.lang)
 	return cmd
 }
