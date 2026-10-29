@@ -123,6 +123,63 @@ func CheckValue(t string, raw json.RawMessage) error {
 	return checkValue(t, v, "")
 }
 
+// checkOutput is CheckValue for an expected output, which must also have the
+// form the drivers encode outputs in: never null for no list, tree or node
+// (that is []), no trailing nulls in a level order, and [0,1] for a QuadNode
+// that is not a leaf. A value in any other form matches no output.
+func checkOutput(t string, raw json.RawMessage) error {
+	var v any
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	if err := dec.Decode(&v); err != nil {
+		return err
+	}
+	if err := checkValue(t, v, ""); err != nil {
+		return err
+	}
+	return checkOutputForm(t, v, "")
+}
+
+// checkOutputForm checks the output form of a value checkValue accepted.
+func checkOutputForm(t string, v any, path string) error {
+	base, depth := SplitArray(t)
+	if depth > 0 {
+		elem := strings.TrimSuffix(t, "[]")
+		for i, x := range v.([]any) {
+			if err := checkOutputForm(elem, x, fmt.Sprintf("%s[%d]", path, i)); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	switch base {
+	case TypeListNode, TypeTreeNode, TypeGraphNode, TypeNaryNode, TypeRandomListNode, TypeQuadNode, TypeMultilevelNode:
+	default:
+		return nil
+	}
+	if v == nil {
+		return fmt.Errorf("%smust be [], not null: an output of %s is never null", pathPrefix(path), base)
+	}
+	arr := v.([]any)
+	switch base {
+	case TypeTreeNode, TypeNaryNode, TypeQuadNode, TypeMultilevelNode:
+		if len(arr) > 0 && arr[len(arr)-1] == nil {
+			if base == TypeTreeNode && len(arr) == 1 {
+				return fmt.Errorf("%smust be [], not [null]: the empty tree is output as []", pathPrefix(path))
+			}
+			return fmt.Errorf("%smust not end with null: outputs of %s have trailing nulls removed", pathPrefix(path), base)
+		}
+	}
+	if base == TypeQuadNode {
+		for i, x := range arr {
+			if pair, ok := x.([]any); ok && pair[0] == json.Number("0") && pair[1] != json.Number("1") {
+				return fmt.Errorf("%smust be [0,1]: a node that is not a leaf is output as [0,1], whatever its value", pathPrefix(fmt.Sprintf("%s[%d]", path, i)))
+			}
+		}
+	}
+	return nil
+}
+
 func checkValue(t string, v any, path string) error {
 	fail := func(want string) error {
 		return fmt.Errorf("%smust be %s, got %s", pathPrefix(path), want, describe(v))
