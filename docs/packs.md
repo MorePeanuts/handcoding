@@ -39,7 +39,9 @@ Commit all of it. The skills are committed on purpose: a fresh clone describes i
 
 The directory is now a pack checkout, which hc opens as a workspace as it is (see [working on a pack](how-to-use.md#working-on-a-pack)): every hc command run in it works on this pack.
 
-`pack.yaml` holds more than `hc pack init` writes: a `version`, a `description`, `authors`, a `license`, a `homepage`, the `languages` the problems can be solved in, and `groups`, which arrange the problems into ordered lists such as topics or study plans. `hc docs protocol packyaml` prints the fields, and `hc docs protocol groups` the rules of groups.
+`pack.yaml` holds more than `hc pack init` writes: a `version`, a `description`, `authors`, a `license`, a `homepage`, the `languages` the problems can be solved in, the `locales` its statements are written in, and `groups`, which arrange the problems into ordered lists such as topics or study plans. `hc docs protocol packyaml` prints the fields, and `hc docs protocol groups` the rules of groups.
+
+**Statements in several languages.** A pack may give its statements in several languages: `locales: [en, zh-CN]`. Which ones, and which comes first, is your decision: the first is the default, the language of each problem's `description.md` and `title`. Every other locale needs a `description.<locale>.md` and a `titles.<locale>` in `problem.yaml` for every problem; `title` and `titles` of the pack and of its groups are optional. `hc docs protocol locales` has the rules. `hc fetch` writes the statements LeetCode has in the pack's locales (English from either site, Chinese from leetcode.cn), and `hc validate` and `hc pack check` report a missing or undeclared one. Nothing in hc translates a statement, and neither does an agent that follows hc's skills: what LeetCode does not have, you write yourself.
 
 ## Adding problems
 

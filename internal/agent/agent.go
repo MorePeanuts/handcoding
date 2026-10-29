@@ -119,6 +119,10 @@ func (a *Agent) definitionSkill() string {
 	return fmt.Sprintf("If the problem's definition itself is wrong (its signature, structure inputs, statement or templates), fix it with the %s skill (read %s) first.\n", skill.Problem, a.skillPath(skill.Problem))
 }
 
+// statementRule keeps the agent to the statement in the pack's default
+// locale: hc translates nothing.
+const statementRule = "The statement is description.md, in the pack's default locale; read only that one, and never write, edit or translate a statement in another locale (description.<locale>.md).\n"
+
 // GeneratePrompt asks the agent to write a reference solution and cases for
 // the problem ref (pack/slug) in problemDir, relative to the workspace.
 func (a *Agent) GeneratePrompt(ref, problemDir string, count int, extra string) string {
@@ -129,6 +133,7 @@ func (a *Agent) GeneratePrompt(ref, problemDir string, count int, extra string) 
 	if count > 0 {
 		fmt.Fprintf(&b, "Target about %d cases in total.\n", count)
 	}
+	b.WriteString(statementRule)
 	b.WriteString(a.definitionSkill())
 	b.WriteString("Do not touch the solutions/ directory.\n")
 	if extra != "" {
@@ -153,6 +158,7 @@ func (a *Agent) FixPrompt(ref, problemDir string, cases []int, complaint, soluti
 		fmt.Fprintf(&b, "The user's solution is %s — read it only to understand the dispute, never modify it.\n", solutionPath)
 	}
 	b.WriteString("Follow its \"fix a test case\" workflow. If the test case is correct and the user's solution is wrong, explain why instead of changing anything.\n")
+	b.WriteString(statementRule)
 	b.WriteString(a.definitionSkill())
 	return b.String()
 }

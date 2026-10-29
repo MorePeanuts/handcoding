@@ -16,15 +16,18 @@ import (
 const sample = `protocol: 1
 name: leetcode
 title: LeetCode
+titles: {zh-CN: 力扣}
 version: 0.3.0
 description: Classic LeetCode problems with Go and Python references.
 authors: [MorePeanuts]
 license: MIT
 homepage: https://github.com/MorePeanuts/handcoding-leetcode
 languages: [go, python]
+locales: [en, zh-CN]
 groups:
   - name: arrays
     title: Arrays
+    titles: {zh-CN: 数组}
     problems: [two-sum, rotate-array]
 `
 
@@ -51,12 +54,17 @@ func TestLoad(t *testing.T) {
 	}
 	want := Manifest{
 		Protocol: 1, Name: "leetcode", Title: "LeetCode", Version: "0.3.0",
+		Titles:      map[string]string{"zh-CN": "力扣"},
 		Description: "Classic LeetCode problems with Go and Python references.",
 		Authors:     []string{"MorePeanuts"}, License: "MIT",
 		Homepage:  "https://github.com/MorePeanuts/handcoding-leetcode",
 		Languages: []string{"go", "python"},
-		Groups:    []Group{{Name: "arrays", Title: "Arrays", Problems: []string{"two-sum", "rotate-array"}}},
+		Locales:   []string{"en", "zh-CN"},
+		Groups:    []Group{{Name: "arrays", Title: "Arrays", Titles: map[string]string{"zh-CN": "数组"}, Problems: []string{"two-sum", "rotate-array"}}},
 		Dir:       dir,
+	}
+	if m.DefaultLocale() != "en" || m.TitleIn("zh-CN") != "力扣" || m.TitleIn("en") != "LeetCode" || m.Groups[0].TitleIn("zh-CN") != "数组" || m.Groups[0].TitleIn("fr") != "Arrays" {
+		t.Error("DefaultLocale or TitleIn")
 	}
 	if !reflect.DeepEqual(*m, want) {
 		t.Errorf("Load = %+v, want %+v", *m, want)
@@ -149,6 +157,23 @@ func TestValidate(t *testing.T) {
 		{"duplicate problem", func(m *Manifest) {
 			m.Groups = []Group{{Name: "arrays", Problems: []string{"two-sum", "rotate-array", "two-sum"}}}
 		}, "group arrays: problem two-sum is listed more than once"},
+		{"locales", func(m *Manifest) {
+			m.Locales = []string{"en", "zh-CN"}
+			m.Titles = map[string]string{"zh-CN": "力扣"}
+			m.Groups = []Group{{Name: "arrays", Titles: map[string]string{"zh-CN": "数组"}}}
+		}, ""},
+		{"empty locales", func(m *Manifest) { m.Locales = []string{} }, "locales must not be empty"},
+		{"bad locale", func(m *Manifest) { m.Locales = []string{"en_US"} }, `"en_US" is not a BCP 47 language tag`},
+		{"duplicate locale", func(m *Manifest) { m.Locales = []string{"en", "zh-CN", "en"} }, `locales: duplicate locale "en"`},
+		{"titles without locales", func(m *Manifest) { m.Titles = map[string]string{"zh-CN": "力扣"} }, "titles: zh-CN: the pack declares no locales"},
+		{"undeclared title", func(m *Manifest) {
+			m.Locales = []string{"en"}
+			m.Groups = []Group{{Name: "arrays", Titles: map[string]string{"fr": "Tableaux"}}}
+		}, "group arrays: titles: fr is not one of locales (en)"},
+		{"default title", func(m *Manifest) {
+			m.Locales = []string{"en", "zh-CN"}
+			m.Titles = map[string]string{"en": "LeetCode"}
+		}, "titles: en is the default locale, whose title is title"},
 	} {
 		m := base()
 		tt.mut(m)

@@ -225,16 +225,19 @@ type Source struct {
 
 // Problem is the content of problem.yaml plus runtime information.
 type Problem struct {
-	ID         string    `yaml:"id,omitempty"`
-	Slug       string    `yaml:"slug"`
-	Title      string    `yaml:"title"`
-	Difficulty string    `yaml:"difficulty,omitempty"`
-	Tags       []string  `yaml:"tags,omitempty"`
-	Kind       Kind      `yaml:"kind"`
-	Function   *Function `yaml:"function,omitempty"`
-	Class      *Class    `yaml:"class,omitempty"`
-	Judge      Judge     `yaml:"judge,omitempty"`
-	Source     Source    `yaml:"source,omitempty"`
+	ID    string `yaml:"id,omitempty"`
+	Slug  string `yaml:"slug"`
+	Title string `yaml:"title"`
+	// Titles are the title in the pack's other locales, by locale; Title is
+	// the default locale's (see TitleIn).
+	Titles     map[string]string `yaml:"titles,omitempty"`
+	Difficulty string            `yaml:"difficulty,omitempty"`
+	Tags       []string          `yaml:"tags,omitempty"`
+	Kind       Kind              `yaml:"kind"`
+	Function   *Function         `yaml:"function,omitempty"`
+	Class      *Class            `yaml:"class,omitempty"`
+	Judge      Judge             `yaml:"judge,omitempty"`
+	Source     Source            `yaml:"source,omitempty"`
 
 	// Dir is the directory the problem was loaded from.
 	Dir string `yaml:"-"`
@@ -655,7 +658,7 @@ func (p *Problem) Save() error {
 	return os.WriteFile(filepath.Join(p.Dir, MetaFile), data, 0o644)
 }
 
-// Description returns the Markdown statement.
+// Description returns the Markdown statement in the pack's default locale.
 func (p *Problem) Description() (string, error) {
 	data, err := os.ReadFile(filepath.Join(p.Dir, DescriptionFile))
 	if errors.Is(err, os.ErrNotExist) {

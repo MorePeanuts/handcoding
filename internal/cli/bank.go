@@ -152,6 +152,14 @@ them, then run
 			fmt.Printf("%s %s\n", ui.Green.Render("created"), a.WS.Rel(p.Dir))
 			ref := a.WS.Ref(p)
 			fmt.Println("Edit problem.yaml and description.md, then run `hc validate " + ref + "` and `hc gen " + ref + "`.")
+			if locales := k.Manifest.Locales; len(locales) > 1 {
+				var files []string
+				for _, l := range locales[1:] {
+					files = append(files, problem.TranslationFile(l)+" and titles."+l)
+				}
+				fmt.Printf("The pack's statements are in %s: description.md is in %s, and the others need %s.\n",
+					strings.Join(locales, ", "), locales[0], strings.Join(files, ", "))
+			}
 			return nil
 		},
 	}
@@ -216,8 +224,8 @@ whose problems are copied. See ` + "`hc docs protocol`" + ` for the format.`,
 	return cmd
 }
 
-// importEntries are the files and directories of the problem protocol;
-// anything else in an imported directory (editor files, solutions, ...) is
+// importEntries are the files and directories of the problem protocol,
+// with the translated statements (description.<locale>.md); anything else in an imported directory (editor files, solutions, ...) is
 // left behind.
 var importEntries = []string{
 	problem.MetaFile, problem.DescriptionFile, problem.CasesFile,
@@ -246,6 +254,14 @@ func importProblem(a *app.App, dir string, force bool) error {
 		}
 	}
 	k := a.WS.WritablePack()
+	if k.Err != nil {
+		return k.Err
+	}
+	// Statements and titles must be in the locales of the pack imported
+	// into, as hc validate requires.
+	if err := p.ValidateLocales(k.Manifest.Locales); err != nil {
+		return fmt.Errorf("%w\nthe problems of pack %s need a statement and a title in each of its locales (%s), and none in another", err, k.Name, localesText(k))
+	}
 	if other := duplicateID(k, p); other != "" {
 		return fmt.Errorf("id %s is already used by %s", p.ID, other)
 	}
@@ -272,7 +288,8 @@ func importProblem(a *app.App, dir string, force bool) error {
 	var ignored []string
 	for _, e := range entries {
 		name := e.Name()
-		if !slices.Contains(importEntries, name) {
+		_, translation := problem.TranslationLocale(name)
+		if !slices.Contains(importEntries, name) && !translation {
 			ignored = append(ignored, name)
 			continue
 		}
@@ -295,6 +312,18 @@ func importProblem(a *app.App, dir string, force bool) error {
 		fmt.Printf("     %d case(s) without expected output; run `hc cases build %s`\n", missing, a.WS.Ref(p))
 	}
 	return nil
+}
+
+// localesText lists the locales of pack k, saying where they are set.
+func localesText(k *workspace.Pack) string {
+	if len(k.Manifest.Locales) == 0 {
+		return "none: one unnamed language"
+	}
+	where := "locales in " + pack.ManifestFile
+	if k.Name == pack.LocalName {
+		where = "locales in " + workspace.ConfigFile
+	}
+	return strings.Join(k.Manifest.Locales, ", ") + ", from " + where
 }
 
 // sameDir reports whether a and b are the same directory, which importing

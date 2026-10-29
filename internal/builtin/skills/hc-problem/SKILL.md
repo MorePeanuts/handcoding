@@ -189,6 +189,27 @@ The statement users read with `hc show <slug>`, in Markdown.
   - a requirement hc does not judge (449's compactness).
 - `hc docs protocol cases` describes each form the note may need.
 
+### Statements in several locales
+
+A pack may declare `locales` (`[en, zh-CN]`; for the workspace's own
+problems, `locales` in `hc.yaml`, `[en]` when unset). Read
+`hc docs protocol locales`. `description.md` and `title` are in the first,
+the default locale; every other locale has `description.<locale>.md` and
+`titles.<locale>` in problem.yaml.
+
+- **Never translate a statement or a title**, and never write or edit
+  `description.<locale>.md` or `titles`: which languages a problem comes in
+  is its author's decision, and hc translates nothing. Work only on
+  `description.md` and `title`.
+- `hc fetch` writes the locales LeetCode has: English from either site,
+  Chinese only from leetcode.cn. A locale it could not fetch, and one of a
+  problem you wrote, is the user's to write.
+- `hc validate <slug>` reports a missing or undeclared locale as an error.
+  Do not fix that error yourself: report which statements and titles are
+  missing, and leave them to the user.
+- An hc note you add to `description.md` is needed in every translation
+  too: tell the user which ones.
+
 ## Templates
 
 `templates/solution.go` and `templates/solution.py` are optional: without
@@ -222,9 +243,11 @@ LeetCode, use LeetCode's templates.
    reference against the statement later. When the statement accepts
    several answers, leave `expected` out: how they are judged is decided
    in `hc-cases`.
-7. Run `hc validate <slug>`. Fix every error; the warnings about the
-   undecided judge rule, missing expected outputs and the missing reference
-   are for `hc-cases`.
+7. Run `hc validate <slug>`. Fix every error, except the missing
+   statements and titles of the pack's other locales, which are the user's
+   to write ([locales](#statements-in-several-locales)); the warnings about
+   the undecided judge rule, missing expected outputs and the missing
+   reference are for `hc-cases`.
 8. Continue with the `hc-cases` skill: the judge rule, the reference
    solutions and the test cases.
 
@@ -257,7 +280,8 @@ not. Read them if you ran it. Then check:
      until `hasNext` is false).
 5. **description.md.** Add an [hc note](#descriptionmd) wherever hc's
    format differs, and check that every image is in `assets/`
-   (`hc validate <slug>` warns about missing ones).
+   (`hc validate <slug>` warns about missing ones). Leave the statements
+   of other locales (`description.<locale>.md`) as hc fetch wrote them.
 6. Run `hc validate <slug>`, and continue with `hc-cases`: a fetched
    problem has no judge rule yet, and if hc fetch warned that LeetCode
    judges it with its own checker, expect several valid answers.
@@ -287,6 +311,7 @@ statement or a template is wrong).
 
 Report what you wrote or changed and why: the kind and signature, each
 structure input or Node type with the sentence of the statement it rests
-on, and the hc notes you added. If the signature changed, tell the user
+on, and the hc notes you added. Name any locale whose statement or title
+the problem lacks, for the user to write. If the signature changed, tell the user
 that solutions they already wrote must follow the new one; do not touch
 them.

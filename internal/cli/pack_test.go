@@ -111,7 +111,11 @@ func TestPackLanguages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(manifest, append(data, "languages: [python]\n"...), 0o644); err != nil {
+	limited := strings.Replace(string(data), "\nlanguages: [go, python]\n", "\nlanguages: [python]\n", 1)
+	if limited == string(data) {
+		t.Fatal("the regression set's pack.yaml has no languages: [go, python]")
+	}
+	if err := os.WriteFile(manifest, []byte(limited), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	err = runHC(t, "-w", dir, "start", "regression/two-sum", "-l", "go")

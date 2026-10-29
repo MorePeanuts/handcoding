@@ -142,7 +142,7 @@ func (m *model) applyFilter() {
 }
 
 func matches(p *problem.Problem, q string) bool {
-	if p.ID == q || strings.Contains(p.Slug, q) || strings.Contains(strings.ToLower(p.Title), q) {
+	if p.ID == q || strings.Contains(p.Slug, q) || titleMatches(p, q) {
 		return true
 	}
 	for _, t := range p.Tags {
@@ -202,6 +202,8 @@ func (m *model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.switchPack(-1)
 	case "c":
 		m.openGroups()
+	case "i":
+		m.switchLocale(m.pack)
 	case "enter", " ", "v":
 		if p != nil {
 			m.openDetail(p, key != "v")
@@ -350,7 +352,8 @@ func (m *model) viewList() string {
 	}
 	header := titleStyle.Render("handcoding")
 	if g := m.group(); g != nil {
-		header += "  " + keyStyle.Render(g.DisplayTitle())
+		cur, _ := m.locale(m.pack)
+		header += "  " + keyStyle.Render(g.TitleIn(cur))
 	}
 	header += fmt.Sprintf("  %d problems  %s  %s", len(m.probs),
 		ui.Green.Render(fmt.Sprintf("✔ %d solved", solved)), ui.Yellow.Render(fmt.Sprintf("● %d attempted", attempted)))
@@ -358,6 +361,9 @@ func (m *model) viewList() string {
 		header += "  " + ui.Cyan.Render(fmt.Sprintf("? %d not ready", notReady))
 	}
 	right := ui.Faint.Render(fmt.Sprintf("lang: %s  filter: %s", m.lang.Name(), m.filter))
+	if l := m.localeLabel(m.pack); l != "" {
+		right = ui.Faint.Render("locale: "+l+"  ") + right
+	}
 	b.WriteString(padBetween(header, right, m.width) + "\n\n")
 
 	h := m.listHeight()
@@ -386,6 +392,9 @@ func (m *model) viewList() string {
 		"y copy-path", "r reset", "D discard", "f filter", "/ search", "L lang", "q quit"}
 	if t := m.tab(); t != nil && len(t.groups()) > 0 {
 		keys = slices.Insert(keys, 1, "c group")
+	}
+	if m.localeLabel(m.pack) != "" {
+		keys = slices.Insert(keys, len(keys)-1, "i locale")
 	}
 	if m.multiPack {
 		keys = slices.Insert(keys, 1, "tab pack")
@@ -422,7 +431,7 @@ func (m *model) viewProblems(b *strings.Builder, h int) {
 			mark = ui.Yellow.Render("●")
 		}
 		tags := ui.Faint.Render(fit(strings.Join(p.Tags, ", "), tagsW))
-		row := fmt.Sprintf("%s %-6s %s %s %s", mark, p.ID, fit(p.Title, titleW), padRight(ui.Difficulty(p.Difficulty), 8), tags)
+		row := fmt.Sprintf("%s %-6s %s %s %s", mark, p.ID, fit(m.title(p), titleW), padRight(ui.Difficulty(p.Difficulty), 8), tags)
 		if i == m.cursor {
 			row = cursorStyle.Render("▸") + " " + row
 		} else {
@@ -456,7 +465,8 @@ func (m *model) viewGroups(b *strings.Builder, h int) {
 		title, probs, name := "All problems", t.probs, ""
 		if i > 0 {
 			g := &groups[i-1]
-			title, probs, name = g.DisplayTitle(), groupProblems(t.probs, g), g.Name
+			cur, _ := m.locale(m.pack)
+			title, probs, name = g.TitleIn(cur), groupProblems(t.probs, g), g.Name
 		}
 		row := fmt.Sprintf("%s %7s  %s", fit(title, titleW), m.progress(probs), ui.Faint.Render(name))
 		if i == m.groupCursor {

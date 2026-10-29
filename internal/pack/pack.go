@@ -46,6 +46,8 @@ type Manifest struct {
 	Name string `yaml:"name"`
 	// Title is the display name; see DisplayTitle.
 	Title string `yaml:"title,omitempty"`
+	// Titles are the title in the other locales, by locale; see TitleIn.
+	Titles map[string]string `yaml:"titles,omitempty"`
 	// Version is the pack's own SemVer version, without a "v" prefix. It is
 	// informational: installs are pinned by commit.
 	Version     string   `yaml:"version,omitempty"`
@@ -58,6 +60,10 @@ type Manifest struct {
 	// solved in. Empty means every language of Protocol; see
 	// SolutionLanguages.
 	Languages []string `yaml:"languages,omitempty"`
+	// Locales are the BCP 47 tags of the languages the statements are
+	// written in, the default first: description.md and title are in it.
+	// Empty means one unnamed language. See DefaultLocale.
+	Locales []string `yaml:"locales,omitempty"`
 	// Groups are ordered, named lists of the pack's problems.
 	Groups []Group `yaml:"groups,omitempty"`
 
@@ -68,9 +74,11 @@ type Manifest struct {
 // Group is a named, ordered list of problems of the pack, by slug. A problem
 // may be in several groups or in none.
 type Group struct {
-	Name     string   `yaml:"name"`
-	Title    string   `yaml:"title,omitempty"`
-	Problems []string `yaml:"problems,omitempty"`
+	Name  string `yaml:"name"`
+	Title string `yaml:"title,omitempty"`
+	// Titles are the title in the pack's other locales, by locale.
+	Titles   map[string]string `yaml:"titles,omitempty"`
+	Problems []string          `yaml:"problems,omitempty"`
 }
 
 // nameRE is the syntax of pack and group names: lower-case kebab-case.
@@ -167,6 +175,33 @@ func (g *Group) DisplayTitle() string {
 	return g.Name
 }
 
+// DefaultLocale is the locale of description.md and title: the first of
+// locales, or "" when the pack declares none.
+func (m *Manifest) DefaultLocale() string {
+	if len(m.Locales) == 0 {
+		return ""
+	}
+	return m.Locales[0]
+}
+
+// TitleIn is the pack's title in locale: its entry in titles, else the
+// display title.
+func (m *Manifest) TitleIn(locale string) string {
+	if t := m.Titles[locale]; t != "" {
+		return t
+	}
+	return m.DisplayTitle()
+}
+
+// TitleIn is the group's title in locale: its entry in titles, else the
+// display title.
+func (g *Group) TitleIn(locale string) string {
+	if t := g.Titles[locale]; t != "" {
+		return t
+	}
+	return g.DisplayTitle()
+}
+
 // SolutionLanguages are the languages the pack's problems can be solved in:
 // languages when given, else every language of the pack's protocol.
 func (m *Manifest) SolutionLanguages() []string {
@@ -248,6 +283,12 @@ func (m *Manifest) Validate() error {
 			seen[l] = true
 		}
 	}
+	if m.Locales != nil {
+		if err := problem.CheckLocales(m.Locales); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	errs = append(errs, m.checkTitles("titles", m.Titles)...)
 	groups := map[string]bool{}
 	for i, g := range m.Groups {
 		switch {
@@ -259,6 +300,7 @@ func (m *Manifest) Validate() error {
 			errs = append(errs, fmt.Errorf("group %s: duplicate group name", g.Name))
 		}
 		groups[g.Name] = true
+		errs = append(errs, m.checkTitles(fmt.Sprintf("group %s: titles", g.Name), g.Titles)...)
 		seen := map[string]bool{}
 		for _, slug := range g.Problems {
 			if seen[slug] {
@@ -268,6 +310,31 @@ func (m *Manifest) Validate() error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// checkTitles checks the keys of titles, the titles of the pack or a group
+// by locale, named where: they must be locales of the pack other than the
+// default, whose title is title.
+func (m *Manifest) checkTitles(where string, titles map[string]string) []error {
+	keys := make([]string, 0, len(titles))
+	for l := range titles {
+		keys = append(keys, l)
+	}
+	slices.Sort(keys)
+	var errs []error
+	for _, l := range keys {
+		switch {
+		case len(m.Locales) == 0:
+			errs = append(errs, fmt.Errorf("%s: %s: the pack declares no locales, so there is only title", where, l))
+		case l == m.DefaultLocale():
+			errs = append(errs, fmt.Errorf("%s: %s is the default locale, whose title is title", where, l))
+		case !slices.Contains(m.Locales, l):
+			errs = append(errs, fmt.Errorf("%s: %s is not one of locales (%s)", where, l, strings.Join(m.Locales, ", ")))
+		case strings.TrimSpace(titles[l]) == "":
+			errs = append(errs, fmt.Errorf("%s: the %s title is empty", where, l))
+		}
+	}
+	return errs
 }
 
 // ValidateProblems checks the manifest against the pack's problems: every

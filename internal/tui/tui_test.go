@@ -367,7 +367,7 @@ func TestEnterOpensDetailAndCopiesPath(t *testing.T) {
 	if title, _, _ := strings.Cut(view, "\n"); !strings.Contains(title, "1. Two Sum  two-sum  Easy") {
 		t.Errorf("title line lacks the title or the slug: %q", title)
 	}
-	for _, want := range []string{"两数之和", "solution.go", "t test", "esc back"} {
+	for _, want := range []string{"You may assume", "solution.go", "t test", "esc back"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("detail view missing %q", want)
 		}
@@ -571,5 +571,45 @@ func TestNotReadyProblem(t *testing.T) {
 	h.press("s")
 	if h.m.run.err == nil || h.m.run.subID != 0 {
 		t.Fatalf("submit should be refused: %+v", h.m.run)
+	}
+}
+
+// i cycles the locales of the pack shown: titles in the list, the
+// statement in the detail screen. The pack remembers its locale.
+func TestSwitchLocale(t *testing.T) {
+	h := newHarness(t)
+	if view := h.view(); !strings.Contains(view, "Two Sum") || !strings.Contains(view, "locale: en") {
+		t.Errorf("list in en:\n%s", view)
+	}
+	h.press("i")
+	if view := h.view(); !strings.Contains(view, "两数之和") || !strings.Contains(view, "locale: zh-CN") {
+		t.Errorf("list in zh-CN:\n%s", view)
+	}
+	h.press("enter")
+	view := h.view()
+	if title, _, _ := strings.Cut(view, "\n"); !strings.Contains(title, "1. 两数之和") || !strings.Contains(title, "[zh-CN]") {
+		t.Errorf("title line: %q", title)
+	}
+	if !strings.Contains(view, "给定一个整数数组") {
+		t.Errorf("statement not in zh-CN:\n%s", view)
+	}
+	h.press("i")
+	if view := h.view(); !strings.Contains(view, "You may assume") {
+		t.Errorf("statement not in en again:\n%s", view)
+	}
+	h.press("i", "esc")
+
+	// The locale is remembered for the pack.
+	if cur, _ := h.openModel(Options{}).locale(regression.Name); cur != "zh-CN" {
+		t.Errorf("reopened in %q, want zh-CN", cur)
+	}
+
+	// A problem without the statement shows the default one and says so.
+	if err := os.Remove(filepath.Join(h.m.selected().Dir, "description.zh-CN.md")); err != nil {
+		t.Fatal(err)
+	}
+	h.press("enter")
+	if view := h.view(); !strings.Contains(view, "no zh-CN statement") || !strings.Contains(view, "You may assume") {
+		t.Errorf("fallback to en:\n%s", view)
 	}
 }

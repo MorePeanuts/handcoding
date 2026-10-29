@@ -10,6 +10,9 @@ change problems in `problems/`.
   defined by MorePeanuts/handcoding: `hc docs protocol` prints it, and
   `hc docs protocol <section>` one section of it.
 - A problem lands only when `hc pack check` passes, which is what CI runs.
+- The languages of the statements, `locales` in `pack.yaml`, are the
+  author's decision. Never translate a statement or a title: write only
+  what you are asked to, and report the locales a problem lacks.
 - If a problem cannot be expressed in the protocol, do not work around it:
   open an issue at https://github.com/MorePeanuts/handcoding/issues that says
   what is missing, and leave the problem out until the protocol has it.

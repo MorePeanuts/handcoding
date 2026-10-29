@@ -28,7 +28,7 @@ import (
 // default tolerance feature and the exemptions. It needs no toolchain: TestRegressionReferences
 // (internal/app) checks that the problems' references pass.
 func TestProtocolCoverage(t *testing.T) {
-	probs := loadSet(t)
+	m, probs := loadSet(t)
 	consts := protocolConstants(t)
 
 	used := map[string][]string{} // feature -> slugs of the problems using it
@@ -36,6 +36,12 @@ func TestProtocolCoverage(t *testing.T) {
 		for f := range features(p) {
 			used[f] = append(used[f], p.Slug)
 		}
+	}
+	// pack.yaml's fields, used by the set itself.
+	packFields := map[string]bool{}
+	setFields(packFields, reflect.ValueOf(m).Elem())
+	for f := range packFields {
+		used[inPack(f)] = append(used[inPack(f)], regression.Name)
 	}
 
 	var missing []string
@@ -61,6 +67,9 @@ var exempt = map[string]string{
 	arrayOf(problem.TypeNestedInteger, out): "LeetCode returns a NestedInteger (385) but never an array of them",
 	field("Judge", "timeout"): "hc-cases says to leave judge.timeout unset: it guards against hangs, " +
 		"and a reference must run well within the default",
+	packField("version"):  "informational: installs are pinned by commit",
+	packField("authors"):  "informational",
+	packField("homepage"): "informational",
 }
 
 // Directions of a value: decoded from a case, or encoded from a result.
@@ -76,8 +85,16 @@ func arrayOf(t, dir string) string   { return "array of " + t + " as " + dir }
 func depth(d int, dir string) string { return "array of depth " + strconv.Itoa(d) + " as " + dir }
 func returns(t string) string        { return "return type " + t }
 func field(typ, name string) string  { return "problem.yaml field " + typ + "." + name }
-func refTo(t string) string          { return "ref to a " + t }
-func returnsRefTo(t string) string   { return "returns_ref into a " + t }
+func packField(name string) string   { return inPack(field("Manifest", name)) }
+
+// inPack renames a field feature of problem.yaml, as setFields and
+// yamlFields name them, to the field of pack.yaml it is.
+func inPack(f string) string { return "pack.yaml" + strings.TrimPrefix(f, "problem.yaml") }
+
+const translation = "a statement in a locale other than the default (description.<locale>.md)"
+
+func refTo(t string) string        { return "ref to a " + t }
+func returnsRefTo(t string) string { return "returns_ref into a " + t }
 
 const defaultTolerance = "the default judge.tolerance on a double result"
 
@@ -154,6 +171,11 @@ func required(t *testing.T, consts map[string][]constant) []string {
 	for _, f := range yamlFields(reflect.TypeFor[problem.Problem]()) {
 		add(f)
 	}
+	// Every field of pack.yaml, and statements in several locales.
+	for _, f := range yamlFields(reflect.TypeFor[pack.Manifest]()) {
+		add(inPack(f))
+	}
+	add(translation)
 
 	// ref and returns_ref on each type the validator accepts them for.
 	var refs, returnsRefs int
@@ -279,6 +301,9 @@ func features(p *problem.Problem) map[string]bool {
 		fs[defaultTolerance] = true
 	}
 	setFields(fs, reflect.ValueOf(p).Elem())
+	if ls, _ := p.Translations(); len(ls) > 0 {
+		fs[translation] = true
+	}
 	return fs
 }
 
@@ -361,8 +386,9 @@ func setFields(fs map[string]bool, v reflect.Value) {
 }
 
 // loadSet loads the regression set as hc loads an installed pack, and
-// requires the pack to be valid.
-func loadSet(t *testing.T) []*problem.Problem {
+// requires the pack to be valid, its problems' statements and titles in
+// every locale included.
+func loadSet(t *testing.T) (*pack.Manifest, []*problem.Problem) {
 	t.Helper()
 	m, err := pack.Load(regression.Dir())
 	if err != nil {
@@ -388,11 +414,14 @@ func loadSet(t *testing.T) []*problem.Problem {
 		for _, err := range pack.IdentityErrors(p, probs) {
 			t.Errorf("%s: %v", p.Slug, err)
 		}
+		if err := p.ValidateLocales(m.Locales); err != nil {
+			t.Errorf("%s: %v", p.Slug, err)
+		}
 	}
 	if len(probs) == 0 {
 		t.Fatal("no problems in the regression set")
 	}
-	return probs
+	return m, probs
 }
 
 // constant is a string constant of internal/problem.

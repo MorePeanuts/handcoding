@@ -29,6 +29,10 @@ func TestSkillDir(t *testing.T) {
 			if !strings.Contains(prompt, "(read "+tt.want+")") || !strings.Contains(prompt, strings.Replace(tt.want, "hc-cases", "hc-problem", 1)) {
 				t.Errorf("%s %v: prompt does not cite %s:\n%s", tt.name, tt.command, tt.want, prompt)
 			}
+			// hc translates nothing: the agent keeps to the default locale.
+			if !strings.Contains(prompt, "never write, edit or translate a statement in another locale") {
+				t.Errorf("%s %v: prompt does not keep the agent to description.md:\n%s", tt.name, tt.command, prompt)
+			}
 		}
 	}
 }

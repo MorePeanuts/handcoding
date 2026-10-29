@@ -41,6 +41,9 @@ func (m *model) problemKey(key string, p *problem.Problem) (tea.Cmd, bool) {
 	case "L":
 		m.switchLang()
 		return nil, true
+	case "i":
+		m.switchLocale(p.Pack)
+		return nil, true
 	case "r":
 		if !m.app.HasSolution(p, m.lang) {
 			m.message = "no " + m.lang.Name() + " solution to reset"

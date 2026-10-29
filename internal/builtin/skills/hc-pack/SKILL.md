@@ -26,6 +26,7 @@ when this skill and the spec seem to disagree, the spec wins.
 - `hc docs protocol packs`: what a pack is and which files belong to it
 - `hc docs protocol packyaml`: every field of pack.yaml
 - `hc docs protocol groups`: the rules for groups
+- `hc docs protocol locales`: statements and titles in several languages
 - `hc docs protocol identity`: slugs, ids and directory names
 - `hc docs protocol protocol-versions`: versions and the changelog
 
@@ -55,7 +56,8 @@ decide; do not do it on your own.
 3. Place it in the groups ([Groups](#groups)).
 4. Run `hc pack check`. It checks the whole pack as its CI does, and must
    pass. Only ready problems land: never commit a problem that fails it,
-   or one without `judge.compare`.
+   or one without `judge.compare`. In a pack with `locales`, that includes
+   a statement and a title in every locale ([Locales](#locales)).
 5. Land one problem per commit (or pull request), whose message names the
    problem, with its group changes in the same commit. Commit only the pack's
    files: `pack.yaml` and `problems/<dir>/`, never `solutions/`, `.hc/`,
@@ -64,6 +66,24 @@ decide; do not do it on your own.
 To fix a problem that has landed, use `hc-problem` or `hc-cases` the same
 way, then `hc pack check`. Fixing cases, a reference or a statement is not
 breaking; changing a signature is, since users' solutions must follow it.
+
+## Locales
+
+A pack may give its statements in several languages, `locales` in
+pack.yaml; the first is the default, the language of `description.md` and
+`title`. Read `hc docs protocol locales`.
+
+- **The locales are the author's decision.** Never add, remove or reorder
+  `locales` unless asked: every problem needs a statement and a title in
+  each, and the first decides what `description.md` is.
+- **Never translate.** No statement (`description.<locale>.md`) and no
+  title (`titles` in problem.yaml, pack.yaml and its groups) is yours to
+  write by translating another. `hc fetch` writes what LeetCode has: English
+  from either site, Chinese from leetcode.cn; fetching a problem again from
+  the other site adds the locale it lacks.
+- `hc validate` and `hc pack check` fail a problem that lacks a locale, or
+  has one the pack does not declare. A problem that lacks one does not
+  land: tell the user which statements and titles are missing.
 
 ## Groups
 

@@ -109,6 +109,8 @@ type model struct {
 	// multiPack is set when the list has several tabs: the detail screen
 	// then names the problem's pack.
 	multiPack bool
+	// locales are the locales the packs are shown in, by pack name.
+	locales map[string]*packLocale
 
 	// current is the problem shown by the detail, result and history screens.
 	current *problem.Problem
@@ -272,6 +274,9 @@ func (m *model) reload() error {
 	}
 	packs, err := m.app.WS.Packs()
 	if err != nil {
+		return err
+	}
+	if err := m.loadLocales(packs); err != nil {
 		return err
 	}
 	statuses, err := m.app.Statuses(m.ctx, probs)

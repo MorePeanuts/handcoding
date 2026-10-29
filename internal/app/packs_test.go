@@ -49,7 +49,7 @@ var tinyProblems = []string{"0001-two-sum", "0027-remove-element", "2469-convert
 // writeTinyPack writes a pack called tiny into dir, holding tinyProblems.
 func writeTinyPack(t *testing.T, dir string) {
 	t.Helper()
-	manifest := "protocol: 1\nname: tiny\nversion: 1.0.0\ntitle: Tiny\ngroups:\n  - name: easy\n    problems: [two-sum, remove-element]\n"
+	manifest := "protocol: 1\nname: tiny\nversion: 1.0.0\ntitle: Tiny\nlocales: [en, zh-CN]\ngroups:\n  - name: easy\n    problems: [two-sum, remove-element]\n"
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -665,6 +665,9 @@ func TestCheckPack(t *testing.T) {
 			t.Fatal(err)
 		}
 		replaceIn(t, filepath.Join(problems, "2469-convert-the-temperature", "cases.jsonl"), "[309.65,97.7]", "[309.65,97.8]")
+		if err := os.Remove(filepath.Join(problems, "2469-convert-the-temperature", "description.zh-CN.md")); err != nil {
+			t.Fatal(err)
+		}
 		replaceIn(t, filepath.Join(dir, pack.ManifestFile), "[two-sum, remove-element]", "[two-sum, nope]")
 	})
 	if sum.OK() || sum.Failed != 2 || sum.PackErrors != 1 {
@@ -672,7 +675,7 @@ func TestCheckPack(t *testing.T) {
 	}
 	for name, wants := range map[string][]string{
 		"two-sum":                 {"not ready", "no reference solution"},
-		"convert-the-temperature": {"case 1: Wrong Answer"},
+		"convert-the-temperature": {"case 1: Wrong Answer", "no statement in zh-CN: description.zh-CN.md is missing"},
 		"pack tiny":               {"group easy: nope is not a problem of the pack"},
 	} {
 		f := findings[name]

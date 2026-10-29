@@ -58,16 +58,19 @@ problems/<dir>/    每道题目一个题目目录；见题目目录
 |---|---|---|---|---|---|
 | `protocol` | 整数 | 是 | | 题目包所依据的[协议版本](#协议版本)：正整数，不能是字符串或小数 | 1 |
 | `name` | 字符串 | 是 | | 小写字母、数字和单个短横线：`^[a-z0-9]+(-[a-z0-9]+)*$`。不能是 `local`。题目包的标识（见下文） | 1 |
-| `title` | 字符串 | 否 | `name` | 显示名称 | 1 |
+| `title` | 字符串 | 否 | `name` | 显示名称，使用默认语言区域 | 1 |
+| `titles` | 映射 | 否 | `{}` | 其他语言区域的显示名称，以语言区域为键；见[语言区域](#语言区域) | 1 |
 | `version` | 字符串 | 否 | 无 | 不带 `v` 前缀的 SemVer 2.0.0 版本号：`0.3.0`、`1.0.0-alpha.1`。仅供参考：安装时固定的是提交，而不是这个字段 | 1 |
 | `description` | 字符串 | 否 | 无 | 仅供参考 | 1 |
 | `authors` | 字符串列表 | 否 | `[]` | 仅供参考 | 1 |
 | `license` | 字符串 | 否 | 无 | 应当是 SPDX 许可证表达式，如 `MIT` | 1 |
 | `homepage` | 字符串 | 否 | 无 | 应当是 URL | 1 |
 | `languages` | 字符串列表 | 否 | `protocol` 的所有语言 | 非空；所声明协议的语言 id，不得重复；见下文 | 1 |
+| `locales` | 字符串列表 | 否 | 无：一种不具名的语言 | 非空；BCP 47 语言标签，不得重复。第一个是默认语言区域。见[语言区域](#语言区域) | 1 |
 | `groups` | 分组列表 | 否 | `[]` | 见[分组](#分组) | 1 |
 | `groups[].name` | 字符串 | 是 | | `^[a-z0-9]+(-[a-z0-9]+)*$`，在题目包的分组中唯一 | 1 |
-| `groups[].title` | 字符串 | 否 | 分组的 `name` | 显示名称 | 1 |
+| `groups[].title` | 字符串 | 否 | 分组的 `name` | 显示名称，使用默认语言区域 | 1 |
+| `groups[].titles` | 映射 | 否 | `{}` | 其他语言区域的显示名称，以语言区域为键 | 1 |
 | `groups[].problems` | 字符串列表 | 否 | `[]` | 题目包中题目的 slug，不得重复 | 1 |
 
 - 最先读取的是 `protocol`。不读取所声明版本的工具会拒绝这个题目包，不再读取其余内容（[协议版本](#协议版本)），因为更新的协议可能增加了它不认识的字段。
@@ -87,15 +90,18 @@ problems/<dir>/    每道题目一个题目目录；见题目目录
 protocol: 1
 name: leetcode
 title: LeetCode
+titles: {zh-CN: 力扣}
 version: 0.3.0
 description: Classic LeetCode problems with Go and Python references.
 authors: [MorePeanuts]
 license: MIT
 homepage: https://github.com/MorePeanuts/handcoding-leetcode
 languages: [go, python]
+locales: [en, zh-CN]
 groups:
   - name: arrays
     title: Arrays
+    titles: {zh-CN: 数组}
     problems: [two-sum, rotate-array]
 ```
 
@@ -107,6 +113,17 @@ groups:
 - 分组用 `slug` 引用题目，而不是用 id 或目录名，每一项都必须是题目包中某道题目的 slug。一个分组不得重复列出同一道题目。
 - 一道题目可以属于多个分组，也可以不属于任何分组。分组可以为空。
 
+### 语言区域
+
+题目包可以用多种语言提供题面。这里的“语言”指题面的语言，不是解答语言（`languages`）。
+
+- `locales` 用 BCP 47 语言标签列出这些语言，如 `en` 或 `zh-CN`，每个只出现一次（比较标签时不区分大小写）。第一个是题目包的**默认语言区域**。题目包有哪些语言区域、哪个是默认的，由作者决定。
+- `description.md` 和 `title` 使用默认语言区域。其他语言区域的题面是 `description.<locale>.md`，如 `description.zh-CN.md`，标题是 `problem.yaml` 中的 `titles.<locale>`：`titles: {zh-CN: 两数之和}`。题目包和每个分组的 `titles` 用法相同，且是可选的。
+- 声明了某个语言区域的题目包，必须为每道题目提供该语言区域的题面和标题：默认语言区域是 `description.md`，其他语言区域是 `description.<locale>.md` 和 `titles.<locale>`。
+- `description.<locale>.md` 文件和 `titles` 的键必须是题目包声明的、默认语言区域以外的语言区域，默认语言区域的题面和标题是 `description.md` 和 `title`。
+- 没有 `locales` 时，题面使用一种不具名的语言：只有 `description.md` 和 `title`，没有 `description.<locale>.md`，也没有 `titles`。
+- 所有题面共用同一个 `assets/`。签名、用例、初始代码、参考解和判题程序都与语言区域无关。
+
 ## 题目目录
 
 一道题目是一个目录，包含以下条目：
@@ -114,14 +131,15 @@ groups:
 | 条目 | 必需 | 内容 |
 |---|---|---|
 | `problem.yaml` | 是 | 元数据、签名和判题选项；见 [problem.yaml](#problemyaml) |
-| `description.md` | 否 | 题面，Markdown 格式 |
+| `description.md` | 题目包有 `locales` 时 | 题面，Markdown 格式，使用题目包的默认语言区域 |
+| `description.<locale>.md` | 题目包的每个其他语言区域 | 该语言区域的题面；见[语言区域](#语言区域) |
 | `assets/` | 否 | 题面引用的文件，如图片 |
 | `cases.jsonl` | 否 | 测试用例；见[用例](#用例) |
 | `reference/solution.py`、`reference/solution.go` | 否 | 参考解，可以只有其中一部分语言 |
 | `templates/solution.py`、`templates/solution.go` | 否 | 初始代码，取代根据签名生成的初始代码 |
 | `checker.py` | 仅限 `judge.compare: checker` | 判题程序；见[判题程序](#判题程序) |
 
-- 没有 `description.md` 的题目题面为空，没有 `cases.jsonl` 的题目没有用例。两者都合法，但这样的题目没法真正拿来练习。
+- 在没有 `locales` 的题目包中，没有 `description.md` 的题目题面为空。没有 `cases.jsonl` 的题目没有用例。两者都合法，但这样的题目没法真正拿来练习。
 - 题面用相对于题目目录的路径引用本地文件，这些文件必须位于 `assets/` 下：`![](assets/rev1ex1.jpg)`。
 - 其他条目不属于题目。工具可以忽略或丢弃它们。
 - 参考解、初始代码和判题程序可以包含什么，由[解答 ABI](#解答-abi) 和[判题程序](#判题程序)规定。
@@ -140,7 +158,8 @@ groups:
 |---|---|---|---|---|---|
 | `id` | 字符串 | 否 | 无 | 在题目包中唯一；见[标识](#标识)。YAML 整数按其十进制文本读取 | 1 |
 | `slug` | 字符串 | 是 | | 字母、数字和单个短横线：`^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$`。应当全部小写。在题目包中唯一 | 1 |
-| `title` | 字符串 | 是 | | 非空 | 1 |
+| `title` | 字符串 | 是 | | 非空。使用题目包的默认语言区域 | 1 |
+| `titles` | 映射 | 否 | `{}` | 题目包其他语言区域的标题，以语言区域为键：每个一项，不得为空；见[语言区域](#语言区域) | 1 |
 | `difficulty` | 字符串 | 否 | 无 | `easy`、`medium` 或 `hard`，大小写不限 | 1 |
 | `tags` | 字符串列表 | 否 | `[]` | | 1 |
 | `kind` | 字符串 | 是 | | `function` 或 `class`。不会根据出现了哪些段来推断 | 1 |
@@ -165,6 +184,7 @@ groups:
 id: "1"
 slug: two-sum
 title: Two Sum
+titles: {zh-CN: 两数之和}
 difficulty: easy
 tags: [array, hash-table]
 kind: function
@@ -660,7 +680,7 @@ def check(input, output, expected):
 
 ## 合法性规则
 
-合法的题目包满足以下每一条规则，其中的每道题目也满足。`hc validate` 检查关于 `problem.yaml` 和 `cases.jsonl` 的规则，以及题目包中关于题目目录和标识的规则；`hc validate --run` 还检查关于参考解的规则。
+合法的题目包满足以下每一条规则，其中的每道题目也满足。`hc validate` 检查关于 `problem.yaml` 和 `cases.jsonl` 的规则，以及题目包中关于题目目录、标识和语言区域的规则；`hc validate --run` 还检查关于参考解的规则。
 
 **problem.yaml**
 
@@ -696,6 +716,7 @@ def check(input, output, expected):
 4. 有 `version` 时，它必须是不带 `v` 前缀的 SemVer 2.0.0 版本号。
 5. 有 `languages` 时，它不得为空，并且必须由所声明协议的语言 id 组成，每个只出现一次。
 6. 每个分组都必须有匹配 `^[a-z0-9]+(-[a-z0-9]+)*$` 的 `name`，在分组中唯一，并且不得重复列出同一个 slug。
+7. 有 `locales` 时，它不得为空，并且必须由 BCP 47 语言标签组成，每个只出现一次。`titles`（题目包的和每个分组的）的键必须是题目包中默认语言区域以外的语言区域，标题不得为空。
 
 **题目包**
 
@@ -703,6 +724,8 @@ def check(input, output, expected):
 2. 每个题目目录都必须使用规范名称（[标识](#标识)）。
 3. `slug` 在题目包中必须唯一，有 `id` 时 `id` 也必须唯一。
 4. 分组中的每一项都必须是题目包中某道题目的 slug。
+5. 在有 `locales` 的题目包中，每道题目都必须有每个语言区域的题面和标题：默认语言区域是 `description.md` 和 `title`，其他语言区域是 `description.<locale>.md` 和非空的 `titles.<locale>`（[语言区域](#语言区域)）。
+6. 题目的 `description.<locale>.md` 文件和 `titles` 的键必须是题目包中默认语言区域以外的语言区域；在没有 `locales` 的题目包中，题目两者都不得有。
 
 **参考解、初始代码和判题程序**
 

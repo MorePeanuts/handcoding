@@ -37,7 +37,7 @@ English · [简体中文](how-to-use_zh.md)
 
 The problems of a workspace come in [packs](protocol.md#packs), each a directory of `packs/`:
 
-- `packs/local/` holds your own problems: what `hc fetch`, `hc new` and `hc import` add. It has no `pack.yaml` (`local` is a reserved name), and is solved in every language.
+- `packs/local/` holds your own problems: what `hc fetch`, `hc new` and `hc import` add. It has no `pack.yaml` (`local` is a reserved name), and is solved in every language. Its statements are in the [locales](#statements-in-several-languages) that `locales` in `hc.yaml` sets, English (`[en]`) by default.
 - Every other directory is an installed pack: a `pack.yaml` whose `name` is the directory's name, and its `problems/`. Installed packs are **read-only**: `hc gen`, `hc fix` and `hc cases add|rm|edit|build` refuse to change them, since updating the pack would replace the change. A pack whose `pack.yaml` lists `languages` can only be solved in those: `hc start -l` refuses the others, and if your default language is not among them, hc uses the pack's first language and says so. `hc pack install` installs them (see [Packs](#packs)); a pack copied into `packs/` by hand works too, and `hc pack list` shows it as unmanaged.
 
 A pack that hc cannot read (no `pack.yaml`, an invalid one, or one written for a newer protocol, which says to upgrade hc) is reported by `hc validate` and the list, and its problems are left out; the rest of the workspace works.
@@ -74,7 +74,7 @@ my-pack/
   .claude/  .agents/  AGENTS.md            the agent skills, once a command installs them
 ```
 
-Without `hc.yaml` hc uses the defaults, and it never creates one in a checkout. A `pack.yaml` that hc cannot read, for example one of a newer protocol, does not keep the workspace from opening: `hc validate` says what is wrong. What hc adds is yours, not the pack's, so keep it out of the repository's history:
+Without `hc.yaml` hc uses the defaults, and it never creates one in a checkout. Its `locales` are those of `pack.yaml`, so an `hc.yaml` there must not set them, as it must not list `packs`. A `pack.yaml` that hc cannot read, for example one of a newer protocol, does not keep the workspace from opening: `hc validate` says what is wrong. What hc adds is yours, not the pack's, so keep it out of the repository's history:
 
 ```
 # .gitignore
@@ -100,6 +100,7 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 - The list shows one pack at a time. With more than one pack, a tab bar at the top names each pack with its progress (solved/total), and `tab` / `shift+tab` switch packs; on a narrow terminal the bar scrolls to keep the current pack in view. A pack without problems, such as `local` before you add one, gets no tab.
 - `c` chooses a group of the pack, or all of its problems, and shows the progress of each. A group lists its problems in the group's order. Search and the filter apply to the pack and group shown.
 - `hc` opens the pack you were in last, and each pack opens on the group you chose last. `hc list --pack <name>` opens that pack's tab, and `--group <name>` that group (a group name that only one pack uses needs no `--pack`).
+- `i` switches the statement language of a pack whose statements come in [several languages](#statements-in-several-languages): titles in the list, and the statement on the detail screen. The list header and the statement's title line show the one in use.
 
 | Key | Action | Key | Action |
 |---|---|---|---|
@@ -111,7 +112,8 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 | `/` | Search | `f` | Filter: all / unsolved / solved |
 | `tab` / `shift+tab` | Next / previous pack | `c` | Choose a group of the pack |
 | `v` | View the statement only | `o` | Open the statement's images (statement view) |
-| `esc` / `q` | Back; `q` on the list quits | `ctrl+c` | Quit |
+| `i` | Switch the statement language | `esc` / `q` | Back; `q` on the list quits |
+| `ctrl+c` | Quit | | |
 
 ## Commands
 
@@ -151,13 +153,23 @@ Run `hc <command> --help` for every flag.
 
 ```sh
 hc fetch 3 146 lru-cache    # by number, slug or URL, from leetcode.com
-hc fetch --site cn 1        # from leetcode.cn (Chinese statement by default)
+hc fetch --site cn 1        # from leetcode.cn, which also has Chinese statements
 hc fetch https://leetcode.cn/problems/two-sum/description/   # any problem URL; the URL picks the site
 hc fetch --site cn "LCR 001"                                  # leetcode.cn IDs such as LCR/LCP
 hc gen 146                  # make it ready: test cases and the judge rule
 ```
 
 `hc fetch` downloads the statement and its images, the signature, the Go and Python starter code, and the examples. Expected outputs are included when they can be parsed from the statement.
+
+It writes the statements in the locales of the pack it fetches into: `locales` in `hc.yaml` for your own problems (see [statements in several languages](#statements-in-several-languages)). Both sites have the English statement; only leetcode.cn has the Chinese one, and its title:
+
+| `locales` in `hc.yaml` | leetcode.com | leetcode.cn |
+|---|---|---|
+| `[en]` (the default) | `description.md`: English | `description.md`: English |
+| `[en, zh-CN]` | `description.md`: English; no Chinese statement, and a note says so | both: English in `description.md`, Chinese in `description.zh-CN.md`, both titles |
+| `[zh-CN]` | refused: leetcode.com has no Chinese statement | `description.md`: Chinese |
+
+Fetching a problem again from the other site adds the statements it lacks, without `--force` and without touching anything else: `hc fetch two-sum` then `hc fetch --site cn two-sum` gives a problem both statements. The statements share `assets/`, and an image both use is stored once. A problem that exists only in Chinese (LCR, LCP) cannot be fetched into a pack whose default locale is `en`.
 
 A fetched problem is **not ready to submit** yet. LeetCode only publishes the examples, and not how answers are judged: whether order matters, whether several answers are valid. Until that is decided, `hc test` shows your output next to the example's answer without a verdict, and `hc submit` refuses. `hc gen` writes the full test suite and decides the judge rule from the statement, writing a checker when no built-in rule fits; you can also set `judge.compare` yourself (see the protocol's [compare modes](protocol.md#compare-modes)). The list marks such problems with `?` in the status column, where solved problems show `✔` and attempted ones `●`.
 
@@ -179,7 +191,7 @@ hc import ./my-problems/            # import problem directories shared by other
 
 - `hc cases build` runs a reference solution: the Go one if there is one, else the Python one; `-l` picks one. It refuses problems judged with `any_of`, whose `expected` lists every acceptable answer and has to be written by hand.
 - `hc validate` reports every break of the protocol's [validity rules](protocol.md#validity-rules) as an error, with the case number and field. With `--run` it also runs every reference solution on every case, and through the checker if there is one. It warns about an undecided judge rule (no `judge.compare`), no cases, cases without `expected`, no case marked as an example, no reference solution, and statement images that do not exist. `hc test`, `hc submit` and `hc debug` refuse to run a case that breaks these rules, and name it.
-- `hc import` copies only the entries the protocol defines (anything else, such as editor files or a `solutions/` folder, is left behind), and refuses problems whose slug or ID is already among your own problems (`--force` replaces a problem with the same slug). Slugs and IDs only need to be unique within a pack, so importing a problem that an installed pack also has is fine.
+- `hc import` copies only the entries the protocol defines (anything else, such as editor files or a `solutions/` folder, is left behind), and refuses problems whose slug or ID is already among your own problems (`--force` replaces a problem with the same slug). Slugs and IDs only need to be unique within a pack, so importing a problem that an installed pack also has is fine. It also refuses a problem whose statements and titles do not match the locales of your own problems, as `hc validate` would report them: one without a statement in each of them, or with one in another locale.
 - `hc validate` without arguments also checks every installed pack's `pack.yaml`, and that its groups name problems of the pack. Each problem's directory name, slug and ID are checked against the rest of its pack.
 
 hc carries the protocol (in English) for its own version, so it is at hand offline:
@@ -191,6 +203,20 @@ hc docs protocol structure-inputs   # one section, with its subsections
 ```
 
 A section is named by its heading's anchor on GitHub, as in `protocol.md#structure-inputs`. On a terminal the output is rendered like a statement; piped, or with `--raw`, it is Markdown.
+
+### Statements in several languages
+
+A pack can give its statements in several languages, its [locales](protocol.md#locales): `locales: [en, zh-CN]` in `pack.yaml`. The first is the pack's default, the language of `description.md` and `title`; the others are in `description.<locale>.md` and `titles` in `problem.yaml`. The pack's author decides which locales it has and which comes first. For your own problems you are the author, and `locales` in `hc.yaml` sets them, `[en]` when unset:
+
+```yaml
+locales: [en, zh-CN]   # your own problems: English first, Chinese too
+```
+
+- `i` in the list switches a pack's locale, and hc remembers the choice for each pack in `.hc/`. A pack you open for the first time shows its default locale.
+- `hc show <problem> --locale zh-CN` shows a statement in a locale; without `--locale`, it shows the one you chose last in the list.
+- When a problem lacks the chosen locale, which only happens in a pack that does not validate, hc shows the default one and says so.
+- `hc validate` reports a problem without a statement or a title in one of the pack's locales, and statements or titles in a locale the pack does not declare. `hc pack check` fails on them too.
+- hc translates nothing. `hc fetch` writes the statements LeetCode has (see [above](#from-leetcode)); for your own problems, you write each locale's statement yourself. `hc gen` and `hc fix` read only the statement in the default locale, and never write one.
 
 ### Test cases
 
@@ -332,6 +358,7 @@ agent:
   name: claude        # claude | codex, or set command (see above)
 leetcode:
   site: com           # com | cn
+locales: [en]         # the statement languages of your own problems, the default first
 ```
 
 `images: auto` picks `kitty` in kitty, Ghostty and [herdr](https://herdr.dev), `blocks` in other truecolor terminals, and `none` otherwise.

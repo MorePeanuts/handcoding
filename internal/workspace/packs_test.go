@@ -83,6 +83,56 @@ func TestSavePacks(t *testing.T) {
 	}
 }
 
+// locales in hc.yaml are the local pack's, [en] when unset; a pack
+// checkout's are in its pack.yaml.
+func TestConfigLocales(t *testing.T) {
+	w := newWorkspace(t)
+	local := func(w *Workspace) []string {
+		packs, err := w.Packs()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return packs[0].Manifest.Locales
+	}
+	if got := local(w); !slices.Equal(got, []string{"en"}) {
+		t.Errorf("default locales = %q, want [en]", got)
+	}
+	path := filepath.Join(w.Root, ConfigFile)
+	writeFile(t, path, "language: go\nlocales: [zh-CN, en]\n")
+	w, err := Open(w.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := local(w); !slices.Equal(got, []string{"zh-CN", "en"}) {
+		t.Errorf("locales = %q", got)
+	}
+	for config, want := range map[string]string{
+		"locales: []\n":        "locales must not be empty",
+		"locales: [en, en]\n":  "duplicate locale",
+		"locales: [english]\n": "", // a valid tag, if an odd one
+		"locales: [en_GB]\n":   "not a BCP 47 language tag",
+	} {
+		writeFile(t, path, config)
+		_, err := Open(w.Root)
+		if want == "" && err != nil || want != "" && (err == nil || !strings.Contains(err.Error(), want)) {
+			t.Errorf("%q: %v, want %q", config, err, want)
+		}
+	}
+
+	root := newCheckout(t, "protocol: 1\nname: mine\nlocales: [en, zh-CN]\n")
+	ws, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := local(ws); !slices.Equal(got, []string{"en", "zh-CN"}) {
+		t.Errorf("checkout locales = %q", got)
+	}
+	writeFile(t, filepath.Join(root, ConfigFile), "locales: [en]\n")
+	if _, err := Open(root); err == nil || !strings.Contains(err.Error(), "a pack checkout's are in its pack.yaml") {
+		t.Errorf("locales in a checkout's hc.yaml: %v", err)
+	}
+}
+
 func TestConfigPacksChecked(t *testing.T) {
 	w := newWorkspace(t)
 	path := filepath.Join(w.Root, ConfigFile)

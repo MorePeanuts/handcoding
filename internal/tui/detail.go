@@ -36,7 +36,7 @@ func (m *model) renderDetail() {
 	if p == nil {
 		return
 	}
-	desc, err := p.Description()
+	desc, err := m.statement(p)
 	if err != nil {
 		desc = "_" + err.Error() + "_"
 	}
@@ -74,16 +74,20 @@ func (m *model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) problemTitle(p *problem.Problem) string {
-	title := titleStyle.Render(fmt.Sprintf("%s. %s", p.ID, p.Title))
+	title := titleStyle.Render(fmt.Sprintf("%s. %s", p.ID, m.title(p)))
 	if p.ID == "" {
-		title = titleStyle.Render(p.Title)
+		title = titleStyle.Render(m.title(p))
 	}
 	if m.multiPack {
 		title = ui.Faint.Render(p.Pack+" ·") + " " + title
 	}
 	// The slug is what commands take, and the only name a problem without
 	// an ID, or with an ID such as "LCR 001", is easy to type by.
-	return fmt.Sprintf("%s  %s  %s  %s", title, ui.Faint.Render(p.Slug), ui.Difficulty(p.Difficulty), ui.Faint.Render(strings.Join(p.Tags, ", ")))
+	line := fmt.Sprintf("%s  %s  %s  %s", title, ui.Faint.Render(p.Slug), ui.Difficulty(p.Difficulty), ui.Faint.Render(strings.Join(p.Tags, ", ")))
+	if l := m.localeLabel(p.Pack); l != "" {
+		line += "  " + ui.Faint.Render("["+l+"]")
+	}
+	return line
 }
 
 func (m *model) solutionLine(p *problem.Problem) string {
@@ -112,6 +116,9 @@ func clipLeft(s string, width int) string {
 func (m *model) viewDetail() string {
 	p := m.current
 	keys := []string{"↑↓ scroll", "t test", "s submit", "d debug", "e edit", "h history", "y copy-path", "L lang", "r reset", "D discard", "esc back"}
+	if m.localeLabel(p.Pack) != "" {
+		keys = append(keys, "i locale")
+	}
 	if len(m.detailImages) > 0 {
 		keys = append([]string{"o open-images"}, keys...)
 	}
