@@ -189,7 +189,16 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 				errs = append(errs, fmt.Sprintf("%s reference not run: %v", l.Name(), err))
 				continue
 			}
-			errs = append(errs, a.checkReference(ctx, p, l, sel, o.Stderr)...)
+			refErrs := a.checkReference(ctx, p, l, sel, o.Stderr)
+			// The reference ran on the local toolchain, which may well be
+			// newer than the protocol's oldest.
+			if mc, ok := l.(lang.MinVersionChecker); ok && len(refErrs) == 0 {
+				file, _ := p.Reference(l.SolutionFile())
+				if err := mc.CheckMinVersion(ctx, p, file); err != nil {
+					refErrs = append(refErrs, fmt.Sprintf("%s reference does not work on %s %s: %v", l.Name(), l.Name(), tc.Min, err))
+				}
+			}
+			errs = append(errs, refErrs...)
 		}
 	}
 	// Conflicts with the rest of the pack come last, so that they do not

@@ -562,6 +562,39 @@ func (Language) DebugCommand(dir, binDir string, p *problem.Problem, opts lang.D
 	return cmd, nil
 }
 
+// CheckMinVersion builds the solution file with the driver in a module whose
+// go directive is MinVersion, which limits the language, and runs go vet,
+// whose stdversion analyzer reports standard library symbols newer than
+// that. A newer toolchain checks both.
+func (l Language) CheckMinVersion(ctx context.Context, p *problem.Problem, file string) error {
+	code, err := os.ReadFile(file)
+	if err != nil {
+		return err
+	}
+	dir, err := os.MkdirTemp("", "hc-vet-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+	if err := os.WriteFile(filepath.Join(dir, l.SolutionFile()), code, 0o644); err != nil {
+		return err
+	}
+	if err := l.Prepare(dir, p); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), GoMod(MinVersion), 0o644); err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, "go", "vet", ".")
+	cmd.Dir = dir
+	cmd.Env = localToolchain()
+	out, err := cmd.CombinedOutput()
+	if _, ok := errors.AsType[*exec.ExitError](err); ok {
+		return fmt.Errorf("go vet in a module at go %s:\n%s", MinVersion, strings.TrimSpace(string(out)))
+	}
+	return err
+}
+
 // localToolchain is the environment for go commands: always the installed
 // toolchain, never one downloaded on demand, so hc stays offline.
 func localToolchain() []string {
