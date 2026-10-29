@@ -106,9 +106,9 @@ Read `hc docs protocol groups`.
 ## Removing a problem
 
 Removing a problem is a breaking change: users lose it from the pack, and
-their solutions to it stay behind. Do it only when asked. Delete its
-directory, remove its slug from every group, note it for the next release,
-and never reuse the slug ([Identity](#identity-never-rename-never-reuse)).
+their solutions to it stay behind. Do it only when asked. `hc rm <slug> --yes`
+deletes its directory and removes its slug from every group; note it for the
+next release, and never reuse the slug ([Identity](#identity-never-rename-never-reuse)).
 Removing a language from `languages` is breaking too.
 
 ## Moving to a new protocol version

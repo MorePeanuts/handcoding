@@ -729,3 +729,59 @@ func lowerCamel(slug string) string {
 	}
 	return strings.ToLower(s[:1]) + s[1:]
 }
+
+func newRmCmd(root *rootOptions) *cobra.Command {
+	var yes, purge bool
+	cmd := &cobra.Command{
+		Use:     "rm <problem>...",
+		Aliases: []string{"remove"},
+		Short:   "Remove problems from your own problems or a pack checkout",
+		Long: `Remove problems from the workspace's own problems (packs/local/problems/),
+or from the pack of a pack checkout: their directories, and their slugs from
+the groups of pack.yaml. Installed packs are read-only.
+
+Your solutions, submission history and star of a removed problem are kept,
+so a problem with the same slug added later gets them back; --purge deletes
+them too. In a published pack, removing a problem is a breaking change: its
+users' solutions and history no longer belong to any problem.`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			for _, ref := range args {
+				err := withWritableProblem(root, ref, func(a *app.App, p *problem.Problem) error {
+					// Named before it is gone: Ref looks for the problems the
+					// name could mean.
+					ref, rel := a.WS.Ref(p), a.WS.Rel(p.Dir)
+					what := rel
+					if purge {
+						what += ", with your solutions, submission history and star"
+					}
+					if !yes && !confirm(fmt.Sprintf("Remove %s (%s)?", ref, what)) {
+						return errors.New("aborted (use --yes to skip the prompt)")
+					}
+					r, err := a.RemoveProblem(cmd.Context(), p, purge)
+					if err != nil {
+						return err
+					}
+					fmt.Printf("%s %s: deleted %s\n", ui.Red.Render("removed"), ref, rel)
+					if len(r.Groups) > 0 {
+						fmt.Printf("    taken out of group(s) %s in %s\n", strings.Join(r.Groups, ", "), pack.ManifestFile)
+					}
+					switch {
+					case r.Purged:
+						fmt.Printf("    solutions, star and %d submission(s) deleted\n", r.Submissions)
+					case r.Kept:
+						fmt.Println("    your solutions and history of it are kept; a problem with the same slug gets them back")
+					}
+					return nil
+				})
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
+	cmd.Flags().BoolVar(&purge, "purge", false, "also delete your solutions, submission history and star of the problems")
+	return cmd
+}

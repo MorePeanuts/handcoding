@@ -159,3 +159,56 @@ func TestConfigPacksChecked(t *testing.T) {
 		t.Error("SavePacks in a checkout")
 	}
 }
+
+// removeFromGroups takes a slug out of every group, in flow and block
+// sequences, and keeps the rest of the file as it was.
+func TestRemoveFromGroups(t *testing.T) {
+	in := `# The manifest.
+protocol: 1
+name: demo
+# Groups, in order.
+groups:
+  - name: a
+    title: A # the first
+    problems: [two-sum, rotate-array, two-sum-ii]
+  - name: b
+    problems:
+      # the classic
+      - lru-cache
+      - two-sum   # gone
+      - x
+  - name: c
+    problems:
+      - two-sum
+  - name: d
+    problems: [x]
+`
+	want := `# The manifest.
+protocol: 1
+name: demo
+# Groups, in order.
+groups:
+  - name: a
+    title: A # the first
+    problems: [rotate-array, two-sum-ii]
+  - name: b
+    problems:
+      # the classic
+      - lru-cache
+      - x
+  - name: c
+    problems: []
+  - name: d
+    problems: [x]
+`
+	out, groups, err := removeFromGroups([]byte(in), "two-sum")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != want || !slices.Equal(groups, []string{"a", "b", "c"}) {
+		t.Errorf("groups %v, got:\n%s", groups, out)
+	}
+	if out, groups, err := removeFromGroups([]byte(in), "absent"); err != nil || groups != nil || string(out) != in {
+		t.Errorf("an absent slug changed the file: %v %v", groups, err)
+	}
+}

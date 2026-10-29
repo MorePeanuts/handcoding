@@ -237,6 +237,59 @@ func (a *App) Discard(ctx context.Context, p *problem.Problem) (int64, error) {
 	return st.DeleteProblem(ctx, p.Pack, p.Slug)
 }
 
+// Removed is what RemoveProblem did.
+type Removed struct {
+	// Groups are the groups of the pack the problem was taken out of.
+	Groups []string
+	// Purged is set when the solutions, history and star went too;
+	// Submissions is then the number of deleted submissions.
+	Purged      bool
+	Submissions int64
+	// Kept is set when the user's solutions or history of the problem
+	// stay, without the problem: purge was not asked for.
+	Kept bool
+}
+
+// RemoveProblem deletes p from its pack, which must be writable: its
+// directory, and its slug from the pack's groups. With purge, the user's
+// solutions, submission history and star of p go too; without, they stay,
+// and a problem with the same slug added later gets them back.
+func (a *App) RemoveProblem(ctx context.Context, p *problem.Problem, purge bool) (Removed, error) {
+	var r Removed
+	if err := a.WS.CheckWritable(p); err != nil {
+		return r, err
+	}
+	k, err := a.WS.Pack(p.Pack)
+	if err != nil {
+		return r, err
+	}
+	// The groups first: a pack whose groups name a problem it lacks is
+	// invalid, one with a problem in no group is not.
+	if r.Groups, err = k.RemoveFromGroups(p.Slug); err != nil {
+		return r, err
+	}
+	st, err := a.Store()
+	if err != nil {
+		return r, err
+	}
+	if purge {
+		if r.Submissions, err = a.Discard(ctx, p); err != nil {
+			return r, err
+		}
+		if err := st.SetStar(ctx, p.Pack, p.Slug, false); err != nil {
+			return r, err
+		}
+		r.Purged = true
+	} else {
+		subs, err := st.List(ctx, p.Pack, p.Slug)
+		if err != nil {
+			return r, err
+		}
+		r.Kept = len(subs) > 0 || slices.ContainsFunc(a.Langs.All(), func(l lang.Language) bool { return a.HasSolution(p, l) })
+	}
+	return r, os.RemoveAll(p.Dir)
+}
+
 // Restore writes code (e.g. from a past submission) into the solution file.
 func (a *App) Restore(p *problem.Problem, l lang.Language, code string) (string, error) {
 	path, _, err := a.Start(p, l)
