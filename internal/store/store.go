@@ -1,5 +1,5 @@
-// Package store persists submission history, and the preferences hc
-// remembers across runs, in SQLite.
+// Package store persists submission history, starred problems and the
+// preferences hc remembers across runs, in SQLite.
 package store
 
 import (
@@ -67,6 +67,14 @@ CREATE TABLE IF NOT EXISTS prefs (
 	PRIMARY KEY (pack, key)
 )`
 
+// stars holds the problems the user starred, by pack and slug.
+const stars = `
+CREATE TABLE IF NOT EXISTS stars (
+	pack TEXT NOT NULL,
+	slug TEXT NOT NULL,
+	PRIMARY KEY (pack, slug)
+)`
+
 // ErrOldSchema is returned for a database written by an older hc.
 var ErrOldSchema = errors.New("the submission history was written by an older hc, which this one does not read; delete the file to start a new history")
 
@@ -95,7 +103,10 @@ func create(db *sql.DB) error {
 	if _, err := db.Exec(index); err != nil {
 		return err
 	}
-	_, err := db.Exec(prefs)
+	if _, err := db.Exec(prefs); err != nil {
+		return err
+	}
+	_, err := db.Exec(stars)
 	return err
 }
 
@@ -181,7 +192,8 @@ func (s *Store) DeleteProblem(ctx context.Context, pack, slug string) (int64, er
 }
 
 // DeletePack removes every submission of the problems of the pack called
-// pack, and its preferences, and returns how many submissions were deleted.
+// pack, its preferences and its stars, and returns how many submissions
+// were deleted.
 func (s *Store) DeletePack(ctx context.Context, pack string) (int64, error) {
 	if pack == "" {
 		return 0, errors.New("no pack named")
@@ -190,10 +202,41 @@ func (s *Store) DeletePack(ctx context.Context, pack string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	if _, err := s.db.ExecContext(ctx, `DELETE FROM prefs WHERE pack = ?`, pack); err != nil {
-		return 0, err
+	for _, table := range []string{"prefs", "stars"} {
+		if _, err := s.db.ExecContext(ctx, `DELETE FROM `+table+` WHERE pack = ?`, pack); err != nil {
+			return 0, err
+		}
 	}
 	return res.RowsAffected()
+}
+
+// SetStar stars the problem pack/slug, or unstars it.
+func (s *Store) SetStar(ctx context.Context, pack, slug string, starred bool) error {
+	q := `DELETE FROM stars WHERE pack = ? AND slug = ?`
+	if starred {
+		q = `INSERT OR IGNORE INTO stars (pack, slug) VALUES (?, ?)`
+	}
+	_, err := s.db.ExecContext(ctx, q, pack, slug)
+	return err
+}
+
+// Stars returns the starred problems, keyed by pack/slug (see
+// Submission.Ref).
+func (s *Store) Stars(ctx context.Context) (map[string]bool, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT pack, slug FROM stars`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var sub Submission
+		if err := rows.Scan(&sub.Pack, &sub.Slug); err != nil {
+			return nil, err
+		}
+		out[sub.Ref()] = true
+	}
+	return out, rows.Err()
 }
 
 // Pref returns the preference key of the pack, or of the workspace when

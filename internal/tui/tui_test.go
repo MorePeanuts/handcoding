@@ -470,6 +470,40 @@ func TestViewDoesNotStart(t *testing.T) {
 	}
 }
 
+// m stars a problem, or unstars it, from the list or its statement; the
+// list marks it, the starred filter keeps only starred problems, and a new
+// session still has the stars.
+func TestStars(t *testing.T) {
+	h := newHarness(t)
+	p := h.m.selected()
+	h.press("m")
+	if !h.m.stars[p.Ref()] || !strings.Contains(h.view(), "★ 1 starred") {
+		t.Fatalf("m did not star %s:\n%s", p.Ref(), h.view())
+	}
+	if _, row, _ := strings.Cut(h.view(), "▸"); !strings.HasPrefix(strings.TrimSpace(row), "· ★ 1 ") {
+		t.Errorf("starred row %q", strings.SplitN(row, "\n", 2)[0])
+	}
+	h.press("j", "v", "m")
+	if q := h.m.current; !h.m.stars[q.Ref()] || !strings.Contains(strings.SplitN(h.view(), "\n", 2)[0], "★") {
+		t.Fatalf("m on the statement did not star %s", q.Ref())
+	}
+	h.press("esc", "f", "f", "f")
+	if h.m.filter != filterStarred || len(h.m.visible) != 2 {
+		t.Fatalf("filter %s: %d visible", h.m.filter, len(h.m.visible))
+	}
+	h.press("m") // unstar the first: the starred filter drops it
+	if h.m.stars[p.Ref()] || len(h.m.visible) != 1 {
+		t.Fatalf("after unstarring %s: %d visible", p.Ref(), len(h.m.visible))
+	}
+	h.press("f")
+	if h.m.filter != filterAll {
+		t.Errorf("f after starred gives %s", h.m.filter)
+	}
+	if m := h.openModel(Options{}); len(m.stars) != 1 || m.stars[p.Ref()] {
+		t.Errorf("reopened with stars %v", m.stars)
+	}
+}
+
 func TestDetailOpensStatementImages(t *testing.T) {
 	h := newHarness(t)
 	var opened []string
