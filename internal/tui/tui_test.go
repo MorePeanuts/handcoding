@@ -313,6 +313,67 @@ func TestListGroups(t *testing.T) {
 	}
 }
 
+// An empty pack has no tab once another pack has problems, even when it was
+// the pack shown last, unless --pack names it.
+func TestListHidesEmptyPacks(t *testing.T) {
+	h := newHarness(t)
+	st, _ := h.m.app.Store()
+	if err := st.SetPref(context.Background(), "", prefPack, "local"); err != nil {
+		t.Fatal(err)
+	}
+	if m := h.openModel(Options{}); m.pack != regression.Name || len(m.tabs) != 1 || m.top() != screenList {
+		t.Errorf("remembered empty local: pack %s, %d tabs, screen %v", m.pack, len(m.tabs), m.top())
+	}
+	m := h.openModel(Options{Pack: "local"})
+	if m.pack != "local" || len(m.tabs) != 2 || !strings.Contains(m.View(), "no problems yet") {
+		t.Errorf("--pack local: pack %s, %d tabs:\n%s", m.pack, len(m.tabs), m.View())
+	}
+}
+
+// With several packs that have problems, the TUI opens on a pack picker,
+// the pack shown last under the cursor; enter opens a pack's list, and esc
+// comes back. --pack and --group skip the picker.
+func TestPackPicker(t *testing.T) {
+	h := newHarness(t)
+	addLocal(t, h.m, "0001-two-sum")
+	st, _ := h.m.app.Store()
+	if err := st.SetPref(context.Background(), "", prefPack, regression.Name); err != nil {
+		t.Fatal(err)
+	}
+	p := &harness{t: t, m: h.openModel(Options{})}
+	if p.m.top() != screenPacks {
+		t.Fatalf("opened on screen %v, want the pack picker", p.m.top())
+	}
+	view := p.view()
+	for _, want := range []string{"2 packs", "choose a pack", "local", "0/1", "regression", "hc regression set", "enter open"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("picker lacks %q:\n%s", want, view)
+		}
+	}
+	if got := strings.Count(view, "\n") + 1; got != 30 {
+		t.Errorf("picker has %d lines, want 30", got)
+	}
+	if p.m.tabs[p.m.packCursor].pack.Name != regression.Name {
+		t.Errorf("cursor on %s, want the pack shown last", p.m.tabs[p.m.packCursor].pack.Name)
+	}
+	p.press("k", "enter")
+	if p.m.top() != screenList || p.m.pack != "local" || len(p.m.probs) != 1 || !strings.Contains(p.view(), "esc packs") {
+		t.Fatalf("enter: screen %v, pack %s", p.m.top(), p.m.pack)
+	}
+	p.press("tab", "esc")
+	if p.m.top() != screenPacks || p.m.tabs[p.m.packCursor].pack.Name != regression.Name {
+		t.Fatalf("esc: screen %v, cursor %d", p.m.top(), p.m.packCursor)
+	}
+	if _, cmd := p.m.Update(keyMsg("esc")); cmd == nil || cmd() != tea.Quit() {
+		t.Error("esc on the picker does not quit")
+	}
+	for _, opts := range []Options{{Pack: "local"}, {Group: "design"}} {
+		if m := h.openModel(opts); m.top() != screenList || len(m.stack) != 1 {
+			t.Errorf("%+v: screen %v", opts, m.top())
+		}
+	}
+}
+
 // --pack and --group open that pack's tab, and that group in it; a
 // remembered pack or group that no longer exists falls back silently.
 func TestListOptionsAndFallback(t *testing.T) {

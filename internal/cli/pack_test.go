@@ -183,3 +183,22 @@ func TestPackCheckout(t *testing.T) {
 		t.Errorf("validate: %v\n%s", err, out)
 	}
 }
+
+// hc --pack and --group open a pack or a group, like hc list; outside a
+// terminal they print its table.
+func TestRootPackFlag(t *testing.T) {
+	dir := packWorkspace(t)
+	out, err := capture(t, "-w", dir, "--pack", "local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "two-sum") || strings.Contains(out, "regression") {
+		t.Errorf("hc --pack local:\n%s", out)
+	}
+	if _, err := capture(t, "-w", dir, "--group", "design"); err != nil {
+		t.Errorf("hc --group design: %v", err)
+	}
+	if _, err := capture(t, "-w", dir, "--pack", "nope"); err == nil {
+		t.Error("hc --pack nope did not fail")
+	}
+}

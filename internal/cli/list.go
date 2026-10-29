@@ -31,9 +31,11 @@ func newListCmd(root *rootOptions) *cobra.Command {
 		Short:   "Browse problems (interactive in a terminal)",
 		Long: `Browse the problems of the workspace.
 
-In a terminal, the list shows one pack at a time, with a tab for each pack,
-and opens on the pack and group shown last. --pack opens a pack's tab, and
---group a group of a pack, in the group's order.
+In a terminal, the list shows one pack at a time, with a tab for each pack
+that has problems. With several of them it opens on a pack picker, the pack
+shown last under the cursor; --pack opens a pack's list right away, and
+--group a group of a pack, in the group's order. Each pack opens on the
+group shown last.
 
 With --plain, or when not in a terminal, it prints a table of every pack's
 problems, or only those of one pack (--pack), or of one group of a pack
