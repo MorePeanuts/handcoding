@@ -34,7 +34,8 @@ type Agent struct {
 }
 
 // Presets maps agent names to their headless command lines. Both keep writes
-// inside the workspace. Claude: Write/Edit are left out of the allowlist so
+// inside the workspace (and temporary directories), so hc must prepare what
+// the commands it runs need elsewhere before it starts them. Claude: Write/Edit are left out of the allowlist so
 // acceptEdits approves them only in the working directory, and the sandbox
 // confines what Bash commands (python3, go) can write. Codex: --full-auto
 // runs in its workspace-write sandbox.
@@ -72,8 +73,9 @@ func skillDir(command string) string {
 	return skill.AgentsDir
 }
 
-// Run executes the agent in dir with the prompt, streaming its output.
-func (a *Agent) Run(ctx context.Context, dir, prompt string) error {
+// Run executes the agent in dir with the prompt, streaming its output. env
+// adds to the agent's environment.
+func (a *Agent) Run(ctx context.Context, dir, prompt string, env []string) error {
 	argv := make([]string, len(a.Argv))
 	replaced := false
 	for i, arg := range a.Argv {
@@ -93,7 +95,7 @@ func (a *Agent) Run(ctx context.Context, dir, prompt string) error {
 	cmd.Dir = dir
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	// Make sure the agent's `hc` calls resolve to this binary and workspace.
-	env := append(os.Environ(), "HC_WORKSPACE="+dir)
+	env = append(append(os.Environ(), env...), "HC_WORKSPACE="+dir)
 	if exe, err := os.Executable(); err == nil {
 		env = append(env, "PATH="+filepath.Dir(exe)+string(os.PathListSeparator)+os.Getenv("PATH"))
 	}

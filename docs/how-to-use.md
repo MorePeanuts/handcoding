@@ -25,6 +25,7 @@ English · [简体中文](how-to-use_zh.md)
   solutions/local/python/0001-two-sum/     your code: solution.py, plus generated hc_runtime.py and _hc_runner.py
   .hc/hc.db                                submission history (SQLite)
   .hc/venv/                                Python virtual environment managed by hc
+  .hc/cache/                               Go and uv caches for coding agents
   pyrightconfig.json                       points pyright at .hc/venv
 ```
 
@@ -255,6 +256,8 @@ hc fix two-sum -c 5 -m "answers in a different order should pass"
 2. writes test **inputs** to `cases.jsonl`, covering edge cases, special structures and large inputs;
 3. runs `hc cases build`, so expected outputs come from running the reference, not from the model;
 4. runs `hc validate --run` until every reference passes.
+
+The presets run the agent in a sandbox where its commands can write only to the workspace and temporary directories (Claude Code's sandbox, Codex's `workspace-write`). So hc sets up the Python environment in `.hc/venv` before the agent starts, and gives the agent, preset or not, caches inside the workspace: `GOCACHE` is `.hc/cache/go-build` and `UV_CACHE_DIR` is `.hc/cache/uv`. The agent's first Go build is slower for it.
 
 To use another agent, set its command line in `hc.yaml`; `{prompt}` is replaced by the prompt:
 

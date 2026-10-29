@@ -25,6 +25,7 @@
   solutions/local/python/0001-two-sum/     你的代码：solution.py，以及自动生成的 hc_runtime.py 和 _hc_runner.py
   .hc/hc.db                                提交历史（SQLite）
   .hc/venv/                                hc 管理的 Python 虚拟环境
+  .hc/cache/                               供编码智能体使用的 Go 和 uv 缓存
   pyrightconfig.json                       让 pyright 使用 .hc/venv
 ```
 
@@ -255,6 +256,8 @@ hc fix two-sum -c 5 -m "answers in a different order should pass"
 2. 把测试**输入**写入 `cases.jsonl`，覆盖边界情况、特殊结构和大规模输入；
 3. 运行 `hc cases build`，所以期望输出来自运行参考解，而不是模型自己写的；
 4. 反复运行 `hc validate --run`，直到每份参考解都通过。
+
+预设会在沙箱中运行智能体，它执行的命令只能写入工作区和临时目录（Claude Code 的沙箱，Codex 的 `workspace-write`）。因此 hc 会在智能体启动前建好 `.hc/venv` 中的 Python 环境，并为智能体（无论是否用预设）把缓存放在工作区内：`GOCACHE` 为 `.hc/cache/go-build`，`UV_CACHE_DIR` 为 `.hc/cache/uv`。所以智能体第一次构建 Go 时会慢一些。
 
 要使用其他智能体，在 `hc.yaml` 中设置它的命令行，`{prompt}` 会被替换为提示词：
 
