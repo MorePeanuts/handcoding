@@ -51,6 +51,7 @@ CLAUDE.md                     @AGENTS.md，以及留给 Claude Code 的备注
 hc fetch two-sum            # 从 LeetCode 导入一道题
 hc new my-problem           # 或者自己出一道题（problems/my-problem/）
 hc import ../elsewhere/     # 或者把题目目录复制进来
+hc rm old-problem           # 删除题目：它的目录，以及分组中的 slug
 hc gen two-sum              # 让智能体编写参考解、用例和判题规则
 hc validate two-sum --run   # 每个参考解都通过每个用例
 hc pack check               # 像 CI 那样检查整个题目包

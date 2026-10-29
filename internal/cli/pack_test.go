@@ -202,3 +202,68 @@ func TestRootPackFlag(t *testing.T) {
 		t.Error("hc --pack nope did not fail")
 	}
 }
+
+// hc rm deletes a problem and takes it out of the pack's groups, keeping
+// the rest of pack.yaml; installed packs refuse it, and the user's
+// solutions stay unless --purge.
+func TestRm(t *testing.T) {
+	checkout := filepath.Join(t.TempDir(), "checkout")
+	if err := regression.Copy(checkout); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(checkout, "problems", "0146-lru-cache")
+	if _, err := capture(t, "-w", checkout, "rm", "lru-cache"); err == nil || !strings.Contains(err.Error(), "aborted") {
+		t.Fatalf("rm without --yes outside a terminal: %v", err)
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatal("rm without --yes deleted the problem")
+	}
+	out, err := capture(t, "-w", checkout, "rm", "lru-cache", "-y")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "removed lru-cache: deleted problems/0146-lru-cache") || !strings.Contains(out, "taken out of group(s) design") {
+		t.Errorf("rm lru-cache:\n%s", out)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("problem directory still there: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(checkout, "pack.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "lru-cache") || !strings.Contains(string(data), "# Groups exercise") {
+		t.Errorf("pack.yaml after rm:\n%s", data)
+	}
+	if _, err := capture(t, "-w", checkout, "validate"); err != nil {
+		t.Errorf("the pack is invalid after rm: %v", err)
+	}
+
+	ws := packWorkspace(t)
+	if _, err := capture(t, "-w", ws, "rm", "regression/two-sum", "-y"); err == nil {
+		t.Error("rm in an installed pack")
+	}
+	solution := filepath.Join(ws, "solutions", "local", "go", "two-sum")
+	for _, purge := range []bool{false, true} {
+		if purge {
+			if _, err := capture(t, "-w", ws, "new", "two-sum"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := capture(t, "-w", ws, "start", "local/two-sum"); err != nil {
+			t.Fatal(err)
+		}
+		args := []string{"-w", ws, "rm", "local/two-sum", "-y"}
+		if purge {
+			args = append(args, "--purge")
+		}
+		out, err := capture(t, args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, statErr := os.Stat(solution)
+		if kept := statErr == nil; kept == purge || strings.Contains(out, "are kept") == purge {
+			t.Errorf("purge %v: solution kept %v:\n%s", purge, kept, out)
+		}
+	}
+}

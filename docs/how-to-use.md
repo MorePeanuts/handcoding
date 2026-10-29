@@ -187,6 +187,7 @@ hc gen my-problem                   # have an agent write a reference and cases,
 hc cases build my-problem           #   expected outputs from reference/solution.*
 hc validate my-problem --run        #   every reference must pass every case
 hc import ./my-problems/            # import problem directories shared by others, or a pack's problems
+hc rm my-problem                    # remove a problem (--purge: your solutions and history of it too)
 ```
 
 `hc fetch`, `hc new` and `hc import` write into `packs/local/problems/`. The format of a problem, from `problem.yaml` to the reference solution, is specified by the [problem protocol](protocol.md); `hc new` scaffolds one to fill in, and hc's regression set ([`testdata/regression`](../testdata/regression) in its repository) has complete examples of every feature.
@@ -194,6 +195,7 @@ hc import ./my-problems/            # import problem directories shared by other
 - `hc cases build` runs a reference solution: the Go one if there is one, else the Python one; `-l` picks one. It refuses problems judged with `any_of`, whose `expected` lists every acceptable answer and has to be written by hand.
 - `hc validate` reports every break of the protocol's [validity rules](protocol.md#validity-rules) as an error, with the case number and field. With `--run` it also runs every reference solution on every case, and through the checker if there is one. It warns about an undecided judge rule (no `judge.compare`), no cases, cases without `expected`, no case marked as an example, no reference solution, and statement images that do not exist. `hc test`, `hc submit` and `hc debug` refuse to run a case that breaks these rules, and name it.
 - `hc import` copies only the entries the protocol defines (anything else, such as editor files or a `solutions/` folder, is left behind), and refuses problems whose slug or ID is already among your own problems (`--force` replaces a problem with the same slug). Slugs and IDs only need to be unique within a pack, so importing a problem that an installed pack also has is fine. It also refuses a problem whose statements and titles do not match the locales of your own problems, as `hc validate` would report them: one without a statement in each of them, or with one in another locale.
+- `hc rm` deletes a problem's directory, and in a pack checkout takes its slug out of the groups of `pack.yaml`, keeping the file's comments and layout. It asks first (`--yes` skips the question) and refuses installed packs. Your solutions, submission history and star of the problem are kept, so a problem with the same slug added later gets them back; `--purge` deletes them as well.
 - `hc validate` without arguments also checks every installed pack's `pack.yaml`, and that its groups name problems of the pack. Each problem's directory name, slug and ID are checked against the rest of its pack.
 
 hc carries the protocol (in English) for its own version, so it is at hand offline:

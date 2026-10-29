@@ -49,6 +49,7 @@ The directory is now a pack checkout, which hc opens as a workspace as it is (se
 hc fetch two-sum            # import a problem from LeetCode
 hc new my-problem           # or write one of your own (problems/my-problem/)
 hc import ../elsewhere/     # or copy problem directories in
+hc rm old-problem           # remove one: its directory and its slug in the groups
 hc gen two-sum              # an agent writes a reference, the cases and the judge rule
 hc validate two-sum --run   # every reference passes every case
 hc pack check               # the whole pack, as CI checks it

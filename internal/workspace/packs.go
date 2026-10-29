@@ -219,3 +219,107 @@ func writeAtomic(path string, data []byte) error {
 	}
 	return os.Rename(tmp.Name(), path)
 }
+
+// RemoveFromGroups removes slug from every group of the pack's pack.yaml,
+// keeping its comments and layout, and returns the names of the groups it
+// was in. The local pack has no pack.yaml, and no groups.
+func (k *Pack) RemoveFromGroups(slug string) ([]string, error) {
+	path := filepath.Join(k.Dir, pack.ManifestFile)
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) && k.Name == pack.LocalName {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	out, groups, err := removeFromGroups(data, slug)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", pack.ManifestFile, err)
+	}
+	if len(groups) == 0 {
+		return nil, nil
+	}
+	return groups, writeAtomic(path, out)
+}
+
+// removeFromGroups returns the pack.yaml document data without slug in the
+// problems of any group, and the names of the groups that had it.
+func removeFromGroups(data []byte, slug string) ([]byte, []string, error) {
+	f, err := parser.ParseBytes(data, parser.ParseComments)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(f.Docs) != 1 {
+		return nil, nil, errors.New("must hold one YAML document")
+	}
+	m, ok := f.Docs[0].Body.(*ast.MappingNode)
+	if !ok {
+		return nil, nil, errors.New("must be a mapping")
+	}
+	var groups []string
+	for _, v := range m.Values {
+		seq, ok := v.Value.(*ast.SequenceNode)
+		if v.Key.String() != "groups" || !ok {
+			continue
+		}
+		for _, g := range seq.Values {
+			gm, ok := g.(*ast.MappingNode)
+			if !ok {
+				continue
+			}
+			name := ""
+			for _, gv := range gm.Values {
+				if gv.Key.String() == "name" {
+					name = gv.Value.String()
+				}
+			}
+			for _, gv := range gm.Values {
+				probs, ok := gv.Value.(*ast.SequenceNode)
+				if !ok || gv.Key.String() != "problems" || !dropValue(probs, slug) {
+					continue
+				}
+				groups = append(groups, name)
+				if len(probs.Values) == 0 && !probs.IsFlowStyle {
+					// An empty block sequence would print as [] on a line
+					// of its own.
+					empty, err := yaml.ValueToNode([]string{}, yaml.Flow(true))
+					if err != nil {
+						return nil, nil, err
+					}
+					if err := gv.Replace(empty); err != nil {
+						return nil, nil, err
+					}
+				}
+			}
+		}
+	}
+	if len(groups) == 0 {
+		return data, nil, nil
+	}
+	return []byte(strings.TrimRight(f.String(), "\n") + "\n"), groups, nil
+}
+
+// dropValue removes the scalar entries equal to value from seq, with their
+// comments, and reports whether there were any.
+func dropValue(seq *ast.SequenceNode, value string) bool {
+	comments := len(seq.ValueHeadComments) == len(seq.Values)
+	var keep []ast.Node
+	var keepComments []*ast.CommentGroupNode
+	for i, e := range seq.Values {
+		if s, ok := e.(*ast.StringNode); ok && s.Value == value {
+			continue
+		}
+		keep = append(keep, e)
+		if comments {
+			keepComments = append(keepComments, seq.ValueHeadComments[i])
+		}
+	}
+	if len(keep) == len(seq.Values) {
+		return false
+	}
+	seq.Values = keep
+	if comments {
+		seq.ValueHeadComments = keepComments
+	}
+	return true
+}

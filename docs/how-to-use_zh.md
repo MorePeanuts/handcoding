@@ -187,6 +187,7 @@ hc gen my-problem                   # 让智能体写参考解和用例，或者
 hc cases build my-problem           #   用 reference/solution.* 生成期望输出
 hc validate my-problem --run        #   每份参考解都必须通过每个用例
 hc import ./my-problems/            # 导入别人分享的题目目录，或一个题目包里的题目
+hc rm my-problem                    # 删除题目（加 --purge 时连同你的解答和提交历史）
 ```
 
 `hc fetch`、`hc new` 和 `hc import` 都写入 `packs/local/problems/`。题目的格式，从 `problem.yaml` 到参考解，由[题目协议](protocol_zh.md)规定；`hc new` 会生成一个待填写的骨架，hc 的回归测试集（仓库中的 [`testdata/regression`](../testdata/regression)）则包含覆盖每项功能的完整例子。
@@ -194,6 +195,7 @@ hc import ./my-problems/            # 导入别人分享的题目目录，或一
 - `hc cases build` 运行一个参考解：有 Go 参考解时用 Go，否则用 Python；`-l` 可以指定。判题方式为 `any_of` 的题目会被拒绝，因为它的 `expected` 要列出所有可接受的答案，只能手写。
 - `hc validate` 把每一处违反协议[合法性规则](protocol_zh.md#合法性规则)的地方报为错误，并注明用例编号和字段。加上 `--run` 时，它还会在每个用例上运行每个参考解，有判题程序时交给判题程序判定。以下情况给出警告：判题规则未确定（没有 `judge.compare`）、没有用例、有用例缺少 `expected`、没有用例标记为示例、没有参考解，以及题面引用的图片不存在。`hc test`、`hc submit` 和 `hc debug` 拒绝运行违反这些规则的用例，并指出是哪一个。
 - `hc import` 只复制协议定义的条目（其余内容，如编辑器文件、`solutions/` 目录，不会被导入）；如果你自己的题目中已有相同的 slug 或编号，会拒绝导入（`--force` 会替换 slug 相同的题目）。slug 和编号只需在一个题目包内唯一，所以导入一道已安装题目包里也有的题目没有问题。题面和标题与你自己题目的语言区域不符的题目也会被拒绝，就像 `hc validate` 会报告的那样：缺少某个语言区域的题面，或者有其他语言区域的题面。
+- `hc rm` 删除题目的目录；在题目包检出目录中，还会把它的 slug 从 `pack.yaml` 的各个分组中移除，并保留该文件的注释和格式。它会先询问确认（`--yes` 跳过询问），并且拒绝修改已安装的题目包。你对这道题的解答、提交历史和收藏会保留，以后再添加同一 slug 的题目时会重新对应上；加 `--purge` 则一并删除。
 - 不带参数的 `hc validate` 还会检查每个已安装题目包的 `pack.yaml`，以及它的分组是否都指向本题目包的题目。每道题的目录名、slug 和编号都会与所在题目包的其他题目对照检查。
 
 hc 内置了与自身版本对应的协议（英文版），离线也能查阅：
