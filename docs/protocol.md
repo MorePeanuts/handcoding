@@ -115,7 +115,7 @@ Groups arrange the pack's problems into named lists, such as topics or study pla
 
 A pack MAY give its statements in several languages. "Language" here means the language of the statement, not the solution language (`languages`).
 
-- `locales` lists them as BCP 47 language tags, such as `en` or `zh-CN`, each once (tags are compared ignoring case). The first is the pack's **default locale**. Which locales a pack has, and which is the default, is its author's decision.
+- `locales` lists them as BCP 47 language tags, such as `en` or `zh-CN`, each once (tags are compared ignoring case). Statement files and the keys of `titles` spell a tag exactly as `locales` does. The first is the pack's **default locale**. Which locales a pack has, and which is the default, is its author's decision.
 - `description.md` and `title` are in the default locale. The statement in another locale is `description.<locale>.md`, such as `description.zh-CN.md`, and its title is `titles.<locale>` in `problem.yaml`: `titles: {zh-CN: 两数之和}`. The pack's and each group's `titles` work the same way, and are optional.
 - A pack that declares a locale MUST give every problem a statement and a title in it: `description.md` for the default locale, `description.<locale>.md` and `titles.<locale>` for the others.
 - `description.<locale>.md` files and the keys of `titles` MUST name locales the pack declares, other than the default, whose statement and title are `description.md` and `title`.

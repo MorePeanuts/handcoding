@@ -225,8 +225,9 @@ whose problems are copied. See ` + "`hc docs protocol`" + ` for the format.`,
 }
 
 // importEntries are the files and directories of the problem protocol,
-// with the translated statements (description.<locale>.md); anything else in an imported directory (editor files, solutions, ...) is
-// left behind.
+// besides the translated statements (description.<locale>.md); anything
+// else in an imported directory (editor files, solutions, ...) is left
+// behind.
 var importEntries = []string{
 	problem.MetaFile, problem.DescriptionFile, problem.CasesFile,
 	problem.AssetsDir, problem.ReferenceDir, problem.TemplatesDir, problem.CheckerFile,

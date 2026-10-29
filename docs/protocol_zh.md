@@ -117,7 +117,7 @@ groups:
 
 题目包可以用多种语言提供题面。这里的“语言”指题面的语言，不是解答语言（`languages`）。
 
-- `locales` 用 BCP 47 语言标签列出这些语言，如 `en` 或 `zh-CN`，每个只出现一次（比较标签时不区分大小写）。第一个是题目包的**默认语言区域**。题目包有哪些语言区域、哪个是默认的，由作者决定。
+- `locales` 用 BCP 47 语言标签列出这些语言，如 `en` 或 `zh-CN`，每个只出现一次（比较标签时不区分大小写）。题面文件名和 `titles` 的键必须与 `locales` 中的写法完全一致。第一个是题目包的**默认语言区域**。题目包有哪些语言区域、哪个是默认的，由作者决定。
 - `description.md` 和 `title` 使用默认语言区域。其他语言区域的题面是 `description.<locale>.md`，如 `description.zh-CN.md`，标题是 `problem.yaml` 中的 `titles.<locale>`：`titles: {zh-CN: 两数之和}`。题目包和每个分组的 `titles` 用法相同，且是可选的。
 - 声明了某个语言区域的题目包，必须为每道题目提供该语言区域的题面和标题：默认语言区域是 `description.md`，其他语言区域是 `description.<locale>.md` 和 `titles.<locale>`。
 - `description.<locale>.md` 文件和 `titles` 的键必须是题目包声明的、默认语言区域以外的语言区域，默认语言区域的题面和标题是 `description.md` 和 `title`。

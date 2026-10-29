@@ -112,8 +112,9 @@ func lines(err error) []string { return strings.Split(err.Error(), "\n") }
 
 // ValidateProblem validates p against the protocol: problem.yaml,
 // cases.jsonl, starter generation, its statements and titles in the pack's
-// locales, their images and its identity among peers, the problems of its pack (nil loads them). name is how hints
-// name the problem. With o.Run, every reference runs on every case.
+// locales, their images and its identity among peers, the problems of its
+// pack (nil loads them). name is how hints name the problem. With o.Run,
+// every reference runs on every case.
 func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*problem.Problem, name string, o ValidateOptions) Finding {
 	f := Finding{Name: name, Problem: p}
 	var errs, warns []string
