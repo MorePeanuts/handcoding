@@ -263,6 +263,8 @@ agent:
   command: ["my-agent", "--yes", "{prompt}"]
 ```
 
+The prompt points the agent at the skills in `.agents/skills/`, or in `.claude/skills/` when the command is `claude`.
+
 ### Agent skills
 
 hc ships skills that teach coding agents its problem protocol and workflows:

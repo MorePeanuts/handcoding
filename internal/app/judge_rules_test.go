@@ -10,6 +10,7 @@ import (
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/lang"
+	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 )
@@ -124,6 +125,17 @@ func TestNotReady(t *testing.T) {
 	}
 	if _, _, err := a.Submit(context.Background(), p, l, app.RunOptions{}); err == nil || !strings.Contains(err.Error(), "hc gen remove-dup") {
 		t.Fatalf("submit error = %v", err)
+	}
+	// Once another pack has a remove-dup, the bare slug no longer names it.
+	other := filepath.Join(a.WS.PacksPath(), "other")
+	if err := os.CopyFS(filepath.Join(other, pack.ProblemsDir, "remove-dup"), os.DirFS(p.Dir)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(other, pack.ManifestFile), []byte("protocol: 1\nname: other\nversion: 1.0.0\ntitle: Other\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := a.Submit(context.Background(), p, l, app.RunOptions{}); err == nil || !strings.Contains(err.Error(), "hc gen local/remove-dup") {
+		t.Fatalf("submit error with two packs = %v", err)
 	}
 }
 

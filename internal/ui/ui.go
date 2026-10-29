@@ -53,6 +53,15 @@ type ReportOptions struct {
 	Verbose bool
 	// MaxLen truncates long values (default 400).
 	MaxLen int
+	// Ref is how hints name the problem in commands; empty means its slug.
+	Ref string
+}
+
+func (o ReportOptions) ref(p *problem.Problem) string {
+	if o.Ref != "" {
+		return o.Ref
+	}
+	return p.Slug
 }
 
 // ExpectedLabel names a case's expected value: "Any of" for any_of, whose
@@ -150,7 +159,7 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 	if rep.Verdict == runner.NotJudged {
 		summary := fmt.Sprintf("%s · %d case(s) ran · %s", VerdictStyle(rep.Verdict).Render(string(rep.Verdict)), rep.Total, FormatDuration(rep.Elapsed))
 		fmt.Fprintln(w, "\n"+summary)
-		fmt.Fprintln(w, Faint.Render("Compare your output with the expected one yourself; "+p.NotReadyHint()+"."))
+		fmt.Fprintln(w, Faint.Render("Compare your output with the expected one yourself; "+p.NotReadyHint(o.ref(p))+"."))
 		return
 	}
 	summary := fmt.Sprintf("%s · %d/%d passed · %s", VerdictStyle(rep.Verdict).Render(string(rep.Verdict)), rep.Passed, rep.Total, FormatDuration(rep.Elapsed))

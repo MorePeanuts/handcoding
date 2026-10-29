@@ -171,7 +171,7 @@ func (m *model) renderSubmission() {
 	width := min(max(m.width-2, 20), 120)
 	var b strings.Builder
 	if rep := app.DecodeReport(s.Details); rep != nil {
-		ui.PrintReport(&b, m.current, rep, ui.ReportOptions{})
+		ui.PrintReport(&b, m.current, rep, ui.ReportOptions{Ref: m.app.WS.Ref(m.current)})
 	} else {
 		b.WriteString(ui.VerdictStyle(runner.Verdict(s.Verdict)).Render(s.Verdict) +
 			fmt.Sprintf(" · %d/%d passed", s.Passed, s.Total) + "\n" +

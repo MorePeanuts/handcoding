@@ -130,7 +130,7 @@ func (m *model) renderResult() {
 	case r.err != nil:
 		b.WriteString(ui.Red.Render(r.err.Error()))
 	case r.report != nil:
-		ui.PrintReport(&b, m.current, r.report, ui.ReportOptions{})
+		ui.PrintReport(&b, m.current, r.report, ui.ReportOptions{Ref: m.app.WS.Ref(m.current)})
 		if r.subID > 0 {
 			b.WriteString(ui.Faint.Render(fmt.Sprintf("Recorded as submission #%d (h to browse history)", r.subID)) + "\n")
 		}
