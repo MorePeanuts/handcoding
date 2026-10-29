@@ -81,7 +81,9 @@ func (m *model) problemTitle(p *problem.Problem) string {
 	if m.multiPack {
 		title = ui.Faint.Render(p.Pack+" ·") + " " + title
 	}
-	return fmt.Sprintf("%s  %s  %s", title, ui.Difficulty(p.Difficulty), ui.Faint.Render(strings.Join(p.Tags, ", ")))
+	// The slug is what commands take, and the only name a problem without
+	// an ID, or with an ID such as "LCR 001", is easy to type by.
+	return fmt.Sprintf("%s  %s  %s  %s", title, ui.Faint.Render(p.Slug), ui.Difficulty(p.Difficulty), ui.Faint.Render(strings.Join(p.Tags, ", ")))
 }
 
 func (m *model) solutionLine(p *problem.Problem) string {

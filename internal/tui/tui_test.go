@@ -182,6 +182,9 @@ func TestEnterOpensDetailAndCopiesPath(t *testing.T) {
 		t.Fatalf("copied %v, want %s", h.copied, path)
 	}
 	view := h.view()
+	if title, _, _ := strings.Cut(view, "\n"); !strings.Contains(title, "1. Two Sum  two-sum  Easy") {
+		t.Errorf("title line lacks the title or the slug: %q", title)
+	}
 	for _, want := range []string{"两数之和", "solution.go", "t test", "esc back"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("detail view missing %q", want)
