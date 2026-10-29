@@ -232,7 +232,7 @@ LeetCode calls six different structures `Node`. The protocol gives each its own 
 | `QuadNode` | `Val bool`, `IsLeaf bool`, `TopLeft`, `TopRight`, `BottomLeft`, `BottomRight *Node` | Level order in which every node has four child slots, `null` when empty, each node written `[isLeaf, val]` with `0` or `1`, trailing `null`s removed: `[[0,1],[1,0],[1,1],[1,1],[1,0]]`. A node that is not a leaf is output as `[0,1]`, whatever its value | 427, 558 |
 | `MultilevelNode` | `Val int`, `Prev *Node`, `Next *Node`, `Child *Node` | The levels one after the other, each ended by `null`; a child level is preceded by as many more `null`s as its parent's 0-based index in the level above: `[1,2,3,4,5,6,null,null,null,7,8,9,10,null,null,11,12]` | 430 |
 
-- In inputs, `null` means no node for every `Node` type.
+- In inputs, `null` means no node for every `Node` type; outputs write no node as `[]`. A `MultilevelNode` output ends with its last value.
 - Python constructors take LeetCode's arguments, all optional: `Node(val, neighbors)`, `Node(val, children)`, `Node(x, next, random)` (stored as `val`), `Node(val, left, right, next)`, `Node(val, isLeaf, topLeft, topRight, bottomLeft, bottomRight)`, `Node(val, prev, next, child)`.
 - A solution MAY return nodes it built itself. A returned structure that the encoding cannot express is a Runtime Error: a `GraphNode` that is not node 1 of a graph whose values are 1 to n, each once; a random pointer to a node outside the returned list; a `MultilevelNode` whose `Prev` does not point to the node before it, or is set on the first node of a level; two nodes of one level with a child.
 
@@ -684,7 +684,7 @@ A valid pack satisfies every rule below, and so does each of its problems. `hc v
 3. Every value MUST have the encoding of its type ([Types](#types)), including the constraints of the tree and judge-defined types: a `TreeNode` level order with children only for its nodes, neighbors in the graph, random indices in the list, well-formed `NaryNode`, `QuadNode` and `MultilevelNode` forms, distinct employee ids and known subordinates. A `ref` value MUST be an integer.
 4. Structure inputs MUST fit: a `cycle` position in the list, joined lists that end with the same values from `skip` and `at`, a `ref` value that occurs exactly once.
 5. In a class case, `ops` and `args` MUST have the same, non-zero length, `ops[0]` MUST be the class name, every other op MUST be a method, and every `args` entry MUST hold exactly the op's arguments, of their types.
-6. `expected`, when present, MUST have the form of the judged value ([Cases](#cases)): for `any_of`, an array of such values; for a class case, one entry per op, `null` for the constructor and `void` methods.
+6. `expected`, when present, MUST have the form of the judged value ([Cases](#cases)): for `any_of`, an array of such values; for a class case, one entry per op, `null` for the constructor and `void` methods. Its values MUST be encoded as outputs are, which rule 3 does not require of inputs: no `null` for an empty `ListNode`, `TreeNode` or `Node`, no trailing `null`s, and `[0,1]` for a `QuadNode` that is not a leaf.
 
 **pack.yaml**
 

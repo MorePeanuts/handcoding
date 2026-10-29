@@ -267,7 +267,7 @@ func (p *Problem) validateExpected(c Case) error {
 	if p.Function != nil && p.Function.ReturnsRef != "" {
 		want = typeNodeRef + strings.TrimPrefix(want, TypeInteger)
 	}
-	if err := CheckValue(want, c.Expected); err != nil {
+	if err := checkOutput(want, c.Expected); err != nil {
 		if p.Judge.Compare == CompareAnyOf {
 			return fmt.Errorf("expected (any_of: an array of acceptable answers): %w", err)
 		}
@@ -331,7 +331,7 @@ func (p *Problem) validateClassCase(c Case) error {
 			}
 			continue
 		}
-		if err := CheckValue(outputForm(m.Returns), expected[i]); err != nil {
+		if err := checkOutput(outputForm(m.Returns), expected[i]); err != nil {
 			return fmt.Errorf("expected[%d] (%s): %w", i, m.Name, err)
 		}
 	}

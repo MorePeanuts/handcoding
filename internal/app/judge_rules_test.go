@@ -39,6 +39,10 @@ func addProblem(t *testing.T, a *app.App, dir, yaml, cases string) *problem.Prob
 	return p
 }
 
+// refused, as the verdict a test wants, means that the run refuses the case:
+// an invalid input never reaches the drivers.
+const refused runner.Verdict = ""
+
 const removeDupYAML = `slug: remove-dup
 title: Remove Duplicates
 kind: function
@@ -267,9 +271,9 @@ func TestStructureInputs(t *testing.T) {
 		{"linked-list-cycle-ii", "python", "class Solution:\n    def detectCycle(self, head):\n        return head\n",
 			`{"head":[3,2,0,-4],"pos":1}`, runner.WrongAnswer, ""},
 		{"linked-list-cycle", "go", "package main\n\nfunc hasCycle(head *ListNode) bool { return false }\n",
-			`{"head":[1,2],"pos":2}`, runner.RuntimeError, "invalid input: pos = 2 is outside [-1, 1] for head"},
+			`{"head":[1,2],"pos":2}`, refused, `input "pos": 2 must be -1 (no cycle) or an index of "head"`},
 		{"linked-list-cycle", "python", "class Solution:\n    def hasCycle(self, head):\n        return False\n",
-			`{"head":[1,2],"pos":2}`, runner.RuntimeError, "invalid input: pos = 2 is outside [-1, 1] for head"},
+			`{"head":[1,2],"pos":2}`, refused, `input "pos": 2 must be -1 (no cycle) or an index of "head"`},
 		// 1379: the target itself is a node of original, not of cloned.
 		{"find-a-corresponding-node-of-a-binary-tree-in-a-clone-of-that-tree", "go",
 			"package main\n\nfunc getTargetCopy(original, cloned, target *TreeNode) *TreeNode { return target }\n",
@@ -278,9 +282,9 @@ func TestStructureInputs(t *testing.T) {
 			"class Solution:\n    def getTargetCopy(self, original, cloned, target):\n        return target\n",
 			`{"original":[7,4,3],"target":3}`, runner.RuntimeError, "is not a node of cloned"},
 		{"lowest-common-ancestor-of-a-binary-tree", "go", "package main\n\nfunc lowestCommonAncestor(root, p, q *TreeNode) *TreeNode { return root }\n",
-			`{"root":[1,2,2],"p":2,"q":1}`, runner.RuntimeError, "invalid input: p = 2 occurs 2 times in root"},
+			`{"root":[1,2,2],"p":2,"q":1}`, refused, `input "p": 2 occurs 2 times in "root"`},
 		{"lowest-common-ancestor-of-a-binary-tree", "python", "class Solution:\n    def lowestCommonAncestor(self, root, p, q):\n        return root\n",
-			`{"root":[1,2,3],"p":5,"q":1}`, runner.RuntimeError, "invalid input: p = 5 is not a value in root"},
+			`{"root":[1,2,3],"p":5,"q":1}`, refused, `input "p": 5 is not a value of "root"`},
 		// 160: the lists are joined, so B's last node is A's last node.
 		{"intersection-of-two-linked-lists", "go",
 			"package main\n\nfunc getIntersectionNode(headA, headB *ListNode) *ListNode {\n\tfor headB.Next != nil {\n\t\theadB = headB.Next\n\t}\n\treturn headB\n}\n",
@@ -317,6 +321,12 @@ func TestStructureInputs(t *testing.T) {
 			t.Fatal(err)
 		}
 		rep, err := a.Run(context.Background(), p, l, sel, app.RunOptions{})
+		if tt.want == refused {
+			if err == nil || !strings.Contains(err.Error(), tt.errSub) {
+				t.Errorf("%s %s %s: error = %v, want %q", tt.slug, tt.lang, tt.input, err, tt.errSub)
+			}
+			continue
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -358,7 +368,7 @@ func TestJudgeDefinedTypes(t *testing.T) {
 			"package main\n\nfunc copyRandomList(head *Node) *Node { return &Node{Val: head.Val, Random: &Node{}} }\n",
 			`{"head":[[1,0]]}`, `[[1,0]]`, runner.RuntimeError, "points to a node outside the list"},
 		{"copy-list-with-random-pointer", "go", "package main\n\nfunc copyRandomList(head *Node) *Node { return nil }\n",
-			`{"head":[[1,2]]}`, `[[1,0]]`, runner.RuntimeError, "invalid input: random index 2 of node 0 is outside [0, 0]"},
+			`{"head":[[1,2]]}`, `[[1,0]]`, refused, `input "head": [0][1]: random index 2 is outside [0, 0]`},
 		// Flattening without fixing prev pointers.
 		{"flatten-a-multilevel-doubly-linked-list", "go",
 			"package main\n\nfunc flatten(head *Node) *Node {\n\tc := head.Child\n\thead.Child, head.Next, c.Next = nil, c, head.Next\n\treturn head\n}\n",
@@ -370,7 +380,7 @@ func TestJudgeDefinedTypes(t *testing.T) {
 		{"flatten-a-multilevel-doubly-linked-list", "python", "class Solution:\n    def flatten(self, head):\n        return head\n",
 			`{"head":[1,2,null,3]}`, `[1,3,2]`, runner.WrongAnswer, ""},
 		{"flatten-a-multilevel-doubly-linked-list", "go", "package main\n\nfunc flatten(head *Node) *Node { return head }\n",
-			`{"head":[1,2,null,null,null,3]}`, `[1,2,3]`, runner.RuntimeError, "invalid input: a child level starts under node 3 of a level with 2 nodes"},
+			`{"head":[1,2,null,null,null,3]}`, `[1,2,3]`, refused, `input "head": [5]: starts a child level under node 3`},
 		// Linking only siblings misses the link from 5 to 7.
 		{"populating-next-right-pointers-in-each-node-ii", "go",
 			"package main\n\nfunc connect(root *Node) *Node {\n\tif root != nil {\n\t\tif root.Left != nil {\n\t\t\troot.Left.Next = root.Right\n\t\t}\n\t\tconnect(root.Left)\n\t\tconnect(root.Right)\n\t}\n\treturn root\n}\n",
@@ -387,7 +397,7 @@ func TestJudgeDefinedTypes(t *testing.T) {
 			"class Solution:\n    def getImportance(self, employees, id):\n        e = next(e for e in employees if e.id == id)\n        return e.importance + sum(x.importance for x in employees if x.id in e.subordinates)\n",
 			`{"employees":[[1,5,[2]],[2,3,[3]],[3,1,[]]],"id":1}`, `9`, runner.WrongAnswer, ""},
 		{"employee-importance", "go", "package main\n\nfunc getImportance(employees []*Employee, id int) int { return 0 }\n",
-			`{"employees":[[1,5]],"id":1}`, `5`, runner.RuntimeError, "invalid input: an employee must be [id, importance, [subordinate ids]]"},
+			`{"employees":[[1,5]],"id":1}`, `5`, refused, `input "employees": [0]: must be an employee`},
 		// Only the integers at the top level.
 		{"flatten-nested-list-iterator", "go",
 			"package main\n\ntype NestedIterator struct{ l []*NestedInteger }\n\nfunc Constructor(l []*NestedInteger) NestedIterator { return NestedIterator{l} }\n\nfunc (it *NestedIterator) Next() int {\n\tv := it.l[0].GetInteger()\n\tit.l = it.l[1:]\n\treturn v\n}\n\nfunc (it *NestedIterator) HasNext() bool { return len(it.l) > 0 }\n",
@@ -412,6 +422,12 @@ func TestJudgeDefinedTypes(t *testing.T) {
 			t.Fatal(err)
 		}
 		rep, err := a.Run(context.Background(), p, l, sel, app.RunOptions{})
+		if tt.want == refused {
+			if err == nil || !strings.Contains(err.Error(), tt.errSub) {
+				t.Errorf("%s %s %s: error = %v, want %q", tt.slug, tt.lang, tt.input, err, tt.errSub)
+			}
+			continue
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -846,5 +862,40 @@ func TestRoundTrip(t *testing.T) {
 	}
 	if c := rep.Cases[0]; separate.FormatInput(c.Case) != "root = [1,2,3,null,null,4,5]" || string(c.Output) != "[1]" {
 		t.Errorf("case %q, output %s", separate.FormatInput(c.Case), c.Output)
+	}
+}
+
+// TestRunInvalidCase checks that a run refuses a case the protocol calls
+// invalid instead of judging the drivers' reading of it: [null,1] gives the
+// empty tree a child, and [1,null] is not the output form of a tree.
+func TestRunInvalidCase(t *testing.T) {
+	requireTools(t, "python3")
+	a := newWorkspace(t)
+	yaml := "slug: same\ntitle: Same\nkind: function\nfunction:\n  name: same\n  params:\n    - name: root\n      type: TreeNode\n  returns: TreeNode\njudge:\n  compare: exact\n"
+	p := addProblem(t, a, "same", yaml, `{"input":{"root":[1]},"expected":[1]}`+"\n"+`{"input":{"root":[null,1]},"expected":[]}`+"\n"+`{"input":{"root":[1]},"expected":[1,null]}`+"\n")
+	l := mustLang(t, a, "python")
+	path, _, err := a.Start(p, l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("class Solution:\n    def same(self, root):\n        return root\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cases, _ := p.LoadCases()
+	for _, tt := range []struct {
+		index int
+		err   string
+	}{
+		{2, `case 2 is invalid: input "root": [1]: the root is null`},
+		{3, `case 3 is invalid: expected: must not end with null`},
+	} {
+		sel, _ := app.Select(cases, []int{tt.index}, false)
+		if _, err := a.Run(context.Background(), p, l, sel, app.RunOptions{}); err == nil || !strings.Contains(err.Error(), tt.err) {
+			t.Errorf("case %d: error = %v, want %q", tt.index, err, tt.err)
+		}
+	}
+	sel, _ := app.Select(cases, []int{1}, false)
+	if rep, err := a.Run(context.Background(), p, l, sel, app.RunOptions{}); err != nil || rep.Verdict != runner.Accepted {
+		t.Fatalf("case 1: %v %+v", err, rep)
 	}
 }

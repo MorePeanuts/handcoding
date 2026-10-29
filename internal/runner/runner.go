@@ -97,6 +97,9 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 	if opts.Timeout <= 0 {
 		opts.Timeout = 10 * time.Second
 	}
+	if err := checkCases(p, cases); err != nil {
+		return nil, err
+	}
 	if err := l.Prepare(dir, p); err != nil {
 		return nil, fmt.Errorf("prepare: %w", err)
 	}
@@ -308,6 +311,9 @@ func orDiscard(w io.Writer) io.Writer {
 // DebugCommand builds a debugger command for the given cases. The returned
 // cleanup removes temporary files.
 func DebugCommand(l lang.Language, p *problem.Problem, dir string, cases []Selected, opts lang.DebugOptions) (*exec.Cmd, func(), error) {
+	if err := checkCases(p, cases); err != nil {
+		return nil, nil, err
+	}
 	if err := l.Prepare(dir, p); err != nil {
 		return nil, nil, err
 	}
@@ -345,3 +351,14 @@ func (t *tailBuffer) Write(p []byte) (int, error) {
 }
 
 func (t *tailBuffer) String() string { return t.buf.String() }
+
+// checkCases refuses cases the protocol calls invalid, which the drivers
+// would read in some way of their own and the judge would then judge.
+func checkCases(p *problem.Problem, cases []Selected) error {
+	for _, c := range cases {
+		if err := p.ValidateCase(c.Case); err != nil {
+			return fmt.Errorf("case %d is invalid: %w (hc validate checks the whole problem)", c.Index, err)
+		}
+	}
+	return nil
+}

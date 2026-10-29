@@ -92,6 +92,48 @@ func TestValidateCaseLevelOrder(t *testing.T) {
 	}
 }
 
+// TestCheckOutput checks that expected outputs have the form the drivers
+// encode outputs in, which is stricter than the form of inputs.
+func TestCheckOutput(t *testing.T) {
+	tests := []struct {
+		t, raw, err string
+	}{
+		{TypeListNode, `[1,2]`, ""},
+		{TypeListNode, `[]`, ""},
+		{TypeListNode, `null`, "must be [], not null: an output of ListNode is never null"},
+		{TypeTreeNode, `[1,null,2]`, ""},
+		{TypeTreeNode, `[]`, ""},
+		{TypeTreeNode, `null`, "must be [], not null"},
+		{TypeTreeNode, `[null]`, "must be [], not [null]"},
+		{TypeTreeNode, `[1,2,null]`, "must not end with null: outputs of TreeNode have trailing nulls removed"},
+		{"TreeNode[]", `[[1],[2,null,null]]`, "[1]: must not end with null"},
+		{TypeNaryNode, `[1,null]`, "must not end with null"},
+		{TypeMultilevelNode, `[1,2,null]`, "must not end with null"},
+		{TypeQuadNode, `[[0,1],[1,0],[1,1],[1,1],[1,0]]`, ""},
+		{TypeQuadNode, `[[0,1],[1,0],[1,1],[1,1],[1,0],null]`, "must not end with null"},
+		{TypeQuadNode, `[[0,0],[1,0],[1,1],[1,1],[1,0]]`, "[0]: must be [0,1]: a node that is not a leaf"},
+		{TypeGraphNode, `null`, "must be [], not null"},
+		{TypeRandomListNode, `null`, "must be [], not null"},
+		{"integer[]", `[1,2]`, ""},
+		{"string", `"x"`, ""},
+	}
+	for _, tt := range tests {
+		err := checkOutput(tt.t, []byte(tt.raw))
+		switch {
+		case tt.err == "" && err != nil:
+			t.Errorf("%s %s: unexpected error %v", tt.t, tt.raw, err)
+		case tt.err != "" && (err == nil || !strings.Contains(err.Error(), tt.err)):
+			t.Errorf("%s %s: error = %v, want %q", tt.t, tt.raw, err, tt.err)
+		}
+	}
+	// Inputs keep the lenient form.
+	for _, raw := range []string{`null`, `[null]`, `[1,2,null]`} {
+		if err := CheckValue(TypeTreeNode, []byte(raw)); err != nil {
+			t.Errorf("input %s: %v", raw, err)
+		}
+	}
+}
+
 func TestValidateCaseClass(t *testing.T) {
 	p := &Problem{Slug: "s", Title: "S", Kind: KindClass, Class: &Class{
 		Name:        "Stack",

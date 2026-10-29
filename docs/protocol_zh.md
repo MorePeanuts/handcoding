@@ -234,7 +234,7 @@ LeetCode 把六种不同的结构都叫作 `Node`。协议给每种结构各起�
 | `QuadNode` | `Val bool`、`IsLeaf bool`、`TopLeft`、`TopRight`、`BottomLeft`、`BottomRight *Node` | 层序，每个节点都有四个子节点位置，空位为 `null`，每个节点写成 `[isLeaf, val]`，取 `0` 或 `1`，去掉末尾的 `null`：`[[0,1],[1,0],[1,1],[1,1],[1,0]]`。非叶子节点不论取什么值，输出时都写成 `[0,1]` | 427、558 |
 | `MultilevelNode` | `Val int`、`Prev *Node`、`Next *Node`、`Child *Node` | 各层依次写出，每层以 `null` 结束；子层前面再加若干个 `null`，个数等于其父节点在上一层中的下标（从 0 开始）：`[1,2,3,4,5,6,null,null,null,7,8,9,10,null,null,11,12]` | 430 |
 
-- 在输入中，`null` 对每种 `Node` 类型都表示没有节点。
+- 在输入中，`null` 对每种 `Node` 类型都表示没有节点；输出把没有节点写作 `[]`。`MultilevelNode` 的输出以最后一个值结尾。
 - Python 构造函数的参数与 LeetCode 一致，且都可省略：`Node(val, neighbors)`、`Node(val, children)`、`Node(x, next, random)`（存为 `val`）、`Node(val, left, right, next)`、`Node(val, isLeaf, topLeft, topRight, bottomLeft, bottomRight)`、`Node(val, prev, next, child)`。
 - 解答可以返回自己创建的节点。返回的结构无法用这种编码表达时，算运行错误：`GraphNode` 不是一个值为 1 到 n（各出现一次）的图中的节点 1；随机指针指向返回链表之外的节点；`MultilevelNode` 的 `Prev` 没有指向前一个节点，或者某层第一个节点的 `Prev` 不为空；同一层有两个节点带子层。
 
@@ -686,7 +686,7 @@ def check(input, output, expected):
 3. 每个值都必须使用其类型的编码（[类型](#类型)），包括树和评测系统定义的类型的约束：`TreeNode` 的层序只为实际存在的节点列出子节点、邻居在图中、随机下标在链表内、`NaryNode`、`QuadNode` 和 `MultilevelNode` 的形式合法、员工 id 互不相同且下属都已知。`ref` 的值必须是整数。
 4. 结构输入必须吻合：`cycle` 的位置在链表内，被接上的两个链表从 `skip` 和 `at` 开始的值相同，`ref` 的值恰好出现一次。
 5. 在设计题用例中，`ops` 和 `args` 的长度必须相同且不为零，`ops[0]` 必须是类名，其余每个操作都必须是方法，`args` 的每一项都必须恰好包含该操作的参数，且类型相符。
-6. 有 `expected` 时，它必须具有被评判的值的形式（[用例](#用例)）：`any_of` 时为这种值组成的数组；设计题用例中每个操作一项，构造函数和 `void` 方法为 `null`。
+6. 有 `expected` 时，它必须具有被评判的值的形式（[用例](#用例)）：`any_of` 时为这种值组成的数组；设计题用例中每个操作一项，构造函数和 `void` 方法为 `null`。其中的值必须按输出的方式编码，规则 3 对输入没有这项要求：空的 `ListNode`、`TreeNode` 或 `Node` 不写作 `null`，没有末尾的 `null`，不是叶子的 `QuadNode` 写作 `[0,1]`。
 
 **pack.yaml**
 
