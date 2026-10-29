@@ -1,6 +1,7 @@
 id: "744"
 slug: find-smallest-letter-greater-than-target
 title: Find Smallest Letter Greater Than Target
+titles: {zh-CN: 寻找比目标字母大的最小字母}
 difficulty: easy
 tags: [array, binary-search]
 kind: function

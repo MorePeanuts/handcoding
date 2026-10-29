@@ -1,6 +1,7 @@
 id: "138"
 slug: copy-list-with-random-pointer
 title: Copy List with Random Pointer
+titles: {zh-CN: 随机链表的复制}
 difficulty: medium
 tags: [hash-table, linked-list]
 kind: function

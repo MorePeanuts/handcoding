@@ -1,54 +1,67 @@
-# 1932. 合并多棵二叉搜索树
+# 1932. Merge BSTs to Create Single BST
 
-给你一个数组 `trees`，其中存放着 `n` 棵二叉搜索树（BST）的根节点。每棵树**最多有 3 个节点**，且任意两棵树的根节点值互不相同。一次操作中，你可以：
+You are given `n` **BST (binary search tree) root nodes** for `n` separate BSTs stored in an array `trees` (**0-indexed**). Each BST in `trees` has **at most 3 nodes**, and no two roots have the same value. In one operation, you can:
 
-- 选择两个**不同**的下标 `i` 和 `j`，要求 `trees[i]` 的某个**叶子节点**的值等于 `trees[j]` 的**根节点**的值；
-- 用 `trees[j]` 替换 `trees[i]` 中的这个叶子节点；
-- 从 `trees` 中移除 `trees[j]`。
+- Select two **distinct** indices `i` and `j` such that the value stored at one of the **leaves** of `trees[i]` is equal to the **root value** of `trees[j]`.
+- Replace the leaf node in `trees[i]` with `trees[j]`.
+- Remove `trees[j]` from `trees`.
 
-如果执行 `n - 1` 次操作后能得到一棵合法的 BST，返回它的根节点；否则返回 `null`。
+Return *the **root** of the resulting BST if it is possible to form a valid BST after performing* `n - 1` *operations, or* `null` *if it is impossible to create a valid BST*.
 
-合法的 BST 中，每个节点左子树中的值都**严格小于**该节点的值，右子树中的值都**严格大于**该节点的值。叶子节点是没有子节点的节点。
+A BST (binary search tree) is a binary tree where each node satisfies the following property:
 
-**hc 说明：** 返回 `null` 时，输出写作空树 `[]`。
+- Every node in the node's left subtree has a value **strictly less** than the node's value.
+- Every node in the node's right subtree has a value **strictly greater** than the node's value.
 
-**示例 1：**
+A leaf is a node that has no children.
+
+**Example 1:**
 
 ![](assets/d1.png)
 
 ```
-输入：trees = [[2,1],[3,2,5],[5,4]]
-输出：[3,2,5,1,null,4]
-解释：先把 trees[0] 接到 trees[1] 值为 2 的叶子上，得到 [3,2,5,1]；
-再把 [5,4] 接到值为 5 的叶子上，得到 [3,2,5,1,null,4]，它是合法的 BST。
+Input: trees = [[2,1],[3,2,5],[5,4]]
+Output: [3,2,5,1,null,4]
+Explanation:
+In the first operation, pick i=1 and j=0, and merge trees[0] into trees[1].
+Delete trees[0], so trees = [[3,2,5,1],[5,4]].
+
+In the second operation, pick i=0 and j=1, and merge trees[1] into trees[0].
+Delete trees[1], so trees = [[3,2,5,1,null,4]].
+
+The resulting tree, shown above, is a valid BST, so return its root.
 ```
 
-**示例 2：**
+**Example 2:**
 
 ![](assets/d2.png)
 
 ```
-输入：trees = [[5,3,8],[3,2,6]]
-输出：[]
-解释：唯一可行的操作得到 [5,3,8,2,6]，6 在 5 的左子树中，不是合法的 BST。
+Input: trees = [[5,3,8],[3,2,6]]
+Output: []
+Explanation:
+Pick i=0 and j=1 and merge trees[1] into trees[0].
+Delete trees[1], so trees = [[5,3,8,2,6]].
+
+The resulting tree is shown above. This is the only valid operation that can be performed, but the resulting tree is not a valid BST, so return null.
 ```
 
-**示例 3：**
+**Example 3:**
 
 ![](assets/d3.png)
 
 ```
-输入：trees = [[5,4],[3]]
-输出：[]
-解释：无法执行任何操作。
+Input: trees = [[5,4],[3]]
+Output: []
+Explanation: It is impossible to perform any operations.
 ```
 
-**提示：**
+**Constraints:**
 
 - `n == trees.length`
 - `1 <= n <= 5 * 10^4`
-- 每棵树的节点数在 `[1, 3]` 范围内
-- 输入中的节点可以有子节点，但没有孙节点
-- 任意两棵树的根节点值都不相同
-- 输入中的每棵树都是合法的 BST
-- `1 <= TreeNode.val <= 5 * 10^4`
+- The number of nodes in each tree is in the range `[1, 3]`.
+- Each node in the input may have children but no grandchildren.
+- No two roots of `trees` have the same value.
+- All the trees in the input are **valid BSTs**.
+- `1 <= TreeNode.val <= 5 * 10^4`.

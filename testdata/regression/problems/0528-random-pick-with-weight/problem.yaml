@@ -1,6 +1,7 @@
 id: "528"
 slug: random-pick-with-weight
 title: Random Pick with Weight
+titles: {zh-CN: 按权重随机选择}
 difficulty: medium
 tags: [array, math, binary-search, prefix-sum, randomized]
 kind: class

@@ -1,6 +1,7 @@
 id: "4"
 slug: median-of-two-sorted-arrays
 title: Median of Two Sorted Arrays
+titles: {zh-CN: 寻找两个正序数组的中位数}
 difficulty: hard
 tags: [array, binary-search, divide-and-conquer]
 kind: function

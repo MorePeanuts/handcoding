@@ -1,6 +1,7 @@
 id: "1"
 slug: two-sum
 title: Two Sum
+titles: {zh-CN: 两数之和}
 difficulty: easy
 tags: [array, hash-table]
 kind: function

@@ -1,6 +1,7 @@
 id: "725"
 slug: split-linked-list-in-parts
 title: Split Linked List in Parts
+titles: {zh-CN: 分隔链表}
 difficulty: medium
 tags: [linked-list]
 kind: function

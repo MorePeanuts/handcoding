@@ -1,6 +1,7 @@
 id: "1379"
 slug: find-a-corresponding-node-of-a-binary-tree-in-a-clone-of-that-tree
 title: Find a Corresponding Node of a Binary Tree in a Clone of That Tree
+titles: {zh-CN: 找出克隆二叉树中的相同节点}
 difficulty: easy
 tags: [tree, depth-first-search, breadth-first-search, binary-tree]
 kind: function

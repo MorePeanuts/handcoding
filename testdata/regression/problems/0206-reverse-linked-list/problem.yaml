@@ -1,6 +1,7 @@
 id: "206"
 slug: reverse-linked-list
 title: Reverse Linked List
+titles: {zh-CN: 反转链表}
 difficulty: easy
 tags: [linked-list, recursion]
 kind: function

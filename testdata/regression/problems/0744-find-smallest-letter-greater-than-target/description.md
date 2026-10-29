@@ -1,31 +1,37 @@
-# 744. 寻找比目标字母大的最小字母
+# 744. Find Smallest Letter Greater Than Target
 
-字符数组 `letters` 按非递减顺序排列，其中至少有两种不同的字符。给定字符 `target`，返回 `letters` 中严格大于 `target` 的最小字符；如果没有这样的字符，返回 `letters` 的第一个字符。
+You are given an array of characters `letters` that is sorted in **non-decreasing order**, and a character `target`. There are **at least two different** characters in `letters`.
 
-**示例 1：**
+Return *the smallest character in* `letters` *that is lexicographically greater than* `target`. If such a character does not exist, return the first character in `letters`.
 
-```
-输入：letters = ["c","f","j"], target = "a"
-输出："c"
-```
-
-**示例 2：**
+**Example 1:**
 
 ```
-输入：letters = ["c","f","j"], target = "c"
-输出："f"
+Input: letters = ["c","f","j"], target = "a"
+Output: "c"
+Explanation: The smallest character that is lexicographically greater than 'a' in letters is 'c'.
 ```
 
-**示例 3：**
+**Example 2:**
 
 ```
-输入：letters = ["x","x","y","y"], target = "z"
-输出："x"
-解释：没有比 "z" 大的字符，返回 letters[0]。
+Input: letters = ["c","f","j"], target = "c"
+Output: "f"
+Explanation: The smallest character that is lexicographically greater than 'c' in letters is 'f'.
 ```
 
-**提示：**
+**Example 3:**
+
+```
+Input: letters = ["x","x","y","y"], target = "z"
+Output: "x"
+Explanation: There are no characters in letters that is lexicographically greater than 'z' so we return letters[0].
+```
+
+**Constraints:**
 
 - `2 <= letters.length <= 10^4`
-- `letters[i]` 和 `target` 都是小写英文字母
-- `letters` 按非递减顺序排列，且至少包含两种不同的字符
+- `letters[i]` is a lowercase English letter.
+- `letters` is sorted in **non-decreasing** order.
+- `letters` contains at least two different characters.
+- `target` is a lowercase English letter.

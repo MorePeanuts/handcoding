@@ -1,6 +1,7 @@
 id: "1932"
 slug: merge-bsts-to-create-single-bst
 title: Merge BSTs to Create Single BST
+titles: {zh-CN: 合并多棵二叉搜索树}
 difficulty: hard
 tags: [hash-table, binary-search, tree, depth-first-search, binary-tree]
 kind: function

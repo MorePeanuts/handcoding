@@ -1,6 +1,7 @@
 id: "143"
 slug: reorder-list
 title: Reorder List
+titles: {zh-CN: 重排链表}
 difficulty: medium
 tags: [stack, recursion, linked-list, two-pointers]
 kind: function

@@ -1,34 +1,43 @@
-# 23. 合并 K 个升序链表
+# 23. Merge k Sorted Lists
 
-给你一个链表数组 `lists`，其中每个链表都已按升序排列。把它们合并成一个升序链表并返回。
+You are given an array of `k` linked-lists `lists`, each linked-list is sorted in ascending order.
 
-**示例 1：**
+*Merge all the linked-lists into one sorted linked-list and return it.*
 
-```
-输入：lists = [[1,4,5],[1,3,4],[2,6]]
-输出：[1,1,2,3,4,4,5,6]
-解释：三个链表合并后为 1->1->2->3->4->4->5->6。
-```
-
-**示例 2：**
+**Example 1:**
 
 ```
-输入：lists = []
-输出：[]
+Input: lists = [[1,4,5],[1,3,4],[2,6]]
+Output: [1,1,2,3,4,4,5,6]
+Explanation: The linked-lists are:
+[
+  1->4->5,
+  1->3->4,
+  2->6
+]
+merging them into one sorted linked list:
+1->1->2->3->4->4->5->6
 ```
 
-**示例 3：**
+**Example 2:**
 
 ```
-输入：lists = [[]]
-输出：[]
+Input: lists = []
+Output: []
 ```
 
-**提示：**
+**Example 3:**
+
+```
+Input: lists = [[]]
+Output: []
+```
+
+**Constraints:**
 
 - `k == lists.length`
 - `0 <= k <= 10^4`
 - `0 <= lists[i].length <= 500`
 - `-10^4 <= lists[i][j] <= 10^4`
-- `lists[i]` 按升序排列
-- 所有 `lists[i].length` 之和不超过 `10^4`
+- `lists[i]` is sorted in **ascending order**.
+- The sum of `lists[i].length` will not exceed `10^4`.

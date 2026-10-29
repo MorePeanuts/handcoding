@@ -1,6 +1,7 @@
 id: "1490"
 slug: clone-n-ary-tree
 title: Clone N-ary Tree
+titles: {zh-CN: 克隆 N 叉树}
 difficulty: medium
 tags: [hash-table, tree, depth-first-search, breadth-first-search]
 kind: function

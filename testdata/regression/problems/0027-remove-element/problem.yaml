@@ -1,6 +1,7 @@
 id: "27"
 slug: remove-element
 title: Remove Element
+titles: {zh-CN: 移除元素}
 difficulty: easy
 tags: [array, two-pointers]
 kind: function

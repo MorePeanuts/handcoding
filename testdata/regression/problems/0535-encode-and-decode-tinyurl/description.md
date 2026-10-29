@@ -1,28 +1,30 @@
-# 535. TinyURL 的加密与解密
+# 535. Encode and Decode TinyURL
 
-TinyURL 是一种 URL 简化服务， 比如：当你输入一个 URL `https://leetcode.com/problems/design-tinyurl` 时，它将返回一个简化的URL `http://tinyurl.com/4e9iAk` 。请你设计一个类来加密与解密 TinyURL 。
+> Note: This is a companion problem to the [System Design](https://leetcode.com/discuss/interview-question/system-design/) problem: [Design TinyURL](https://leetcode.com/discuss/interview-question/124658/Design-a-URL-Shortener-%28-TinyURL-%29-System/).
 
-加密和解密算法如何设计和运作是没有限制的，你只需要保证一个 URL 可以被加密成一个 TinyURL ，并且这个 TinyURL 可以用解密方法恢复成原本的 URL 。
+TinyURL is a URL shortening service where you enter a URL such as `https://leetcode.com/problems/design-tinyurl` and it returns a short URL such as `http://tinyurl.com/4e9iAk`. Design a class to encode a URL and decode a tiny URL.
 
-实现 `Solution` 类：
+There is no restriction on how your encode/decode algorithm should work. You just need to ensure that a URL can be encoded to a tiny URL and the tiny URL can be decoded to the original URL.
 
-- `Solution()` 初始化 TinyURL 系统对象。
-- `String encode(String longUrl)` 返回 `longUrl` 对应的 TinyURL 。
-- `String decode(String shortUrl)` 返回 `shortUrl` 原本的 URL 。题目数据保证给定的 `shortUrl` 是由同一个系统对象加密的。
+Implement the `Solution` class:
 
-**示例：**
+- `Solution()` Initializes the object of the system.
+- `String encode(String longUrl)` Returns a tiny URL for the given `longUrl`.
+- `String decode(String shortUrl)` Returns the original long URL for the given `shortUrl`. It is guaranteed that the given `shortUrl` was encoded by the same object.
+
+**Example 1:**
 
 ```
-输入：url = "https://leetcode.com/problems/design-tinyurl"
-输出："https://leetcode.com/problems/design-tinyurl"
+Input: url = "https://leetcode.com/problems/design-tinyurl"
+Output: "https://leetcode.com/problems/design-tinyurl"
 
-解释：
+Explanation:
 Solution obj = new Solution();
-string tiny = obj.encode(url); // 返回加密后得到的 TinyURL 。
-string ans = obj.decode(tiny); // 返回解密后得到的原本的 URL 。
+string tiny = obj.encode(url); // returns the encoded tiny url.
+string ans = obj.decode(tiny); // returns the original url after decoding it.
 ```
 
-**提示：**
+**Constraints:**
 
 - `1 <= url.length <= 10^4`
-- 题目数据保证 `url` 是一个有效的 URL
+- `url` is guranteed to be a valid URL.

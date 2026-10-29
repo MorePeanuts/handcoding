@@ -1,17 +1,26 @@
 protocol: 1
 name: regression
 title: hc regression set
+titles: {zh-CN: hc 回归测试集}
 description: >-
   hc's own test data: problems that together use every type, kind, compare
   mode and judge option of the protocol, each with Go and Python references.
   Not meant for practice.
 license: MIT
+languages: [go, python]
+# Every problem has its statement and title in both locales. The English
+# statements are LeetCode's, except for prefix-sums-3d (not on LeetCode) and
+# the premium problems clone-n-ary-tree and minimum-flips-in-binary-tree-to-
+# get-result, whose statements the set's authors wrote.
+locales: [en, zh-CN]
 # Groups exercise pack.yaml's groups (hc list --group); their order is
 # deliberately not the order of ids.
 groups:
   - name: structure-inputs
     title: Structure inputs
+    titles: {zh-CN: 结构输入}
     problems: [intersection-of-two-linked-lists, linked-list-cycle-ii, linked-list-cycle, find-a-corresponding-node-of-a-binary-tree-in-a-clone-of-that-tree, copy-list-with-random-pointer]
   - name: design
     title: Design problems
+    titles: {zh-CN: 设计题}
     problems: [lru-cache, binary-search-tree-iterator, serialize-and-deserialize-binary-tree, encode-and-decode-tinyurl, flatten-nested-list-iterator]

@@ -1,6 +1,7 @@
 id: "289"
 slug: game-of-life
 title: Game of Life
+titles: {zh-CN: 生命游戏}
 difficulty: medium
 tags: [array, matrix, simulation]
 kind: function

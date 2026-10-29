@@ -1,34 +1,32 @@
-# 2313. 二叉树中得到结果所需的最少翻转次数
+# 2313. Minimum Flips in Binary Tree to Get Result
 
-给你一棵表示布尔表达式的二叉树的根节点 `root`：
+A binary tree, given by its root `root`, describes a boolean expression:
 
-- 叶子节点的值为 `0`（false）或 `1`（true）；
-- 非叶子节点的值为 `2`（OR）、`3`（AND）、`4`（XOR）或 `5`（NOT）。
+- a leaf has the value `0` (false) or `1` (true), and evaluates to it;
+- an inner node has the value `2` (OR), `3` (AND), `4` (XOR) or `5` (NOT), and evaluates to that operation applied to what its children evaluate to. A NOT node has exactly one child, on either side; the other inner nodes have exactly two.
 
-叶子节点的求值结果就是它的值；非叶子节点的求值结果是把它的运算作用在子节点的求值结果上。`NOT` 节点恰好有一个子节点（左或右），其余非叶子节点恰好有两个子节点。
+A **flip** changes one leaf from false to true, or from true to false. Given a boolean `result`, return the smallest number of flips after which `root` evaluates to `result`. It is always possible.
 
-一次**翻转**把一个叶子节点的值从 false 变为 true，或从 true 变为 false。给你布尔值 `result`，返回使 `root` 的求值结果等于 `result` 所需的最少翻转次数。可以证明总能做到。
-
-**示例 1：**
+**Example 1:**
 
 ```
-输入：root = [3,5,4,2,null,1,1,1,0], result = true
-输出：2
-解释：根是 AND，左子树 NOT(1 OR 0) 为 false，右子树 1 XOR 1 也为 false。
-翻转 OR 下面的 1 使左子树为 true，再翻转 XOR 下面的任意一个叶子使右子树为 true，共 2 次。
+Input: root = [3,5,4,2,null,1,1,1,0], result = true
+Output: 2
+Explanation: the root is an AND of NOT(1 OR 0) and 1 XOR 1, which are both
+false. Flipping the 1 under the OR makes the left side true, and flipping
+either leaf under the XOR makes the right side true: 2 flips.
 ```
 
-**示例 2：**
+**Example 2:**
 
 ```
-输入：root = [0], result = false
-输出：0
-解释：树的求值结果已经是 false。
+Input: root = [1], result = false
+Output: 1
+Explanation: the single leaf is true, and one flip makes it false.
 ```
 
-**提示：**
+**Constraints:**
 
-- 树中节点数目在 `[1, 10^5]` 范围内
-- `0 <= Node.val <= 5`
-- `OR`、`AND`、`XOR` 节点有 `2` 个子节点，`NOT` 节点有 `1` 个子节点
-- 叶子节点的值为 `0` 或 `1`，非叶子节点的值为 `2`、`3`、`4` 或 `5`
+- The tree has between `1` and `10^5` nodes.
+- `0 <= Node.val <= 5`. Leaves have the values `0` and `1`, inner nodes `2` to `5`.
+- OR, AND and XOR nodes have `2` children, NOT nodes `1`.

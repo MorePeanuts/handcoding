@@ -1,24 +1,32 @@
-# 2469. 温度转换
+# 2469. Convert the Temperature
 
-给你一个保留两位小数的非负浮点数 `celsius`，表示摄氏温度。把它换算成开氏温度和华氏温度，以数组 `ans = [kelvin, fahrenheit]` 返回。与准确答案相差不超过 `10^-5` 的结果都会被接受。
+You are given a non-negative floating point number rounded to two decimal places `celsius`, that denotes the **temperature in Celsius**.
 
-- 开氏度 = 摄氏度 + 273.15
-- 华氏度 = 摄氏度 × 1.80 + 32.00
+You should convert Celsius into **Kelvin** and **Fahrenheit** and return it as an array `ans = [kelvin, fahrenheit]`.
 
-**示例 1：**
+Return *the array `ans`.* Answers within `10^-5` of the actual answer will be accepted.
+
+**Note that:**
+
+- `Kelvin = Celsius + 273.15`
+- `Fahrenheit = Celsius * 1.80 + 32.00`
+
+**Example 1:**
 
 ```
-输入：celsius = 36.50
-输出：[309.65000,97.70000]
+Input: celsius = 36.50
+Output: [309.65000,97.70000]
+Explanation: Temperature at 36.50 Celsius converted in Kelvin is 309.65 and converted in Fahrenheit is 97.70.
 ```
 
-**示例 2：**
+**Example 2:**
 
 ```
-输入：celsius = 122.11
-输出：[395.26000,251.79800]
+Input: celsius = 122.11
+Output: [395.26000,251.79800]
+Explanation: Temperature at 122.11 Celsius converted in Kelvin is 395.26 and converted in Fahrenheit is 251.798.
 ```
 
-**提示：**
+**Constraints:**
 
 - `0 <= celsius <= 1000`

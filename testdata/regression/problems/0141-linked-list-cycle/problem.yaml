@@ -1,6 +1,7 @@
 id: "141"
 slug: linked-list-cycle
 title: Linked List Cycle
+titles: {zh-CN: 环形链表}
 difficulty: easy
 tags: [hash-table, linked-list, two-pointers]
 kind: function

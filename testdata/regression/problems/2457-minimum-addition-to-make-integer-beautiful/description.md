@@ -1,35 +1,37 @@
-# 2457. 美丽整数的最小增量
+# 2457. Minimum Addition to Make Integer Beautiful
 
-给你两个正整数 `n` 和 `target`。如果一个整数的各位数字之和不超过 `target`，就称它是**美丽**的。
+You are given two positive integers `n` and `target`.
 
-返回使 `n + x` 成为美丽整数的最小非负整数 `x`。输入保证总能让 `n` 变得美丽。
+An integer is considered **beautiful** if the sum of its digits is less than or equal to `target`.
 
-**示例 1：**
+Return the *minimum **non-negative** integer* `x` *such that* `n + x` *is beautiful*. The input will be generated such that it is always possible to make `n` beautiful.
 
-```
-输入：n = 16, target = 6
-输出：4
-解释：16 的数位和是 7；加 4 得到 20，数位和是 2。加 0 到 3 都不够。
-```
-
-**示例 2：**
+**Example 1:**
 
 ```
-输入：n = 467, target = 6
-输出：33
-解释：467 + 33 = 500，数位和是 5。
+Input: n = 16, target = 6
+Output: 4
+Explanation: Initially n is 16 and its digit sum is 1 + 6 = 7. After adding 4, n becomes 20 and digit sum becomes 2 + 0 = 2. It can be shown that we can not make n beautiful with adding non-negative integer less than 4.
 ```
 
-**示例 3：**
+**Example 2:**
 
 ```
-输入：n = 1, target = 1
-输出：0
-解释：1 本身已经是美丽的。
+Input: n = 467, target = 6
+Output: 33
+Explanation: Initially n is 467 and its digit sum is 4 + 6 + 7 = 17. After adding 33, n becomes 500 and digit sum becomes 5 + 0 + 0 = 5. It can be shown that we can not make n beautiful with adding non-negative integer less than 33.
 ```
 
-**提示：**
+**Example 3:**
+
+```
+Input: n = 1, target = 1
+Output: 0
+Explanation: Initially n is 1 and its digit sum is 1, which is already smaller than or equal to target.
+```
+
+**Constraints:**
 
 - `1 <= n <= 10^12`
 - `1 <= target <= 150`
-- 输入保证总能让 `n` 变得美丽
+- The input will be generated such that it is always possible to make `n` beautiful.

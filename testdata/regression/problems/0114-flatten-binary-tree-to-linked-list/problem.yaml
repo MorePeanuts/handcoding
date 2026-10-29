@@ -1,6 +1,7 @@
 id: "114"
 slug: flatten-binary-tree-to-linked-list
 title: Flatten Binary Tree to Linked List
+titles: {zh-CN: 二叉树展开为链表}
 difficulty: medium
 tags: [stack, tree, depth-first-search, linked-list, binary-tree]
 kind: function

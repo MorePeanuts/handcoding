@@ -1,31 +1,38 @@
-# 725. 分隔链表
+# 725. Split Linked List in Parts
 
-给你单链表的头节点 `head` 和整数 `k`，把链表分成 `k` 个连续的部分，以数组返回。
+Given the `head` of a singly linked list and an integer `k`, split the linked list into `k` consecutive linked list parts.
 
-各部分的长度应尽可能相等：任意两部分的长度相差不超过 1，因此有些部分可能为空。各部分按它们在原链表中出现的顺序排列，排在前面的部分长度不小于排在后面的部分。
+The length of each part should be as equal as possible: no two parts should have a size differing by more than one. This may lead to some parts being null.
 
-**示例 1：**
+The parts should be in the order of occurrence in the input list, and parts occurring earlier should always have a size greater than or equal to parts occurring later.
+
+Return *an array of the* `k` *parts*.
+
+**Example 1:**
 
 ![](assets/split1-lc.jpg)
 
 ```
-输入：head = [1,2,3], k = 5
-输出：[[1],[2],[3],[],[]]
-解释：最后两部分是空链表，写作 []。
+Input: head = [1,2,3], k = 5
+Output: [[1],[2],[3],[],[]]
+Explanation:
+The first element output[0] has output[0].val = 1, output[0].next = null.
+The last element output[4] is null, but its string representation as a ListNode is [].
 ```
 
-**示例 2：**
+**Example 2:**
 
 ![](assets/split2-lc.jpg)
 
 ```
-输入：head = [1,2,3,4,5,6,7,8,9,10], k = 3
-输出：[[1,2,3,4],[5,6,7],[8,9,10]]
-解释：10 个节点分成 3 部分，长度为 4、3、3。
+Input: head = [1,2,3,4,5,6,7,8,9,10], k = 3
+Output: [[1,2,3,4],[5,6,7],[8,9,10]]
+Explanation:
+The input has been split into consecutive parts with size difference at most 1, and earlier parts are a larger size than the later parts.
 ```
 
-**提示：**
+**Constraints:**
 
-- 链表中节点数目在 `[0, 1000]` 范围内
+- The number of nodes in the list is in the range `[0, 1000]`.
 - `0 <= Node.val <= 1000`
 - `1 <= k <= 50`

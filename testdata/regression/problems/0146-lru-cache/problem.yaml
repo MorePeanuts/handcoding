@@ -1,6 +1,7 @@
 id: "146"
 slug: lru-cache
 title: LRU Cache
+titles: {zh-CN: LRU 缓存}
 difficulty: medium
 tags: [design, hash-table, linked-list, doubly-linked-list]
 kind: class

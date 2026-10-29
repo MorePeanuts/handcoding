@@ -1,6 +1,7 @@
 id: "133"
 slug: clone-graph
 title: Clone Graph
+titles: {zh-CN: 克隆图}
 difficulty: medium
 tags: [depth-first-search, breadth-first-search, graph, hash-table]
 kind: function
