@@ -118,3 +118,24 @@ func TestDescriptionIn(t *testing.T) {
 		t.Errorf("Translations: %q, %v", ls, err)
 	}
 }
+
+// setTitles adds titles after title, or replaces them, and leaves the rest
+// of problem.yaml byte for byte.
+func TestSetTitles(t *testing.T) {
+	in := "# Fetched from leetcode.com.\nid: \"1\"\nslug: two-sum\ntitle: Two Sum # the original\ndifficulty: Easy\n# Decided by hc gen.\njudge:\n  compare: unordered\n"
+	want := "# Fetched from leetcode.com.\nid: \"1\"\nslug: two-sum\ntitle: Two Sum # the original\ntitles:\n  zh-CN: 两数之和\ndifficulty: Easy\n# Decided by hc gen.\njudge:\n  compare: unordered\n"
+	out, err := setTitles([]byte(in), map[string]string{"zh-CN": "两数之和"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != want {
+		t.Errorf("added titles:\n%s\nwant:\n%s", out, want)
+	}
+	out, err = setTitles(out, map[string]string{"zh-CN": "两数之和", "ja": "二つの和"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := strings.Replace(want, "titles:\n", "titles:\n  ja: 二つの和\n", 1); string(out) != want {
+		t.Errorf("replaced titles:\n%s\nwant:\n%s", out, want)
+	}
+}

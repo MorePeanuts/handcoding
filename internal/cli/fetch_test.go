@@ -109,8 +109,12 @@ func TestFetchLocales(t *testing.T) {
 	}
 
 	// leetcode.cn adds the Chinese statement and title, without --force,
-	// and keeps the rest.
+	// and keeps the rest, problem.yaml's comments included.
 	if err := os.WriteFile(filepath.Join(pdir, problem.CasesFile), []byte(`{"input":{"nums":[1,2],"target":3},"expected":[0,1]}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	meta := "# Edited by hand.\n" + read(problem.MetaFile)
+	if err := os.WriteFile(filepath.Join(pdir, problem.MetaFile), []byte(meta), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	out, err := capture(t, "-w", dir, "fetch", "--site", "cn", "two-sum")
@@ -129,6 +133,9 @@ func TestFetchLocales(t *testing.T) {
 	}
 	if !strings.Contains(read(problem.CasesFile), `"nums":[1,2]`) {
 		t.Error("adding a locale replaced cases.jsonl")
+	}
+	if got, want := read(problem.MetaFile), strings.Replace(meta, "title: Two Sum\n", "title: Two Sum\ntitles:\n  zh-CN: 两数之和\n", 1); got != want {
+		t.Errorf("problem.yaml after adding a locale:\n%s\nwant:\n%s", got, want)
 	}
 	p, err := problem.Load(pdir)
 	if err != nil {

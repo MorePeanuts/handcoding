@@ -495,7 +495,7 @@ func (c *Converted) AddTo(p *problem.Problem) error {
 			p.Titles[l] = t
 		}
 	}
-	return p.Save()
+	return p.SaveTitles()
 }
 
 // writeStatements writes the statements into dir, with the images they

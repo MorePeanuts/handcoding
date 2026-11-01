@@ -1,7 +1,9 @@
 package app_test
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -322,6 +324,76 @@ func TestPackList(t *testing.T) {
 	}
 	if packs[1].Manifest.Version != "1.0.0" || packs[1].Source.Source != repo || packs[2].Source.Commit != "abc" {
 		t.Errorf("tiny %+v, gone %+v", packs[1], packs[2])
+	}
+}
+
+// git's progress reaches the caller without the line that names the
+// staging directory.
+func TestInstallPackProgress(t *testing.T) {
+	repo := tinyRepo(t)
+	a := practice(t)
+	var progress bytes.Buffer
+	if _, err := a.InstallPack(context.Background(), repo, app.PackOptions{Progress: &progress}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(progress.String(), ".tmp-") || strings.Contains(progress.String(), "Cloning into") {
+		t.Errorf("progress names the staging directory:\n%s", progress.String())
+	}
+}
+
+// One pack command at a time: while another holds the lock, install,
+// update and remove refuse to start; once it is released, a command sees
+// what the other one wrote to hc.yaml.
+func TestPackLock(t *testing.T) {
+	repo := tinyRepo(t)
+	a := practice(t)
+	b := reopen(t, a)
+	ctx := context.Background()
+	unlock, err := a.WS.LockPacks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.InstallPack(ctx, repo, app.PackOptions{}); !errors.Is(err, workspace.ErrPacksLocked) {
+		t.Errorf("install while locked: %v", err)
+	}
+	if _, err := b.UpdatePack(ctx, "tiny", app.PackOptions{}); !errors.Is(err, workspace.ErrPacksLocked) {
+		t.Errorf("update while locked: %v", err)
+	}
+	if _, err := b.RemovePack(ctx, "tiny", false); !errors.Is(err, workspace.ErrPacksLocked) {
+		t.Errorf("remove while locked: %v", err)
+	}
+	unlock()
+	// b opened the workspace before a installed the pack.
+	if _, err := a.InstallPack(ctx, repo, app.PackOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.RemovePack(ctx, "tiny", false); err != nil {
+		t.Fatalf("remove after the lock is released: %v", err)
+	}
+	if packs := reopen(t, a).WS.Config.Packs; len(packs) != 0 {
+		t.Errorf("hc.yaml packs after remove: %+v", packs)
+	}
+}
+
+// An update follows the source's default branch when it is renamed.
+func TestUpdatePackDefaultBranch(t *testing.T) {
+	repo := tinyRepo(t)
+	a := practice(t)
+	ctx := context.Background()
+	if _, err := a.InstallPack(ctx, repo, app.PackOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	gitCmd(t, repo, "branch", "-m", "main", "trunk")
+	if err := os.WriteFile(filepath.Join(repo, "NOTES"), []byte("moved to trunk\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	head := commitAll(t, repo, "on trunk")
+	u, err := a.UpdatePack(ctx, "tiny", app.PackOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.To.Commit != head {
+		t.Errorf("updated to %s, want trunk's %s", u.To.Commit, head)
 	}
 }
 
