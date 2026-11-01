@@ -13,6 +13,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/mattn/go-isatty"
 )
 
 // ErrNotInstalled is returned when there is no git on PATH.
@@ -41,6 +43,9 @@ func run(ctx context.Context, dir string, progress io.Writer, args ...string) (s
 	case nil:
 	case *os.File:
 		cmd.Stderr, shown = w, true
+	case *dropLine:
+		cmd.Stderr = io.MultiWriter(w, &stderr)
+		_, shown = w.w.(*os.File)
 	default:
 		cmd.Stderr = io.MultiWriter(w, &stderr)
 	}
@@ -88,20 +93,80 @@ func IsRepository(dir string) bool {
 }
 
 // Clone clones source, a URL or a path, into dir, which must be missing or
-// empty. git's progress goes to progress.
+// empty. git's progress goes to progress, without the line that names dir:
+// callers clone into a directory of their own, which the user should not
+// see.
 func Clone(ctx context.Context, source, dir string, progress io.Writer) error {
-	_, err := run(ctx, "", progress, "clone", "--", source, dir)
+	args := []string{"clone"}
+	if progress != nil {
+		// git shows its progress only on a terminal, and its standard error
+		// is now a pipe.
+		if f, ok := progress.(*os.File); ok && isatty.IsTerminal(f.Fd()) {
+			args = append(args, "--progress")
+		}
+		d := &dropLine{w: progress, prefix: "Cloning into "}
+		defer d.flush()
+		progress = d
+	}
+	_, err := run(ctx, "", progress, append(args, "--", source, dir)...)
 	return err
 }
 
+// dropLine writes to w what git writes, except its first line when that
+// starts with prefix.
+type dropLine struct {
+	w      io.Writer
+	prefix string
+	// head holds the first line until it is complete.
+	head []byte
+	done bool
+}
+
+func (d *dropLine) Write(p []byte) (int, error) {
+	n := len(p)
+	if !d.done {
+		d.head = append(d.head, p...)
+		i := bytes.IndexByte(d.head, '\n')
+		if i < 0 {
+			return n, nil
+		}
+		d.done = true
+		p = d.head
+		if bytes.HasPrefix(d.head, []byte(d.prefix)) {
+			p = d.head[i+1:]
+		}
+	}
+	if len(p) > 0 {
+		if _, err := d.w.Write(p); err != nil {
+			return n, err
+		}
+	}
+	return n, nil
+}
+
+// flush writes a first line that never ended.
+func (d *dropLine) flush() {
+	if !d.done && len(d.head) > 0 {
+		_, _ = d.w.Write(d.head)
+	}
+}
+
 // Fetch fetches branches and tags from source, which becomes the URL of
-// origin, into the clone in dir. Tags that moved are updated.
+// origin, into the clone in dir. Tags that moved are updated, and so is
+// origin's default branch, which Resolve follows.
 func Fetch(ctx context.Context, dir, source string, progress io.Writer) error {
 	if _, err := run(ctx, dir, nil, "remote", "set-url", "origin", source); err != nil {
 		return err
 	}
-	_, err := run(ctx, dir, progress, "fetch", "--prune", "--tags", "--force", "origin")
-	return err
+	if _, err := run(ctx, dir, progress, "fetch", "--prune", "--tags", "--force", "origin"); err != nil {
+		return err
+	}
+	// The clone set origin/HEAD, and fetch never changes it, so it would
+	// keep naming a default branch the source has renamed or deleted. A
+	// source without a default branch keeps the old one: Resolve says so
+	// only when no ref is named.
+	_, _ = run(ctx, dir, nil, "remote", "set-head", "origin", "--auto")
+	return nil
 }
 
 // Resolve returns the commit that ref names in the clone in dir, as of its

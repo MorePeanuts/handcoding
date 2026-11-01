@@ -8,6 +8,10 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/goccy/go-yaml"
+	"github.com/goccy/go-yaml/ast"
+	"github.com/goccy/go-yaml/parser"
 )
 
 // Statements in several languages (docs/protocol.md, "Locales"). A pack
@@ -155,4 +159,67 @@ func (p *Problem) ValidateLocales(locales []string) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// SaveTitles writes p.Titles into its problem.yaml and leaves the rest of
+// the file as it is, comments and layout included: a titles key is replaced,
+// or added after title.
+func (p *Problem) SaveTitles() error {
+	path := filepath.Join(p.Dir, MetaFile)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	out, err := setTitles(data, p.Titles)
+	if err != nil {
+		return fmt.Errorf("%s: %w", MetaFile, err)
+	}
+	return os.WriteFile(path, out, 0o644)
+}
+
+// setTitles returns the problem.yaml document data with titles as its
+// titles value.
+func setTitles(data []byte, titles map[string]string) ([]byte, error) {
+	f, err := parser.ParseBytes(data, parser.ParseComments)
+	if err != nil {
+		return nil, err
+	}
+	if len(f.Docs) != 1 {
+		return nil, errors.New("must hold one YAML document")
+	}
+	m, ok := f.Docs[0].Body.(*ast.MappingNode)
+	if !ok {
+		return nil, errors.New("must be a mapping")
+	}
+	n, err := yaml.ValueToNode(struct {
+		Titles map[string]string `yaml:"titles"`
+	}{titles})
+	if err != nil {
+		return nil, err
+	}
+	entry := n.(*ast.MappingNode).Values[0]
+	at := len(m.Values)
+	for i, v := range m.Values {
+		switch v.Key.String() {
+		case "titles":
+			// The whole entry: a value replaced in place keeps the
+			// columns of the new node.
+			if c := v.GetComment(); c != nil {
+				if err := entry.SetComment(c); err != nil {
+					return nil, err
+				}
+			}
+			m.Values[i] = entry
+			at = -1
+		case "title":
+			at = i + 1
+		}
+		if at < 0 {
+			break
+		}
+	}
+	if at >= 0 {
+		m.Values = slices.Insert(m.Values, at, entry)
+	}
+	return []byte(strings.TrimRight(f.String(), "\n") + "\n"), nil
 }

@@ -36,6 +36,15 @@ type PackOptions struct {
 
 // requirePractice refuses pack management in an authoring workspace, whose
 // only pack is the checkout itself.
+// lockPacks takes the lock of the commands that change the installed packs
+// (workspace.LockPacks), which only a practice workspace has.
+func (a *App) lockPacks() (unlock func(), err error) {
+	if err := a.requirePractice(); err != nil {
+		return nil, err
+	}
+	return a.WS.LockPacks()
+}
+
 func (a *App) requirePractice() error {
 	if a.WS.Kind != workspace.Practice {
 		return fmt.Errorf("%s is a pack checkout, which has no installed packs: manage packs in a practice workspace", a.WS.Root)
@@ -164,9 +173,11 @@ type InstallResult struct {
 // packs/<name>/, and records it in hc.yaml. Its manifest must be valid and
 // of a protocol this hc reads, and its name must not be taken.
 func (a *App) InstallPack(ctx context.Context, source string, o PackOptions) (*InstallResult, error) {
-	if err := a.requirePractice(); err != nil {
+	unlock, err := a.lockPacks()
+	if err != nil {
 		return nil, err
 	}
+	defer unlock()
 	src, copied, err := locateSource(source)
 	if err != nil {
 		return nil, err
@@ -221,9 +232,11 @@ func (a *App) installed(dir string, m *pack.Manifest, s workspace.PackSource) (*
 // its hc.yaml. A copied directory is copied again. A pack that fails does
 // not keep the others from being installed; the errors are joined.
 func (a *App) InstallMissing(ctx context.Context, o PackOptions) ([]*InstallResult, error) {
-	if err := a.requirePractice(); err != nil {
+	unlock, err := a.lockPacks()
+	if err != nil {
 		return nil, err
 	}
+	defer unlock()
 	var (
 		results []*InstallResult
 		errs    []error
@@ -397,9 +410,11 @@ type Orphan struct {
 // changes is refused unless o.Force, which discards them. An update whose
 // pack.yaml cannot be read, or that renames the pack, is undone.
 func (a *App) UpdatePack(ctx context.Context, name string, o PackOptions) (*PackUpdate, error) {
-	if err := a.requirePractice(); err != nil {
+	unlock, err := a.lockPacks()
+	if err != nil {
 		return nil, err
 	}
+	defer unlock()
 	if err := checkPackName(name); err != nil {
 		return nil, err
 	}
@@ -598,9 +613,11 @@ type RemoveResult struct {
 // entry in hc.yaml. The user's solutions and history of its problems stay,
 // unless purge, which deletes solutions/<name>/ and the pack's submissions.
 func (a *App) RemovePack(ctx context.Context, name string, purge bool) (*RemoveResult, error) {
-	if err := a.requirePractice(); err != nil {
+	unlock, err := a.lockPacks()
+	if err != nil {
 		return nil, err
 	}
+	defer unlock()
 	if name == pack.LocalName {
 		return nil, fmt.Errorf("%s is the workspace's own problems and cannot be removed", pack.LocalName)
 	}
