@@ -44,8 +44,38 @@ skills covers, read its SKILL.md and follow it:
 
 ` + strings.Join(lines, "\n") + `
 
+Keep throwaway files (scripts, scratch data) in .hc/scratch/: .hc/ is hc's
+own directory, never part of a pack. Delete them when you are done.
+
 hc rewrites this block when it installs skills; write your own notes outside it.
 ` + endMarker
+}
+
+// ClaudeFile is the instructions file Claude Code reads at the workspace
+// root. Claude Code does not read AGENTS.md itself, so hc creates one that
+// imports it.
+const ClaudeFile = "CLAUDE.md"
+
+// claudeImport is the CLAUDE.md hc creates.
+const claudeImport = "@AGENTS.md\n"
+
+// WriteClaudeFile creates CLAUDE.md at root, importing AGENTS.md, when root
+// has AGENTS.md and Claude Code has no instructions file there (CLAUDE.md
+// or .claude/CLAUDE.md). One that exists is the user's, and hc never touches
+// it. It reports whether it created the file.
+func WriteClaudeFile(root string) (bool, error) {
+	for _, p := range []string{ClaudeFile, filepath.Join(".claude", ClaudeFile)} {
+		if _, err := os.Lstat(filepath.Join(root, p)); err == nil || !errors.Is(err, os.ErrNotExist) {
+			return false, err
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, AgentsFile)); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			err = nil
+		}
+		return false, err
+	}
+	return true, os.WriteFile(filepath.Join(root, ClaudeFile), []byte(claudeImport), 0o644)
 }
 
 func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }

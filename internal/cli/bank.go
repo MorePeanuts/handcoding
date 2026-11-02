@@ -374,12 +374,19 @@ func newCasesListCmd(root *rootOptions) *cobra.Command {
 		nums    []int
 		asJSON  bool
 		verbose bool
+		expand  bool
 	)
 	cmd := &cobra.Command{
 		Use:     "list <problem>",
 		Aliases: []string{"ls"},
 		Short:   "List test cases",
-		Args:    cobra.ExactArgs(1),
+		Long: `List the test cases of a problem. A generated case shows as its call to
+generator.py; with --expand, hc runs generator.py and shows the input it
+builds now, clipped unless --verbose, and with --json prints the case as the
+line it would be stored as (its expected output is computed only when
+judged), for a script to check. Expanding does not check the case's digest:
+run hc cases build after changing generator.py.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
 				cases, err := p.LoadCases()
@@ -390,9 +397,18 @@ func newCasesListCmd(root *rootOptions) *cobra.Command {
 				if err != nil {
 					return err
 				}
+				if expand {
+					if err := a.GenerateInputs(cmd.Context(), p, sel, os.Stderr); err != nil {
+						return err
+					}
+				}
 				if asJSON {
 					for _, s := range sel {
-						line, err := problem.MarshalCase(s.Case)
+						c := s.Case
+						if c.Generated() && c.Input != nil {
+							c.Generate, c.Digest = nil, ""
+						}
+						line, err := problem.MarshalCase(c)
 						if err != nil {
 							return err
 						}
@@ -414,9 +430,24 @@ func newCasesListCmd(root *rootOptions) *cobra.Command {
 					}
 					fmt.Printf("%s%s\n", ui.Bold.Render(fmt.Sprintf("Case %d", s.Index)), tags)
 					if s.Case.Generated() {
-						fmt.Printf("  %s %s\n", ui.Faint.Render("Generate"), s.Case.Generate)
-						if s.Case.Digest == "" {
+						// An expanded input starts with the call. It is large,
+						// so only --verbose shows all of it, even with --case.
+						if s.Case.Input != nil {
+							n := 200
+							if verbose {
+								n = maxLen
+							}
+							fmt.Printf("  %s %s\n", ui.Faint.Render("Input   "), clip(p.FormatInput(s.Case), n))
+						} else {
+							fmt.Printf("  %s %s\n", ui.Faint.Render("Generate"), s.Case.Generate)
+						}
+						switch {
+						case s.Case.Digest == "":
 							fmt.Printf("  %s %s\n", ui.Faint.Render("Digest  "), ui.Yellow.Render("(missing — run hc cases build)"))
+						case s.Case.Input != nil:
+							if d, err := problem.InputDigest(s.Case.Input); err == nil && d != s.Case.Digest {
+								fmt.Printf("  %s %s\n", ui.Faint.Render("Digest  "), ui.Yellow.Render("(generator.py now builds another input — run hc cases build)"))
+							}
 						}
 						fmt.Printf("  %s %s\n", ui.Faint.Render(fmt.Sprintf("%-8s", ui.ExpectedLabel(p))), ui.Faint.Render("(computed by the reference solution when judged)"))
 						continue
@@ -441,6 +472,7 @@ func newCasesListCmd(root *rootOptions) *cobra.Command {
 	cmd.Flags().IntSliceVarP(&nums, "case", "c", nil, "only these cases")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print raw JSON lines")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "do not truncate")
+	cmd.Flags().BoolVar(&expand, "expand", false, "build generated cases' inputs with generator.py and show them")
 	return cmd
 }
 

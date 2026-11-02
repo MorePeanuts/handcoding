@@ -123,6 +123,11 @@ func (a *Agent) definitionSkill() string {
 // locale: hc translates nothing.
 const statementRule = "The statement is description.md, in the pack's default locale; read only that one, and never write, edit or translate a statement in another locale (description.<locale>.md).\n"
 
+// sandboxRule says what the presets' sandbox refuses, so that the agent does
+// not learn it by trial: writes outside the workspace, and command lines its
+// command check cannot read (heredocs, loops over variables).
+const sandboxRule = "Your commands run in a sandbox that writes only inside the workspace, and long command lines (heredocs, loops) may be refused: write files with your editing tools, and run several shell steps as a script in .hc/scratch/ with sh.\n"
+
 // GeneratePrompt asks the agent to write a reference solution and cases for
 // the problem ref (pack/slug) in problemDir, relative to the workspace.
 func (a *Agent) GeneratePrompt(ref, problemDir string, count int, extra string) string {
@@ -136,6 +141,7 @@ func (a *Agent) GeneratePrompt(ref, problemDir string, count int, extra string) 
 	b.WriteString(statementRule)
 	b.WriteString(a.definitionSkill())
 	b.WriteString("Do not touch the solutions/ directory.\n")
+	b.WriteString(sandboxRule)
 	if extra != "" {
 		fmt.Fprintf(&b, "\nAdditional instructions from the user: %s\n", extra)
 	}
@@ -160,5 +166,6 @@ func (a *Agent) FixPrompt(ref, problemDir string, cases []int, complaint, soluti
 	b.WriteString("Follow its \"fix a test case\" workflow. If the test case is correct and the user's solution is wrong, explain why instead of changing anything.\n")
 	b.WriteString(statementRule)
 	b.WriteString(a.definitionSkill())
+	b.WriteString(sandboxRule)
 	return b.String()
 }

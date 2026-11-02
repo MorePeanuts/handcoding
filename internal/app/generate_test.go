@@ -327,3 +327,37 @@ func TestValidateGeneratedCases(t *testing.T) {
 		t.Errorf("any_of: %v", f.Errors)
 	}
 }
+
+// GenerateInputs builds inputs as generator.py makes them now, digests or
+// not, and computes no expected outputs.
+func TestGenerateInputs(t *testing.T) {
+	requireTools(t, "python3")
+	a := newWorkspace(t)
+	p := largest(t, a)
+	ctx := context.Background()
+	if _, err := a.BuildCases(ctx, p, "python", false); err != nil {
+		t.Fatal(err)
+	}
+	// A changed generator.py: the digests no longer match.
+	writeFile(t, p.GeneratorPath(), strings.Replace(largestGenerator, "range(n, 0, -1)", "range(n)", 1))
+	cases, _ := p.LoadCases()
+	sel, err := app.Select(cases, nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.GenerateInputs(ctx, p, sel, nil); err != nil {
+		t.Fatal(err)
+	}
+	var nums []int
+	if err := json.Unmarshal(sel[1].Case.Input["nums"], &nums); err != nil || len(nums) != 1000 || nums[0] != 0 {
+		t.Errorf("descending, changed: %v, %v", nums[:min(len(nums), 3)], err)
+	}
+	if d, _ := problem.InputDigest(sel[1].Case.Input); d == sel[1].Case.Digest {
+		t.Error("the changed input has the old digest")
+	}
+	for _, s := range sel[1:] {
+		if s.Case.Input == nil || s.Case.HasExpected() {
+			t.Errorf("case %d: input %v, expected %s", s.Index, s.Case.Input != nil, s.Case.Expected)
+		}
+	}
+}

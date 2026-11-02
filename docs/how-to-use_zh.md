@@ -71,7 +71,7 @@ my-pack/
   hc.yaml                                  可选：你的个人设置（language、editor、agent、timeout、python）
   solutions/<pack>/<lang>/<dir>/           你的解答，与练习工作区相同
   .hc/  pyrightconfig.json                 hc 的状态，与练习工作区相同
-  .claude/  .agents/  AGENTS.md            智能体技能，在某个命令安装之后出现
+  .claude/  .agents/  AGENTS.md  CLAUDE.md   智能体技能与说明，在某个命令安装之后出现
 ```
 
 没有 `hc.yaml` 时 hc 使用默认设置，并且从不在检出目录中创建它。检出目录的 `locales` 来自 `pack.yaml`，所以其中的 `hc.yaml` 不得设置它，就像不得列出 `packs` 一样。hc 无法读取的 `pack.yaml`（例如为更新的协议编写）不会妨碍工作区打开：`hc validate` 会指出问题所在。hc 添加的这些内容属于你而不属于题目包，所以不要把它们提交到仓库：
@@ -253,7 +253,7 @@ def distinct(rng, n):
 - `hc cases build` 重新运行生成器，并写入每个用例的 `digest`，即它构造出的输入的哈希。对摘要新增或改变了的用例（`--force` 时为全部），它以所运行的那份参考解的输出为期望输出评判其他每份参考解，所以 Go 和 Python 的参考解必须一致。生成用例不存储期望输出。
 - `hc test`、`hc submit` 和 `hc debug` 会构造它们要运行的生成用例：无论你用什么语言解题，生成器都由 Python 运行；期望输出由你所用语言的参考解（没有时用另一份）计算，然后照常评判。结果保存在 `.hc/cache/cases/<pack>/<problem>/<language>.json`，当 hc、`problem.yaml`、`generator.py`、参考解或生成用例改变时会重新构造。
 - 生成器失败、构造出的输入与摘要不符或不合法，以及参考解在生成的输入上失败，都是题目的错误，而不是对你的解答的判题结果：运行会停止，并指出文件和用例。`hc validate --run` 和 `hc pack check` 总是重新构造这些用例，从不读缓存，以便发现不确定的生成器。
-- `hc cases list` 把生成用例显示为它的调用，例如 `distinct(n=100000) seed 7`；报告中失败的生成用例显示为调用加上截断的输入。
+- `hc cases list` 把生成用例显示为它的调用，例如 `distinct(n=100000) seed 7`；报告中失败的生成用例显示为调用加上截断的输入。`hc cases list --expand` 会运行 `generator.py`，显示它当前生成的输入（加上 `--json` 时，输出为存储用例那样的行，便于脚本检查），不检查摘要。
 - `hc validate` 对超过 100 KB 的存储用例给出警告，`hc pack check` 则判为失败。
 
 ## 题目包
@@ -337,7 +337,7 @@ hc 自带若干 skill，向编码智能体讲解它的题目协议和工作流�
 | `hc-cases` | 题目怎么评判：评判规则、参考解、checker 和测试用例 |
 | `hc-pack` | 维护题目包：收录题目、分组、保持 slug 不变、协议版本、CI 和发布 |
 
-工作区得到哪些 skill 取决于它的类型：练习工作区得到 `hc-problem` 和 `hc-cases`，题目包的检出目录（见[编写题目包](#编写题目包)）三个都有。它们被安装到 `.claude/skills/`（供 Claude Code）和 `.agents/skills/`（供 Codex），并在 `AGENTS.md` 的一个区块中列出：新工作区由 `hc init` 安装，任何工作区中 `hc gen`、`hc fix` 和 `hc skill install` 也会安装。由于它们就在工作区里，在工作区中启动的任何 Claude Code 或 Codex 会话都能使用：让它"写一道 hc 题……"、"为这道 hc 题生成用例"或"把这道题加进题目包"即可。skill 引用协议的章节（`hc docs protocol <section>`），而不是重复其内容。
+工作区得到哪些 skill 取决于它的类型：练习工作区得到 `hc-problem` 和 `hc-cases`，题目包的检出目录（见[编写题目包](#编写题目包)）三个都有。它们被安装到 `.claude/skills/`（供 Claude Code）和 `.agents/skills/`（供 Codex），并在 `AGENTS.md` 的一个区块中列出，这个区块还告诉智能体把临时文件放在 `.hc/scratch/` 中：新工作区由 `hc init` 安装，任何工作区中 `hc gen`、`hc fix` 和 `hc skill install` 也会安装。Claude Code 本身不读取 `AGENTS.md`，所以工作区没有 `CLAUDE.md` 时，hc 还会创建一个导入它的 `CLAUDE.md`（`@AGENTS.md`）；你已有的 `CLAUDE.md` 归你所有，hc 从不触碰。由于它们就在工作区里，在工作区中启动的任何 Claude Code 或 Codex 会话都能使用：让它"写一道 hc 题……"、"为这道 hc 题生成用例"或"把这道题加进题目包"即可。skill 引用协议的章节（`hc docs protocol <section>`），而不是重复其内容。
 
 ```sh
 hc skill list               # 这个工作区得到的 skill；每个 skill 是否安装、是否最新、是否过期或被修改，以及由哪个 hc 版本安装

@@ -70,8 +70,11 @@ func TestInstallManagesOnlyItsSkills(t *testing.T) {
 	agents := AgentsDir + "/" + Cases
 
 	got := install(t, root, Options{}, Cases)
-	if got[claude] != Added || got[agents] != Added || got[AgentsFile] != Updated {
+	if got[claude] != Added || got[agents] != Added || got[AgentsFile] != Updated || got[ClaudeFile] != Added {
 		t.Fatalf("first install: %v", got)
+	}
+	if c := read(t, filepath.Join(root, ClaudeFile)); c != "@AGENTS.md\n" {
+		t.Errorf("CLAUDE.md: %q", c)
 	}
 	if s := state(root, claude); s != Current {
 		t.Fatalf("state after install: %v", s)
@@ -109,6 +112,37 @@ func TestInstallManagesOnlyItsSkills(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, agents, "extra.md")); err == nil {
 		t.Error("update kept a file of the old copy")
+	}
+}
+
+// hc creates CLAUDE.md only beside an AGENTS.md, and never touches one
+// Claude Code already has.
+func TestWriteClaudeFile(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		files  map[string]string
+		create bool
+	}{
+		{"no AGENTS.md", nil, false},
+		{"AGENTS.md alone", map[string]string{AgentsFile: "x\n"}, true},
+		{"own CLAUDE.md", map[string]string{AgentsFile: "x\n", ClaudeFile: "mine\n"}, false},
+		{".claude/CLAUDE.md", map[string]string{AgentsFile: "x\n", ".claude/CLAUDE.md": "mine\n"}, false},
+	} {
+		root := t.TempDir()
+		for p, c := range tc.files {
+			write(t, filepath.Join(root, p), c)
+		}
+		created, err := WriteClaudeFile(root)
+		if err != nil || created != tc.create {
+			t.Errorf("%s: WriteClaudeFile = %v, %v", tc.name, created, err)
+		}
+		data, err := os.ReadFile(filepath.Join(root, ClaudeFile))
+		switch {
+		case tc.create && string(data) != "@AGENTS.md\n":
+			t.Errorf("%s: CLAUDE.md %q, %v", tc.name, data, err)
+		case !tc.create && tc.files[ClaudeFile] != string(data):
+			t.Errorf("%s: CLAUDE.md became %q", tc.name, data)
+		}
 	}
 }
 

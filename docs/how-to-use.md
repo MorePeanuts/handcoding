@@ -71,7 +71,7 @@ my-pack/
   hc.yaml                                  optional: your settings (language, editor, agent, timeout, python)
   solutions/<pack>/<lang>/<dir>/           your solutions, as in a practice workspace
   .hc/  pyrightconfig.json                 hc's state, as in a practice workspace
-  .claude/  .agents/  AGENTS.md            the agent skills, once a command installs them
+  .claude/  .agents/  AGENTS.md  CLAUDE.md   the agent skills and instructions, once a command installs them
 ```
 
 Without `hc.yaml` hc uses the defaults, and it never creates one in a checkout. Its `locales` are those of `pack.yaml`, so an `hc.yaml` there must not set them, as it must not list `packs`. A `pack.yaml` that hc cannot read, for example one of a newer protocol, does not keep the workspace from opening: `hc validate` says what is wrong. What hc adds is yours, not the pack's, so keep it out of the repository's history:
@@ -253,7 +253,7 @@ def distinct(rng, n):
 - `hc cases build` runs the generators afresh and writes each case's `digest`, the hash of the input it built. On the cases whose digest is new or changed (all of them with `--force`), it judges every other reference against the outputs of the one it runs, so the Go and the Python reference must agree. A generated case stores no expected output.
 - `hc test`, `hc submit` and `hc debug` build the generated cases they run: Python runs the generators, whatever your solution's language, and the reference solution in your language (else another) computes the expected outputs, which are then judged as usual. The results are kept in `.hc/cache/cases/<pack>/<problem>/<language>.json` and built again when hc, `problem.yaml`, `generator.py`, the reference or the generated cases change.
 - A generator that fails, builds an input other than its digest's, or an invalid one, and a reference that fails on a generated input, are errors of the problem, not verdicts on your solution: the run stops and names the file and the case. `hc validate --run` and `hc pack check` build the cases afresh, never from the cache, so that they catch a generator that is not deterministic.
-- `hc cases list` shows a generated case as its call, `distinct(n=100000) seed 7`, and a failing one in a report as the call followed by the clipped input.
+- `hc cases list` shows a generated case as its call, `distinct(n=100000) seed 7`, and a failing one in a report as the call followed by the clipped input. `hc cases list --expand` runs `generator.py` and shows the inputs it builds now (with `--json`, as the lines they would be if stored, for a script to check), without checking the digests.
 - `hc validate` warns about a stored case over 100 KB, and `hc pack check` fails on it.
 
 ## Packs
@@ -337,7 +337,7 @@ hc ships skills that teach coding agents its problem protocol and workflows:
 | `hc-cases` | how it is judged: judge rules, reference solutions, checkers and test cases |
 | `hc-pack` | maintaining a pack: landing problems, groups, stable slugs, protocol versions, CI and releases |
 
-Which of them a workspace gets depends on its kind: a practice workspace gets `hc-problem` and `hc-cases`, a pack checkout ([working on a pack](#working-on-a-pack)) all three. They are installed into `.claude/skills/` for Claude Code and `.agents/skills/` for Codex, and listed in a block of `AGENTS.md`: by `hc init` in a new workspace, and by `hc gen`, `hc fix` and `hc skill install` in any. Because they live in the workspace, any Claude Code or Codex session started there can use them: ask it to "write an hc problem for ...", "generate cases for this hc problem" or "add this problem to the pack". The skills cite the sections of the protocol (`hc docs protocol <section>`) rather than repeating it.
+Which of them a workspace gets depends on its kind: a practice workspace gets `hc-problem` and `hc-cases`, a pack checkout ([working on a pack](#working-on-a-pack)) all three. They are installed into `.claude/skills/` for Claude Code and `.agents/skills/` for Codex, and listed in a block of `AGENTS.md`, which also tells agents to keep throwaway files in `.hc/scratch/`: by `hc init` in a new workspace, and by `hc gen`, `hc fix` and `hc skill install` in any. Claude Code does not read `AGENTS.md` itself, so hc also creates a `CLAUDE.md` that imports it (`@AGENTS.md`) when the workspace has none; one you have is yours, and hc never touches it. Because they live in the workspace, any Claude Code or Codex session started there can use them: ask it to "write an hc problem for ...", "generate cases for this hc problem" or "add this problem to the pack". The skills cite the sections of the protocol (`hc docs protocol <section>`) rather than repeating it.
 
 ```sh
 hc skill list               # the skills this workspace gets; each one installed, up to date, outdated or modified, and by which hc version

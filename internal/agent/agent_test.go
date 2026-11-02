@@ -33,6 +33,9 @@ func TestSkillDir(t *testing.T) {
 			if !strings.Contains(prompt, "never write, edit or translate a statement in another locale") {
 				t.Errorf("%s %v: prompt does not keep the agent to description.md:\n%s", tt.name, tt.command, prompt)
 			}
+			if !strings.Contains(prompt, "run several shell steps as a script in .hc/scratch/") {
+				t.Errorf("%s %v: prompt does not describe the sandbox:\n%s", tt.name, tt.command, prompt)
+			}
 		}
 	}
 }

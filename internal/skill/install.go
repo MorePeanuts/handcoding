@@ -247,6 +247,11 @@ func Install(root string, names []string, opts Options) ([]Change, error) {
 	} else if changed {
 		changes = append(changes, Change{Path: AgentsFile, Action: Updated})
 	}
+	if created, err := WriteClaudeFile(root); err != nil {
+		return changes, err
+	} else if created {
+		changes = append(changes, Change{Path: ClaudeFile, Action: Added})
+	}
 	return changes, nil
 }
 
