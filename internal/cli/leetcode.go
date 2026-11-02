@@ -2,13 +2,17 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -48,45 +52,67 @@ func defaultSite(root *rootOptions, name string) (leetcode.Site, error) {
 	return leetcode.SiteByName(name)
 }
 
+// browserLoginTimeout is how long hc leetcode login waits for the browser.
+const browserLoginTimeout = 5 * time.Minute
+
 func newLeetCodeLoginCmd(root *rootOptions) *cobra.Command {
-	var siteName string
+	var (
+		siteName string
+		paste    bool
+		port     int
+	)
 	cmd := &cobra.Command{
 		Use:   "login",
 		Short: "Log in to LeetCode with your browser's session",
 		Long: `Log in to leetcode.com or leetcode.cn with the session of a browser signed
 in to it. LeetCode signs in with a CAPTCHA, so hc cannot log in with a
-password: it takes the browser's LEETCODE_SESSION cookie instead. Open the
-site signed in and open the developer tools (F12), then either
+password: it takes the browser's LEETCODE_SESSION cookie instead.
+
+By default hc opens the site's authorization page, as LeetCode's VS Code
+extension does; sign in there if the browser is not signed in yet. LeetCode
+then sends the browser's cookies to hc, on a port of 127.0.0.1 (any free one,
+or --port). Over SSH, forward that port (ssh -L 8765:127.0.0.1:8765 host,
+with --port 8765) and open the page on your own machine.
+
+With --paste, or with standard input not a terminal, hc reads the session
+instead. Open the site signed in and the developer tools (F12), then either
 
   - under Application (Chrome, Edge) or Storage (Firefox, Safari) → Cookies,
     copy the value of LEETCODE_SESSION, or
   - under Network, reload the page, and copy any request to the site as cURL
-    (right-click → Copy → Copy as cURL), or copy its Cookie request header.
+    (right-click → Copy → Copy as cURL), or copy its Cookie request header,
 
-Paste it when hc asks (nothing is shown as you paste), or pipe it in: on
-macOS, copy it and run pbpaste | hc leetcode login. hc checks the session
-with LeetCode before saving it, readable by you only, in hc/leetcode.json of
-your user configuration directory. A session lasts a few weeks; log in again
-when LeetCode refuses it.
+and paste it (nothing is shown as you paste), or pipe it in: on macOS, copy
+it and run pbpaste | hc leetcode login.
 
-  hc leetcode login --site cn`,
+hc checks the session with LeetCode before saving it, readable by you only,
+in hc/leetcode.json of your user configuration directory. A session lasts a
+few weeks; log in again when LeetCode refuses it.
+
+  hc leetcode login --site cn
+  hc leetcode login --site cn --paste`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			site, err := defaultSite(root, siteName)
 			if err != nil {
 				return err
 			}
-			text, err := readSession(cmd)
-			if err != nil {
-				return err
-			}
-			s, err := leetcode.ParseSession(text)
-			if err != nil {
-				return err
-			}
 			c := leetcode.NewClient(site, "")
-			user, path, err := app.LeetCodeLogin(cmd.Context(), c, s)
-			if err != nil {
+			var user, path string
+			if paste || !stdinIsTerminal(cmd) {
+				text, err := readSession(cmd)
+				if err != nil {
+					return err
+				}
+				s, err := leetcode.ParseSession(text)
+				if err != nil {
+					return err
+				}
+				user, path, err = app.LeetCodeLogin(cmd.Context(), c, s)
+				if err != nil {
+					return err
+				}
+			} else if user, path, err = browserLogin(cmd, c, port); err != nil {
 				return err
 			}
 			fmt.Printf("%s to leetcode.%s as %s (session kept in %s)\n", ui.Green.Render("logged in"), site.Name, user, path)
@@ -94,7 +120,74 @@ when LeetCode refuses it.
 		},
 	}
 	cmd.Flags().StringVar(&siteName, "site", "", "com or cn (default from hc.yaml)")
+	cmd.Flags().BoolVar(&paste, "paste", false, "paste the session instead of authorizing in the browser")
+	cmd.Flags().IntVar(&port, "port", 0, "port of 127.0.0.1 the browser sends the session to (default: any free one)")
+	cmd.MarkFlagsMutuallyExclusive("paste", "port")
 	return cmd
+}
+
+// browserLogin logs c in through the browser, opening the site's
+// authorization page when this machine has a desktop.
+func browserLogin(cmd *cobra.Command, c *leetcode.Client, port int) (user, path string, err error) {
+	b, err := app.StartLeetCodeBrowserLogin(c, port)
+	if err != nil {
+		return "", "", err
+	}
+	defer b.Close()
+	fmt.Fprintf(os.Stderr, "Authorize hc in a browser signed in to leetcode.%s, at\n\n  %s\n\n", c.Site.Name, b.URL)
+	switch {
+	case overSSH():
+		fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Over SSH: on your own machine, forward the port (ssh -L %d:127.0.0.1:%d <this host>) and open the page there; --port picks the port.", b.Port, b.Port)))
+	case openURL(b.URL) == nil:
+		fmt.Fprintln(os.Stderr, ui.Faint.Render("Opened it in your browser."))
+	}
+	fmt.Fprintln(os.Stderr, ui.Faint.Render("Waiting for the browser (Ctrl-C to stop; --paste pastes the session instead)…"))
+	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
+	defer stop()
+	ctx, cancel := context.WithTimeout(ctx, browserLoginTimeout)
+	defer cancel()
+	user, path, err = b.Wait(ctx)
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		err = fmt.Errorf("no reply from the browser in %v; run hc leetcode login again, or with --paste", browserLoginTimeout)
+	case errors.Is(err, context.Canceled):
+		err = errors.New("login canceled")
+	}
+	return user, path, err
+}
+
+func stdinIsTerminal(cmd *cobra.Command) bool {
+	f, ok := cmd.InOrStdin().(*os.File)
+	return ok && term.IsTerminal(int(f.Fd()))
+}
+
+// overSSH reports whether hc runs in an SSH session, where a browser it
+// opened would not be the user's.
+func overSSH() bool {
+	return os.Getenv("SSH_CONNECTION") != "" || os.Getenv("SSH_TTY") != ""
+}
+
+// openURL opens url in the desktop's browser. Without a desktop (no display
+// on Linux) it does nothing and fails, rather than start a text browser in
+// the terminal.
+func openURL(url string) error {
+	var c *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		c = exec.Command("open", url)
+	case "windows":
+		c = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default:
+		if os.Getenv("DISPLAY") == "" && os.Getenv("WAYLAND_DISPLAY") == "" {
+			return errors.New("no display")
+		}
+		c = exec.Command("xdg-open", url)
+	}
+	if err := c.Start(); err != nil {
+		return err
+	}
+	go func() { _ = c.Wait() }() // reap it; its exit status does not matter
+	return nil
 }
 
 // readSession reads what holds the session: on a terminal, a line read

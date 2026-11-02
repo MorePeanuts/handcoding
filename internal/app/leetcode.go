@@ -2,12 +2,17 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/leetcode"
@@ -132,6 +137,96 @@ func LeetCodeSites() ([]string, error) {
 		}
 	}
 	return names, nil
+}
+
+// LeetCodeBrowserLogin is a login through the browser, as LeetCode's VS Code
+// extension logs in: LeetCode's authorize-login page, opened in a browser
+// signed in to the site, redirects to a callback with the browser's cookies.
+// The callback is a server on 127.0.0.1, at a path made for this login, so
+// that nothing else can hand it a session.
+type LeetCodeBrowserLogin struct {
+	// URL is the page to open in the browser.
+	URL string
+	// Port is the port of 127.0.0.1 the callback listens on.
+	Port int
+
+	c    *leetcode.Client
+	path string
+	ln   net.Listener
+	srv  *http.Server
+	once sync.Once
+	done chan browserLogin
+}
+
+type browserLogin struct {
+	user, path string
+	err        error
+}
+
+// StartLeetCodeBrowserLogin starts the callback server of a login to c's
+// site, on port of 127.0.0.1 (0: any free port).
+func StartLeetCodeBrowserLogin(c *leetcode.Client, port int) (*LeetCodeBrowserLogin, error) {
+	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		return nil, fmt.Errorf("starting the login's callback on 127.0.0.1: %w", err)
+	}
+	b := &LeetCodeBrowserLogin{
+		c: c, path: "/callback/" + rand.Text(), ln: ln, done: make(chan browserLogin, 1),
+	}
+	b.Port = ln.Addr().(*net.TCPAddr).Port
+	b.URL = c.Site.AuthorizeURL(ln.Addr().String() + b.path)
+	b.srv = &http.Server{Handler: http.HandlerFunc(b.callback), ReadHeaderTimeout: 10 * time.Second}
+	go func() { _ = b.srv.Serve(ln) }()
+	return b, nil
+}
+
+// callback takes the session from the cookies LeetCode's redirect carries,
+// once, and tells the browser how the login went.
+func (b *LeetCodeBrowserLogin) callback(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != b.path {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	handled := false
+	b.once.Do(func() {
+		handled = true
+		var res browserLogin
+		s, err := leetcode.ParseSession(r.URL.Query().Get("cookie"))
+		if err != nil {
+			res.err = fmt.Errorf("leetcode.%s's authorization sent no session: %w", b.c.Site.Name, err)
+		} else {
+			res.user, res.path, res.err = LeetCodeLogin(r.Context(), b.c, s)
+		}
+		if res.err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "hc could not log in: %v\n\nSee the terminal.\n", res.err)
+		} else {
+			fmt.Fprintf(w, "hc is logged in to leetcode.%s as %s. You can close this tab.\n", b.c.Site.Name, res.user)
+		}
+		b.done <- res
+	})
+	if !handled {
+		fmt.Fprintln(w, "This login is over; see the terminal.")
+	}
+}
+
+// Wait waits for the login, and returns the user's name and where the
+// session is kept, as LeetCodeLogin does.
+func (b *LeetCodeBrowserLogin) Wait(ctx context.Context) (user, path string, err error) {
+	select {
+	case res := <-b.done:
+		return res.user, res.path, res.err
+	case <-ctx.Done():
+		return "", "", ctx.Err()
+	}
+}
+
+// Close stops the callback server, after the reply to the browser is sent.
+func (b *LeetCodeBrowserLogin) Close() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return b.srv.Shutdown(ctx)
 }
 
 // LeetCodeLogout forgets the sessions of sites, or every session when no
