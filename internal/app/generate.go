@@ -103,6 +103,14 @@ func (a *App) generatedRef(p *problem.Problem, l lang.Language) (lang.Language, 
 	return refs[0], nil
 }
 
+// GenerateInputs builds the inputs of the generated cases in sel with
+// generator.py, as they are now: unlike a run, it neither checks them
+// against their digests nor computes expected outputs, so that it shows
+// what a changed generator.py makes before hc cases build.
+func (a *App) GenerateInputs(ctx context.Context, p *problem.Problem, sel []runner.Selected, w io.Writer) error {
+	return a.generateInputs(ctx, p, sel, false, w)
+}
+
 // generator returns what runs the problem's generator.py: the workspace's
 // Python, whatever the solution's language, which must be a supported one
 // since generators are part of the problem.

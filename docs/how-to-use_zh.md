@@ -253,7 +253,7 @@ def distinct(rng, n):
 - `hc cases build` 重新运行生成器，并写入每个用例的 `digest`，即它构造出的输入的哈希。对摘要新增或改变了的用例（`--force` 时为全部），它以所运行的那份参考解的输出为期望输出评判其他每份参考解，所以 Go 和 Python 的参考解必须一致。生成用例不存储期望输出。
 - `hc test`、`hc submit` 和 `hc debug` 会构造它们要运行的生成用例：无论你用什么语言解题，生成器都由 Python 运行；期望输出由你所用语言的参考解（没有时用另一份）计算，然后照常评判。结果保存在 `.hc/cache/cases/<pack>/<problem>/<language>.json`，当 hc、`problem.yaml`、`generator.py`、参考解或生成用例改变时会重新构造。
 - 生成器失败、构造出的输入与摘要不符或不合法，以及参考解在生成的输入上失败，都是题目的错误，而不是对你的解答的判题结果：运行会停止，并指出文件和用例。`hc validate --run` 和 `hc pack check` 总是重新构造这些用例，从不读缓存，以便发现不确定的生成器。
-- `hc cases list` 把生成用例显示为它的调用，例如 `distinct(n=100000) seed 7`；报告中失败的生成用例显示为调用加上截断的输入。
+- `hc cases list` 把生成用例显示为它的调用，例如 `distinct(n=100000) seed 7`；报告中失败的生成用例显示为调用加上截断的输入。`hc cases list --expand` 会运行 `generator.py`，显示它当前生成的输入（加上 `--json` 时，输出为存储用例那样的行，便于脚本检查），不检查摘要。
 - `hc validate` 对超过 100 KB 的存储用例给出警告，`hc pack check` 则判为失败。
 
 ## 题目包

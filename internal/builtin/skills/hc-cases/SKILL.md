@@ -34,6 +34,17 @@ skill does not repeat them: when a step names a section, read it with
 exactly. `hc docs protocol --list` lists the sections. When this skill and
 the spec seem to disagree, the spec wins.
 
+## Scratch work
+
+Throwaway scripts (to build or check inputs, wrong solutions) go in
+`.hc/scratch/` of the workspace: `.hc/` is hc's own directory, never part
+of a pack, and outside the workspace the sandbox of `hc gen` and `hc fix`
+refuses writes. Delete it when you are
+done. Run several shell steps as a script there (`sh .hc/scratch/try.sh`)
+rather than as one long command line. A script that searches for inputs
+must end: build them [by construction](#test-cases), and bound any retry
+loop.
+
 ## Decide the judge rule
 
 A problem without `judge.compare` is not ready (`hc docs protocol readiness`),
@@ -167,7 +178,10 @@ case inputs must satisfy their rules as well as the statement's.
   - a few large inputs near the constraint limits, to catch quadratic
     solutions, as [generated cases](#generated-cases).
 - Every input must satisfy the stated constraints and guarantees ("exactly
-  one solution", "all values are unique").
+  one solution", "all values are unique"), by construction: for "exactly
+  one solution", build the answer in and keep every other pair from
+  forming one. Never retry random inputs until one fits: for large inputs
+  such a loop may never end.
 - Large inputs are generated cases, never stored ones: a stored case over
   100 KB fails `hc pack check`.
 - Give each non-example case a `note` saying what it targets.
@@ -197,10 +211,13 @@ function of the problem's `generator.py`, and the case only names the call:
   hand-designed worst case (descending input, all equal values, a skewed
   tree, the answer at the very end) is a function that ignores `rng`; use
   `rng` only for random data, and never the `random` module.
-- The input must satisfy the constraints and guarantees like any other.
-  Make it so by construction: for "exactly one solution", build the answer
-  in and keep every other pair from forming one, rather than hoping a
-  random input has a single answer.
+- The input must satisfy the constraints and guarantees like any other,
+  [by construction](#test-cases).
+- Check what a function builds with
+  `hc cases list <slug> --case N --expand`, which runs generator.py as hc
+  does; add `--json` to read the inputs from a script. `hc_runtime` cannot
+  be imported outside hc, so never stand in for `rng` with the `random`
+  module: you would check other inputs than the cases'.
 - Add the cases with
   `hc cases add <slug> --generate <name> --args '{"n": 100000}' --seed 7`,
   or as `generate` lines in `cases.jsonl`, each with a `note` saying what
@@ -288,7 +305,8 @@ Report:
 ## Useful commands
 
 - `hc show <slug>`: the statement
-- `hc cases list <slug> [--case N]`: inspect cases
+- `hc cases list <slug> [--case N]`: inspect cases (`--expand` builds
+  generated inputs, `--json` prints lines)
 - `hc cases build <slug> [--force] [--lang python]`: fill expected outputs from the reference
 - `hc validate <slug> --run`: check the problem and run every reference on every case
 - `hc pack check`: in a pack checkout, check the whole pack as its CI does
