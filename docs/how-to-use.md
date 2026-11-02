@@ -120,7 +120,7 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 ## Commands
 
 ```
-Practice       list  start  edit  show  test  submit  debug  reset  discard  history
+Practice       list  start  edit  show  test  submit  debug  reset  discard  history  leetcode
 Problems       init  fetch  new  import  cases  validate  pack  docs
 Coding agent   gen  fix  skill
 ```
@@ -371,6 +371,24 @@ table.insert(dap.configurations.python, { type = "hc", name = "hc attach", reque
 ```
 
 Set breakpoints in your solution file, start `hc debug --headless`, then pick "hc attach" in Neovim.
+
+## Running on LeetCode
+
+`hc leetcode` runs a solution on LeetCode, or submits it to your own account, as the Run and Submit buttons of the problem's page do. It works on problems that come from LeetCode (fetched with `hc fetch`, or from a pack such as the official one): the site and slug are those of `source` in `problem.yaml`, and `--site` picks the other site.
+
+```sh
+hc leetcode login --site cn          # once per site: paste the browser's session
+hc leetcode test two-sum             # run on LeetCode's example testcases
+hc leetcode test two-sum -i $'[3,3]\n6'   # or on your own, in LeetCode's format
+hc leetcode submit two-sum -l python # submit to your account
+hc leetcode logout --site cn
+```
+
+**Logging in.** LeetCode signs in with a CAPTCHA, so hc logs in with the session of a browser instead of a password. Open the site signed in, open the developer tools (F12), and under Application (Chrome) or Storage (Firefox, Safari) → Cookies copy the values of `LEETCODE_SESSION` and `csrftoken`. `hc leetcode login` asks for them without echoing them (or reads them from standard input, one per line), checks them with LeetCode and saves them, readable by you only, in `hc/leetcode.json` of your user configuration directory (`~/Library/Application Support` on macOS, `~/.config` on Linux), never in the workspace. A session lasts a few weeks; when LeetCode refuses one, log in again.
+
+**Code.** hc sends the solution `hc test` would run (`-l` as there), turned into LeetCode's code: Python drops its imports from `hc_runtime` (LeetCode defines `ListNode`, `TreeNode` and `Node` itself), and Go its `package main`. A Python function problem must be a method of `class Solution` there; hc also accepts a module-level function, LeetCode does not.
+
+**Results.** `test` shows each example's output next to LeetCode's expected answer and what it printed. `submit` shows the verdict, the testcases passed, and the runtime and memory with their percentiles. When a submission fails, it shows the case it failed on, your output and the expected one; when the problem's inputs are LeetCode's as they are (a function problem without [structure inputs](protocol.md#structure-inputs) or LeetCode's own types), it also prints the `hc cases add` command that adds the case, so that a case LeetCode has and the problem lacks can join its tests. LeetCode results are not recorded in hc's history.
 
 ## Configuration
 
