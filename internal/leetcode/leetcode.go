@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -54,6 +55,9 @@ type Client struct {
 	Session *Session
 	// PollInterval and PollTimeout pace Wait: 1s and 2m when zero.
 	PollInterval, PollTimeout time.Duration
+
+	csrfOnce sync.Once
+	csrf     string
 }
 
 // NewClient creates a client.

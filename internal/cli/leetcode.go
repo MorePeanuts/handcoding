@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -56,14 +55,19 @@ func newLeetCodeLoginCmd(root *rootOptions) *cobra.Command {
 		Short: "Log in to LeetCode with your browser's session",
 		Long: `Log in to leetcode.com or leetcode.cn with the session of a browser signed
 in to it. LeetCode signs in with a CAPTCHA, so hc cannot log in with a
-password: copy two cookies from the browser instead. Open the site signed in,
-open the developer tools (F12), and under Application (Chrome) or Storage
-(Firefox, Safari) → Cookies, copy the values of LEETCODE_SESSION and csrftoken.
+password: it takes the browser's LEETCODE_SESSION cookie instead. Open the
+site signed in and open the developer tools (F12), then either
 
-hc asks for them without echoing them, or reads them from standard input, one
-per line. It checks the session with LeetCode before saving it, readable by
-you only, in hc/leetcode.json of your user configuration directory. A session
-lasts a few weeks; log in again when LeetCode refuses it.
+  - under Application (Chrome, Edge) or Storage (Firefox, Safari) → Cookies,
+    copy the value of LEETCODE_SESSION, or
+  - under Network, reload the page, and copy any request to the site as cURL
+    (right-click → Copy → Copy as cURL), or copy its Cookie request header.
+
+Paste it when hc asks (nothing is shown as you paste), or pipe it in: on
+macOS, copy it and run pbpaste | hc leetcode login. hc checks the session
+with LeetCode before saving it, readable by you only, in hc/leetcode.json of
+your user configuration directory. A session lasts a few weeks; log in again
+when LeetCode refuses it.
 
   hc leetcode login --site cn`,
 		Args: cobra.NoArgs,
@@ -72,12 +76,12 @@ lasts a few weeks; log in again when LeetCode refuses it.
 			if err != nil {
 				return err
 			}
-			in := bufio.NewReader(cmd.InOrStdin())
-			var s leetcode.Session
-			if s.Token, err = readSecret(cmd, in, "LEETCODE_SESSION: "); err != nil {
+			text, err := readSession(cmd)
+			if err != nil {
 				return err
 			}
-			if s.CSRF, err = readSecret(cmd, in, "csrftoken: "); err != nil {
+			s, err := leetcode.ParseSession(text)
+			if err != nil {
 				return err
 			}
 			c := leetcode.NewClient(site, "")
@@ -93,22 +97,33 @@ lasts a few weeks; log in again when LeetCode refuses it.
 	return cmd
 }
 
-// readSecret reads one value: without echo on a terminal, else a line of in.
-func readSecret(cmd *cobra.Command, in *bufio.Reader, prompt string) (string, error) {
-	if f, ok := cmd.InOrStdin().(*os.File); ok && term.IsTerminal(int(f.Fd())) {
-		fmt.Fprint(os.Stderr, prompt)
-		b, err := term.ReadPassword(int(f.Fd()))
-		fmt.Fprintln(os.Stderr)
-		return strings.TrimSpace(string(b)), err
+// readSession reads what holds the session: on a terminal, a line read
+// without echo, and the lines after it while each ends with a backslash, as
+// a pasted cURL command's do (left unread, they would run in the shell);
+// else all of standard input.
+func readSession(cmd *cobra.Command) (string, error) {
+	f, ok := cmd.InOrStdin().(*os.File)
+	if !ok || !term.IsTerminal(int(f.Fd())) {
+		b, err := io.ReadAll(io.LimitReader(cmd.InOrStdin(), 1<<20))
+		if err != nil {
+			return "", fmt.Errorf("reading the session: %w", err)
+		}
+		return string(b), nil
 	}
-	line, err := in.ReadString('\n')
-	if errors.Is(err, io.EOF) && line != "" {
-		err = nil
+	fmt.Fprint(os.Stderr, "LEETCODE_SESSION, a Cookie header or a cURL command: ")
+	defer fmt.Fprintln(os.Stderr)
+	var text strings.Builder
+	for {
+		line, err := term.ReadPassword(int(f.Fd()))
+		if err != nil {
+			return "", fmt.Errorf("reading the session: %w", err)
+		}
+		text.Write(line)
+		text.WriteByte('\n')
+		if !strings.HasSuffix(strings.TrimSpace(string(line)), `\`) {
+			return text.String(), nil
+		}
 	}
-	if err != nil {
-		return "", fmt.Errorf("reading %s: %w", strings.TrimSuffix(prompt, ": "), err)
-	}
-	return strings.TrimSpace(line), nil
 }
 
 func newLeetCodeLogoutCmd() *cobra.Command {
