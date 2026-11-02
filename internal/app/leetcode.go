@@ -116,25 +116,58 @@ func LeetCodeLogin(ctx context.Context, c *leetcode.Client, s leetcode.Session) 
 	return user, path, all.save(path)
 }
 
-// LeetCodeLogout forgets the session of site, reporting whether there was
-// one.
-func LeetCodeLogout(site leetcode.Site) (bool, error) {
+// leetCodeSites are the sites hc can log in to.
+var leetCodeSites = []leetcode.Site{leetcode.SiteCom, leetcode.SiteCN}
+
+// LeetCodeSites returns the names of the sites hc has a session of.
+func LeetCodeSites() ([]string, error) {
+	all, _, err := loadLeetCodeSessions()
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, s := range leetCodeSites {
+		if _, ok := all[s.Name]; ok {
+			names = append(names, s.Name)
+		}
+	}
+	return names, nil
+}
+
+// LeetCodeLogout forgets the sessions of sites, or every session when no
+// site is given, and returns the names of the sites it forgot one of. Only
+// hc forgets them: LeetCode keeps a session valid until it expires or the
+// browser logs out.
+func LeetCodeLogout(sites ...leetcode.Site) ([]string, error) {
+	if len(sites) == 0 {
+		sites = leetCodeSites
+	}
 	all, path, err := loadLeetCodeSessions()
 	if err != nil {
 		// A broken file is removed whole.
 		if path == "" {
-			return false, err
+			return nil, err
 		}
-		return true, os.Remove(path)
+		var names []string
+		for _, s := range sites {
+			names = append(names, s.Name)
+		}
+		return names, os.Remove(path)
 	}
-	if _, ok := all[site.Name]; !ok {
-		return false, nil
+	var names []string
+	for _, s := range sites {
+		if _, ok := all[s.Name]; ok {
+			delete(all, s.Name)
+			names = append(names, s.Name)
+		}
 	}
-	delete(all, site.Name)
-	if len(all) == 0 {
-		return true, os.Remove(path)
+	switch {
+	case len(names) == 0:
+		return nil, nil
+	case len(all) == 0:
+		return names, os.Remove(path)
 	}
-	return true, all.save(path)
+	return names, all.save(path)
 }
 
 // LeetCodeTarget is where a problem is on LeetCode.
