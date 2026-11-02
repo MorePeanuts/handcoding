@@ -96,15 +96,15 @@ func LeetCodeSession(site leetcode.Site) (*leetcode.Session, error) {
 // site. It returns the user's name and where the session is kept. A session
 // LeetCode does not accept is not saved.
 func LeetCodeLogin(ctx context.Context, c *leetcode.Client, s leetcode.Session) (user, path string, err error) {
-	s.Token, s.CSRF = strings.TrimSpace(s.Token), strings.TrimSpace(s.CSRF)
-	if s.Token == "" || s.CSRF == "" {
-		return "", "", errors.New("both LEETCODE_SESSION and csrftoken are needed")
+	s.Token = strings.TrimSpace(s.Token)
+	if s.Token == "" {
+		return "", "", errors.New("LEETCODE_SESSION is needed")
 	}
 	c.Session = &s
 	user, err = c.Username(ctx)
 	switch {
 	case errors.Is(err, leetcode.ErrNotSignedIn):
-		return "", "", fmt.Errorf("leetcode.%s does not accept this session: copy LEETCODE_SESSION and csrftoken again from a browser signed in to it", c.Site.Name)
+		return "", "", fmt.Errorf("leetcode.%s does not accept this session: copy LEETCODE_SESSION again from a browser signed in to it", c.Site.Name)
 	case err != nil:
 		return "", "", err
 	}

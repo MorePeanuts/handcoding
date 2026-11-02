@@ -60,11 +60,11 @@ func TestLeetCodeSessions(t *testing.T) {
 	cn := leetcode.Site{Name: leetcode.SiteCN.Name, Base: srv.URL}
 
 	// A session LeetCode does not accept, or half of one, is not saved.
-	if _, _, err := app.LeetCodeLogin(ctx, leetcode.NewClient(com, ""), leetcode.Session{Token: "bad", CSRF: "c"}); err == nil || !strings.Contains(err.Error(), "does not accept") {
+	if _, _, err := app.LeetCodeLogin(ctx, leetcode.NewClient(com, ""), leetcode.Session{Token: "bad"}); err == nil || !strings.Contains(err.Error(), "does not accept") {
 		t.Errorf("signed-out session: err = %v", err)
 	}
-	if _, _, err := app.LeetCodeLogin(ctx, leetcode.NewClient(com, ""), leetcode.Session{Token: "good"}); err == nil {
-		t.Error("session without csrftoken accepted")
+	if _, _, err := app.LeetCodeLogin(ctx, leetcode.NewClient(com, ""), leetcode.Session{Token: " \n"}); err == nil {
+		t.Error("empty session accepted")
 	}
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("sessions file written for refused sessions: %v", err)
@@ -73,11 +73,11 @@ func TestLeetCodeSessions(t *testing.T) {
 		t.Errorf("not logged in: err = %v", err)
 	}
 
-	user, saved, err := app.LeetCodeLogin(ctx, leetcode.NewClient(com, ""), leetcode.Session{Token: " good ", CSRF: "csrf-com\n"})
+	user, saved, err := app.LeetCodeLogin(ctx, leetcode.NewClient(com, ""), leetcode.Session{Token: " good\n"})
 	if err != nil || user != "alice" || saved != path {
 		t.Fatalf("LeetCodeLogin = %q, %q, %v", user, saved, err)
 	}
-	if _, _, err := app.LeetCodeLogin(ctx, leetcode.NewClient(cn, ""), leetcode.Session{Token: "good", CSRF: "csrf-cn"}); err != nil {
+	if _, _, err := app.LeetCodeLogin(ctx, leetcode.NewClient(cn, ""), leetcode.Session{Token: "good"}); err != nil {
 		t.Fatal(err)
 	}
 	if runtime.GOOS != "windows" {
@@ -88,7 +88,7 @@ func TestLeetCodeSessions(t *testing.T) {
 		}
 	}
 	s, err := app.LeetCodeSession(com)
-	if err != nil || s.Token != "good" || s.CSRF != "csrf-com" {
+	if err != nil || s.Token != "good" {
 		t.Errorf("LeetCodeSession(com) = %+v, %v", s, err)
 	}
 
@@ -102,7 +102,7 @@ func TestLeetCodeSessions(t *testing.T) {
 	if _, err := app.LeetCodeSession(com); err == nil {
 		t.Error("com still logged in")
 	}
-	if s, err := app.LeetCodeSession(cn); err != nil || s.CSRF != "csrf-cn" {
+	if s, err := app.LeetCodeSession(cn); err != nil || s.Token != "good" {
 		t.Errorf("cn lost on logout of com: %+v, %v", s, err)
 	}
 	if removed, err := app.LeetCodeLogout(com); removed != nil || err != nil {
@@ -224,7 +224,7 @@ func fakeLeetCode(t *testing.T, typed *string) *leetcode.Client {
 	}))
 	t.Cleanup(srv.Close)
 	c := leetcode.NewClient(leetcode.Site{Name: leetcode.SiteCom.Name, Base: srv.URL}, "")
-	c.Session = &leetcode.Session{Token: "t", CSRF: "c"}
+	c.Session = &leetcode.Session{Token: "t"}
 	c.PollInterval = time.Millisecond
 	return c
 }

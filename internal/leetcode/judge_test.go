@@ -6,11 +6,26 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+// checkAuth checks that r carries the session "tok" and a CSRF token of
+// Django's form, the same in the cookie and the header.
+func checkAuth(t *testing.T, r *http.Request) {
+	t.Helper()
+	cookie := r.Header.Get("Cookie")
+	csrf, ok := strings.CutPrefix(cookie, "LEETCODE_SESSION=tok; csrftoken=")
+	if !ok || !regexp.MustCompile(`^[a-zA-Z0-9]{32}$`).MatchString(csrf) {
+		t.Errorf("%s: Cookie %q", r.URL.Path, cookie)
+	}
+	if got := r.Header.Get("X-CSRFToken"); got != csrf {
+		t.Errorf("%s: X-CSRFToken %q, csrftoken cookie %q", r.URL.Path, got, csrf)
+	}
+}
 
 // fakeJudge is LeetCode's judge for one solution: it checks that requests
 // carry the session, and answers the checks of id with states, the last of
@@ -19,12 +34,7 @@ func fakeJudge(t *testing.T, states ...string) (*Client, *atomic.Int32) {
 	t.Helper()
 	var polls atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("Cookie"); got != "LEETCODE_SESSION=tok; csrftoken=csrf" {
-			t.Errorf("%s: Cookie %q", r.URL.Path, got)
-		}
-		if got := r.Header.Get("X-CSRFToken"); got != "csrf" {
-			t.Errorf("%s: X-CSRFToken %q", r.URL.Path, got)
-		}
+		checkAuth(t, r)
 		switch r.URL.Path {
 		case "/problems/two-sum/interpret_solution/", "/problems/two-sum/submit/":
 			if got := r.Header.Get("Referer"); !strings.HasSuffix(got, "/problems/two-sum/") {
@@ -54,7 +64,7 @@ func fakeJudge(t *testing.T, states ...string) (*Client, *atomic.Int32) {
 	}))
 	t.Cleanup(srv.Close)
 	c := NewClient(Site{Name: SiteCom.Name, Base: srv.URL}, "")
-	c.Session = &Session{Token: "tok", CSRF: "csrf"}
+	c.Session = &Session{Token: "tok"}
 	c.PollInterval = time.Millisecond
 	return c, &polls
 }
@@ -142,7 +152,7 @@ func TestRefusals(t *testing.T) {
 			}))
 			defer srv.Close()
 			c := NewClient(Site{Name: SiteCN.Name, Base: srv.URL}, "")
-			c.Session = &Session{Token: "secret-token", CSRF: "secret-csrf"}
+			c.Session = &Session{Token: "secret-token"}
 			_, err := c.Submit(context.Background(), code)
 			if err == nil {
 				t.Fatal("no error")
@@ -169,13 +179,14 @@ func TestUsername(t *testing.T) {
 		{`{"data": {"userStatus": {"isSignedIn": false, "username": ""}}}`, "", ErrNotSignedIn},
 	} {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path != "/graphql/" || r.Header.Get("Cookie") != "LEETCODE_SESSION=tok; csrftoken=csrf" {
-				t.Errorf("%s with Cookie %q", r.URL.Path, r.Header.Get("Cookie"))
+			if r.URL.Path != "/graphql/" {
+				t.Errorf("request to %s", r.URL.Path)
 			}
+			checkAuth(t, r)
 			_, _ = w.Write([]byte(tc.body))
 		}))
 		c := NewClient(Site{Name: SiteCom.Name, Base: srv.URL}, "")
-		c.Session = &Session{Token: "tok", CSRF: "csrf"}
+		c.Session = &Session{Token: "tok"}
 		user, err := c.Username(context.Background())
 		srv.Close()
 		if user != tc.user || !errors.Is(err, tc.err) {
@@ -198,5 +209,41 @@ func TestLinesAndText(t *testing.T) {
 	}
 	if v.E != "s" || v.F != "l1\nl2" || v.G != "7" {
 		t.Errorf("text %+v", v)
+	}
+}
+
+func TestParseSession(t *testing.T) {
+	const tok = "eyJhbGciOi.eyJzdWIiOi.sig-_x"
+	for _, text := range []string{
+		tok,
+		"  " + tok + "\n",
+		"csrftoken=abc; LEETCODE_SESSION=" + tok + "; _ga=1",
+		"Cookie: LEETCODE_SESSION=" + tok,
+		"curl 'https://leetcode.cn/graphql/' \\\n  -b 'csrftoken=abc; LEETCODE_SESSION=" + tok + "' \\\n  -H 'accept: */*'\n",
+		"curl 'https://leetcode.cn/' -H 'cookie: a=b; LEETCODE_SESSION=" + tok + "'",
+		"curl \"https://leetcode.cn/\" -H \"Cookie: LEETCODE_SESSION=" + tok + "\"",
+	} {
+		s, err := ParseSession(text)
+		if err != nil || s.Token != tok {
+			t.Errorf("ParseSession(%q) = %q, %v", text, s.Token, err)
+		}
+	}
+	for _, text := range []string{"", " \n", "csrftoken=secret; _ga=1", "curl 'https://leetcode.cn/' -H 'accept: */*'", "LEETCODE_SESSION=; a=b"} {
+		_, err := ParseSession(text)
+		if err == nil {
+			t.Errorf("ParseSession(%q) accepted", text)
+		} else if strings.Contains(err.Error(), "secret") {
+			t.Errorf("ParseSession(%q): the error shows the input: %v", text, err)
+		}
+	}
+}
+
+// Every request of a client carries the same CSRF token, and every client
+// its own.
+func TestCSRFToken(t *testing.T) {
+	a, b := NewClient(SiteCN, ""), NewClient(SiteCN, "")
+	first := a.csrfToken()
+	if again, other := a.csrfToken(), b.csrfToken(); again != first || other == first {
+		t.Errorf("tokens %q, %q, %q", first, again, other)
 	}
 }

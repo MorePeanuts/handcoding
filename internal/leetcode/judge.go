@@ -3,6 +3,7 @@ package leetcode
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,12 +13,36 @@ import (
 	"time"
 )
 
-// Session is a signed-in LeetCode session: the values of the
-// LEETCODE_SESSION and csrftoken cookies of a browser signed in to the site.
-// Running and submitting solutions need one.
+// Session is a signed-in LeetCode session: the value of the LEETCODE_SESSION
+// cookie of a browser signed in to the site. Running and submitting
+// solutions need one.
 type Session struct {
 	Token string `json:"session"`
-	CSRF  string `json:"csrftoken"`
+}
+
+// ParseSession finds the session in text: the value of LEETCODE_SESSION in
+// a Cookie header, a cURL command or anything else that names it, else text
+// itself, a bare value. Its errors never show text, a secret.
+func ParseSession(text string) (Session, error) {
+	const name = "LEETCODE_SESSION="
+	if i := strings.Index(text, name); i >= 0 {
+		v := text[i+len(name):]
+		if j := strings.IndexAny(v, "; \t\r\n'\"\\"); j >= 0 {
+			v = v[:j]
+		}
+		if v == "" {
+			return Session{}, errors.New("LEETCODE_SESSION is empty in what was given")
+		}
+		return Session{Token: v}, nil
+	}
+	v := strings.TrimSpace(text)
+	switch {
+	case v == "":
+		return Session{}, errors.New("no LEETCODE_SESSION given")
+	case strings.ContainsAny(v, "; \t\r\n'\""):
+		return Session{}, errors.New("no LEETCODE_SESSION cookie in what was given")
+	}
+	return Session{Token: v}, nil
 }
 
 var (
@@ -31,15 +56,33 @@ var (
 	ErrRateLimited = errors.New("leetcode: too many requests (HTTP 429); wait a little and retry")
 )
 
-// auth adds the session's cookies and CSRF token to req, sent from the page
+// auth adds the session's cookie and a CSRF token to req, sent from the page
 // at referer.
 func (c *Client) auth(req *http.Request, referer string) {
 	req.Header.Set("Referer", c.Site.Base+referer)
 	req.Header.Set("Origin", c.Site.Base)
 	if c.Session != nil {
-		req.Header.Set("Cookie", "LEETCODE_SESSION="+c.Session.Token+"; csrftoken="+c.Session.CSRF)
-		req.Header.Set("X-CSRFToken", c.Session.CSRF)
+		csrf := c.csrfToken()
+		req.Header.Set("Cookie", "LEETCODE_SESSION="+c.Session.Token+"; csrftoken="+csrf)
+		req.Header.Set("X-CSRFToken", csrf)
 	}
+}
+
+// csrfToken is the CSRF token the client sends, as both the csrftoken
+// cookie and the X-CSRFToken header. LeetCode does not tie it to the
+// session (leetcode.cn does not even check it), so the client makes its
+// own, of Django's form: 32 letters and digits.
+func (c *Client) csrfToken() string {
+	c.csrfOnce.Do(func() {
+		const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+		b := make([]byte, 32)
+		_, _ = rand.Read(b) // never fails
+		for i := range b {
+			b[i] = chars[int(b[i])%len(chars)]
+		}
+		c.csrf = string(b)
+	})
+	return c.csrf
 }
 
 const userStatusQuery = `query globalData {

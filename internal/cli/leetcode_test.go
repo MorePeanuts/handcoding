@@ -31,7 +31,7 @@ func TestLeetCodeCommands(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte(`{"cn": {"session": "s", "csrftoken": "c"}}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"cn": {"session": "s"}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
