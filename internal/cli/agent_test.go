@@ -44,4 +44,15 @@ func TestAgentEnvironment(t *testing.T) {
 	if string(got) != want {
 		t.Errorf("the agent found:\n%s\nwant:\n%s", got, want)
 	}
+
+	// The run is logged in the workspace.
+	logs, _ := filepath.Glob(filepath.Join(dir, ".hc", "agent", "local", "demo", "*-gen.jsonl"))
+	if len(logs) != 1 {
+		t.Fatalf("agent logs %v", logs)
+	}
+	data, _ = os.ReadFile(logs[0])
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) < 2 || !strings.Contains(lines[0], `"type":"start"`) || !strings.Contains(lines[0], `"task":"gen"`) || !strings.Contains(lines[len(lines)-1], `"type":"end"`) {
+		t.Errorf("agent log:\n%s", data)
+	}
 }

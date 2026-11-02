@@ -318,6 +318,14 @@ hc fix two-sum -c 5 -m "answers in a different order should pass"
 
 预设会在沙箱中运行智能体，它执行的命令只能写入工作区和临时目录（Claude Code 的沙箱，Codex 的 `workspace-write`）。因此 hc 会在智能体启动前建好 `.hc/venv` 中的 Python 环境，并为智能体（无论是否用预设）把缓存放在工作区内：`GOCACHE` 为 `.hc/cache/go-build`，`UV_CACHE_DIR` 为 `.hc/cache/uv`。所以智能体第一次构建 Go 时会慢一些。
 
+智能体工作时，hc 会显示它运行的每条命令和写入的每个文件，结束后显示它的最终报告、运行时长（Claude Code 还会显示轮数和费用）以及执行轨迹的位置。**每次运行都会记录日志**，保存在 `.hc/agent/<pack>/<slug>/<时间>-<gen|fix>.jsonl`，每道题保留最近 10 份。日志是 JSON 行：
+
+- 第一行是 `{"type": "start", ...}`：hc 的版本、任务、题目、智能体及其命令行，以及提示词；
+- 之后智能体输出的每一行对应一行日志，带有 hc 读到它的时间：`{"type": "stdout", "event": ...}` 是预设 JSON 输出中的一个事件（Claude Code 的 `--output-format stream-json`、`codex exec --json`），`"text"` 则是其他任何一行，标准错误（`"stderr"`）也一样；
+- 最后一行是 `{"type": "end", ...}`：运行时长、退出码，以及出错时的错误信息。
+
+读日志就能看到智能体做了什么、时间花在哪里，比如用 `jq`。智能体自己也有记录，但在别处，也看不出属于哪次 hc 运行。
+
 要使用其他智能体，在 `hc.yaml` 中设置它的命令行，`{prompt}` 会被替换为提示词：
 
 ```yaml
@@ -325,7 +333,7 @@ agent:
   command: ["my-agent", "--yes", "{prompt}"]
 ```
 
-提示词让智能体读 `.agents/skills/` 下的 skill；命令是 `claude` 时读 `.claude/skills/` 下的。
+提示词让智能体读 `.agents/skills/` 下的 skill；命令是 `claude` 时读 `.claude/skills/` 下的。这类命令的输出，hc 按文本显示和记录。
 
 ### 智能体 skill
 
