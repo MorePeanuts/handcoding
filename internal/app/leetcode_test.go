@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -117,6 +119,83 @@ func TestLeetCodeSessions(t *testing.T) {
 	}
 	if removed, err := app.LeetCodeLogout(); removed != nil || err != nil {
 		t.Errorf("LeetCodeLogout() logged out = %v, %v", removed, err)
+	}
+}
+
+// The browser login takes the session from the authorize-login redirect, at
+// its own path only, once.
+func TestLeetCodeBrowserLogin(t *testing.T) {
+	isolateConfig(t)
+	srv := userStatus(t)
+	c := leetcode.NewClient(leetcode.Site{Name: leetcode.SiteCN.Name, Base: srv.URL}, "")
+	get := func(u string) (int, string) {
+		t.Helper()
+		resp, err := http.Get(u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(body)
+	}
+	// start returns a login and its callback URL, as the page redirects to it.
+	start := func() (*app.LeetCodeBrowserLogin, string) {
+		t.Helper()
+		b, err := app.StartLeetCodeBrowserLogin(c, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = b.Close() })
+		page, err := url.Parse(b.URL)
+		if err != nil || page.Path != "/authorize-login/http/" || !strings.HasPrefix(b.URL, srv.URL) {
+			t.Fatalf("URL %s", b.URL)
+		}
+		callback := page.Query().Get("path")
+		if !strings.HasPrefix(callback, fmt.Sprintf("127.0.0.1:%d/callback/", b.Port)) {
+			t.Fatalf("callback %s", callback)
+		}
+		return b, "http://" + callback
+	}
+	wait := func(b *app.LeetCodeBrowserLogin) (string, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		user, _, err := b.Wait(ctx)
+		return user, err
+	}
+
+	b, callback := start()
+	if code, _ := get(strings.TrimRight(callback, "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567") + "?cookie=LEETCODE_SESSION%3Dgood"); code != http.StatusNotFound {
+		t.Errorf("another path: HTTP %d", code)
+	}
+	cookie := "?cookie=" + url.QueryEscape("LEETCODE_SESSION=good; csrftoken=x")
+	if code, body := get(callback + cookie); code != http.StatusOK || !strings.Contains(body, "as alice") {
+		t.Errorf("callback: HTTP %d, %q", code, body)
+	}
+	if user, err := wait(b); user != "alice" || err != nil {
+		t.Errorf("Wait = %q, %v", user, err)
+	}
+	if s, err := app.LeetCodeSession(c.Site); err != nil || s.Token != "good" {
+		t.Errorf("saved session %+v, %v", s, err)
+	}
+	if _, body := get(callback + cookie); !strings.Contains(body, "over") {
+		t.Errorf("second callback: %q", body)
+	}
+
+	for _, q := range []string{"?cookie=" + url.QueryEscape("LEETCODE_SESSION=bad"), ""} {
+		b, callback := start()
+		if code, _ := get(callback + q); code != http.StatusBadRequest {
+			t.Errorf("callback%s: HTTP %d", q, code)
+		}
+		if _, err := wait(b); err == nil {
+			t.Errorf("callback%s: logged in", q)
+		}
+	}
+
+	b, _ = start()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, _, err := b.Wait(ctx); !errors.Is(err, context.Canceled) {
+		t.Errorf("Wait canceled: %v", err)
 	}
 }
 

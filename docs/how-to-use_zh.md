@@ -377,19 +377,28 @@ table.insert(dap.configurations.python, { type = "hc", name = "hc attach", reque
 `hc leetcode` 在 LeetCode 上运行解答，或把它提交到你自己的账号，相当于题目页面上的"运行"和"提交"按钮。它只用于来自 LeetCode 的题目（用 `hc fetch` 获取，或来自官方题目包等题目包）：站点和 slug 取自 `problem.yaml` 的 `source`，`--site` 可以换成另一个站点。
 
 ```sh
-hc leetcode login --site cn          # 每个站点一次：粘贴浏览器的 LEETCODE_SESSION
+hc leetcode login --site cn          # 每个站点一次：在浏览器中授权 hc
 hc leetcode test two-sum             # 在 LeetCode 的示例测试用例上运行
 hc leetcode test two-sum -i $'[3,3]\n6'   # 或者用自己的输入，采用 LeetCode 的格式
 hc leetcode submit two-sum -l python # 提交到你的账号
 hc leetcode logout                   # 忘掉所有站点的会话（--site：只忘掉一个）
 ```
 
-**登录。** LeetCode 登录需要验证码，所以 hc 不用密码，而是使用浏览器的会话。在浏览器中登录该站点，打开开发者工具（F12），然后复制下面任意一种：
+**登录。** LeetCode 登录需要验证码，所以 hc 不用密码，而是使用浏览器的会话。默认情况下，`hc leetcode login` 会像 LeetCode 的 VS Code 插件那样，在浏览器中打开该站点的授权页面（尚未登录的话，先在那里登录）。随后 LeetCode 把浏览器的 cookie 发送到 hc 在 `127.0.0.1` 上监听的端口，页面会提示 hc 已经登录。cookie 是通过这个 URL 传递的，所以它会留在浏览器的历史记录中。在没有桌面环境的机器上，或者通过 SSH 登录时，先转发端口，再在你自己的机器上打开 hc 打印的页面：
+
+```sh
+ssh -L 8765:127.0.0.1:8765 server     # 在你的机器上
+hc leetcode login --port 8765         # 在服务器上
+```
+
+授权页面并不是 LeetCode 公开文档中的 API。如果它不再可用，就用 `--paste` 登录（标准输入不是终端时也会这样）：在浏览器中登录该站点，打开开发者工具（F12），然后复制下面任意一种：
 
 - `LEETCODE_SESSION` 这个 cookie 的值，位于 Application（Chrome、Edge）或 Storage（Firefox、Safari）→ Cookies；
 - 或者在 Network 中任选一个发往该站点的请求（列表为空时刷新页面）：右键 → Copy → Copy as cURL，或者复制它的 `Cookie` 请求头。
 
-在 `hc leetcode login` 询问时粘贴（粘贴时不会显示任何内容），或者通过管道传入（macOS 上是 `pbpaste | hc leetcode login --site cn`）。hc 从粘贴的内容中找出 `LEETCODE_SESSION`，向 LeetCode 验证之后保存到用户配置目录（macOS 上是 `~/Library/Application Support`，Linux 上是 `~/.config`）下的 `hc/leetcode.json`，只有你自己可读，绝不会放在工作区里。会话的有效期是几周；LeetCode 拒绝它时，重新登录即可。`hc leetcode logout` 忘掉所有站点的会话，或者 `--site` 指定的那个，但只是 hc 不再保存：会话在过期之前在 LeetCode 那边仍然有效，要让它失效，需要在浏览器中退出登录。
+在 `hc leetcode login --paste` 询问时粘贴（粘贴时不会显示任何内容），或者通过管道传入（macOS 上是 `pbpaste | hc leetcode login --site cn`）。hc 从粘贴的内容中找出 `LEETCODE_SESSION`。
+
+无论哪种方式，hc 都会向 LeetCode 验证会话，然后保存到用户配置目录（macOS 上是 `~/Library/Application Support`，Linux 上是 `~/.config`）下的 `hc/leetcode.json`，只有你自己可读，绝不会放在工作区里。会话的有效期是几周；LeetCode 拒绝它时，重新登录即可。`hc leetcode logout` 忘掉所有站点的会话，或者 `--site` 指定的那个，但只是 hc 不再保存：会话在过期之前在 LeetCode 那边仍然有效，要让它失效，需要在浏览器中退出登录。
 
 **代码。** hc 发送的是 `hc test` 会运行的那份解答（`-l` 的用法相同），并转换成 LeetCode 的代码：Python 去掉从 `hc_runtime` 的导入（LeetCode 自己定义了 `ListNode`、`TreeNode` 和 `Node`），Go 去掉 `package main`。Python 的函数题在 LeetCode 上必须是 `class Solution` 的方法；hc 也接受模块级函数，但 LeetCode 不接受。
 

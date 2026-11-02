@@ -47,6 +47,9 @@ func TestLeetCodeCommands(t *testing.T) {
 			t.Errorf("logout %v: %q, %v; want %q", tc.args, out, err, tc.want)
 		}
 	}
+	if _, err := capture(t, "-w", dir, "leetcode", "login", "--paste", "--port", "8765"); err == nil || !strings.Contains(err.Error(), "paste") {
+		t.Errorf("login --paste --port: err = %v", err)
+	}
 	for ref, want := range map[string]string{
 		"local/two-sum":      "does not come from LeetCode",
 		"regression/two-sum": "not logged in to leetcode.com; run `hc leetcode login --site com`",

@@ -32,6 +32,13 @@ var (
 	SiteCN  = Site{Name: "cn", Base: "https://leetcode.cn"}
 )
 
+// AuthorizeURL is the site's authorize-login page, which redirects a browser
+// signed in to the site to http://callback?cookie=<its cookies>. callback is
+// a host and port, then a path.
+func (s Site) AuthorizeURL(callback string) string {
+	return s.Base + "/authorize-login/http/?path=" + url.QueryEscape(callback)
+}
+
 // SiteByName returns a site by "com" or "cn".
 func SiteByName(name string) (Site, error) {
 	switch strings.TrimPrefix(strings.ToLower(name), "leetcode.") {
