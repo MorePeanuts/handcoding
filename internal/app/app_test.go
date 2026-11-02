@@ -60,7 +60,8 @@ func requireTools(t *testing.T, tools ...string) {
 
 // TestRegressionReferences checks every problem of the regression set end to
 // end: its expected outputs must be reproduced by both the Python and the Go
-// reference solutions, which exercises both drivers on every supported shape.
+// reference solutions, which exercises both drivers on every supported shape,
+// and the inputs of its generated cases must match their digests.
 func TestRegressionReferences(t *testing.T) {
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
@@ -85,11 +86,18 @@ func TestRegressionReferences(t *testing.T) {
 				t.Fatal(err)
 			}
 			for i, c := range cases {
-				if !c.HasExpected() {
+				switch {
+				case c.Generated() && c.Digest == "":
+					t.Fatalf("generated case %d has no digest", i+1)
+				case !c.Generated() && !c.HasExpected():
 					t.Fatalf("case %d has no expected output", i+1)
 				}
 			}
 			sel, _ := app.Select(cases, nil, true)
+			// Generated cases are judged on the Python reference's outputs.
+			if err := a.Materialize(ctx, p, mustLang(t, a, "python"), sel, app.RunOptions{}); err != nil {
+				t.Fatal(err)
+			}
 			for _, langID := range []string{"python", "go"} {
 				rep, _, err := a.RunReference(ctx, p, langID, sel, app.RunOptions{})
 				if err != nil {

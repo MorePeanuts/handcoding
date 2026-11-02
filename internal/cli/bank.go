@@ -231,6 +231,7 @@ whose problems are copied. See ` + "`hc docs protocol`" + ` for the format.`,
 var importEntries = []string{
 	problem.MetaFile, problem.DescriptionFile, problem.CasesFile,
 	problem.AssetsDir, problem.ReferenceDir, problem.TemplatesDir, problem.CheckerFile,
+	problem.GeneratorFile,
 }
 
 func importProblem(a *app.App, dir string, force bool) error {
@@ -250,7 +251,7 @@ func importProblem(a *app.App, dir string, force bool) error {
 		if err := p.ValidateCase(c); err != nil {
 			return fmt.Errorf("case %d: %w", i+1, err)
 		}
-		if !c.HasExpected() {
+		if !c.HasExpected() && !c.Generated() {
 			missing++
 		}
 	}
@@ -412,6 +413,14 @@ func newCasesListCmd(root *rootOptions) *cobra.Command {
 						tags += ui.Faint.Render(" (" + s.Case.Note + ")")
 					}
 					fmt.Printf("%s%s\n", ui.Bold.Render(fmt.Sprintf("Case %d", s.Index)), tags)
+					if s.Case.Generated() {
+						fmt.Printf("  %s %s\n", ui.Faint.Render("Generate"), s.Case.Generate)
+						if s.Case.Digest == "" {
+							fmt.Printf("  %s %s\n", ui.Faint.Render("Digest  "), ui.Yellow.Render("(missing — run hc cases build)"))
+						}
+						fmt.Printf("  %s %s\n", ui.Faint.Render(fmt.Sprintf("%-8s", ui.ExpectedLabel(p))), ui.Faint.Render("(computed by the reference solution when judged)"))
+						continue
+					}
 					fmt.Printf("  %s %s\n", ui.Faint.Render("Input   "), clip(p.FormatInput(s.Case), maxLen))
 					exp := ui.Yellow.Render("(missing — run hc cases build)")
 					if s.Case.HasExpected() {
@@ -454,22 +463,22 @@ func newCasesBuildCmd(root *rootOptions) *cobra.Command {
 every case without an expected output and store the results. With --force,
 recompute all expected outputs and report which ones changed. Problems judged
 with any_of are refused: their expected outputs list every acceptable answer,
-so write them by hand.`,
+so write them by hand.
+
+Generated cases (built by generator.py) store no expected output. Their inputs
+are built afresh and their digests written; on those whose digest is new or
+changed (all with --force), every other reference is judged against the
+outputs of the one that runs.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withWritableProblem(root, args[0], func(a *app.App, p *problem.Problem) error {
 				res, err := a.BuildCases(cmd.Context(), p, langName, force)
-				if res != nil && res.Filled > 0 {
-					fmt.Printf("%s %d expected output(s) using the %s reference\n", ui.Green.Render("filled"), res.Filled, res.Lang.Name())
-				}
-				if res != nil && len(res.Changed) > 0 {
-					fmt.Printf("%s cases %v differ from the previous expected output\n", ui.Yellow.Render("changed"), res.Changed)
-				}
+				printBuild(res)
 				if err != nil {
 					return err
 				}
-				if res.Filled == 0 {
-					fmt.Println("All cases already have expected outputs (use --force to recompute).")
+				if res.Filled == 0 && res.Digests == 0 && len(res.Checked) == 0 {
+					fmt.Println("All cases already have expected outputs and digests (use --force to recompute).")
 				}
 				return nil
 			})
@@ -480,31 +489,83 @@ so write them by hand.`,
 	return cmd
 }
 
+// printBuild reports what BuildCases did.
+func printBuild(res *app.BuildResult) {
+	if res == nil {
+		return
+	}
+	if res.Filled > 0 {
+		fmt.Printf("%s %d expected output(s) using the %s reference\n", ui.Green.Render("filled"), res.Filled, res.Lang.Name())
+	}
+	if res.Digests > 0 {
+		fmt.Printf("%s %d digest(s) of generated inputs\n", ui.Green.Render("wrote"), res.Digests)
+	}
+	for _, l := range res.Checked {
+		fmt.Printf("%s the %s reference matches the %s reference on generated cases\n", ui.Green.Render("checked"), l.Name(), res.Lang.Name())
+	}
+	for _, u := range res.Unchecked {
+		fmt.Printf("%s %s\n", ui.Yellow.Render("warning:"), u)
+	}
+	if len(res.Changed) > 0 {
+		fmt.Printf("%s cases %v differ from their previous expected output or digest\n", ui.Yellow.Render("changed"), res.Changed)
+	}
+}
+
 func newCasesAddCmd(root *rootOptions) *cobra.Command {
 	var (
 		input, expected, note string
+		generate, args        string
+		seed                  int64
 		example               bool
 	)
 	cmd := &cobra.Command{
-		Use:   "add <problem> --input JSON [--expected JSON]",
+		Use:   "add <problem> (--input JSON [--expected JSON] | --generate NAME [--args JSON] [--seed N])",
 		Short: "Append a test case",
 		Long: `Append a case. Without --expected, the reference solution computes it if
 there is one.
 
-  hc cases add two-sum --input '{"nums":[1,4],"target":5}' --expected '[0,1]'`,
+  hc cases add two-sum --input '{"nums":[1,4],"target":5}' --expected '[0,1]'
+
+With --generate, append a generated case instead: generator.py builds its input
+with the function NAME, called as NAME(rng, **args), and a reference solution
+computes its expected output when it is judged. The case's digest is written
+when there is a reference solution.
+
+  hc cases add two-sum --generate distinct --args '{"n":100000}' --seed 7`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return withWritableProblem(root, args[0], func(a *app.App, p *problem.Problem) error {
-				c, err := parseInput(p, input)
-				if err != nil {
-					return err
+		RunE: func(cmd *cobra.Command, cmdArgs []string) error {
+			return withWritableProblem(root, cmdArgs[0], func(a *app.App, p *problem.Problem) error {
+				var c problem.Case
+				switch {
+				case (input == "") == (generate == ""):
+					return errors.New("give either --input or --generate")
+				case generate != "":
+					if expected != "" || example {
+						return errors.New("a generated case has no --expected and cannot be an --example")
+					}
+					g, err := parseGenerate(generate, args, seed)
+					if err != nil {
+						return err
+					}
+					c = problem.Case{Generate: g}
+				default:
+					if args != "" || cmd.Flags().Changed("seed") {
+						return errors.New("--args and --seed go with --generate")
+					}
+					var err error
+					if c, err = parseInput(p, input); err != nil {
+						return err
+					}
+					if expected != "" {
+						if !json.Valid([]byte(expected)) {
+							return errors.New("--expected is not valid JSON")
+						}
+						c.Expected = json.RawMessage(expected)
+					}
 				}
 				c.Note, c.Example = note, example
-				if expected != "" {
-					if !json.Valid([]byte(expected)) {
-						return errors.New("--expected is not valid JSON")
-					}
-					c.Expected = json.RawMessage(expected)
+				if err := p.ValidateCase(c); err != nil {
+					return err
 				}
 				cases, err := p.LoadCases()
 				if err != nil {
@@ -518,10 +579,12 @@ there is one.
 				if c.Expected == nil {
 					if _, _, err := a.ReferenceLang(p, ""); err == nil {
 						res, err := a.BuildCases(cmd.Context(), p, "", false)
+						printBuild(res)
 						if err != nil {
 							return err
 						}
-						fmt.Printf("%s %d expected output(s) using the %s reference\n", ui.Green.Render("filled"), res.Filled, res.Lang.Name())
+					} else if c.Generated() {
+						fmt.Println(ui.Yellow.Render("no digest and no expected output (no reference solution); add one, then run hc cases build"))
 					} else {
 						fmt.Println(ui.Yellow.Render("no expected output (no reference solution); the case only shows your output"))
 					}
@@ -530,12 +593,34 @@ there is one.
 			})
 		},
 	}
-	cmd.Flags().StringVarP(&input, "input", "i", "", "input as a JSON object (required)")
+	cmd.Flags().StringVarP(&input, "input", "i", "", "input as a JSON object")
 	cmd.Flags().StringVarP(&expected, "expected", "e", "", "expected output as JSON")
+	cmd.Flags().StringVar(&generate, "generate", "", "the function of generator.py that builds the input")
+	cmd.Flags().StringVar(&args, "args", "", "the generator's keyword arguments as a JSON object")
+	cmd.Flags().Int64Var(&seed, "seed", 0, "the seed of the generator's rng")
 	cmd.Flags().StringVar(&note, "note", "", "remark")
 	cmd.Flags().BoolVar(&example, "example", false, "mark as example (run by hc test)")
-	_ = cmd.MarkFlagRequired("input")
 	return cmd
+}
+
+// parseGenerate builds the generate field of a case from the flags of
+// hc cases add.
+func parseGenerate(name, args string, seed int64) (*problem.Generate, error) {
+	g := &problem.Generate{Name: name, Seed: seed}
+	if args != "" {
+		if err := json.Unmarshal([]byte(args), &g.Args); err != nil || g.Args == nil {
+			return nil, errors.New("--args must be a JSON object mapping argument names to values")
+		}
+	}
+	// Checked as cases.jsonl would be.
+	line, err := problem.MarshalCase(problem.Case{Generate: g})
+	if err != nil {
+		return nil, err
+	}
+	if _, err := problem.ParseCase(line); err != nil {
+		return nil, err
+	}
+	return g, nil
 }
 
 func newCasesRmCmd(root *rootOptions) *cobra.Command {

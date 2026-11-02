@@ -97,19 +97,34 @@ func IsRepository(dir string) bool {
 // callers clone into a directory of their own, which the user should not
 // see.
 func Clone(ctx context.Context, source, dir string, progress io.Writer) error {
-	args := []string{"clone"}
+	terminal := false
 	if progress != nil {
 		// git shows its progress only on a terminal, and its standard error
 		// is now a pipe.
 		if f, ok := progress.(*os.File); ok && isatty.IsTerminal(f.Fd()) {
-			args = append(args, "--progress")
+			terminal = true
 		}
 		d := &dropLine{w: progress, prefix: "Cloning into "}
 		defer d.flush()
 		progress = d
 	}
-	_, err := run(ctx, "", progress, append(args, "--", source, dir)...)
+	_, err := run(ctx, "", progress, cloneArgs(source, dir, terminal)...)
 	return err
+}
+
+// cloneArgs are the arguments of git clone. A clone of a URL is partial
+// (--filter=blob:none): it gets every commit but only the files of the
+// commits checked out, so that the size of a repository's history does not
+// matter. git ignores the filter for a local path, and says so.
+func cloneArgs(source, dir string, progress bool) []string {
+	args := []string{"clone"}
+	if progress {
+		args = append(args, "--progress")
+	}
+	if _, err := os.Stat(source); err != nil {
+		args = append(args, "--filter=blob:none")
+	}
+	return append(args, "--", source, dir)
 }
 
 // dropLine writes to w what git writes, except its first line when that

@@ -25,7 +25,7 @@
   solutions/local/python/0001-two-sum/     你的代码：solution.py，以及自动生成的 hc_runtime.py 和 _hc_runner.py
   .hc/hc.db                                提交历史（SQLite）
   .hc/venv/                                hc 管理的 Python 虚拟环境
-  .hc/cache/                               供编码智能体使用的 Go 和 uv 缓存
+  .hc/cache/                               供编码智能体使用的 Go 和 uv 缓存，以及生成用例（cases/）
   pyrightconfig.json                       让 pyright 使用 .hc/venv
 ```
 
@@ -193,7 +193,7 @@ hc rm my-problem                    # 删除题目（加 --purge 时连同你的
 `hc fetch`、`hc new` 和 `hc import` 都写入 `packs/local/problems/`。题目的格式，从 `problem.yaml` 到参考解，由[题目协议](protocol_zh.md)规定；`hc new` 会生成一个待填写的骨架，hc 的回归测试集（仓库中的 [`testdata/regression`](../testdata/regression)）则包含覆盖每项功能的完整例子。
 
 - `hc cases build` 运行一个参考解：有 Go 参考解时用 Go，否则用 Python；`-l` 可以指定。判题方式为 `any_of` 的题目会被拒绝，因为它的 `expected` 要列出所有可接受的答案，只能手写。
-- `hc validate` 把每一处违反协议[合法性规则](protocol_zh.md#合法性规则)的地方报为错误，并注明用例编号和字段。加上 `--run` 时，它还会在每个用例上运行每个参考解，有判题程序时交给判题程序判定。以下情况给出警告：判题规则未确定（没有 `judge.compare`）、没有用例、有用例缺少 `expected`、没有用例标记为示例、没有参考解，以及题面引用的图片不存在。`hc test`、`hc submit` 和 `hc debug` 拒绝运行违反这些规则的用例，并指出是哪一个。
+- `hc validate` 把每一处违反协议[合法性规则](protocol_zh.md#合法性规则)的地方报为错误，并注明用例编号和字段。加上 `--run` 时，它还会在每个用例上运行每个参考解，有判题程序时交给判题程序判定。以下情况给出警告：判题规则未确定（没有 `judge.compare`）、没有用例、有用例缺少 `expected`、有生成用例缺少摘要、有存储的用例超过 100 KB、没有用例标记为示例、没有参考解，以及题面引用的图片不存在。`hc test`、`hc submit` 和 `hc debug` 拒绝运行违反这些规则的用例，并指出是哪一个。
 - `hc import` 只复制协议定义的条目（其余内容，如编辑器文件、`solutions/` 目录，不会被导入）；如果你自己的题目中已有相同的 slug 或编号，会拒绝导入（`--force` 会替换 slug 相同的题目）。slug 和编号只需在一个题目包内唯一，所以导入一道已安装题目包里也有的题目没有问题。题面和标题与你自己题目的语言区域不符的题目也会被拒绝，就像 `hc validate` 会报告的那样：缺少某个语言区域的题面，或者有其他语言区域的题面。
 - `hc rm` 删除题目的目录；在题目包检出目录中，还会把它的 slug 从 `pack.yaml` 的各个分组中移除，并保留该文件的注释和格式。它会先询问确认（`--yes` 跳过询问），并且拒绝修改已安装的题目包。你对这道题的解答、提交历史和收藏会保留，以后再添加同一 slug 的题目时会重新对应上；加 `--purge` 则一并删除。
 - 不带参数的 `hc validate` 还会检查每个已安装题目包的 `pack.yaml`，以及它的分组是否都指向本题目包的题目。每道题的目录名、slug 和编号都会与所在题目包的其他题目对照检查。
@@ -227,9 +227,34 @@ locales: [en, zh-CN]   # 你自己的题目：英文优先，也有中文
 ```sh
 hc cases list 3                     # 查看用例
 hc cases add 3 -i '{"s":"abba"}'    # 追加一个用例（有参考解时会算出期望输出）
+hc cases add 3 --generate long --args '{"n":100000}'   # 追加一个生成用例
 hc cases edit 3                     # 在编辑器中编辑 cases.jsonl
 hc cases build 3                    # 用参考解补全缺失的期望输出（--force：全部重算）
 ```
+
+### 生成用例
+
+大规模输入，也就是能抓出复杂度不对的解答的那种输入，不该写进 `cases.jsonl`：几个这样的用例就能让一道题有几 MB 大，而它们的每次改动都会永远留在题目包的 git 历史里。改为编写[生成器](protocol_zh.md#生成器)：题目的 `generator.py` 中一个返回输入的函数，再添加一个调用它的用例：
+
+```python
+# generator.py
+def descending(rng, n):
+    return {"nums": list(range(n, 0, -1))}      # 手工设计的最坏情况：不用 rng
+
+def distinct(rng, n):
+    return {"nums": rng.sample(range(-10**9, 10**9 + 1), n)}
+```
+
+```json
+{"generate":{"name":"descending","args":{"n":100000}},"note":"descending, quadratic for insertion sort"}
+{"generate":{"name":"distinct","args":{"n":100000},"seed":7}}
+```
+
+- `hc cases build` 重新运行生成器，并写入每个用例的 `digest`，即它构造出的输入的哈希。对摘要新增或改变了的用例（`--force` 时为全部），它以所运行的那份参考解的输出为期望输出评判其他每份参考解，所以 Go 和 Python 的参考解必须一致。生成用例不存储期望输出。
+- `hc test`、`hc submit` 和 `hc debug` 会构造它们要运行的生成用例：无论你用什么语言解题，生成器都由 Python 运行；期望输出由你所用语言的参考解（没有时用另一份）计算，然后照常评判。结果保存在 `.hc/cache/cases/<pack>/<problem>/<language>.json`，当 hc、`problem.yaml`、`generator.py`、参考解或生成用例改变时会重新构造。
+- 生成器失败、构造出的输入与摘要不符或不合法，以及参考解在生成的输入上失败，都是题目的错误，而不是对你的解答的判题结果：运行会停止，并指出文件和用例。`hc validate --run` 和 `hc pack check` 总是重新构造这些用例，从不读缓存，以便发现不确定的生成器。
+- `hc cases list` 把生成用例显示为它的调用，例如 `distinct(n=100000) seed 7`；报告中失败的生成用例显示为调用加上截断的输入。
+- `hc validate` 对超过 100 KB 的存储用例给出警告，`hc pack check` 则判为失败。
 
 ## 题目包
 
@@ -246,9 +271,9 @@ hc pack remove leetcode --purge             # ……连同它们一起删除
 ```
 
 > [!WARNING]
-> 安装题目包意味着信任它的代码：测试、提交或校验时，它的参考解和 checker 会在你的机器上运行。只从你信任的来源安装题目包。
+> 安装题目包意味着信任它的代码：测试、提交或校验时，它的参考解、checker 和生成器会在你的机器上运行。只从你信任的来源安装题目包。
 
-- **`hc pack install <source>`** 接受 git URL 或目录。本身是 git 仓库的目录会像 URL 一样被克隆；其他包含 `pack.yaml` 的目录会被复制（只复制 `pack.yaml` 和 `problems/`）。`--ref` 安装 git 来源的某个 tag 或分支，而不是默认分支。题目包安装到 `packs/<name>/`，名字取自它的 `pack.yaml`。hc 拒绝不合法的 `pack.yaml`、为它不支持的协议版本编写的 `pack.yaml`（并说明该升级 hc 还是题目包），以及与 `packs/` 中已有题目包重名的题目包。加载失败的题目会被报告，但不会阻止安装。
+- **`hc pack install <source>`** 接受 git URL 或目录。git URL 以部分克隆（`--filter=blob:none`）的方式克隆：hc 下载所有 commit，但只下载它检出的 commit 中的文件，所以无论题目包的文件曾经多大，它的历史都不占多少空间。本身是 git 仓库的目录会被完整克隆；其他包含 `pack.yaml` 的目录会被复制（只复制 `pack.yaml` 和 `problems/`）。`--ref` 安装 git 来源的某个 tag 或分支，而不是默认分支。题目包安装到 `packs/<name>/`，名字取自它的 `pack.yaml`。hc 拒绝不合法的 `pack.yaml`、为它不支持的协议版本编写的 `pack.yaml`（并说明该升级 hc 还是题目包），以及与 `packs/` 中已有题目包重名的题目包。加载失败的题目会被报告，但不会阻止安装。
 - **`hc pack list`** 显示每个题目包的名字、版本、题目数、进度（有通过提交的题目数）、已安装的 commit 和来源。`packs/` 中 `hc.yaml` 没有列出的目录（例如手动复制进来的）标为 *unmanaged*（未托管）；`hc.yaml` 列出了但 `packs/` 中没有的题目包标为 *missing*（缺失）。
 - **`hc pack update [name]...`** 拉取每个题目包，并检出它的 ref 的最新 commit：分支会前进，tag 保持不动（除非上游移动了它），`--ref` 改为跟随另一个 ref。安装时没有指定 `--ref` 的题目包跟随源仓库的默认分支，源仓库给默认分支改名后也一样。复制安装的题目包会重新复制。已安装的题目包是只读的，所以有本地修改的题目包会被拒绝更新；`--force` 丢弃这些修改。如果更新后 hc 无法读取 `pack.yaml`，或者题目包改了名，更新会被撤销。更新后 hc 列出新增和删除的题目。你的解答和提交历史按题目的目录名和 slug 关联，所以被删除的题目（或目录被改名的题目）的解答和历史会保留，但不再属于任何题目：hc 会说明这一点，不会删除任何东西。
 - **`hc pack remove <name>`** 删除 `packs/<name>/` 和它在 `hc.yaml` 中的条目。你的解答（`solutions/<name>/`）和提交历史保留，重新安装题目包后它们又会出现；`--purge` 会在确认后把它们一并删除（`--yes` 跳过确认）。`local` 不能删除。
@@ -274,7 +299,7 @@ hc 只修改这个列表，`hc.yaml` 的其余部分保留原有的注释和顺�
 
 ### 检查题目包
 
-`hc pack check` 是题目包的 CI 在发布前运行的检查。在题目包的检出目录中运行它（见[编写题目包](#编写题目包)），或者传入它的目录：`hc pack check ./my-pack`。它检查 `pack.yaml` 合法且协议版本受支持，分组中列出的都是本包的题目，并且每道题都能加载、合法、目录名规范、slug 和 ID 唯一、已就绪（设置了 `judge.compare`）、有用例且每个用例都有期望输出、有参考解，并通过 `hc validate --run`：每个参考解都通过每个用例。因此它需要 Go 和 Python 3.10+，无法运行的参考解也算错误。它为每道题输出一行，最后输出汇总，任何一项失败都以非零状态退出。
+`hc pack check` 是题目包的 CI 在发布前运行的检查。在题目包的检出目录中运行它（见[编写题目包](#编写题目包)），或者传入它的目录：`hc pack check ./my-pack`。它检查 `pack.yaml` 合法且协议版本受支持，分组中列出的都是本包的题目，并且每道题都能加载、合法、目录名规范、slug 和 ID 唯一、已就绪（设置了 `judge.compare`）、有用例且每个用例都有期望输出（生成用例则有摘要）、没有超过 100 KB 的用例、有参考解，并通过 `hc validate --run`：每个参考解都通过每个用例，生成用例重新构造。因此它需要 Go 和 Python 3.10+，无法运行的参考解也算错误。它为每道题输出一行，最后输出汇总，任何一项失败都以非零状态退出。
 
 ## 用编码智能体生成用例
 
@@ -287,7 +312,7 @@ hc fix two-sum -c 5 -m "answers in a different order should pass"
 `hc` 在工作区中以无头模式运行智能体（`claude -p` 或 `codex exec`）。启动前，它会安装或更新工作区的 skill（见[智能体 skill](#智能体-skill)）；智能体遵循 **`hc-cases`**，题目定义本身有误时还会用到 **`hc-problem`**。智能体按照 skill：
 
 1. 编写参考解 `reference/solution.py`，必要时再写一个暴力解用来交叉验证；
-2. 把测试**输入**写入 `cases.jsonl`，覆盖边界情况、特殊结构和大规模输入；
+2. 把测试**输入**写入 `cases.jsonl`，覆盖边界情况和特殊结构，大规模输入写成[生成用例](#生成用例)；
 3. 运行 `hc cases build`，所以期望输出来自运行参考解，而不是模型自己写的；
 4. 反复运行 `hc validate --run`，直到每份参考解都通过。
 

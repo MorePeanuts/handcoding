@@ -22,9 +22,10 @@ type ValidateOptions struct {
 	// Run runs the reference solutions on every case, which must pass.
 	Run bool
 	// Strict is for publishing a pack (hc pack check): a problem that is not
-	// ready, has no cases, cases without expected outputs or no reference,
-	// or a reference that cannot be run for want of its toolchain, is an
-	// error rather than a warning.
+	// ready, has no cases, cases without expected outputs or digests,
+	// stored cases over problem.MaxStoredCase or no reference, or a
+	// reference that cannot be run for want of its toolchain, is an error
+	// rather than a warning.
 	Strict bool
 	// Stderr receives the output of reference runs, such as the creation of
 	// the Python environment. Nil discards it.
@@ -111,10 +112,11 @@ func (a *App) ValidateWorkspace(ctx context.Context, o ValidateOptions, report f
 func lines(err error) []string { return strings.Split(err.Error(), "\n") }
 
 // ValidateProblem validates p against the protocol: problem.yaml,
-// cases.jsonl, starter generation, its statements and titles in the pack's
+// cases.jsonl (with generator.py, and the size of stored cases), starter
+// generation, its statements and titles in the pack's
 // locales, their images and its identity among peers, the problems of its
 // pack (nil loads them). name is how hints name the problem. With o.Run,
-// every reference runs on every case.
+// every reference runs on every case, generated cases built afresh.
 func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*problem.Problem, name string, o ValidateOptions) Finding {
 	f := Finding{Name: name, Problem: p}
 	var errs, warns []string
@@ -126,7 +128,8 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 		errs = append(errs, casesErr.Error())
 	}
 	f.Cases = len(cases)
-	missing, examples := 0, 0
+	missing, examples, generated, undigested := 0, 0, 0, 0
+	var large []string
 	if len(errs) == 0 {
 		for i, c := range cases {
 			if err := p.ValidateCase(c); err != nil {
@@ -134,13 +137,28 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 			}
 		}
 	}
-	for _, c := range cases {
-		if !c.HasExpected() {
+	for i, c := range cases {
+		switch {
+		case c.Generated():
+			generated++
+			if c.Digest == "" {
+				undigested++
+			}
+		case !c.HasExpected():
 			missing++
 		}
 		if c.Example {
 			examples++
 		}
+		if line, err := problem.MarshalCase(c); err == nil && len(line) > problem.MaxStoredCase && !c.Generated() {
+			large = append(large, fmt.Sprintf("case %d (%d KB)", i+1, len(line)>>10))
+		}
+	}
+	switch hasGen := p.HasGenerator(); {
+	case generated > 0 && !hasGen:
+		errs = append(errs, fmt.Sprintf("%d case(s) are generated, but %s is missing", generated, problem.GeneratorFile))
+	case generated == 0 && hasGen && casesErr == nil:
+		errs = append(errs, fmt.Sprintf("%s is only used by generated cases (\"generate\" in %s); add some, or remove it", problem.GeneratorFile, problem.CasesFile))
 	}
 	if len(errs) == 0 {
 		for _, l := range a.Langs.All() {
@@ -165,6 +183,12 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 	if missing > 0 {
 		gap(fmt.Sprintf("%d case(s) without expected output (hc cases build %s)", missing, name))
 	}
+	if undigested > 0 {
+		gap(fmt.Sprintf("%d generated case(s) without digest (hc cases build %s)", undigested, name))
+	}
+	if len(large) > 0 {
+		gap(fmt.Sprintf("stored cases over %d KB: %s; build large inputs with %s instead (\"generate\")", problem.MaxStoredCase>>10, strings.Join(large, ", "), problem.GeneratorFile))
+	}
 	if len(cases) > 0 && examples == 0 {
 		warns = append(warns, "no case marked as example; hc test runs the first 3")
 	}
@@ -181,6 +205,13 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 		gap("no reference solution")
 	} else if o.Run && len(errs) == 0 && len(cases) > 0 {
 		sel, _ := Select(cases, nil, true)
+		// Generated cases are built afresh, never from the cache, so that
+		// their digests check the generator; the first reference that runs
+		// computes their expected outputs, which the others must match.
+		if err := a.generateInputs(ctx, p, sel, true, o.Stderr); err != nil {
+			errs = append(errs, lines(err)...)
+			refs = nil
+		}
 		for _, l := range refs {
 			tc, err := l.Toolchain()
 			if err != nil {
@@ -190,6 +221,10 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 			if err := tc.Err(); err != nil {
 				errs = append(errs, fmt.Sprintf("%s reference not run: %v", l.Name(), err))
 				continue
+			}
+			if err := a.expectGenerated(ctx, p, l, sel, o.Stderr); err != nil {
+				errs = append(errs, lines(err)...)
+				break
 			}
 			refErrs := a.checkReference(ctx, p, l, sel, o.Stderr)
 			// The reference ran on the local toolchain, which may well be

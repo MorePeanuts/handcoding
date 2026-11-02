@@ -33,7 +33,7 @@ hc 自身的行为（`hc test` 运行哪些用例、`hc fetch` 如何导入题�
 
 - 交互题，即解答要与评测程序对话的题目（issue #7）；
 - `tests` 题，用测试代码而不是用例评判（issue #31）；
-- 用例生成器，以及性能评判（issue #33）；
+- 性能评判，例如相对于参考解的时限（issue #33）；
 - Go 和 Python 以外的解答语言。
 
 ## 题目包
@@ -138,11 +138,12 @@ groups:
 | `reference/solution.py`、`reference/solution.go` | 否 | 参考解，可以只有其中一部分语言 |
 | `templates/solution.py`、`templates/solution.go` | 否 | 初始代码，取代根据签名生成的初始代码 |
 | `checker.py` | 仅限 `judge.compare: checker` | 判题程序；见[判题程序](#判题程序) |
+| `generator.py` | 仅限有生成用例时 | 生成用例的生成器；见[生成器](#生成器) |
 
 - 在没有 `locales` 的题目包中，没有 `description.md` 的题目题面为空。没有 `cases.jsonl` 的题目没有用例。两者都合法，但这样的题目没法真正拿来练习。
 - 题面用相对于题目目录的路径引用本地文件，这些文件必须位于 `assets/` 下：`![](assets/rev1ex1.jpg)`。
 - 其他条目不属于题目。工具可以忽略或丢弃它们。
-- 参考解、初始代码和判题程序可以包含什么，由[解答 ABI](#解答-abi) 和[判题程序](#判题程序)规定。
+- 参考解、初始代码、判题程序和生成器可以包含什么，由[解答 ABI](#解答-abi)、[判题程序](#判题程序)和[生成器](#生成器)规定。
 
 ### 标识
 
@@ -504,14 +505,26 @@ judge:
 
 | 字段 | 类型 | 必需 | 含义 | 起始版本 |
 |---|---|---|---|---|
-| `input` | 对象 | 是 | 用例的输入，按题目种类而定（见下文） | 1 |
+| `input` | 对象 | 没有 `generate` 时 | 用例的输入，按题目种类而定（见下文） | 1 |
 | `expected` | JSON 值 | 否 | 期望输出，按题目种类而定（见下文）。`null` 也是一个值：`"expected": null` 是一个期望输出，缺少这个字段才表示没有 | 1 |
 | `example` | 布尔值 | 否 | 该用例是题面中的示例 | 1 |
 | `note` | 字符串 | 否 | 对用例的说明 | 1 |
+| `generate` | 对象 | 代替 `input` | 该用例是生成的：由 `generator.py` 构造它的输入（[生成器](#生成器)） | 1 |
+| `digest` | 字符串 | 与 `generate` 一起 | 生成的输入的摘要，即作者的生成器构造出的那个输入（[生成器](#生成器)） | 1 |
+
+`generate` 只含以下字段：
+
+| 字段 | 类型 | 必需 | 含义 | 起始版本 |
+|---|---|---|---|---|
+| `name` | 字符串 | 是 | `generator.py` 中构造输入的函数，是一个 Python 标识符 | 1 |
+| `args` | 对象 | 否 | 它的关键字参数，以名字为键；默认 `{}`。`rng` 不能作参数名 | 1 |
+| `seed` | 整数 | 否 | 它的 `rng` 的种子；默认 0 | 1 |
 
 - 一行恰好包含一个 JSON 值。空行，以及去掉开头空白后以 `//` 开头的行，会被忽略。
 - 用例从 1 开始编号，只计入包含用例的行。
 - 没有 `expected` 的用例是合法的，但无法评判（[判题结果](#判题结果)）。
+- 用例要么是存储的（有 `input`），要么是生成的（有 `generate`），不能两者都是。生成的用例没有 `expected`，因为它由参考解计算，也不能是 `example`。它的 `digest` 是可选的；没有它，就没有任何东西检查构造出的输入是否就是作者构造出的那个。
+- 存储的用例（它在 `cases.jsonl` 中的那一行）应该不超过 100 KB；更大的输入应该改为生成。
 
 按题目种类的 `input` 和 `expected`：
 
@@ -527,6 +540,12 @@ judge:
 
 ```json
 {"input": {"ops": ["LRUCache","put","put","get","put","get","put","get","get","get"], "args": [[2],[1,1],[2,2],[1],[3,3],[2],[4,4],[1],[3],[4]]}, "expected": [null,null,null,1,null,-1,null,-1,3,4], "example": true}
+```
+
+题目 0001 的一个生成用例：
+
+```json
+{"generate": {"name": "distinct", "args": {"n": 10000}, "seed": 7}, "digest": "sha256:770f520998afe517410b3abd7ee67824586ddb091eb9035006a536f1d45da621", "note": "10^4 distinct numbers"}
 ```
 
 ## 判题
@@ -576,7 +595,7 @@ judge:
 
 ### 时限
 
-`judge.timeout` 是解答在为它选定的用例上整次运行的墙钟时限，不是每个用例的时限。它用来防止卡死和死循环，不评判复杂度。到时后运行被终止，没有结果的用例判为超时（Time Limit Exceeded）；已经完成的用例保留各自的结果。判题程序的运行另有一个同样长度的时限。默认值是工作区的 `timeout`（未配置时为 10s）。
+`judge.timeout` 是解答在为它选定的用例上整次运行的墙钟时限，不是每个用例的时限。它用来防止卡死和死循环，不评判复杂度。到时后运行被终止，没有结果的用例判为超时（Time Limit Exceeded）；已经完成的用例保留各自的结果。判题程序的运行、生成器的运行，以及参考解为生成用例计算期望输出的运行，各自另有一个同样长度的时限。默认值是工作区的 `timeout`（未配置时为 10s）。
 
 ### 就绪
 
@@ -598,7 +617,7 @@ judge:
 
 前三种结果在评判之前确定；No Expected Output 先于 Not Judged 确定。整次运行的结果是按用例顺序第一个结果为 Runtime Error、Time Limit Exceeded 或 Wrong Answer 的用例的结果。没有这样的用例时，只要有用例被接受（或者没有运行任何用例）就是 Accepted，否则有用例未评判时为 Not Judged，否则为 No Expected Output。
 
-判题程序出错不是一种判题结果：见[判题程序](#判题程序)。
+判题程序出错不是一种判题结果：见[判题程序](#判题程序)。无法构造的生成用例也不是：见[生成器](#生成器)。
 
 ## 判题程序
 
@@ -636,6 +655,30 @@ def check(input, output, expected):
         return "%r has length %d, but the longest palindrome has length %d" % (output, len(output), len(expected))
 ```
 
+## 生成器
+
+用例可以是生成的，而不是存储的：评判该用例时，由 `generator.py` 构造它的输入，由参考解计算它的期望输出。能抓出复杂度不对的解答的大输入就这样写，于是题目包里存的是构造数据的程序，而不是数据本身。
+
+有生成用例的题目必须在目录中有 `generator.py`，没有生成用例的题目不得有。无论解答用什么语言，生成器都用 Python 编写，并且必须能在 Python 3.10 上运行。
+
+```python
+def descending(rng, n):
+    return {"nums": list(range(n, 0, -1))}
+
+
+def distinct(rng, n):
+    return {"nums": rng.sample(range(-10**9, 10**9 + 1), n)}
+```
+
+- `generate.name` 指向 `generator.py` 中的一个函数，以 `name(rng, **args)` 的形式调用，`args` 即用例的 `generate.args`。它返回用例的输入：一个 `input` 形式的 dict（[用例](#用例)），值是解码后的 JSON 值，并且必须像存储的输入一样是该题目的合法输入。
+- 生成器可以是任何程序，不只是随机的。精心设计的最坏情况（倒序数组、全部相等的值、退化的树）就是一个不用 `rng` 的函数。
+- `rng` 是以 `generate.seed` 为种子的 `hc_runtime.Rng`：splitmix64，同一个种子在任何 Python 版本和机器上都给出相同的数。它的方法有 `random()`（[0, 1) 中的浮点数）、`randint(a, b)`（[a, b] 中的整数）、`uniform(a, b)`、`choice(seq)`、`shuffle(x)`（就地打乱一个列表）和 `sample(population, k)`（序列中 k 个互不相同的元素，顺序随机；`sample(range(1, 10**9), 10**5)` 不会构造整个 range）。生成器可以用 `Rng(seed)` 再创建别的。
+- 生成器必须是确定的：同一个调用在任何机器和受支持的 Python 版本上都必须返回相同的输入。它们不得使用 `random` 模块（它只保证 `random()` 在不同 Python 版本间不变），也不得使用时间、环境、文件或网络，并且不得让以字符串为键的集合或字典的迭代顺序（哈希随机化会改变它）进入输入。
+- `digest` 是 `sha256:` 加上输入的规范 JSON 的 SHA-256 的小写十六进制：UTF-8 的输入对象，键排序，没有空白，数字保持生成器写出的样子，字符串只转义 `"`、`\`、控制字符、U+2028 和 U+2029。它由工具写入（`hc cases build`），而不是由作者手写。与摘要不符的输入是作者从未检查过的用例，所以算题目出错。
+- 生成用例的期望输出是参考解在其输入上的输出。有生成用例的题目必须有参考解。判题程序收到的 `expected` 就是这个输出。`judge.compare: any_of` 不能评判生成用例，因为参考解只找出一个答案：这类题目的大用例用 `unordered` 或判题程序评判。
+- 一次运行中各生成用例的生成器在同一个进程里运行，在解答之前，时限为[时限](#时限)的长度。`generator.py` 无法加载、缺少该函数、抛出异常、返回的不是合法输入或与摘要不符，或者超时，都算题目出错，而不是对解答的判题结果；参考解在生成的输入上失败也一样：这次运行失败，并给出指明文件和用例的错误。
+- 生成器可以导入 `hc_runtime` 的公开名称（[Python](#python)），此外只能使用标准库。
+
 ## 解答 ABI
 
 解答必须是什么样子，驱动程序才能调用它。用户的解答、参考解（`reference/solution.*`）和初始代码（`templates/solution.*`）都是解答。参考解和初始代码必须遵守本节，并且只使用标准库；初始代码必须保持签名，即这里规定的函数名、类名、方法名、参数顺序和类型。解答按 `function.params`（或构造函数和方法参数）的顺序收到参数，不含隐藏输入，绑定方式见[类型](#类型)。
@@ -649,7 +692,7 @@ def check(input, output, expected):
 | 入口 | 一个 `Solution` 类，带有名为 `function.name` 的方法，每个用例无参数实例化一次；或者在模块没有定义 `Solution` 时，一个名为 `function.name` 的模块级函数 | 一个名为 `class.name` 的类，`__init__` 接收构造函数参数，方法名为 `class.methods` 中的名字 |
 
 - 未捕获的异常算运行错误；语法错误算编译错误。
-- 协议的类型来自 `hc_runtime` 模块。它的公开 API 正是其 `__all__` 中的名称：`ListNode`、`TreeNode`、`GraphNode`、`NaryNode`、`RandomListNode`、`NextTreeNode`、`QuadNode`、`MultilevelNode`、`NestedInteger`、`Employee`、`decode` 和 `encode`。解答和判题程序可以导入这些名称，不得从中导入其他任何东西。
+- 协议的类型来自 `hc_runtime` 模块。它的公开 API 正是其 `__all__` 中的名称：`ListNode`、`TreeNode`、`GraphNode`、`NaryNode`、`RandomListNode`、`NextTreeNode`、`QuadNode`、`MultilevelNode`、`NestedInteger`、`Employee`、`Rng`、`decode` 和 `encode`。解答、判题程序和生成器可以导入这些名称，不得从中导入其他任何东西。`Rng` 是[生成器](#生成器)的随机数生成器。
 - 题目的 `Node` 类型以 `Node` 这个名字导入：`from hc_runtime import GraphNode as Node`。其他类型保留原名：`from hc_runtime import ListNode, TreeNode`、`from hc_runtime import NestedInteger`。
 - `decode(type, value)` 把一个 JSON 值转成协议类型 `type`（规范名称，如 `"TreeNode"` 或 `"integer[]"`）对应的 Python 值，`encode(type, value)` 做相反的转换。
 - 参考解必须导入它用到的名称。初始代码可以省略导入：不包含 `hc_runtime` 的初始代码前面会加上标准的导入块（`typing` 中的名称、`ListNode`、`TreeNode`，以及题目的 `Node`、`NestedInteger` 和 `Employee`）。
@@ -676,11 +719,11 @@ def check(input, output, expected):
 | Python | 3.10 |
 | Go | 1.22 |
 
-参考解、初始代码和判题程序必须能在这些版本上运行，包括语言和标准库：只有在受支持的工具链上，才会用参考解计算期望输出或检查参考解。用户的解答可以使用其工具链支持的任何特性。要按 Go 1.22 检查 Go 代码，在它的模块中写 `go 1.22` 并运行 `go vet`，其中的 `stdversion` 检查会报告较新的标准库符号。
+参考解、初始代码、判题程序和生成器必须能在这些版本上运行，包括语言和标准库：只有在受支持的工具链上，才会用参考解计算期望输出或检查参考解。用户的解答可以使用其工具链支持的任何特性。要按 Go 1.22 检查 Go 代码，在它的模块中写 `go 1.22` 并运行 `go vet`，其中的 `stdversion` 检查会报告较新的标准库符号。
 
 ## 合法性规则
 
-合法的题目包满足以下每一条规则，其中的每道题目也满足。`hc validate` 检查关于 `problem.yaml` 和 `cases.jsonl` 的规则，以及题目包中关于题目目录、标识和语言区域的规则；`hc validate --run` 还检查关于参考解的规则。
+合法的题目包满足以下每一条规则，其中的每道题目也满足。`hc validate` 检查关于 `problem.yaml` 和 `cases.jsonl` 的规则，以及题目包中关于题目目录、标识和语言区域的规则；`hc validate --run` 还检查关于参考解和生成用例的规则。
 
 **problem.yaml**
 
@@ -701,12 +744,14 @@ def check(input, output, expected):
 
 **cases.jsonl**
 
-1. 每个非空、非注释的行都必须是一个 JSON 对象，包含 `input`（对象），可选 `expected`、`example`（布尔值）和 `note`（字符串），没有其他字段。
+1. 每个非空、非注释的行都必须是一个 JSON 对象，包含 `input`（对象），可选 `expected`、`example`（布尔值）和 `note`（字符串），没有其他字段；生成用例则包含 `generate`，可选 `digest` 和 `note`，没有其他字段。
 2. 函数题用例的 `input` 必须恰好以参数（`copy` 参数除外）和隐藏输入为键；设计题用例恰好有 `ops` 和 `args`；编解码往返题用例恰好有 `encode` 的参数。
 3. 每个值都必须使用其类型的编码（[类型](#类型)），包括树和评测系统定义的类型的约束：`TreeNode` 的层序只为实际存在的节点列出子节点、邻居在图中、随机下标在链表内、`NaryNode`、`QuadNode` 和 `MultilevelNode` 的形式合法、员工 id 互不相同且下属都已知。`ref` 的值必须是整数。
 4. 结构输入必须吻合：`cycle` 的位置在链表内，被接上的两个链表从 `skip` 和 `at` 开始的值相同，`ref` 的值恰好出现一次。
 5. 在设计题用例中，`ops` 和 `args` 的长度必须相同且不为零，`ops[0]` 必须是类名，其余每个操作都必须是方法，`args` 的每一项都必须恰好包含该操作的参数，且类型相符。
 6. 有 `expected` 时，它必须具有被评判的值的形式（[用例](#用例)）：`any_of` 时为这种值组成的数组；设计题用例中每个操作一项，构造函数和 `void` 方法为 `null`。其中的值必须按输出的方式编码，规则 3 对输入没有这项要求：空的 `ListNode`、`TreeNode` 或 `Node` 不写作 `null`，没有末尾的 `null`，不是叶子的 `QuadNode` 写作 `[0,1]`。
+7. `generate` 必须是一个对象，包含 `name`（Python 标识符），可选 `args`（键为 `rng` 以外的 Python 标识符的对象）和 `seed`（整数），没有其他字段。有 `digest` 时，它必须是 `sha256:` 加上 64 个小写十六进制数字。
+8. 有生成用例时必须有 `generator.py`，否则不得有。用 `any_of` 评判的题目不得有生成用例。
 
 **pack.yaml**
 
@@ -727,7 +772,8 @@ def check(input, output, expected):
 5. 在有 `locales` 的题目包中，每道题目都必须有每个语言区域的题面和标题：默认语言区域是 `description.md` 和 `title`，其他语言区域是 `description.<locale>.md` 和非空的 `titles.<locale>`（[语言区域](#语言区域)）。
 6. 题目的 `description.<locale>.md` 文件和 `titles` 的键必须是题目包中默认语言区域以外的语言区域；在没有 `locales` 的题目包中，题目两者都不得有。
 
-**参考解、初始代码和判题程序**
+**参考解、初始代码、判题程序和生成器**
 
 1. 每份参考解都必须能构建，并且在受支持的工具链上，按题目的判题规则通过每个有 `expected` 的用例（Accepted；题目未就绪时为 Not Judged）；没有 `expected` 的用例必须能无错误地运行。有判题程序时，判题程序在任何参考解输出上都不得出错。
-2. 参考解、初始代码和判题程序必须遵守[解答 ABI](#解答-abi) 和[判题程序](#判题程序)的规定，并且能在[支持的最低版本](#语言版本)上运行。`hc validate` 不检查这一条。
+2. 有生成用例的题目必须有参考解。每个生成用例都必须能构造：它的函数必须返回合法的输入，有 `digest` 时就是摘要所指的那个；每份参考解都必须能在它上面无错误地运行，并且以任何其他参考解的输出为期望输出时能通过。
+3. 参考解、初始代码、判题程序和生成器必须遵守[解答 ABI](#解答-abi)、[判题程序](#判题程序)和[生成器](#生成器)的规定，并且能在[支持的最低版本](#语言版本)上运行。`hc validate` 不检查这一条。

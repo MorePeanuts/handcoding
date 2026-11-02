@@ -356,6 +356,9 @@ func (t *tailBuffer) String() string { return t.buf.String() }
 // would read in some way of their own and the judge would then judge.
 func checkCases(p *problem.Problem, cases []Selected) error {
 	for _, c := range cases {
+		if c.Case.Generated() && c.Case.Input == nil {
+			return fmt.Errorf("case %d is generated, and its input was not built", c.Index)
+		}
 		if err := p.ValidateCase(c.Case); err != nil {
 			return fmt.Errorf("case %d is invalid: %w (hc validate checks the whole problem)", c.Index, err)
 		}

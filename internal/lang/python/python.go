@@ -6,7 +6,9 @@
 //
 // Python also runs the checkers of problems judged by one (judge.compare:
 // checker), for solutions in every language: hc_checker.py calls check from
-// the problem's checker.py on every case of a run.
+// the problem's checker.py on every case of a run. It also runs the
+// generators of generated cases: hc_generator.py calls the functions of the
+// problem's generator.py.
 package python
 
 import (
@@ -36,11 +38,15 @@ var runtimeSrc []byte
 //go:embed hc_checker.py
 var checkerSrc []byte
 
+//go:embed hc_generator.py
+var generatorSrc []byte
+
 const (
 	solutionFile = "solution.py"
 	runtimeFile  = "hc_runtime.py"
 	runnerFile   = "_hc_runner.py"
 	checkerFile  = "hc_checker.py"
+	genFile      = "hc_generator.py"
 )
 
 // header is the import block of starters: typing names, ListNode and
@@ -272,6 +278,21 @@ except SyntaxError:
     sys.stderr.write("".join(traceback.format_exc(limit=0)))
     sys.exit(1)
 `
+
+// GenerateCommand runs a problem's generator.py with hc_generator.py, next
+// to hc_runtime.py, which provides the Rng generators get.
+func (l Language) GenerateCommand(ctx context.Context, dir, generator, items, out string) (*exec.Cmd, error) {
+	if err := writeFiles(dir, map[string][]byte{runtimeFile: runtimeSrc, genFile: generatorSrc}); err != nil {
+		return nil, err
+	}
+	cmd := exec.CommandContext(ctx, l.python(), genFile, generator, items, out)
+	cmd.Dir = dir
+	// A fixed hash seed keeps the order of sets of strings from changing
+	// between runs; generators must not depend on it, and digests catch
+	// those that do.
+	cmd.Env = append(os.Environ(), "PYTHONDONTWRITEBYTECODE=1", "PYTHONUNBUFFERED=1", "PYTHONHASHSEED=0")
+	return cmd, nil
+}
 
 // Build only checks syntax; Python has no compile step worth caching.
 func (l Language) Build(ctx context.Context, dir, _ string) error {

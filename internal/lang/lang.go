@@ -13,7 +13,9 @@
 // terminal untouched, which keeps printf-debugging usable.
 //
 // Problems with judge.compare: checker are judged by their checker.py, which
-// a Checker runs once per run over every case that produced an output.
+// a Checker runs once per run over every case that produced an output. The
+// inputs of generated cases come from the problem's generator.py, which a
+// Generator runs before the solution.
 package lang
 
 import (
@@ -91,6 +93,16 @@ type Checker interface {
 	// array of judge.CheckerCase. The command writes one judge.CheckerResult
 	// per item as a JSON line to out.
 	CheckCommand(ctx context.Context, dir, checker, items, out string) (*exec.Cmd, error)
+}
+
+// Generator runs a problem's generator.py, which builds the inputs of its
+// generated cases, for solutions in every language. Python implements it.
+type Generator interface {
+	// GenerateCommand writes the support files the generator needs into dir
+	// and returns the command that runs generator on items, a JSON file
+	// holding an array of runner.GenerateItem. The command writes one
+	// result line, {"id", "input"} or {"id", "error"}, per item to out.
+	GenerateCommand(ctx context.Context, dir, generator, items, out string) (*exec.Cmd, error)
 }
 
 // Toolchain is the compiler or interpreter a language runs solutions with.
