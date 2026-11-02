@@ -156,7 +156,7 @@ case inputs must satisfy their rules as well as the statement's.
   yourself as the array of every acceptable answer (compute them with a
   throwaway script); `hc cases build` refuses, since a reference finds only
   one. That includes the examples.
-- Aim for 15 to 40 cases covering:
+- Aim for 15 to 40 cases. What they cover matters, not how many; cover:
   - every statement example (`"example": true`);
   - minimum sizes and empty inputs the constraints allow;
   - boundary values (minimum and maximum values, negative numbers,
@@ -174,6 +174,19 @@ case inputs must satisfy their rules as well as the statement's.
 - Give each non-example case a `note` saying what it targets.
 - Randomized problems: a few cases with many calls (1000 to 3000) are
   better than many small ones; the checker needs samples.
+
+**Prove the cases reject wrong solutions.** Cases that a plausible wrong
+solution passes are not enough, however many there are. Write two or three
+wrong solutions a user might write for this problem: an off-by-one, one
+that mishandles an input the constraints allow (empty, one element,
+duplicates, negative numbers), a greedy or shortcut that the problem
+defeats. For each, copy a reference aside, put the wrong solution in its
+place, and run `hc validate <slug> --run`: some case must fail. If none
+does, add a case that catches it, with a `note` naming the mistake. Restore
+the real reference before anything else, and never run `hc cases build`
+while a wrong solution is in place: it would write wrong expected outputs.
+A slow but correct solution need not fail (the timeout does not judge
+complexity).
 
 ## Workflow: generate test cases
 
@@ -196,7 +209,10 @@ case inputs must satisfy their rules as well as the statement's.
    wrote yourself.
 7. Run `hc validate <slug> --run`. It must report no errors, and every
    reference must pass every case. Fix and repeat until it does.
-8. For `checker`, [prove it rejects wrong answers](#checkers), and run
+8. [Prove the cases reject wrong solutions](#test-cases), and for
+   `checker`, [that the checker rejects wrong answers](#checkers). If you
+   added cases, run `hc cases build <slug> --lang python` again (with
+   `any_of`, write their `expected` yourself). Then run
    `hc validate <slug> --run` once more with the real reference restored.
 9. In a pack checkout (the workspace has `pack.yaml`), run `hc pack check`
    once you are done with every problem you were asked for: it checks the
@@ -236,6 +252,7 @@ lines that hold a case) and the user's complaint.
 Report:
 
 - the cases you added, counted by category;
+- the wrong solutions you tried, and the case that rejects each;
 - the judge rule, with the sentence of the statement it rests on;
 - for a checker, what it verifies, and for a randomized problem its
   false-reject probability per case;
