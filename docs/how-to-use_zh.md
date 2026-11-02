@@ -120,7 +120,7 @@ pyrightconfig.json
 ## 命令
 
 ```
-练习          list  start  edit  show  test  submit  debug  reset  discard  history
+练习          list  start  edit  show  test  submit  debug  reset  discard  history  leetcode
 题目          init  fetch  new  import  cases  validate  pack  docs
 编码智能体    gen  fix  skill
 ```
@@ -371,6 +371,24 @@ table.insert(dap.configurations.python, { type = "hc", name = "hc attach", reque
 ```
 
 在解答文件中设好断点，启动 `hc debug --headless`，然后在 Neovim 中选择 "hc attach"。
+
+## 在 LeetCode 上运行
+
+`hc leetcode` 在 LeetCode 上运行解答，或把它提交到你自己的账号，相当于题目页面上的"运行"和"提交"按钮。它只用于来自 LeetCode 的题目（用 `hc fetch` 获取，或来自官方题目包等题目包）：站点和 slug 取自 `problem.yaml` 的 `source`，`--site` 可以换成另一个站点。
+
+```sh
+hc leetcode login --site cn          # 每个站点一次：粘贴浏览器的会话
+hc leetcode test two-sum             # 在 LeetCode 的示例测试用例上运行
+hc leetcode test two-sum -i $'[3,3]\n6'   # 或者用自己的输入，采用 LeetCode 的格式
+hc leetcode submit two-sum -l python # 提交到你的账号
+hc leetcode logout --site cn
+```
+
+**登录。** LeetCode 登录需要验证码，所以 hc 不用密码，而是使用浏览器的会话。在浏览器中登录该站点，打开开发者工具（F12），在 Application（Chrome）或 Storage（Firefox、Safari）→ Cookies 中复制 `LEETCODE_SESSION` 和 `csrftoken` 的值。`hc leetcode login` 会在不回显的情况下询问这两个值（也可以从标准输入读取，每行一个），向 LeetCode 验证之后保存到用户配置目录（macOS 上是 `~/Library/Application Support`，Linux 上是 `~/.config`）下的 `hc/leetcode.json`，只有你自己可读，绝不会放在工作区里。会话的有效期是几周；LeetCode 拒绝它时，重新登录即可。
+
+**代码。** hc 发送的是 `hc test` 会运行的那份解答（`-l` 的用法相同），并转换成 LeetCode 的代码：Python 去掉从 `hc_runtime` 的导入（LeetCode 自己定义了 `ListNode`、`TreeNode` 和 `Node`），Go 去掉 `package main`。Python 的函数题在 LeetCode 上必须是 `class Solution` 的方法；hc 也接受模块级函数，但 LeetCode 不接受。
+
+**结果。** `test` 显示每个示例的输出、LeetCode 的期望答案以及打印的内容。`submit` 显示判定结果、通过的测试用例数，以及运行时间和内存及其百分位。提交失败时，会显示失败的那个用例、你的输出和期望输出；如果题目的输入就是 LeetCode 的原样输入（没有[结构输入](protocol_zh.md#结构输入)和 LeetCode 自有类型的函数题），还会打印添加这个用例的 `hc cases add` 命令，这样 LeetCode 有而题目缺少的用例就能加入题目的测试。LeetCode 的结果不会记录到 hc 的历史中。
 
 ## 配置
 

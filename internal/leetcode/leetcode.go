@@ -45,11 +45,15 @@ func SiteByName(name string) (Site, error) {
 const userAgent = "handcoding/1 (+https://github.com/MorePeanuts/handcoding)"
 
 // Client talks to LeetCode's public GraphQL API. No login is needed for free
-// problems.
+// problems; running and submitting solutions need a Session.
 type Client struct {
 	Site     Site
 	HTTP     *http.Client
 	CacheDir string // caches the problem list used to resolve IDs
+	// Session signs requests in, when set.
+	Session *Session
+	// PollInterval and PollTimeout pace Wait: 1s and 2m when zero.
+	PollInterval, PollTimeout time.Duration
 }
 
 // NewClient creates a client.
@@ -119,7 +123,7 @@ func (c *Client) graphql(ctx context.Context, op, query string, vars map[string]
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Referer", c.Site.Base+referer)
+	c.auth(req, referer)
 	req.Header.Set("User-Agent", userAgent)
 	resp, err := c.HTTP.Do(req)
 	if err != nil {

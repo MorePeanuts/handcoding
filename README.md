@@ -39,6 +39,7 @@ Command-line clients bring your editor back, but they still send your code to th
 - **Real debuggers.** `hc debug` starts Delve or pdb stopped at your function. `--headless` serves DAP for nvim-dap or VS Code.
 - **Interactive TUI.** A problem list in the style of rustlings, a tab per pack with its progress, and the statement, its images, test results and submission history in one place. Your editor stays in the next pane.
 - **LeetCode import.** `hc fetch 146` downloads the statement, its images, the signature, starter code and the examples. With `locales: [en, zh-CN]` in `hc.yaml`, `hc fetch --site cn` keeps both the English and the Chinese statement, and `i` in the TUI switches between them.
+- **LeetCode submission.** `hc leetcode submit two-sum` sends your solution to your own LeetCode account and shows LeetCode's verdict, and `hc leetcode test` runs it there on the examples. Log in once with your browser's session (`hc leetcode login`).
 - **Agent-written test cases.** `hc gen` has Claude Code or Codex decide how a problem is judged (any order? several valid answers?) and write a reference solution and test inputs. Expected outputs come from running the reference, not from the model's guess. `hc fix` repairs a wrong case.
 - **Open problem format.** Problems are plain directories: YAML, Markdown and JSON Lines. Write your own and share them as packs: git repositories that `hc pack install` installs and `hc pack update` keeps current.
 - **History.** Every submission keeps its code and judge report, so you can review, restore or delete it.

@@ -105,6 +105,16 @@ type Generator interface {
 	GenerateCommand(ctx context.Context, dir, generator, items, out string) (*exec.Cmd, error)
 }
 
+// LeetCoder is a Language whose solutions LeetCode can run (hc leetcode test
+// and submit): it turns a solution into LeetCode's code for it, without what
+// only hc's driver provides.
+type LeetCoder interface {
+	// LeetCode returns LeetCode's name for the language (its langSlug) and
+	// src, the solution of problem p, as LeetCode runs it, or an error
+	// saying why LeetCode cannot run it.
+	LeetCode(p *problem.Problem, src string) (langSlug, code string, err error)
+}
+
 // Toolchain is the compiler or interpreter a language runs solutions with.
 type Toolchain struct {
 	Name    string // e.g. "Python"
