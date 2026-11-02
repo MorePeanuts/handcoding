@@ -33,7 +33,7 @@ Log in first with hc leetcode login. hc keeps the session in your user
 configuration directory, never in the workspace. LeetCode results are not
 recorded in hc's history.`,
 	}
-	cmd.AddCommand(newLeetCodeLoginCmd(root), newLeetCodeLogoutCmd(root), newLeetCodeTestCmd(root), newLeetCodeSubmitCmd(root))
+	cmd.AddCommand(newLeetCodeLoginCmd(root), newLeetCodeLogoutCmd(), newLeetCodeTestCmd(root), newLeetCodeSubmitCmd(root))
 	return cmd
 }
 
@@ -111,30 +111,47 @@ func readSecret(cmd *cobra.Command, in *bufio.Reader, prompt string) (string, er
 	return strings.TrimSpace(line), nil
 }
 
-func newLeetCodeLogoutCmd(root *rootOptions) *cobra.Command {
+func newLeetCodeLogoutCmd() *cobra.Command {
 	var siteName string
 	cmd := &cobra.Command{
 		Use:   "logout",
-		Short: "Forget the LeetCode session of a site",
-		Args:  cobra.NoArgs,
+		Short: "Forget the LeetCode sessions hc saved",
+		Long: `Forget the LeetCode sessions hc saved: of every site, or of the site of
+--site. Only hc forgets them: LeetCode keeps a session valid until it expires,
+so log out in the browser too to end it there.`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			site, err := defaultSite(root, siteName)
+			var sites []leetcode.Site
+			if siteName != "" {
+				site, err := leetcode.SiteByName(siteName)
+				if err != nil {
+					return err
+				}
+				sites = append(sites, site)
+			}
+			removed, err := app.LeetCodeLogout(sites...)
 			if err != nil {
 				return err
 			}
-			removed, err := app.LeetCodeLogout(site)
-			if err != nil {
-				return err
+			for _, name := range removed {
+				fmt.Printf("%s of leetcode.%s\n", ui.Green.Render("logged out"), name)
 			}
-			if removed {
-				fmt.Printf("%s of leetcode.%s\n", ui.Green.Render("logged out"), site.Name)
-			} else {
-				fmt.Printf("Not logged in to leetcode.%s.\n", site.Name)
+			if len(removed) > 0 {
+				return nil
 			}
+			if len(sites) == 0 {
+				fmt.Println("Not logged in to LeetCode.")
+				return nil
+			}
+			msg := fmt.Sprintf("Not logged in to leetcode.%s", sites[0].Name)
+			if others, err := app.LeetCodeSites(); err == nil && len(others) > 0 {
+				msg += " (logged in to leetcode." + strings.Join(others, ", leetcode.") + ")"
+			}
+			fmt.Println(msg + ".")
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&siteName, "site", "", "com or cn (default from hc.yaml)")
+	cmd.Flags().StringVar(&siteName, "site", "", "com or cn (default: every site)")
 	return cmd
 }
 

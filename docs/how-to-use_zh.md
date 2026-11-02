@@ -381,10 +381,10 @@ hc leetcode login --site cn          # 每个站点一次：粘贴浏览器的�
 hc leetcode test two-sum             # 在 LeetCode 的示例测试用例上运行
 hc leetcode test two-sum -i $'[3,3]\n6'   # 或者用自己的输入，采用 LeetCode 的格式
 hc leetcode submit two-sum -l python # 提交到你的账号
-hc leetcode logout --site cn
+hc leetcode logout                   # 忘掉所有站点的会话（--site：只忘掉一个）
 ```
 
-**登录。** LeetCode 登录需要验证码，所以 hc 不用密码，而是使用浏览器的会话。在浏览器中登录该站点，打开开发者工具（F12），在 Application（Chrome）或 Storage（Firefox、Safari）→ Cookies 中复制 `LEETCODE_SESSION` 和 `csrftoken` 的值。`hc leetcode login` 会在不回显的情况下询问这两个值（也可以从标准输入读取，每行一个），向 LeetCode 验证之后保存到用户配置目录（macOS 上是 `~/Library/Application Support`，Linux 上是 `~/.config`）下的 `hc/leetcode.json`，只有你自己可读，绝不会放在工作区里。会话的有效期是几周；LeetCode 拒绝它时，重新登录即可。
+**登录。** LeetCode 登录需要验证码，所以 hc 不用密码，而是使用浏览器的会话。在浏览器中登录该站点，打开开发者工具（F12），在 Application（Chrome）或 Storage（Firefox、Safari）→ Cookies 中复制 `LEETCODE_SESSION` 和 `csrftoken` 的值。`hc leetcode login` 会在不回显的情况下询问这两个值（也可以从标准输入读取，每行一个），向 LeetCode 验证之后保存到用户配置目录（macOS 上是 `~/Library/Application Support`，Linux 上是 `~/.config`）下的 `hc/leetcode.json`，只有你自己可读，绝不会放在工作区里。会话的有效期是几周；LeetCode 拒绝它时，重新登录即可。`hc leetcode logout` 忘掉所有站点的会话，或者 `--site` 指定的那个，但只是 hc 不再保存：会话在过期之前在 LeetCode 那边仍然有效，要让它失效，需要在浏览器中退出登录。
 
 **代码。** hc 发送的是 `hc test` 会运行的那份解答（`-l` 的用法相同），并转换成 LeetCode 的代码：Python 去掉从 `hc_runtime` 的导入（LeetCode 自己定义了 `ListNode`、`TreeNode` 和 `Node`），Go 去掉 `package main`。Python 的函数题在 LeetCode 上必须是 `class Solution` 的方法；hc 也接受模块级函数，但 LeetCode 不接受。
 

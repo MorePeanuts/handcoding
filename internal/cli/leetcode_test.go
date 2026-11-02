@@ -22,9 +22,30 @@ func TestLeetCodeCommands(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	t.Setenv("AppData", filepath.Join(home, "AppData"))
 
-	out, err := capture(t, "-w", dir, "leetcode", "logout", "--site", "cn")
-	if err != nil || !strings.Contains(out, "Not logged in to leetcode.cn") {
-		t.Errorf("logout: %q, %v", out, err)
+	// logout forgets the session of --site, else every session, whatever
+	// leetcode.site says.
+	path, err := app.LeetCodeSessionsPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"cn": {"session": "s", "csrftoken": "c"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--site", "com"}, "Not logged in to leetcode.com (logged in to leetcode.cn)."},
+		{nil, "logged out of leetcode.cn"},
+		{nil, "Not logged in to LeetCode."},
+	} {
+		out, err := capture(t, append([]string{"-w", dir, "leetcode", "logout"}, tc.args...)...)
+		if err != nil || !strings.Contains(out, tc.want) {
+			t.Errorf("logout %v: %q, %v; want %q", tc.args, out, err, tc.want)
+		}
 	}
 	for ref, want := range map[string]string{
 		"local/two-sum":      "does not come from LeetCode",

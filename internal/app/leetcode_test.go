@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -91,7 +92,11 @@ func TestLeetCodeSessions(t *testing.T) {
 		t.Errorf("LeetCodeSession(com) = %+v, %v", s, err)
 	}
 
-	if removed, err := app.LeetCodeLogout(com); !removed || err != nil {
+	if sites, err := app.LeetCodeSites(); !slices.Equal(sites, []string{"com", "cn"}) || err != nil {
+		t.Errorf("LeetCodeSites() = %v, %v", sites, err)
+	}
+
+	if removed, err := app.LeetCodeLogout(com); !slices.Equal(removed, []string{"com"}) || err != nil {
 		t.Errorf("LeetCodeLogout(com) = %v, %v", removed, err)
 	}
 	if _, err := app.LeetCodeSession(com); err == nil {
@@ -100,14 +105,18 @@ func TestLeetCodeSessions(t *testing.T) {
 	if s, err := app.LeetCodeSession(cn); err != nil || s.CSRF != "csrf-cn" {
 		t.Errorf("cn lost on logout of com: %+v, %v", s, err)
 	}
-	if removed, err := app.LeetCodeLogout(com); removed || err != nil {
+	if removed, err := app.LeetCodeLogout(com); removed != nil || err != nil {
 		t.Errorf("second LeetCodeLogout(com) = %v, %v", removed, err)
 	}
-	if removed, err := app.LeetCodeLogout(cn); !removed || err != nil {
-		t.Errorf("LeetCodeLogout(cn) = %v, %v", removed, err)
+	// Without a site, every session goes.
+	if removed, err := app.LeetCodeLogout(); !slices.Equal(removed, []string{"cn"}) || err != nil {
+		t.Errorf("LeetCodeLogout() = %v, %v", removed, err)
 	}
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("sessions file left after the last logout: %v", err)
+	}
+	if removed, err := app.LeetCodeLogout(); removed != nil || err != nil {
+		t.Errorf("LeetCodeLogout() logged out = %v, %v", removed, err)
 	}
 }
 
