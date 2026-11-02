@@ -382,9 +382,10 @@ func newCasesListCmd(root *rootOptions) *cobra.Command {
 		Short:   "List test cases",
 		Long: `List the test cases of a problem. A generated case shows as its call to
 generator.py; with --expand, hc runs generator.py and shows the input it
-builds now, and with --json prints the case as the line it would be stored as
-(its expected output is computed only when judged). Expanding does not check
-the case's digest: run hc cases build after changing generator.py.`,
+builds now, clipped unless --verbose, and with --json prints the case as the
+line it would be stored as (its expected output is computed only when
+judged), for a script to check. Expanding does not check the case's digest:
+run hc cases build after changing generator.py.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
@@ -429,9 +430,14 @@ the case's digest: run hc cases build after changing generator.py.`,
 					}
 					fmt.Printf("%s%s\n", ui.Bold.Render(fmt.Sprintf("Case %d", s.Index)), tags)
 					if s.Case.Generated() {
-						// An expanded input starts with the call.
+						// An expanded input starts with the call. It is large,
+						// so only --verbose shows all of it, even with --case.
 						if s.Case.Input != nil {
-							fmt.Printf("  %s %s\n", ui.Faint.Render("Input   "), clip(p.FormatInput(s.Case), maxLen))
+							n := 200
+							if verbose {
+								n = maxLen
+							}
+							fmt.Printf("  %s %s\n", ui.Faint.Render("Input   "), clip(p.FormatInput(s.Case), n))
 						} else {
 							fmt.Printf("  %s %s\n", ui.Faint.Render("Generate"), s.Case.Generate)
 						}

@@ -71,7 +71,7 @@ my-pack/
   hc.yaml                                  optional: your settings (language, editor, agent, timeout, python)
   solutions/<pack>/<lang>/<dir>/           your solutions, as in a practice workspace
   .hc/  pyrightconfig.json                 hc's state, as in a practice workspace
-  .claude/  .agents/  AGENTS.md            the agent skills, once a command installs them
+  .claude/  .agents/  AGENTS.md  CLAUDE.md   the agent skills and instructions, once a command installs them
 ```
 
 Without `hc.yaml` hc uses the defaults, and it never creates one in a checkout. Its `locales` are those of `pack.yaml`, so an `hc.yaml` there must not set them, as it must not list `packs`. A `pack.yaml` that hc cannot read, for example one of a newer protocol, does not keep the workspace from opening: `hc validate` says what is wrong. What hc adds is yours, not the pack's, so keep it out of the repository's history:
@@ -337,7 +337,7 @@ hc ships skills that teach coding agents its problem protocol and workflows:
 | `hc-cases` | how it is judged: judge rules, reference solutions, checkers and test cases |
 | `hc-pack` | maintaining a pack: landing problems, groups, stable slugs, protocol versions, CI and releases |
 
-Which of them a workspace gets depends on its kind: a practice workspace gets `hc-problem` and `hc-cases`, a pack checkout ([working on a pack](#working-on-a-pack)) all three. They are installed into `.claude/skills/` for Claude Code and `.agents/skills/` for Codex, and listed in a block of `AGENTS.md`: by `hc init` in a new workspace, and by `hc gen`, `hc fix` and `hc skill install` in any. Because they live in the workspace, any Claude Code or Codex session started there can use them: ask it to "write an hc problem for ...", "generate cases for this hc problem" or "add this problem to the pack". The skills cite the sections of the protocol (`hc docs protocol <section>`) rather than repeating it.
+Which of them a workspace gets depends on its kind: a practice workspace gets `hc-problem` and `hc-cases`, a pack checkout ([working on a pack](#working-on-a-pack)) all three. They are installed into `.claude/skills/` for Claude Code and `.agents/skills/` for Codex, and listed in a block of `AGENTS.md`, which also tells agents to keep throwaway files in `.hc/scratch/`: by `hc init` in a new workspace, and by `hc gen`, `hc fix` and `hc skill install` in any. Claude Code does not read `AGENTS.md` itself, so hc also creates a `CLAUDE.md` that imports it (`@AGENTS.md`) when the workspace has none; one you have is yours, and hc never touches it. Because they live in the workspace, any Claude Code or Codex session started there can use them: ask it to "write an hc problem for ...", "generate cases for this hc problem" or "add this problem to the pack". The skills cite the sections of the protocol (`hc docs protocol <section>`) rather than repeating it.
 
 ```sh
 hc skill list               # the skills this workspace gets; each one installed, up to date, outdated or modified, and by which hc version

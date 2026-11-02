@@ -25,7 +25,6 @@ import (
 const (
 	WorkflowFile = ".github/workflows/check.yml"
 	keepFile     = pack.ProblemsDir + "/.gitkeep"
-	claudeFile   = "CLAUDE.md"
 	ignoreFile   = ".gitignore"
 )
 
@@ -160,7 +159,7 @@ func packFiles(m *pack.Manifest, hcVersion string) ([]packFile, error) {
 		{ignoreFile, "gitignore"},
 		{WorkflowFile, "check.yml"},
 		{skill.AgentsFile, "AGENTS.md"},
-		{claudeFile, "CLAUDE.md"},
+		{skill.ClaudeFile, "CLAUDE.md"},
 	} {
 		out, err := renderPackTemplate(t.template, data)
 		if err != nil {
