@@ -25,7 +25,7 @@ English · [简体中文](how-to-use_zh.md)
   solutions/local/python/0001-two-sum/     your code: solution.py, plus generated hc_runtime.py and _hc_runner.py
   .hc/hc.db                                submission history (SQLite)
   .hc/venv/                                Python virtual environment managed by hc
-  .hc/cache/                               Go and uv caches for coding agents
+  .hc/cache/                               Go and uv caches for coding agents, generated cases (cases/)
   pyrightconfig.json                       points pyright at .hc/venv
 ```
 
@@ -193,7 +193,7 @@ hc rm my-problem                    # remove a problem (--purge: your solutions 
 `hc fetch`, `hc new` and `hc import` write into `packs/local/problems/`. The format of a problem, from `problem.yaml` to the reference solution, is specified by the [problem protocol](protocol.md); `hc new` scaffolds one to fill in, and hc's regression set ([`testdata/regression`](../testdata/regression) in its repository) has complete examples of every feature.
 
 - `hc cases build` runs a reference solution: the Go one if there is one, else the Python one; `-l` picks one. It refuses problems judged with `any_of`, whose `expected` lists every acceptable answer and has to be written by hand.
-- `hc validate` reports every break of the protocol's [validity rules](protocol.md#validity-rules) as an error, with the case number and field. With `--run` it also runs every reference solution on every case, and through the checker if there is one. It warns about an undecided judge rule (no `judge.compare`), no cases, cases without `expected`, no case marked as an example, no reference solution, and statement images that do not exist. `hc test`, `hc submit` and `hc debug` refuse to run a case that breaks these rules, and name it.
+- `hc validate` reports every break of the protocol's [validity rules](protocol.md#validity-rules) as an error, with the case number and field. With `--run` it also runs every reference solution on every case, and through the checker if there is one. It warns about an undecided judge rule (no `judge.compare`), no cases, cases without `expected`, generated cases without a digest, stored cases over 100 KB, no case marked as an example, no reference solution, and statement images that do not exist. `hc test`, `hc submit` and `hc debug` refuse to run a case that breaks these rules, and name it.
 - `hc import` copies only the entries the protocol defines (anything else, such as editor files or a `solutions/` folder, is left behind), and refuses problems whose slug or ID is already among your own problems (`--force` replaces a problem with the same slug). Slugs and IDs only need to be unique within a pack, so importing a problem that an installed pack also has is fine. It also refuses a problem whose statements and titles do not match the locales of your own problems, as `hc validate` would report them: one without a statement in each of them, or with one in another locale.
 - `hc rm` deletes a problem's directory, and in a pack checkout takes its slug out of the groups of `pack.yaml`, keeping the file's comments and layout. It asks first (`--yes` skips the question) and refuses installed packs. Your solutions, submission history and star of the problem are kept, so a problem with the same slug added later gets them back; `--purge` deletes them as well.
 - `hc validate` without arguments also checks every installed pack's `pack.yaml`, and that its groups name problems of the pack. Each problem's directory name, slug and ID are checked against the rest of its pack.
@@ -227,9 +227,34 @@ locales: [en, zh-CN]   # your own problems: English first, Chinese too
 ```sh
 hc cases list 3                     # show the cases
 hc cases add 3 -i '{"s":"abba"}'    # append a case (expected output from the reference, if any)
+hc cases add 3 --generate long --args '{"n":100000}'   # append a generated case
 hc cases edit 3                     # edit cases.jsonl in your editor
 hc cases build 3                    # fill in missing expected outputs from the reference (--force: all)
 ```
+
+### Generated cases
+
+A large input, the kind that catches a solution of the wrong complexity, does not belong in `cases.jsonl`: a few of them make a problem megabytes large, and every change to them stays in the pack's git history. Write a [generator](protocol.md#generators) instead, a function of the problem's `generator.py` that returns the input, and add a case that calls it:
+
+```python
+# generator.py
+def descending(rng, n):
+    return {"nums": list(range(n, 0, -1))}      # a hand-made worst case: rng unused
+
+def distinct(rng, n):
+    return {"nums": rng.sample(range(-10**9, 10**9 + 1), n)}
+```
+
+```json
+{"generate":{"name":"descending","args":{"n":100000}},"note":"descending, quadratic for insertion sort"}
+{"generate":{"name":"distinct","args":{"n":100000},"seed":7}}
+```
+
+- `hc cases build` runs the generators afresh and writes each case's `digest`, the hash of the input it built. On the cases whose digest is new or changed (all of them with `--force`), it judges every other reference against the outputs of the one it runs, so the Go and the Python reference must agree. A generated case stores no expected output.
+- `hc test`, `hc submit` and `hc debug` build the generated cases they run: Python runs the generators, whatever your solution's language, and the reference solution in your language (else another) computes the expected outputs, which are then judged as usual. The results are kept in `.hc/cache/cases/<pack>/<problem>/<language>.json` and built again when hc, `problem.yaml`, `generator.py`, the reference or the generated cases change.
+- A generator that fails, builds an input other than its digest's, or an invalid one, and a reference that fails on a generated input, are errors of the problem, not verdicts on your solution: the run stops and names the file and the case. `hc validate --run` and `hc pack check` build the cases afresh, never from the cache, so that they catch a generator that is not deterministic.
+- `hc cases list` shows a generated case as its call, `distinct(n=100000) seed 7`, and a failing one in a report as the call followed by the clipped input.
+- `hc validate` warns about a stored case over 100 KB, and `hc pack check` fails on it.
 
 ## Packs
 
@@ -246,9 +271,9 @@ hc pack remove leetcode --purge             # ... and delete them too
 ```
 
 > [!WARNING]
-> Installing a pack means trusting its code: its reference solutions and checkers run on your machine when you test, submit or validate. Install packs only from sources you trust.
+> Installing a pack means trusting its code: its reference solutions, checkers and generators run on your machine when you test, submit or validate. Install packs only from sources you trust.
 
-- **`hc pack install <source>`** takes a git URL, or a directory. A directory that is a git repository is cloned like a URL; any other directory holding `pack.yaml` is copied (its `pack.yaml` and `problems/` only). `--ref` installs a tag or branch of a git source instead of its default branch. The pack goes into `packs/<name>/`, named after its `pack.yaml`. hc refuses a `pack.yaml` that is invalid or written for a protocol it does not read (and says whether to upgrade hc or the pack), and a name that another pack in `packs/` has. Problems that fail to load are reported, but do not keep the pack from being installed.
+- **`hc pack install <source>`** takes a git URL, or a directory. A git URL is cloned partially (`--filter=blob:none`): hc downloads every commit, but only the files of the commits it checks out, so a pack's history costs little however large its files once were. A directory that is a git repository is cloned whole; any other directory holding `pack.yaml` is copied (its `pack.yaml` and `problems/` only). `--ref` installs a tag or branch of a git source instead of its default branch. The pack goes into `packs/<name>/`, named after its `pack.yaml`. hc refuses a `pack.yaml` that is invalid or written for a protocol it does not read (and says whether to upgrade hc or the pack), and a name that another pack in `packs/` has. Problems that fail to load are reported, but do not keep the pack from being installed.
 - **`hc pack list`** shows each pack's name, version, number of problems, progress (problems with an accepted submission), installed commit and source. A directory of `packs/` that `hc.yaml` does not list, such as one copied by hand, is *unmanaged*; a pack that `hc.yaml` lists but `packs/` lacks is *missing*.
 - **`hc pack update [name]...`** fetches each pack and checks out the latest commit of its ref: a branch moves on, a tag stays put unless it was moved upstream, and `--ref` switches to another one. A pack installed without `--ref` follows the source's default branch, also when the source renames it. A copied pack is copied again. Installed packs are read-only, so a pack with local changes is refused; `--force` discards them. An update whose `pack.yaml` hc cannot read, or that renames the pack, is undone. Afterwards hc lists the problems added and removed. Your solutions and history are keyed by the problem's directory and slug, so those of a removed problem, or of one whose directory was renamed, are kept but no problem uses them: hc says so, and deletes nothing.
 - **`hc pack remove <name>`** deletes `packs/<name>/` and its entry in `hc.yaml`. Your solutions (`solutions/<name>/`) and its history stay, so installing the pack again brings them back; `--purge` deletes them too, after asking (`--yes` skips the question). `local` cannot be removed.
@@ -274,7 +299,7 @@ To **reproduce a workspace** elsewhere, copy its `hc.yaml` into a new workspace 
 
 ### Checking a pack
 
-`hc pack check` is what a pack's CI runs before publishing. Run it in a pack checkout ([working on a pack](#working-on-a-pack)), or pass its directory: `hc pack check ./my-pack`. It checks that `pack.yaml` is valid and of a supported protocol, that its groups name problems of the pack, and that every problem loads, is valid, has a canonical directory name and a unique slug and ID, is ready (`judge.compare` is set), has cases that all have an expected output and a reference solution, and passes `hc validate --run`: every reference solution passes every case. So it needs Go and Python 3.10+, and a reference that cannot be run is an error. It prints one line per problem and a summary, and exits non-zero on any failure.
+`hc pack check` is what a pack's CI runs before publishing. Run it in a pack checkout ([working on a pack](#working-on-a-pack)), or pass its directory: `hc pack check ./my-pack`. It checks that `pack.yaml` is valid and of a supported protocol, that its groups name problems of the pack, and that every problem loads, is valid, has a canonical directory name and a unique slug and ID, is ready (`judge.compare` is set), has cases that all have an expected output (or, generated, a digest) and none over 100 KB, a reference solution, and passes `hc validate --run`: every reference solution passes every case, generated ones built afresh. So it needs Go and Python 3.10+, and a reference that cannot be run is an error. It prints one line per problem and a summary, and exits non-zero on any failure.
 
 ## Test cases from a coding agent
 
@@ -287,7 +312,7 @@ hc fix two-sum -c 5 -m "answers in a different order should pass"
 `hc` runs the agent headless in the workspace (`claude -p` or `codex exec`). Before it starts, it installs or updates the workspace's skills (see [Agent skills](#agent-skills)); the agent follows **`hc-cases`**, and **`hc-problem`** for when the problem's definition itself is wrong. Following the skill, the agent:
 
 1. writes a reference solution, `reference/solution.py`, and a brute-force one to cross-check when that helps;
-2. writes test **inputs** to `cases.jsonl`, covering edge cases, special structures and large inputs;
+2. writes test **inputs** to `cases.jsonl`, covering edge cases and special structures, and large inputs as [generated cases](#generated-cases);
 3. runs `hc cases build`, so expected outputs come from running the reference, not from the model;
 4. runs `hc validate --run` until every reference passes.
 

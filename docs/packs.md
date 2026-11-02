@@ -98,8 +98,8 @@ hc pack install https://github.com/you/my-pack.git --ref v0.3.0  # a release
 
 ## Trust
 
-A pack is code. Installing a pack means running its checkers and reference solutions on your machine: checkers whenever a problem judged by one is tested or submitted, references under `hc cases build` and `hc validate --run`, and both under `hc pack check`. hc does not sandbox them. So:
+A pack is code. Installing a pack means running its checkers, generators and reference solutions on your machine: checkers whenever a problem judged by one is tested or submitted, generators and references whenever a problem's generated cases are built (the first time they are tested or submitted, and after a change), references also under `hc cases build` and `hc validate --run`, and all of them under `hc pack check`. hc does not sandbox them. So:
 
 - as an author, keep references and checkers to computing answers: no network, no files outside their inputs, nothing a reader would not expect from a solution;
-- as a user, install packs only from sources you trust, and review a pack (its `reference/` and `checker.py` files) before you install or update it;
+- as a user, install packs only from sources you trust, and review a pack (its `reference/`, `checker.py` and `generator.py` files) before you install or update it;
 - in CI, the workflow runs with read-only access to the repository (`permissions: contents: read`), so a pull request that changes a reference cannot push to it.

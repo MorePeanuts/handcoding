@@ -11,6 +11,7 @@
 //	  templates/        optional starter code per language (solution.go, solution.py, ...)
 //	  reference/        optional reference solutions used to compute expected outputs
 //	  checker.py        the checker, with judge.compare: checker
+//	  generator.py      the generators of the generated cases, if any
 package problem
 
 import (
@@ -38,6 +39,9 @@ const (
 	// CheckerFile judges the outputs of a problem with judge.compare:
 	// checker. Checkers are Python whatever the solution's language.
 	CheckerFile = "checker.py"
+	// GeneratorFile builds the inputs of generated cases (Case.Generate).
+	// Generators are Python whatever the solution's language.
+	GeneratorFile = "generator.py"
 )
 
 // Kind is the shape of a problem.
@@ -685,6 +689,18 @@ func (p *Problem) HasChecker() bool {
 		return false
 	}
 	_, err := os.Stat(p.CheckerPath())
+	return err == nil
+}
+
+// GeneratorPath is where the problem's generators live.
+func (p *Problem) GeneratorPath() string { return filepath.Join(p.Dir, GeneratorFile) }
+
+// HasGenerator reports whether the problem directory holds generator.py.
+func (p *Problem) HasGenerator() bool {
+	if p.Dir == "" {
+		return false
+	}
+	_, err := os.Stat(p.GeneratorPath())
 	return err == nil
 }
 

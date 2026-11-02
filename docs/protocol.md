@@ -31,7 +31,7 @@ Protocol 1 does not define the following. Each would be a later, additive change
 
 - interactive problems, whose solution talks to a judge (issue #7);
 - `tests` problems, judged by test code instead of cases (issue #31);
-- case generators, and judging performance (issue #33);
+- judging performance, such as time limits relative to a reference (issue #33);
 - solution languages other than Go and Python.
 
 ## Packs
@@ -136,11 +136,12 @@ A problem is a directory holding these entries:
 | `reference/solution.py`, `reference/solution.go` | no | Reference solutions, any subset of the languages |
 | `templates/solution.py`, `templates/solution.go` | no | Starter code, replacing the one generated from the signature |
 | `checker.py` | with `judge.compare: checker` only | The checker; see [Checkers](#checkers) |
+| `generator.py` | with generated cases only | The generators of the generated cases; see [Generators](#generators) |
 
 - In a pack without `locales`, a problem without `description.md` has an empty statement. A problem without `cases.jsonl` has no cases. Both are valid, but such a problem cannot be practised meaningfully.
 - A statement refers to local files by paths relative to the problem directory, and those files MUST be under `assets/`: `![](assets/rev1ex1.jpg)`.
 - Other entries are not part of the problem. Tools MAY ignore or drop them.
-- What reference solutions, templates and checkers may contain is specified in [Solution ABI](#solution-abi) and [Checkers](#checkers).
+- What reference solutions, templates, checkers and generators may contain is specified in [Solution ABI](#solution-abi), [Checkers](#checkers) and [Generators](#generators).
 
 ### Identity
 
@@ -502,14 +503,26 @@ judge:
 
 | Field | Type | Required | Meaning | Since |
 |---|---|---|---|---|
-| `input` | object | yes | The case's input, by kind (below) | 1 |
+| `input` | object | unless `generate` | The case's input, by kind (below) | 1 |
 | `expected` | JSON value | no | The expected output, by kind (below). `null` is a value: `"expected": null` is an expected output, a missing field is none | 1 |
 | `example` | boolean | no | The case is an example from the statement | 1 |
 | `note` | string | no | A description of the case | 1 |
+| `generate` | object | instead of `input` | The case is generated: `generator.py` builds its input ([Generators](#generators)) | 1 |
+| `digest` | string | with `generate` | The digest of the generated input, as the author's generator built it ([Generators](#generators)) | 1 |
+
+`generate` has these fields and no others:
+
+| Field | Type | Required | Meaning | Since |
+|---|---|---|---|---|
+| `name` | string | yes | The function of `generator.py` that builds the input, a Python identifier | 1 |
+| `args` | object | no | Its keyword arguments, by name; default `{}`. `rng` is not an argument name | 1 |
+| `seed` | integer | no | The seed of its `rng`; default 0 | 1 |
 
 - A line holds exactly one JSON value. Lines that are blank, or start with `//` after leading whitespace, are ignored.
 - Cases are numbered from 1, counting only the lines that hold a case.
 - A case without `expected` is valid but cannot be judged ([Verdicts](#verdicts)).
+- A case is stored (with `input`) or generated (with `generate`), not both. A generated case has no `expected`, since a reference computes it, and is not an `example`. Its `digest` is optional; without it, nothing checks that the input built is the one the author built.
+- A stored case SHOULD be at most 100 KB, its line in `cases.jsonl`; larger inputs SHOULD be generated.
 
 `input` and `expected` by kind:
 
@@ -525,6 +538,12 @@ Problem 0146:
 
 ```json
 {"input": {"ops": ["LRUCache","put","put","get","put","get","put","get","get","get"], "args": [[2],[1,1],[2,2],[1],[3,3],[2],[4,4],[1],[3],[4]]}, "expected": [null,null,null,1,null,-1,null,-1,3,4], "example": true}
+```
+
+A generated case of problem 0001:
+
+```json
+{"generate": {"name": "distinct", "args": {"n": 10000}, "seed": 7}, "digest": "sha256:770f520998afe517410b3abd7ee67824586ddb091eb9035006a536f1d45da621", "note": "10^4 distinct numbers"}
 ```
 
 ## Judging
@@ -574,7 +593,7 @@ judge:
 
 ### Timeout
 
-`judge.timeout` is a wall-clock limit for one whole run of a solution over the cases selected for it, not a per-case limit. It guards against hangs and infinite loops; it does not judge complexity. When it expires the run is stopped, and the cases without a result are Time Limit Exceeded; cases that finished keep their verdicts. A checker run gets its own limit of the same duration. The default is the workspace's `timeout` (10s unless configured).
+`judge.timeout` is a wall-clock limit for one whole run of a solution over the cases selected for it, not a per-case limit. It guards against hangs and infinite loops; it does not judge complexity. When it expires the run is stopped, and the cases without a result are Time Limit Exceeded; cases that finished keep their verdicts. A checker run and a generator run each get their own limit of the same duration, and so does a reference computing the expected outputs of generated cases. The default is the workspace's `timeout` (10s unless configured).
 
 ### Readiness
 
@@ -596,7 +615,7 @@ A run of a solution has one of these outcomes for each case:
 
 The first three are decided before judging; No Expected Output is decided before Not Judged. The verdict of the whole run is the first case, in case order, whose verdict is Runtime Error, Time Limit Exceeded or Wrong Answer. Without one, it is Accepted if any case was accepted (or no case ran), else Not Judged if any case was not judged, else No Expected Output.
 
-A broken checker is not a verdict: see [Checkers](#checkers).
+A broken checker is not a verdict: see [Checkers](#checkers). Neither is a generated case that cannot be built: see [Generators](#generators).
 
 ## Checkers
 
@@ -634,6 +653,30 @@ def check(input, output, expected):
         return "%r has length %d, but the longest palindrome has length %d" % (output, len(output), len(expected))
 ```
 
+## Generators
+
+A case MAY be generated rather than stored: `generator.py` builds its input when the case is judged, and a reference solution its expected output. Large inputs, which catch solutions of the wrong complexity, are written this way, so that a pack holds the programs that build them rather than the data.
+
+A problem with a generated case MUST have `generator.py` in its directory, and a problem without one MUST NOT. Generators are written in Python whatever the solution's language, and MUST work on Python 3.10.
+
+```python
+def descending(rng, n):
+    return {"nums": list(range(n, 0, -1))}
+
+
+def distinct(rng, n):
+    return {"nums": rng.sample(range(-10**9, 10**9 + 1), n)}
+```
+
+- `generate.name` names a function of `generator.py`, called as `name(rng, **args)` with the case's `generate.args`. It returns the case's input: a dict of the form of `input` ([Cases](#cases)), decoded JSON values, which MUST be a valid input for the problem like a stored one.
+- A generator is any program, not only a random one. A hand-designed worst case (a descending array, all equal values, a degenerate tree) is a function that ignores `rng`.
+- `rng` is an `hc_runtime.Rng` seeded with `generate.seed`: splitmix64, which gives the same numbers for a seed on every Python version and machine. Its methods are `random()` (a float in [0, 1)), `randint(a, b)` (an integer in [a, b]), `uniform(a, b)`, `choice(seq)`, `shuffle(x)` (a list, in place) and `sample(population, k)` (k distinct elements of a sequence, in random order; `sample(range(1, 10**9), 10**5)` does not build the range). A generator MAY create more with `Rng(seed)`.
+- Generators MUST be deterministic: a call MUST return the same input on every machine and supported Python version. They MUST NOT use the `random` module, which keeps only `random()` the same across Python versions, nor the time, the environment, files or the network, and MUST NOT let the iteration order of a set or dict keyed by strings, which hash randomization changes, into the input.
+- `digest` is `sha256:` and the lowercase hexadecimal SHA-256 of the input's canonical JSON: the input object in UTF-8, keys sorted, without whitespace, numbers as the generator wrote them, and strings escaping only `"`, `\`, control characters, U+2028 and U+2029. Tools write it (`hc cases build`); authors do not. An input that does not match the digest is a case the author never checked, so it is a broken problem.
+- The expected output of a generated case is the output of a reference solution on its input. A problem with generated cases MUST have a reference solution. A checker gets that output as `expected`. `judge.compare: any_of` cannot judge generated cases, since a reference finds one answer: such problems judge large cases with `unordered` or a checker.
+- The generators of a run's generated cases run in one process, before the solution, with the [timeout](#timeout)'s duration as their limit. A `generator.py` that cannot be loaded, lacks the function, raises, returns something else than a valid input or one that does not match the digest, or runs out of time is a broken problem, not a verdict on the solution, and so is a reference that fails on a generated input: the run fails with an error naming the file and the case.
+- A generator MAY import the public names of `hc_runtime` ([Python](#python)), and otherwise only the standard library.
+
 ## Solution ABI
 
 What a solution must look like for the drivers to call it. User solutions, reference solutions (`reference/solution.*`) and templates (`templates/solution.*`) are all solutions. References and templates MUST follow this section and use only the standard library; templates MUST keep the signature, with the function, class and method names, parameter order and types given here. A solution receives the parameters in the order of `function.params` (or of the constructor and method parameters), without hidden inputs, bound as in [Types](#types).
@@ -647,7 +690,7 @@ The solution is `solution.py`.
 | Entry point | A class `Solution` with a method named `function.name`, instantiated without arguments for each case; or, when the module defines no `Solution`, a module-level function named `function.name` | A class named `class.name`, whose `__init__` takes the constructor parameters and whose methods have the names in `class.methods` |
 
 - An uncaught exception is a Runtime Error; a syntax error is a Compile Error.
-- The protocol's types come from the module `hc_runtime`. Its public API is exactly the names in its `__all__`: `ListNode`, `TreeNode`, `GraphNode`, `NaryNode`, `RandomListNode`, `NextTreeNode`, `QuadNode`, `MultilevelNode`, `NestedInteger`, `Employee`, `decode` and `encode`. Solutions and checkers MAY import these and MUST NOT import anything else from it.
+- The protocol's types come from the module `hc_runtime`. Its public API is exactly the names in its `__all__`: `ListNode`, `TreeNode`, `GraphNode`, `NaryNode`, `RandomListNode`, `NextTreeNode`, `QuadNode`, `MultilevelNode`, `NestedInteger`, `Employee`, `Rng`, `decode` and `encode`. Solutions, checkers and generators MAY import these and MUST NOT import anything else from it. `Rng` is the random number generator of [Generators](#generators).
 - The problem's `Node` type is imported under that name: `from hc_runtime import GraphNode as Node`. The others keep their names: `from hc_runtime import ListNode, TreeNode`, `from hc_runtime import NestedInteger`.
 - `decode(type, value)` turns a JSON value into the Python value for the protocol type `type` (a canonical name such as `"TreeNode"` or `"integer[]"`), and `encode(type, value)` does the reverse.
 - A reference MUST import the names it uses. A template MAY omit the imports: a template that does not mention `hc_runtime` gets the standard import block (`typing` names, `ListNode`, `TreeNode`, and the problem's `Node`, `NestedInteger` and `Employee`) put in front of it.
@@ -674,11 +717,11 @@ The solution is `solution.go`, in `package main`.
 | Python | 3.10 |
 | Go | 1.22 |
 
-Reference solutions, templates and checkers MUST work on these versions, language and standard library: a reference's expected outputs are only computed, and it is only checked, on a supported toolchain. User solutions MAY use anything their toolchain supports. To check Go code against Go 1.22, give its module `go 1.22` and run `go vet`, whose `stdversion` check reports newer standard library symbols.
+Reference solutions, templates, checkers and generators MUST work on these versions, language and standard library: a reference's expected outputs are only computed, and it is only checked, on a supported toolchain. User solutions MAY use anything their toolchain supports. To check Go code against Go 1.22, give its module `go 1.22` and run `go vet`, whose `stdversion` check reports newer standard library symbols.
 
 ## Validity rules
 
-A valid pack satisfies every rule below, and so does each of its problems. `hc validate` checks the rules on `problem.yaml` and `cases.jsonl`, and the pack's rules on problem directories, identity and locales; `hc validate --run` also checks the rules on reference solutions.
+A valid pack satisfies every rule below, and so does each of its problems. `hc validate` checks the rules on `problem.yaml` and `cases.jsonl`, and the pack's rules on problem directories, identity and locales; `hc validate --run` also checks the rules on reference solutions and generated cases.
 
 **problem.yaml**
 
@@ -699,12 +742,14 @@ A valid pack satisfies every rule below, and so does each of its problems. `hc v
 
 **cases.jsonl**
 
-1. Every line that is not blank or a comment MUST be one JSON object with `input` (an object) and, optionally, `expected`, `example` (a boolean) and `note` (a string), and no other fields.
+1. Every line that is not blank or a comment MUST be one JSON object with `input` (an object) and, optionally, `expected`, `example` (a boolean) and `note` (a string), and no other fields; or, for a generated case, with `generate` and, optionally, `digest` and `note`, and no other fields.
 2. A function case's `input` MUST have exactly the keys of the parameters (except `copy` parameters) and hidden inputs; a class case's exactly `ops` and `args`; a round-trip case's exactly `encode`'s parameter.
 3. Every value MUST have the encoding of its type ([Types](#types)), including the constraints of the tree and judge-defined types: a `TreeNode` level order with children only for its nodes, neighbors in the graph, random indices in the list, well-formed `NaryNode`, `QuadNode` and `MultilevelNode` forms, distinct employee ids and known subordinates. A `ref` value MUST be an integer.
 4. Structure inputs MUST fit: a `cycle` position in the list, joined lists that end with the same values from `skip` and `at`, a `ref` value that occurs exactly once.
 5. In a class case, `ops` and `args` MUST have the same, non-zero length, `ops[0]` MUST be the class name, every other op MUST be a method, and every `args` entry MUST hold exactly the op's arguments, of their types.
 6. `expected`, when present, MUST have the form of the judged value ([Cases](#cases)): for `any_of`, an array of such values; for a class case, one entry per op, `null` for the constructor and `void` methods. Its values MUST be encoded as outputs are, which rule 3 does not require of inputs: no `null` for an empty `ListNode`, `TreeNode` or `Node`, no trailing `null`s, and `[0,1]` for a `QuadNode` that is not a leaf.
+7. `generate` MUST be an object with `name` (a Python identifier) and, optionally, `args` (an object whose keys are Python identifiers other than `rng`) and `seed` (an integer), and no other fields. `digest`, when present, MUST be `sha256:` and 64 lowercase hexadecimal digits.
+8. `generator.py` MUST be present when a case is generated, and absent otherwise. A problem judged with `any_of` MUST NOT have generated cases.
 
 **pack.yaml**
 
@@ -725,7 +770,8 @@ A valid pack satisfies every rule below, and so does each of its problems. `hc v
 5. In a pack with `locales`, every problem MUST have a statement and a title in each of them: `description.md` and `title` in the default locale, `description.<locale>.md` and a non-empty `titles.<locale>` in the others ([Locales](#locales)).
 6. A problem's `description.<locale>.md` files and the keys of its `titles` MUST be locales of the pack other than the default; in a pack without `locales`, a problem MUST have neither.
 
-**References, templates and checkers**
+**References, templates, checkers and generators**
 
 1. Every reference solution MUST build, and MUST pass every case that has `expected` under the problem's judge rule (Accepted, or Not Judged for a problem that is not ready), on a supported toolchain; cases without `expected` MUST run without error. With a checker, the checker MUST NOT break on any reference output.
-2. References, templates and checkers MUST follow the [Solution ABI](#solution-abi) and [Checkers](#checkers), and work on the [oldest supported versions](#language-versions). `hc validate` does not check this rule.
+2. A problem with generated cases MUST have a reference solution. Every generated case MUST build: its function MUST return a valid input, the one its `digest` names when it has one, and every reference MUST run on it without error and pass on the output of any other reference.
+3. References, templates, checkers and generators MUST follow the [Solution ABI](#solution-abi), [Checkers](#checkers) and [Generators](#generators), and work on the [oldest supported versions](#language-versions). `hc validate` does not check this rule.

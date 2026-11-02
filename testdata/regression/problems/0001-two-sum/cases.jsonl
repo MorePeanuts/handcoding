@@ -5,3 +5,5 @@
 {"input":{"nums":[0,4,3,0],"target":0},"expected":[0,3],"note":"zeros"}
 {"input":{"nums":[1000000000,-1000000000,5],"target":0},"expected":[0,1],"note":"extreme values"}
 {"input":{"nums":[1,5,9,13,2,8],"target":22},"expected":[2,3]}
+{"generate":{"name":"distinct","args":{"n":10000},"seed":7},"digest":"sha256:770f520998afe517410b3abd7ee67824586ddb091eb9035006a536f1d45da621","note":"10^4 distinct numbers, the answer at random places"}
+{"generate":{"name":"last_pair","args":{"n":10000}},"digest":"sha256:df986ee952dfc409c7d5e5f334fc14a3c6bc3c29626f662c65d507ae16e7ca25","note":"the answer is the last two numbers: the worst case for checking pairs in order"}

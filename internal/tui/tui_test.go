@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
+	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/regression"
 	"github.com/MorePeanuts/handcoding/internal/runner"
@@ -93,6 +94,18 @@ func keyMsg(s string) tea.KeyMsg {
 func requireGo(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go not installed")
+	}
+}
+
+// requirePython skips unless python3 is a supported Python, which building
+// generated cases needs whatever the solution's language.
+func requirePython(t *testing.T) {
+	tc, err := python.Language{}.Toolchain()
+	if err != nil {
+		t.Skip(err)
+	}
+	if err := tc.Err(); err != nil {
+		t.Skip(err)
 	}
 }
 
@@ -552,6 +565,8 @@ func twoSum(nums []int, target int) []int {
 
 func TestRunSubmitHistoryAndDiscard(t *testing.T) {
 	requireGo(t)
+	// two-sum has generated cases.
+	requirePython(t)
 	h := newHarness(t)
 	h.press("enter") // creates the solution
 	l, _ := h.m.app.Lang("go")
@@ -585,7 +600,7 @@ func TestRunSubmitHistoryAndDiscard(t *testing.T) {
 	}
 	h.press("enter")
 	view = h.view()
-	if h.m.top() != screenSubmission || !strings.Contains(view, "twoSum") || !strings.Contains(view, "7/7") {
+	if h.m.top() != screenSubmission || !strings.Contains(view, "twoSum") || !strings.Contains(view, "9/9") {
 		t.Fatalf("submission view:\n%s", view)
 	}
 

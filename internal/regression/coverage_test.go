@@ -19,8 +19,8 @@ import (
 // TestProtocolCoverage requires the regression set
 // to exercise the whole problem protocol: every type as an input and as an
 // output, every kind, compare mode and round-trip instances value, every
-// field of problem.yaml, the default tolerance and the structure inputs on
-// each node type that allows them. The lists come from the protocol's code
+// field of problem.yaml and of a case (generated cases included), the default
+// tolerance and the structure inputs on each node type that allows them. The lists come from the protocol's code
 // wherever they can (the constants of internal/problem, the fields of its
 // structs, its validator), so a new protocol feature fails this test until a
 // problem of the set uses it. Kept by hand: the constant name prefixes, the
@@ -86,6 +86,9 @@ func depth(d int, dir string) string { return "array of depth " + strconv.Itoa(d
 func returns(t string) string        { return "return type " + t }
 func field(typ, name string) string  { return "problem.yaml field " + typ + "." + name }
 func packField(name string) string   { return inPack(field("Manifest", name)) }
+func caseField(typ, name string) string {
+	return "cases.jsonl field " + typ + "." + name
+}
 
 // inPack renames a field feature of problem.yaml, as setFields and
 // yamlFields name them, to the field of pack.yaml it is.
@@ -169,6 +172,10 @@ func required(t *testing.T, consts map[string][]constant) []string {
 	// (hidden, cycle, join, ref, copy, returns_ref, returns_copy), the judge
 	// options and round trips.
 	for _, f := range yamlFields(reflect.TypeFor[problem.Problem]()) {
+		add(f)
+	}
+	// Every field of a case, which covers generated cases.
+	for _, f := range jsonFields(reflect.TypeFor[problem.Case]()) {
 		add(f)
 	}
 	// Every field of pack.yaml, and statements in several locales.
@@ -304,7 +311,60 @@ func features(p *problem.Problem) map[string]bool {
 	if ls, _ := p.Translations(); len(ls) > 0 {
 		fs[translation] = true
 	}
+	cases, _ := p.LoadCases()
+	for _, c := range cases {
+		setJSONFields(fs, reflect.ValueOf(c))
+	}
 	return fs
+}
+
+// jsonName is a struct field's name in a case's JSON, or "" when the field
+// is not in it.
+func jsonName(sf reflect.StructField) string {
+	name, _, _ := strings.Cut(sf.Tag.Get("json"), ",")
+	if name == "-" || name == "" || !sf.IsExported() {
+		return ""
+	}
+	return name
+}
+
+// jsonFields lists the fields of every struct type of a case.
+func jsonFields(typ reflect.Type) []string {
+	var out []string
+	for typ.Kind() == reflect.Pointer {
+		typ = typ.Elem()
+	}
+	if typ.Kind() != reflect.Struct {
+		return nil
+	}
+	for i := range typ.NumField() {
+		sf := typ.Field(i)
+		if name := jsonName(sf); name != "" {
+			out = append(out, caseField(typ.Name(), name))
+			out = append(out, jsonFields(sf.Type)...)
+		}
+	}
+	return out
+}
+
+// setJSONFields marks the fields of a case that v sets (non-zero values).
+func setJSONFields(fs map[string]bool, v reflect.Value) {
+	for v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return
+	}
+	for i := range v.NumField() {
+		sf := v.Type().Field(i)
+		if name := jsonName(sf); name != "" && !v.Field(i).IsZero() {
+			fs[caseField(v.Type().Name(), name)] = true
+			setJSONFields(fs, v.Field(i))
+		}
+	}
 }
 
 // typeFeatures marks the type features of a value of type t in direction

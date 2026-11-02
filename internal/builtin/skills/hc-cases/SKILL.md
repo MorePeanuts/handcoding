@@ -1,6 +1,6 @@
 ---
 name: hc-cases
-description: Decide how an hc (handcoding) problem is judged and write its test cases. Use when generating or fixing the test cases (cases.jsonl) of a problem in an hc workspace, choosing its judge rule (judge.compare in problem.yaml), writing or fixing a reference solution (reference/solution.py or .go), or writing a checker (checker.py); `hc gen` and `hc fix` use it. For the problem's definition itself (signature, structure inputs, statement, templates), use hc-problem instead.
+description: Decide how an hc (handcoding) problem is judged and write its test cases. Use when generating or fixing the test cases (cases.jsonl) of a problem in an hc workspace, choosing its judge rule (judge.compare in problem.yaml), writing or fixing a reference solution (reference/solution.py or .go), writing a checker (checker.py), or generators of large inputs (generator.py); `hc gen` and `hc fix` use it. For the problem's definition itself (signature, structure inputs, statement, templates), use hc-problem instead.
 ---
 
 # handcoding test case authoring
@@ -19,7 +19,7 @@ slug is in several packs (`local/two-sum`); `hc gen` and `hc fix` tell you
 the name to use.
 
 This skill covers how a problem is judged: its judge rule, its reference
-solutions, its checker and its test cases. What the problem is (directory,
+solutions, its checker and its test cases, generators included. What the problem is (directory,
 signature, structure inputs, statement, templates) is the `hc-problem`
 skill. If you find that the definition is wrong (a parameter the template
 does not have, a node that should be a `ref`, a missing `returns_copy`, a
@@ -165,12 +165,11 @@ case inputs must satisfy their rules as well as the statement's.
     reverse sorted; for structure inputs, no cycle, no intersection, a
     node at the root or the tail);
   - a few large inputs near the constraint limits, to catch quadratic
-    solutions.
+    solutions, as [generated cases](#generated-cases).
 - Every input must satisfy the stated constraints and guarantees ("exactly
   one solution", "all values are unique").
-- Generate large inputs with a throwaway script inside the workspace (you
-  cannot write outside it), and delete it afterwards. Keep cases.jsonl
-  under about 2 MB.
+- Large inputs are generated cases, never stored ones: a stored case over
+  100 KB fails `hc pack check`.
 - Give each non-example case a `note` saying what it targets.
 - Randomized problems: a few cases with many calls (1000 to 3000) are
   better than many small ones; the checker needs samples.
@@ -188,6 +187,31 @@ while a wrong solution is in place: it would write wrong expected outputs.
 A slow but correct solution need not fail (the timeout does not judge
 complexity).
 
+## Generated cases
+
+Read `hc docs protocol generators` first. A large input is built by a
+function of the problem's `generator.py`, and the case only names the call:
+
+- Write each kind of large input as its own function, taking the size as
+  an argument (`n`), so that one function serves several cases. A
+  hand-designed worst case (descending input, all equal values, a skewed
+  tree, the answer at the very end) is a function that ignores `rng`; use
+  `rng` only for random data, and never the `random` module.
+- The input must satisfy the constraints and guarantees like any other.
+  Make it so by construction: for "exactly one solution", build the answer
+  in and keep every other pair from forming one, rather than hoping a
+  random input has a single answer.
+- Add the cases with
+  `hc cases add <slug> --generate <name> --args '{"n": 100000}' --seed 7`,
+  or as `generate` lines in `cases.jsonl`, each with a `note` saying what
+  it targets. Never write `digest`: `hc cases build` writes it.
+- Keep generated cases for size: a few near the constraint limits. Small
+  inputs stay stored, where a reader can see them.
+- A generated case has no `expected`, so a problem judged with `any_of`
+  has none: if it needs large inputs, it needs `unordered` or a checker.
+- After changing `generator.py`, run `hc cases build <slug>` again: the
+  changed inputs get new digests.
+
 ## Workflow: generate test cases
 
 1. Read `problem.yaml`, `description.md` and the existing `cases.jsonl`.
@@ -203,10 +227,12 @@ complexity).
 4. If more than one output is acceptable, write the second reference in
    `reference/solution.go`. For `checker`, write `checker.py`
    ([Checkers](#checkers)).
-5. Add the inputs to `cases.jsonl` ([Test cases](#test-cases)).
+5. Add the inputs to `cases.jsonl` ([Test cases](#test-cases)), and the
+   large ones as [generated cases](#generated-cases).
 6. Run `hc cases build <slug> --lang python` to compute `expected` with the
-   Python reference. Skip this step with `any_of`, whose `expected` you
-   wrote yourself.
+   Python reference and write the digests of the generated cases. With
+   `any_of`, whose `expected` you wrote yourself, there is nothing to
+   build.
 7. Run `hc validate <slug> --run`. It must report no errors, and every
    reference must pass every case. Fix and repeat until it does.
 8. [Prove the cases reject wrong solutions](#test-cases), and for

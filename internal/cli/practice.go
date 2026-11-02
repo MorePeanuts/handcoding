@@ -374,13 +374,20 @@ server for your editor to attach to:
 				if err := tc.Err(); err != nil {
 					fmt.Fprintln(os.Stderr, ui.Yellow.Render("warning:")+" "+err.Error())
 				}
+				if err := a.Materialize(cmd.Context(), p, l, sel, app.RunOptions{Stderr: os.Stderr}); err != nil {
+					return err
+				}
 				dcmd, cleanup, err := runner.DebugCommand(l, p, filepath.Dir(a.SolutionPath(p, l)), sel, lang.DebugOptions{Headless: headless, Addr: addr})
 				if err != nil {
 					return err
 				}
 				defer cleanup()
 				for _, s := range sel {
-					fmt.Fprintf(os.Stderr, "%s case %d: %s\n", ui.Cyan.Render("debug"), s.Index, p.FormatInput(s.Case))
+					input := p.FormatInput(s.Case)
+					if s.Case.Generated() {
+						input = clip(input, 200)
+					}
+					fmt.Fprintf(os.Stderr, "%s case %d: %s\n", ui.Cyan.Render("debug"), s.Index, input)
 				}
 				if headless {
 					fmt.Fprintf(os.Stderr, "%s listening on %s — attach your editor, Ctrl-C to stop\n", ui.Cyan.Render("debug"), addr)

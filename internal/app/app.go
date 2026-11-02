@@ -321,11 +321,16 @@ func Select(cases []problem.Case, indices []int, all bool) ([]runner.Selected, e
 				sel = append(sel, runner.Selected{Index: i + 1, Case: c})
 			}
 		}
-		if len(sel) == 0 {
-			for i, c := range cases[:min(3, len(cases))] {
-				sel = append(sel, runner.Selected{Index: i + 1, Case: c})
+		// Else the first three cases, stored ones first: generated cases
+		// are large, and slow to build.
+		for _, generated := range []bool{false, true} {
+			for i, c := range cases {
+				if len(sel) < 3 && c.Generated() == generated {
+					sel = append(sel, runner.Selected{Index: i + 1, Case: c})
+				}
 			}
 		}
+		slices.SortFunc(sel, func(a, b runner.Selected) int { return a.Index - b.Index })
 	}
 	return sel, nil
 }
@@ -336,7 +341,8 @@ type RunOptions struct {
 	Stderr io.Writer
 }
 
-// Run runs the user's solution against the selected cases.
+// Run runs the user's solution against the selected cases, building the
+// generated ones first (see Materialize).
 func (a *App) Run(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, o RunOptions) (*runner.Report, error) {
 	if err := a.CheckLang(p, l); err != nil {
 		return nil, err
@@ -353,6 +359,9 @@ func (a *App) Run(ctx context.Context, p *problem.Problem, l lang.Language, sel 
 	if err != nil {
 		return nil, err
 	}
+	if err := a.Materialize(ctx, p, l, sel, o); err != nil {
+		return nil, err
+	}
 	opts, err := a.runnerOpts(ctx, p, sel, o)
 	if err != nil {
 		return nil, err
@@ -364,14 +373,18 @@ func (a *App) Run(ctx context.Context, p *problem.Problem, l lang.Language, sel 
 	return rep, err
 }
 
-func (a *App) runnerOpts(ctx context.Context, p *problem.Problem, sel []runner.Selected, o RunOptions) (runner.Options, error) {
-	timeout := a.WS.Config.TimeoutDuration()
+// timeout is the time limit of a run of p: judge.timeout, else hc.yaml's.
+func (a *App) timeout(p *problem.Problem) time.Duration {
 	if p.Judge.Timeout != "" {
 		if d, err := time.ParseDuration(p.Judge.Timeout); err == nil {
-			timeout = d
+			return d
 		}
 	}
-	opts := runner.Options{Timeout: timeout, Stdout: o.Stdout, Stderr: o.Stderr}
+	return a.WS.Config.TimeoutDuration()
+}
+
+func (a *App) runnerOpts(ctx context.Context, p *problem.Problem, sel []runner.Selected, o RunOptions) (runner.Options, error) {
+	opts := runner.Options{Timeout: a.timeout(p), Stdout: o.Stdout, Stderr: o.Stderr}
 	if p.Judge.Compare == problem.CompareChecker && slices.ContainsFunc(sel, func(s runner.Selected) bool { return s.Case.HasExpected() }) {
 		c, err := a.checker(ctx, p, o.Stderr)
 		if err != nil {
@@ -422,7 +435,7 @@ func (a *App) Submit(ctx context.Context, p *problem.Problem, l lang.Language, o
 		return nil, nil, fmt.Errorf("%s has no test cases; generate some with `hc gen %s`", p.Slug, a.WS.Ref(p))
 	}
 	for i, c := range cases {
-		if !c.HasExpected() {
+		if !c.HasExpected() && !c.Generated() {
 			return nil, nil, fmt.Errorf("case %d has no expected output; run `hc cases build %s` or `hc gen %s`", i+1, a.WS.Ref(p), a.WS.Ref(p))
 		}
 	}
@@ -532,16 +545,27 @@ type BuildResult struct {
 	Filled  int
 	Changed []int
 	Report  *runner.Report
+	// Digests is the number of digests of generated cases written: new
+	// ones, and changed ones, which are also in Changed.
+	Digests int
+	// Checked are the other references that were judged against Lang's
+	// outputs on generated cases.
+	Checked []lang.Language
+	// Unchecked says why other references were not judged on them.
+	Unchecked []string
 }
 
 // BuildCases fills missing expected outputs (all of them with force) by
-// running the reference solution.
+// running the reference solution. It also builds every generated case and
+// writes the digests of their inputs; the cases whose digest is new or
+// changed (all with force) are cross-checked: every other reference is
+// judged against the outputs of the one that computes stored outputs.
 func (a *App) BuildCases(ctx context.Context, p *problem.Problem, langName string, force bool) (*BuildResult, error) {
 	cases, err := p.LoadCases()
 	if err != nil {
 		return nil, err
 	}
-	var sel []runner.Selected
+	var sel, gen []runner.Selected
 	for i, c := range cases {
 		if force {
 			// The old expected output is about to be replaced, so a
@@ -554,15 +578,18 @@ func (a *App) BuildCases(ctx context.Context, p *problem.Problem, langName strin
 			}
 			return nil, fmt.Errorf("case %d: %w", i+1, err)
 		}
-		if !c.HasExpected() {
+		switch {
+		case c.Generated():
+			gen = append(gen, runner.Selected{Index: i + 1, Case: c})
+		case !c.HasExpected():
 			sel = append(sel, runner.Selected{Index: i + 1, Case: c})
 		}
 	}
 	res := &BuildResult{}
-	if len(sel) == 0 {
+	if len(sel) == 0 && len(gen) == 0 {
 		return res, nil
 	}
-	if p.Judge.Compare == problem.CompareAnyOf {
+	if p.Judge.Compare == problem.CompareAnyOf && len(sel) > 0 {
 		// A reference finds one answer, but any_of needs all of them: storing
 		// the one answer would reject every other correct one.
 		nums := make([]string, len(sel))
@@ -571,33 +598,41 @@ func (a *App) BuildCases(ctx context.Context, p *problem.Problem, langName strin
 		}
 		return nil, fmt.Errorf("judge.compare is any_of, so expected must list every acceptable answer, which a reference solution cannot compute; write it by hand for case(s) %s (`hc validate --run` checks the reference against it)", strings.Join(nums, ", "))
 	}
-	rep, l, err := a.RunReference(ctx, p, langName, sel, RunOptions{Stderr: os.Stderr})
-	if err != nil {
-		return nil, err
-	}
-	res.Lang, res.Report = l, rep
-	if rep.Verdict == runner.CompileError {
-		return res, fmt.Errorf("reference solution does not compile:\n%s", rep.CompileError)
-	}
 	var failed []string
-	for _, cr := range rep.Cases {
-		if cr.Verdict != runner.NoExpected {
-			failed = append(failed, fmt.Sprintf("case %d: %s %s", cr.Index, cr.Verdict, cr.Error))
-			continue
+	if len(sel) > 0 {
+		rep, l, err := a.RunReference(ctx, p, langName, sel, RunOptions{Stderr: os.Stderr})
+		if err != nil {
+			return nil, err
 		}
-		old := cases[cr.Index-1].Expected
-		if old != nil {
-			opts := judge.OptionsFor(p)
-			if opts.Mode == problem.CompareChecker {
-				// Expected is the reference's own answer.
-				opts.Mode = problem.CompareExact
-			}
-			if same, _ := judge.Equal(opts, old, cr.Output); !same {
-				res.Changed = append(res.Changed, cr.Index)
-			}
+		res.Lang, res.Report = l, rep
+		if rep.Verdict == runner.CompileError {
+			return res, fmt.Errorf("reference solution does not compile:\n%s", rep.CompileError)
 		}
-		cases[cr.Index-1].Expected = cr.Output
-		res.Filled++
+		for _, cr := range rep.Cases {
+			if cr.Verdict != runner.NoExpected {
+				failed = append(failed, fmt.Sprintf("case %d: %s %s", cr.Index, cr.Verdict, cr.Error))
+				continue
+			}
+			old := cases[cr.Index-1].Expected
+			if old != nil {
+				opts := judge.OptionsFor(p)
+				if opts.Mode == problem.CompareChecker {
+					// Expected is the reference's own answer.
+					opts.Mode = problem.CompareExact
+				}
+				if same, _ := judge.Equal(opts, old, cr.Output); !same {
+					res.Changed = append(res.Changed, cr.Index)
+				}
+			}
+			cases[cr.Index-1].Expected = cr.Output
+			res.Filled++
+		}
+	}
+	if len(gen) > 0 {
+		if err := a.buildGenerated(ctx, p, langName, cases, gen, force, res); err != nil {
+			return res, err
+		}
+		slices.Sort(res.Changed)
 	}
 	if err := p.SaveCases(cases); err != nil {
 		return res, err
@@ -606,6 +641,77 @@ func (a *App) BuildCases(ctx context.Context, p *problem.Problem, langName strin
 		return res, fmt.Errorf("reference failed on %d case(s):\n  %s", len(failed), strings.Join(failed, "\n  "))
 	}
 	return res, nil
+}
+
+// buildGenerated builds the generated cases gen of cases, from a fresh run of
+// generator.py, sets their digests in cases and cross-checks the references
+// on those whose digest is new or changed (all with force).
+func (a *App) buildGenerated(ctx context.Context, p *problem.Problem, langName string, cases []problem.Case, gen []runner.Selected, force bool, res *BuildResult) error {
+	if err := a.generateInputs(ctx, p, gen, false, os.Stderr); err != nil {
+		return err
+	}
+	var redo []runner.Selected
+	for _, g := range gen {
+		d, err := problem.InputDigest(g.Case.Input)
+		if err != nil {
+			return err
+		}
+		c := &cases[g.Index-1]
+		if c.Digest != d {
+			if c.Digest != "" {
+				res.Changed = append(res.Changed, g.Index)
+			}
+			c.Digest = d
+			res.Digests++
+			redo = append(redo, g)
+		} else if force {
+			redo = append(redo, g)
+		}
+	}
+	if len(redo) == 0 {
+		return nil
+	}
+	first, _, err := a.ReferenceLang(p, langName)
+	if err != nil {
+		return fmt.Errorf("generated cases are judged on the outputs of a reference solution: %w", err)
+	}
+	if res.Lang == nil {
+		res.Lang = first
+	}
+	if err := a.expectGenerated(ctx, p, first, redo, os.Stderr); err != nil {
+		return err
+	}
+	var failed []string
+	for _, l := range a.ReferenceLangs(p) {
+		if l.ID() == first.ID() {
+			continue
+		}
+		tc, err := l.Toolchain()
+		if err == nil {
+			err = tc.Err()
+		}
+		if err != nil {
+			res.Unchecked = append(res.Unchecked, fmt.Sprintf("%s reference not checked on generated cases: %v", l.Name(), err))
+			continue
+		}
+		rep, _, err := a.RunReference(ctx, p, l.ID(), redo, RunOptions{Stderr: os.Stderr})
+		if err != nil {
+			return err
+		}
+		if rep.Verdict == runner.CompileError {
+			return fmt.Errorf("%s reference solution does not compile:\n%s", l.Name(), rep.CompileError)
+		}
+		for _, cr := range rep.Cases {
+			if cr.Verdict != runner.Accepted {
+				failed = append(failed, fmt.Sprintf("case %d (%s): %s on the %s reference's output", cr.Index, cr.Case.Generate, strings.TrimSpace(string(cr.Verdict)+" "+cr.Error), first.Name()))
+			}
+		}
+		res.Checked = append(res.Checked, l)
+		if len(failed) > 0 {
+			return fmt.Errorf("the %s reference disagrees with the %s reference on %d generated case(s):\n  %s", l.Name(), first.Name(), len(failed), strings.Join(failed, "\n  "))
+		}
+	}
+	return nil
 }
 
 // ProblemStatus is the progress on a problem.
