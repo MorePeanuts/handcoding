@@ -113,8 +113,19 @@ const (
 // required lists the features the regression set must cover.
 func required(t *testing.T, consts map[string][]constant) []string {
 	var req []string
+	for _, f := range protocolFeatures(t, consts) {
+		if _, ok := exempt[f]; !ok {
+			req = append(req, f)
+		}
+	}
+	return req
+}
+
+// protocolFeatures lists the features of the protocol hc implements.
+func protocolFeatures(t *testing.T, consts map[string][]constant) []string {
+	var req []string
 	add := func(f string) {
-		if _, ok := exempt[f]; !ok && !slices.Contains(req, f) {
+		if !slices.Contains(req, f) {
 			req = append(req, f)
 		}
 	}
