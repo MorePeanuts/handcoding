@@ -109,6 +109,18 @@ Versions are [SemVer](https://semver.org/) tags with a `v` prefix. Pushing a tag
 
 Patch releases contain only fixes, never new features or problem protocol changes. Features accumulate on `main` and ship as pre-releases when there is something worth trying. There are no `-rc` releases.
 
+### Protocol versions
+
+A [protocol version](docs/protocol.md#protocol-versions) is a draft until the first stable release that implements it, and final from then on. Protocol changes made during a milestone go into its draft version without a bump: protocol 1 is final with `v0.1.0`, and the changes after it go into protocol 2, which `v0.2.0` makes final. A change to a final version, an added feature included, needs a new version. Whether a version is final is `problem.FinalProtocol` (`internal/problem/protocol.go`), and `TestFinalProtocol` (`internal/regression`) fails when the features of a final version change: the types, kinds, compare modes, fields and languages that `TestProtocolCoverage` derives from the code. It cannot see a feature whose meaning changes; review must.
+
+Before tagging a stable release whose protocol is a draft:
+
+1. Set `problem.FinalProtocol` to `problem.Protocol`.
+2. Write the version's snapshot: `go test ./internal/regression -run TestFinalProtocol -update`, and commit `internal/regression/testdata/protocol-N.txt`.
+3. In the version table of `docs/protocol.md` and `docs/protocol_zh.md`, mark the version final with the release.
+
+The first protocol change after that bumps `problem.Protocol` and adds a row to that table.
+
 ### Maintenance branches
 
 As long as `main` holds nothing unreleased beyond fixes, a patch release is tagged on `main` and there is no maintenance branch. Once `main` has features for the next milestone and a fix has to ship before them, create a maintenance branch named after the line, from its release tag:

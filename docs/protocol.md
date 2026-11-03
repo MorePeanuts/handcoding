@@ -14,16 +14,18 @@ How hc itself behaves (which cases `hc test` runs, how `hc fetch` imports a prob
 
 ### Protocol versions
 
-Protocol versions are integers, and are not tied to hc's release versions: an hc release that does not change the protocol does not change what a pack may contain.
+Protocol versions are integers, separate from hc's release versions: an hc release that does not change the protocol does not change what a pack may contain.
+
+A version is a draft until it is final, and final once a stable release of hc implements it (a release without a pre-release suffix such as `-alpha.1`). From then on it never changes. While a version is a draft, hc's pre-releases may add to it, and change what they added, without a new version: two pre-releases may not read each other's packs, and an older one may refuse a pack's new features without telling you to upgrade. A pack that must keep working declares a final version and is checked with a stable hc. The rules below are about final versions.
 
 - A version that only adds features (a type, a compare mode, a field) keeps every pack written against an earlier version valid, with the same meaning. The spec marks each feature with the version that introduced it (the Since columns).
 - A version that changes or removes a feature is incompatible: from that version on, tools stop reading packs that declare an earlier one, and those packs have to be updated.
 - A pack MUST NOT use a feature introduced after the version it declares, so that every tool reading that version can read the pack.
 - A tool reads the versions from the oldest it still supports to the newest it implements. It MUST refuse a pack outside that range, before reading anything else of it, and say what to do: for a newer pack, upgrade the tool; for an older one, update the pack. hc says "this pack needs protocol 2, hc v0.1.0 supports up to 1, upgrade hc", or "this pack uses protocol 1, which hc v0.5.0 no longer reads, update the pack".
 
-| Version | Changes |
-|---|---|
-| 1 | The initial frozen protocol: packs and `pack.yaml`, problem directories, `problem.yaml`, types, signatures, cases, judging, checkers and the solution ABI, with Go and Python as the solution languages. |
+| Version | Final with | Changes |
+|---|---|---|
+| 1 | hc v0.1.0 (not yet released: a draft) | The initial protocol: packs and `pack.yaml`, problem directories, `problem.yaml`, types, signatures, cases, judging, checkers and the solution ABI, with Go and Python as the solution languages. |
 
 ### Out of scope
 
