@@ -834,16 +834,22 @@ def _call_class(solution, meta, inp):
             raise InputError("expected %d arguments, got %r" % (len(params), raw))
         return [decode(p["type"], a) for p, a in zip(params, raw)]
 
+    # Each call is timed on its own, after its arguments are decoded and
+    # before its result is encoded.
     out = [None] * len(ops)
+    argv = conv(cls_meta["constructor"], args[0])
     start = time.perf_counter_ns()
-    obj = cls(*conv(cls_meta["constructor"], args[0]))
+    obj = cls(*argv)
+    elapsed = time.perf_counter_ns() - start
     for i in range(1, len(ops)):
         m = methods.get(ops[i])
         if m is None:
             raise InputError("unknown method %r" % ops[i])
-        ret = getattr(obj, ops[i])(*conv(m["params"], args[i]))
+        argv = conv(m["params"], args[i])
+        start = time.perf_counter_ns()
+        ret = getattr(obj, ops[i])(*argv)
+        elapsed += time.perf_counter_ns() - start
         out[i] = None if m["returns"] == "void" else encode(m["returns"], ret)
-    elapsed = time.perf_counter_ns() - start
     return out, elapsed
 
 

@@ -443,30 +443,48 @@ func writeClassCall(b *strings.Builder, p *problem.Problem) error {
 	b.WriteString("\targs := hcJSON[[][]json.RawMessage](hcArg(in, \"args\"))\n")
 	b.WriteString("\tif len(ops) == 0 || len(ops) != len(args) {\n\t\tpanic(hcInputError{\"ops and args must be non-empty and of equal length\"})\n\t}\n")
 	b.WriteString("\tout := make([]any, len(ops))\n")
-	b.WriteString("\thcStart()\n")
+	// Each call is timed on its own, after its arguments are decoded and
+	// before its result is encoded.
 	fmt.Fprintf(b, "\thcArity(%q, args[0], %d)\n", c.Name, len(c.Constructor))
-	ctorArgs, err := argList(c.Constructor, "args[0]")
+	ctorArgs, err := writeArgs(b, c.Constructor, "args[0]", "\t")
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(b, "\tobj := Constructor(%s)\n", ctorArgs)
+	fmt.Fprintf(b, "\thcStart()\n\tobj := Constructor(%s)\n\thcStop()\n", ctorArgs)
 	b.WriteString("\tfor i := 1; i < len(ops); i++ {\n\t\ta := args[i]\n\t\t_ = a\n\t\tswitch ops[i] {\n")
 	for _, m := range c.Methods {
-		al, err := argList(m.Params, "a")
+		fmt.Fprintf(b, "\t\tcase %q:\n\t\t\thcArity(%q, a, %d)\n", m.Name, m.Name, len(m.Params))
+		al, err := writeArgs(b, m.Params, "a", "\t\t\t")
 		if err != nil {
 			return err
 		}
 		call := fmt.Sprintf("obj.%s(%s)", methodName(p, m.Name), al)
-		fmt.Fprintf(b, "\t\tcase %q:\n\t\t\thcArity(%q, a, %d)\n", m.Name, m.Name, len(m.Params))
 		if m.Returns == problem.TypeVoid {
-			fmt.Fprintf(b, "\t\t\t%s\n", call)
+			fmt.Fprintf(b, "\t\t\thcStart()\n\t\t\t%s\n\t\t\thcStop()\n", call)
 		} else {
-			fmt.Fprintf(b, "\t\t\tout[i] = %s\n", encodeExpr(m.Returns, call))
+			fmt.Fprintf(b, "\t\t\thcStart()\n\t\t\tret := %s\n\t\t\thcStop()\n", call)
+			fmt.Fprintf(b, "\t\t\tout[i] = %s\n", encodeExpr(m.Returns, "ret"))
 		}
 	}
 	b.WriteString("\t\tdefault:\n\t\t\tpanic(hcInputError{fmt.Sprintf(\"unknown method %q\", ops[i])})\n\t\t}\n\t}\n")
-	b.WriteString("\thcStop()\n\treturn out\n")
+	b.WriteString("\treturn out\n")
 	return nil
+}
+
+// writeArgs decodes the arguments of a constructor or method call from
+// slice into the variables hcArg0, hcArg1, …, and returns them as an
+// argument list.
+func writeArgs(b *strings.Builder, params []problem.Param, slice, indent string) (string, error) {
+	names := make([]string, len(params))
+	for i, prm := range params {
+		expr, err := decodeExpr(prm.Type, fmt.Sprintf("hcAt(%s, %d)", slice, i))
+		if err != nil {
+			return "", err
+		}
+		names[i] = fmt.Sprintf("hcArg%d", i)
+		fmt.Fprintf(b, "%s%s := %s\n", indent, names[i], expr)
+	}
+	return strings.Join(names, ", "), nil
 }
 
 // writeRoundTripCall encodes the input with one instance and decodes the
@@ -496,18 +514,6 @@ func writeRoundTripCall(b *strings.Builder, p *problem.Problem) error {
 	b.WriteString("\thcStop()\n")
 	fmt.Fprintf(b, "\treturn %s\n", encodeExpr(dec.Returns, "ret"))
 	return nil
-}
-
-func argList(params []problem.Param, slice string) (string, error) {
-	parts := make([]string, len(params))
-	for i, prm := range params {
-		expr, err := decodeExpr(prm.Type, fmt.Sprintf("hcAt(%s, %d)", slice, i))
-		if err != nil {
-			return "", err
-		}
-		parts[i] = expr
-	}
-	return strings.Join(parts, ", "), nil
 }
 
 func (Language) Build(ctx context.Context, dir, binDir string) error {

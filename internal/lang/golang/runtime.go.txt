@@ -43,13 +43,26 @@ type hcResult struct {
 
 type hcInputError struct{ msg string }
 
+// The time of a case is the sum of its timed sections, the calls into the
+// user's code: a class problem times each call, not the decoding of its
+// arguments or the encoding of its results in between.
 var (
 	hcStartTime time.Time
 	hcElapsed   time.Duration
+	hcTiming    bool
 )
 
-func hcStart() { hcStartTime = time.Now() }
-func hcStop()  { hcElapsed = time.Since(hcStartTime) }
+func hcStart() {
+	hcTiming = true
+	hcStartTime = time.Now()
+}
+
+func hcStop() {
+	if hcTiming {
+		hcElapsed += time.Since(hcStartTime)
+		hcTiming = false
+	}
+}
 
 func main() {
 	data, err := os.ReadFile(os.Getenv("HC_CASES"))
@@ -93,7 +106,7 @@ func hcRun(c hcCase) (res hcResult) {
 			res.Error = strings.TrimRight(fmt.Sprintf("panic: %v\n%s", r, hcStack()), "\n")
 		}
 	}()
-	hcElapsed = 0
+	hcElapsed, hcTiming = 0, false
 	v := hcNorm(reflect.ValueOf(hcCall(c.Input)))
 	var b strings.Builder
 	enc := json.NewEncoder(&b)
