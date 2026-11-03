@@ -116,10 +116,17 @@ func Clone(ctx context.Context, source, dir string, progress io.Writer) error {
 // (--filter=blob:none): it gets every commit but only the files of the
 // commits checked out, so that the size of a repository's history does not
 // matter. git ignores the filter for a local path, and says so.
+//
+// Off a terminal, the clone is --quiet: git leaves out the progress of its
+// fetch there, but not that of its checkout ("Updating files: 1% (2/101)"),
+// which a partial clone makes slow enough to show, as one line of carriage
+// returns in a log. --no-progress does not stop it. Errors still show.
 func cloneArgs(source, dir string, progress bool) []string {
 	args := []string{"clone"}
 	if progress {
 		args = append(args, "--progress")
+	} else {
+		args = append(args, "--quiet")
 	}
 	if _, err := os.Stat(source); err != nil {
 		args = append(args, "--filter=blob:none")
