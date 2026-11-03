@@ -211,8 +211,19 @@ const statementRule = "The statement is description.md, in the pack's default lo
 
 // sandboxRule says what the presets' sandbox refuses, so that the agent does
 // not learn it by trial: writes outside the workspace, and command lines its
-// command check cannot read (heredocs, loops over variables).
-const sandboxRule = "Your commands run in a sandbox that writes only inside the workspace, and long command lines (heredocs, loops) may be refused: write files with your editing tools, and run several shell steps as a script in .hc/scratch/ with sh.\n"
+// command check cannot read (heredocs, loops over variables). It names the
+// problem's own scratch directory (see AGENTS.md's hc block), so that
+// agents working on different problems at once keep apart.
+func sandboxRule(ref string) string {
+	dir := scratchDir(ref)
+	return fmt.Sprintf("Your commands run in a sandbox that writes only inside the workspace, and long command lines (heredocs, loops) may be refused: write files with your editing tools, and run several shell steps as a script with sh. Keep such files in %s, this problem's scratch directory: other agents may be working on other problems in .hc/scratch/ at the same time.\n", dir)
+}
+
+// scratchDir is the scratch directory, relative to the workspace, of an
+// agent working on the problem ref (pack/slug): .hc/scratch/<slug>/.
+func scratchDir(ref string) string {
+	return ".hc/scratch/" + path.Base(ref) + "/"
+}
 
 // GeneratePrompt asks the agent to write a reference solution and cases for
 // the problem ref (pack/slug) in problemDir, relative to the workspace.
@@ -227,7 +238,7 @@ func (a *Agent) GeneratePrompt(ref, problemDir string, count int, extra string) 
 	b.WriteString(statementRule)
 	b.WriteString(a.definitionSkill())
 	b.WriteString("Do not touch the solutions/ directory.\n")
-	b.WriteString(sandboxRule)
+	b.WriteString(sandboxRule(ref))
 	if extra != "" {
 		fmt.Fprintf(&b, "\nAdditional instructions from the user: %s\n", extra)
 	}
@@ -252,6 +263,6 @@ func (a *Agent) FixPrompt(ref, problemDir string, cases []int, complaint, soluti
 	b.WriteString("Follow its \"fix a test case\" workflow. If the test case is correct and the user's solution is wrong, explain why instead of changing anything.\n")
 	b.WriteString(statementRule)
 	b.WriteString(a.definitionSkill())
-	b.WriteString(sandboxRule)
+	b.WriteString(sandboxRule(ref))
 	return b.String()
 }

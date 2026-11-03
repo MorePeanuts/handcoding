@@ -204,7 +204,7 @@ function of the problem's `generator.py`, and the case only names the call:
   [by construction](#test-cases).
 - To check that the inputs meet the constraints, pipe them into a script
   that prints only its verdict:
-  `hc cases list <slug> --expand --json | python3 .hc/scratch/check.py`
+  `hc cases list <slug> --expand --json | python3 .hc/scratch/<slug>/check.py`
   (`--expand` runs generator.py as hc does, `--json` prints one case per
   line). Never print the expanded inputs themselves: a large input costs
   far more to read than to check. `hc_runtime` cannot be imported outside

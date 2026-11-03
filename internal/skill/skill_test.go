@@ -159,8 +159,13 @@ func TestInstallLeavesUnmanagedSkills(t *testing.T) {
 	if read(t, mine) != "mine\n" || read(t, other) != "mine\n" {
 		t.Error("touched a skill hc did not install")
 	}
-	if !strings.Contains(read(t, filepath.Join(root, AgentsFile)), AgentsDir+"/"+Cases+"/"+MainFile) {
+	agents := read(t, filepath.Join(root, AgentsFile))
+	if !strings.Contains(agents, AgentsDir+"/"+Cases+"/"+MainFile) {
 		t.Error("AGENTS.md does not list the skill hc installed")
+	}
+	// Agents working on different problems at once keep their files apart.
+	if !strings.Contains(agents, ".hc/scratch/<slug>/") {
+		t.Errorf("AGENTS.md does not give each problem its scratch directory:\n%s", agents)
 	}
 }
 

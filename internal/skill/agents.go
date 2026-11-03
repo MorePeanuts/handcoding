@@ -44,8 +44,11 @@ skills covers, read its SKILL.md and follow it:
 
 ` + strings.Join(lines, "\n") + `
 
-Keep throwaway files (scripts, scratch data) in .hc/scratch/: .hc/ is hc's
-own directory, never part of a pack. Delete them when you are done.
+Keep throwaway files (scripts, scratch data) in .hc/scratch/<slug>/, the
+directory of the problem you work on (.hc/scratch/ for other work): other
+agents may be working on other problems at the same time, with files of the
+same names. .hc/ is hc's own directory, never part of a pack. Delete your
+files when you are done.
 
 hc rewrites this block when it installs skills; write your own notes outside it.
 ` + endMarker
