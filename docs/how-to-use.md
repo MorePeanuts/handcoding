@@ -318,6 +318,14 @@ hc fix two-sum -c 5 -m "answers in a different order should pass"
 
 The presets run the agent in a sandbox where its commands can write only to the workspace and temporary directories (Claude Code's sandbox, Codex's `workspace-write`). So hc sets up the Python environment in `.hc/venv` before the agent starts, and gives the agent, preset or not, caches inside the workspace: `GOCACHE` is `.hc/cache/go-build` and `UV_CACHE_DIR` is `.hc/cache/uv`. The agent's first Go build is slower for it.
 
+While the agent works, hc shows each command it runs and file it writes, then its final report, how long it ran (with Claude Code, its turns and cost) and where its trace is. **Every run is logged** in `.hc/agent/<pack>/<slug>/<time>-<gen|fix>.jsonl`, the newest 10 per problem. A log is JSON lines:
+
+- the first is `{"type": "start", ...}`: hc's version, the task, the problem, the agent and its command line, and the prompt;
+- then one per line the agent wrote, with the time hc read it: `{"type": "stdout", "event": ...}` holds an event of the presets' JSON output (Claude Code's `--output-format stream-json`, `codex exec --json`), and `"text"` any other line, of standard error (`"stderr"`) too;
+- the last is `{"type": "end", ...}`: how long the run took, the exit code, and the error, if any.
+
+Read it to see what the agent did and where its time went, for example with `jq`. The agents keep their own records too, but they are elsewhere and do not say which hc run they belong to.
+
 To use another agent, set its command line in `hc.yaml`; `{prompt}` is replaced by the prompt:
 
 ```yaml
@@ -325,7 +333,7 @@ agent:
   command: ["my-agent", "--yes", "{prompt}"]
 ```
 
-The prompt points the agent at the skills in `.agents/skills/`, or in `.claude/skills/` when the command is `claude`.
+The prompt points the agent at the skills in `.agents/skills/`, or in `.claude/skills/` when the command is `claude`. hc shows and logs such a command's output as text.
 
 ### Agent skills
 

@@ -10,11 +10,14 @@ package agent
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/MorePeanuts/handcoding/internal/skill"
 )
@@ -31,23 +34,31 @@ type Agent struct {
 	// SkillDir is the directory of the skill copies the agent reads,
 	// relative to the workspace root.
 	SkillDir string
+	// Format is how the agent reports its work on standard output.
+	Format Format
 }
 
 // Presets maps agent names to their headless command lines. Both keep writes
 // inside the workspace (and temporary directories), so hc must prepare what
 // the commands it runs need elsewhere before it starts them. Claude: Write/Edit are left out of the allowlist so
 // acceptEdits approves them only in the working directory, and the sandbox
-// confines what Bash commands (python3, go) can write. Codex: --full-auto
-// runs in its workspace-write sandbox.
+// confines what Bash commands (python3, go) can write. Codex: exec runs
+// without approvals, in its workspace-write sandbox. Both report their work
+// as JSON events, which hc logs (presetFormats).
 var Presets = map[string][]string{
 	"claude": {
 		"claude", "-p", "{prompt}",
+		"--output-format", "stream-json", "--verbose",
 		"--permission-mode", "acceptEdits",
 		"--allowedTools", "Read,Glob,Grep,Bash(hc:*),Bash(python3:*),Bash(go:*),Bash(ls:*),Bash(cat:*),Bash(head:*),Bash(wc:*)",
 		"--settings", `{"sandbox":{"enabled":true,"autoAllowBashIfSandboxed":true,"allowUnsandboxedCommands":false}}`,
 	},
-	"codex": {"codex", "exec", "--full-auto", "{prompt}"},
+	"codex": {"codex", "exec", "--sandbox", "workspace-write", "--json", "{prompt}"},
 }
+
+// presetFormats is the output format of each preset. A command of the
+// user's is Text, whatever program it runs.
+var presetFormats = map[string]Format{"claude": ClaudeStream, "codex": CodexJSON}
 
 // Resolve returns the agent for a preset name or a custom command. Claude
 // Code reads the skills in .claude/skills; Codex, and any other command,
@@ -63,7 +74,7 @@ func Resolve(name string, command []string) (*Agent, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown agent %q (presets: claude, codex; or set agent.command in hc.yaml)", name)
 	}
-	return &Agent{Name: name, Argv: argv, SkillDir: skillDir(name)}, nil
+	return &Agent{Name: name, Argv: argv, SkillDir: skillDir(name), Format: presetFormats[name]}, nil
 }
 
 func skillDir(command string) string {
@@ -73,34 +84,109 @@ func skillDir(command string) string {
 	return skill.AgentsDir
 }
 
-// Run executes the agent in dir with the prompt, streaming its output. env
-// adds to the agent's environment.
-func (a *Agent) Run(ctx context.Context, dir, prompt string, env []string) error {
+// RunOptions configure a run.
+type RunOptions struct {
+	// Dir is the workspace, where the agent runs.
+	Dir    string
+	Prompt string
+	// Env adds to the agent's environment.
+	Env []string
+	// Log, when set, gets the trace of the run (see trace).
+	Log io.Writer
+	// Header goes into the log's first line, beside the agent and its
+	// command line.
+	Header map[string]any
+	// Stdout gets the agent's output that is not an event of its Format,
+	// and Stderr its standard error. Progress, when set, gets a line per
+	// tool the agent calls.
+	Stdout, Stderr io.Writer
+	Progress       func(string)
+}
+
+// Run executes the agent with the prompt, and returns what it reports at
+// its end. A run that fails, or that the agent reports as failed, is an
+// error, with what it reported so far.
+func (a *Agent) Run(ctx context.Context, o RunOptions) (*Result, error) {
 	argv := make([]string, len(a.Argv))
 	replaced := false
 	for i, arg := range a.Argv {
 		if strings.Contains(arg, "{prompt}") {
-			arg = strings.ReplaceAll(arg, "{prompt}", prompt)
+			arg = strings.ReplaceAll(arg, "{prompt}", o.Prompt)
 			replaced = true
 		}
 		argv[i] = arg
 	}
 	if !replaced {
-		argv = append(argv, prompt)
+		argv = append(argv, o.Prompt)
 	}
 	if _, err := exec.LookPath(argv[0]); err != nil {
-		return fmt.Errorf("agent %q not found in PATH: %w", argv[0], err)
+		return nil, fmt.Errorf("agent %q not found in PATH: %w", argv[0], err)
 	}
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
-	cmd.Dir = dir
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	cmd.Dir = o.Dir
+	cmd.Stdin = os.Stdin
+	// On Ctrl-C the agent gets the signal from the terminal too; give it
+	// time to stop before it is killed.
+	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
+	cmd.WaitDelay = 10 * time.Second
 	// Make sure the agent's `hc` calls resolve to this binary and workspace.
-	env = append(append(os.Environ(), env...), "HC_WORKSPACE="+dir)
+	env := append(append(os.Environ(), o.Env...), "HC_WORKSPACE="+o.Dir)
 	if exe, err := os.Executable(); err == nil {
 		env = append(env, "PATH="+filepath.Dir(exe)+string(os.PathListSeparator)+os.Getenv("PATH"))
 	}
 	cmd.Env = env
-	return cmd.Run()
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	t := &trace{w: o.Log}
+	head := map[string]any{"type": "start", "agent": a.Name, "argv": a.Argv, "dir": o.Dir, "prompt": o.Prompt}
+	for k, v := range o.Header {
+		head[k] = v
+	}
+	t.write(head)
+	d := &display{format: a.Format, dir: o.Dir, stdout: o.Stdout, progress: o.Progress}
+	start := time.Now()
+	if err := cmd.Start(); err != nil {
+		t.write(map[string]any{"type": "end", "error": err.Error()})
+		return nil, err
+	}
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		readLines(stdout, func(line []byte) {
+			t.line("stdout", line, a.Format != Text)
+			d.line(line)
+		})
+	}()
+	go func() {
+		defer wg.Done()
+		readLines(stderr, func(line []byte) {
+			t.line("stderr", line, false)
+			if o.Stderr != nil {
+				_, _ = o.Stderr.Write(append(line, '\n'))
+			}
+		})
+	}()
+	wg.Wait()
+	err = cmd.Wait()
+	res := d.res
+	res.Duration = time.Since(start)
+	if err == nil {
+		err = d.err
+	}
+	end := map[string]any{"type": "end", "duration_ms": res.Duration.Milliseconds(), "exit_code": cmd.ProcessState.ExitCode()}
+	if err != nil {
+		end["error"] = err.Error()
+	}
+	t.write(end)
+	return &res, err
 }
 
 // skillPath is the path of a skill's SKILL.md in the agent's copy.

@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -65,7 +67,7 @@ computes expected outputs with ` + "`hc cases build`" + ` and verifies them with
 				}
 				rel, _ := filepath.Rel(a.WS.Root, p.Dir)
 				prompt := ag.GeneratePrompt(p.Ref(), rel, count, extra)
-				return runAgent(cmd, a, ag, prompt, dryRun, p)
+				return runAgent(cmd, a, ag, "gen", prompt, dryRun, p)
 			})
 		},
 	}
@@ -113,7 +115,7 @@ To fix a case by hand instead: hc cases edit <problem>.`,
 				}
 				rel, _ := filepath.Rel(a.WS.Root, p.Dir)
 				prompt := ag.FixPrompt(p.Ref(), rel, cases, complaint, solution)
-				return runAgent(cmd, a, ag, prompt, dryRun, p)
+				return runAgent(cmd, a, ag, "fix", prompt, dryRun, p)
 			})
 		},
 	}
@@ -125,7 +127,9 @@ To fix a case by hand instead: hc cases edit <problem>.`,
 	return cmd
 }
 
-func runAgent(cmd *cobra.Command, a *app.App, ag *agent.Agent, prompt string, dryRun bool, p *problem.Problem) error {
+// runAgent runs the agent for task (gen, fix) on p, logging its trace in
+// the workspace, then validates p.
+func runAgent(cmd *cobra.Command, a *app.App, ag *agent.Agent, task, prompt string, dryRun bool, p *problem.Problem) error {
 	env := agentEnv(a.WS)
 	if dryRun {
 		fmt.Printf("cd %s\n%s %s\n\nPrompt:\n%s", a.WS.Root, strings.Join(env, " "), strings.Join(ag.Argv, " "), prompt)
@@ -136,8 +140,32 @@ func runAgent(cmd *cobra.Command, a *app.App, ag *agent.Agent, prompt string, dr
 	for _, l := range a.Langs.All() {
 		setupEnv(cmd.Context(), l)
 	}
+	o := agent.RunOptions{
+		Dir: a.WS.Root, Prompt: prompt, Env: env,
+		Header: map[string]any{"hc": version.String(), "task": task, "problem": p.Ref()},
+		Stdout: os.Stdout, Stderr: os.Stderr,
+		Progress: func(s string) { fmt.Fprintln(os.Stderr, ui.Faint.Render("  › "+s)) },
+	}
+	logName := ""
+	if f, err := a.CreateAgentLog(p, task); err != nil {
+		fmt.Fprintf(os.Stderr, "%s cannot log the agent's run: %v\n", ui.Yellow.Render("warning"), err)
+	} else {
+		defer f.Close()
+		o.Log, logName = f, a.WS.Rel(f.Name())
+	}
 	fmt.Fprintf(os.Stderr, "%s %s is working on %s (this can take a few minutes)…\n", ui.Cyan.Render("agent"), ag.Name, p.Ref())
-	if err := ag.Run(cmd.Context(), a.WS.Root, prompt, env); err != nil {
+	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
+	defer stop()
+	res, err := ag.Run(ctx, o)
+	if res != nil && res.Message != "" {
+		fmt.Fprintln(os.Stderr)
+		fmt.Println(strings.TrimSpace(res.Message))
+	}
+	if res != nil {
+		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(os.Stderr, ui.Faint.Render(agentSummary(res, logName)))
+	}
+	if err != nil {
 		return fmt.Errorf("agent: %w", err)
 	}
 	fmt.Fprintln(os.Stderr)
@@ -147,6 +175,23 @@ func runAgent(cmd *cobra.Command, a *app.App, ag *agent.Agent, prompt string, dr
 		return err
 	}
 	return validateOne(cmd, a, p2)
+}
+
+// agentSummary sums up a run in a line: how long it took, what the agent
+// reports of its cost, and where its trace is.
+func agentSummary(res *agent.Result, logName string) string {
+	parts := []string{"agent ran " + res.Duration.Round(time.Second).String()}
+	if res.Turns > 0 {
+		parts = append(parts, fmt.Sprintf("%d turns", res.Turns))
+	}
+	if res.CostUSD > 0 {
+		parts = append(parts, fmt.Sprintf("$%.2f", res.CostUSD))
+	}
+	s := strings.Join(parts, ", ")
+	if logName != "" {
+		s += "; trace in " + logName
+	}
+	return s
 }
 
 // agentEnv moves the caches of the toolchains hc runs into the workspace's
