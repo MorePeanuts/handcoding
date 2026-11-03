@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -359,5 +360,76 @@ func TestGenerateInputs(t *testing.T) {
 		if s.Case.Input == nil || s.Case.HasExpected() {
 			t.Errorf("case %d: input %v, expected %s", s.Index, s.Case.Input != nil, s.Case.Expected)
 		}
+	}
+}
+
+// TestRunFile checks hc test --file and --generate: a solution file kept
+// outside solutions/ runs like the user's, its language comes from its
+// extension, and a generator call that is not in cases.jsonl is built with
+// its expected output, nothing cached.
+func TestRunFile(t *testing.T) {
+	requireTools(t, "go", "python3")
+	a := newWorkspace(t)
+	p := largest(t, a)
+	ctx := context.Background()
+	if _, err := a.BuildCases(ctx, p, "python", false); err != nil {
+		t.Fatal(err)
+	}
+	cases, _ := p.LoadCases()
+	sel, err := app.Select(cases, nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scratch := t.TempDir()
+	files := map[string]string{
+		"slow.py": "class Solution:\n    def largest(self, nums):\n        return nums[-1]\n",
+		"slow.go": "package main\n\nfunc largest(nums []int) int { return nums[0] }\n",
+	}
+	want := map[string][]runner.Verdict{
+		"slow.py": {runner.Accepted, runner.WrongAnswer, runner.WrongAnswer},
+		"slow.go": {runner.WrongAnswer, runner.Accepted, runner.WrongAnswer},
+	}
+	for name, code := range files {
+		file := filepath.Join(scratch, name)
+		writeFile(t, file, code)
+		l, err := a.FileLang(file, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		rep, err := a.RunFile(ctx, p, l, file, slices.Clone(sel), app.RunOptions{})
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		for i, c := range rep.Cases {
+			if c.Verdict != want[name][i] {
+				t.Errorf("%s, case %d: %s, want %s", name, c.Index, c.Verdict, want[name][i])
+			}
+		}
+	}
+	if a.HasSolution(p, mustLang(t, a, "python")) {
+		t.Error("RunFile started a solution")
+	}
+	if _, err := a.FileLang(filepath.Join(scratch, "slow.py"), "go"); err == nil {
+		t.Error("FileLang accepted a .py file as Go")
+	}
+	if _, err := a.FileLang(filepath.Join(scratch, "notes.txt"), ""); err == nil {
+		t.Error("FileLang found a language for .txt")
+	}
+
+	before, _ := os.ReadFile(cachePath(a, p, "python"))
+	custom := []runner.Selected{{Index: 1, Case: problem.Case{Generate: &problem.Generate{Name: "descending", Args: map[string]json.RawMessage{"n": json.RawMessage("7")}}}}}
+	if err := a.BuildCase(ctx, p, mustLang(t, a, "python"), custom, app.RunOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if c := custom[0].Case; string(c.Input["nums"]) != "[7,6,5,4,3,2,1]" || string(c.Expected) != "7" {
+		t.Errorf("custom case: input %s, expected %s", c.Input["nums"], c.Expected)
+	}
+	if after, _ := os.ReadFile(cachePath(a, p, "python")); string(after) != string(before) {
+		t.Error("BuildCase changed the cache")
+	}
+	bad := []runner.Selected{{Index: 1, Case: problem.Case{Generate: &problem.Generate{Name: "nope"}}}}
+	err = a.BuildCase(ctx, p, mustLang(t, a, "python"), bad, app.RunOptions{})
+	if ge, ok := errors.AsType[*runner.GeneratedCaseError](err); !ok || !ge.Custom || strings.Contains(err.Error(), "broken") {
+		t.Errorf("unknown generator function: %v", err)
 	}
 }

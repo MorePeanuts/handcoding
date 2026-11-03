@@ -78,6 +78,24 @@ func (a *App) Materialize(ctx context.Context, p *problem.Problem, l lang.Langua
 
 func unbuilt(s runner.Selected) bool { return s.Case.Generated() && s.Case.Input == nil }
 
+// BuildCase builds generated cases that are not in cases.jsonl, such as a
+// generator call given to hc test: their inputs with generator.py and, when
+// p has a reference solution, their expected outputs, with the reference in
+// l when there is one. Nothing is cached.
+func (a *App) BuildCase(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, o RunOptions) error {
+	err := a.generateInputs(ctx, p, sel, false, o.Stderr)
+	if err == nil && len(a.ReferenceLangs(p)) > 0 {
+		var ref lang.Language
+		if ref, err = a.generatedRef(p, l); err == nil {
+			err = a.expectGenerated(ctx, p, ref, sel, o.Stderr)
+		}
+	}
+	if ge, ok := errors.AsType[*runner.GeneratedCaseError](err); ok {
+		ge.Custom = true
+	}
+	return err
+}
+
 // generatedRef is the reference solution that computes the expected outputs
 // of p's generated cases: the one in l when there is one, else another.
 // References run only on toolchains the protocol supports, so one whose

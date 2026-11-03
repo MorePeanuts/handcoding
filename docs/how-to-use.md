@@ -136,6 +136,7 @@ hc test two-sum -c 4 -c 5                           # run chosen cases
 hc test two-sum --all -v                            # all cases, full output, not recorded
 hc test two-sum -i '{"nums":[1,2,3],"target":5}'    # custom input (expected output from the reference, if any)
 hc test lru-cache -l py                             # solve in Python
+hc test two-sum --all --file draft.py               # run another solution file instead of yours
 hc submit two-sum                                   # all cases, recorded in history
 
 hc list --plain --pack leetcode --group arrays   # a pack's group, in its order, as a table
@@ -150,6 +151,10 @@ hc discard two-sum          # delete the solution and all its submissions
 ```
 
 Run `hc <command> --help` for every flag.
+
+The report shows how long each case took in your code: the call of the function, or for a design problem the constructor and every method call, without decoding their arguments and encoding their results.
+
+`--file` runs a solution file kept anywhere instead of the one in `solutions/`, so you can compare drafts or time a slow solution against the reference (`--file` with the reference's own file shows its times). Its language comes from its extension, unless `-l` says otherwise. The file is run alone, copied into a directory of its own.
 
 ## Getting problems
 
@@ -255,6 +260,7 @@ def distinct(rng, n):
 - `hc cases build` runs the generators afresh and writes each case's `digest`, the hash of the input it built. On the cases whose digest is new or changed (all of them with `--force`), it judges every other reference against the outputs of the one it runs, so the Go and the Python reference must agree. A generated case stores no expected output.
 - `hc test`, `hc submit` and `hc debug` build the generated cases they run: Python runs the generators, whatever your solution's language, and the reference solution in your language (else another) computes the expected outputs, which are then judged as usual. The results are kept in `.hc/cache/cases/<pack>/<problem>/<language>.json` and built again when hc, `problem.yaml`, `generator.py`, the reference or the generated cases change.
 - A generator that fails, builds an input other than its digest's, or an invalid one, and a reference that fails on a generated input, are errors of the problem, not verdicts on your solution: the run stops and names the file and the case. `hc validate --run` and `hc pack check` build the cases afresh, never from the cache, so that they catch a generator that is not deterministic.
+- `hc test --generate <name> --args '{…}' --seed N` builds a custom input with a function of `generator.py`, without adding a case to `cases.jsonl` or touching the cache, and runs it like `-i`; the reference computes its expected output. Timing a solution on `n` and on `n/2` this way shows how its time grows.
 - `hc cases list` shows a generated case as its call, `distinct(n=100000) seed 7`, and a failing one in a report as the call followed by the clipped input. `hc cases list --expand` runs `generator.py` and shows the inputs it builds now (with `--json`, as the lines they would be if stored, for a script to check), without checking the digests.
 - `hc validate` warns about a stored case over 100 KB, and `hc pack check` fails on it.
 

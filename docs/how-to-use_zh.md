@@ -136,6 +136,7 @@ hc test two-sum -c 4 -c 5                           # 运行指定用例
 hc test two-sum --all -v                            # 全部用例，完整输出，不记录
 hc test two-sum -i '{"nums":[1,2,3],"target":5}'    # 自定义输入（有参考解时会算出期望输出）
 hc test lru-cache -l py                             # 用 Python 解题
+hc test two-sum --all --file draft.py               # 运行另一个解答文件，而不是你的解答
 hc submit two-sum                                   # 全部用例，记入历史
 
 hc list --plain --pack leetcode --group arrays   # 以表格列出某个题目包的一个分组，按分组中的顺序
@@ -150,6 +151,10 @@ hc discard two-sum          # 删除解答及其全部提交记录
 ```
 
 运行 `hc <command> --help` 查看所有参数。
+
+报告会列出每个用例在你的代码中花费的时间：函数题是函数调用本身，设计题是构造函数和每次方法调用，不含参数的解码和结果的编码。
+
+`--file` 运行放在任意位置的解答文件，而不是 `solutions/` 中的那份，便于比较不同的草稿，或者把一份慢速解与参考解比较用时（`--file` 指向参考解本身的文件即可看到它的用时）。它的语言由扩展名决定，除非用 `-l` 另行指定。这个文件会被复制到单独的目录中运行，所以不能依赖旁边的其他文件。
 
 ## 获取题目
 
@@ -255,6 +260,7 @@ def distinct(rng, n):
 - `hc cases build` 重新运行生成器，并写入每个用例的 `digest`，即它构造出的输入的哈希。对摘要新增或改变了的用例（`--force` 时为全部），它以所运行的那份参考解的输出为期望输出评判其他每份参考解，所以 Go 和 Python 的参考解必须一致。生成用例不存储期望输出。
 - `hc test`、`hc submit` 和 `hc debug` 会构造它们要运行的生成用例：无论你用什么语言解题，生成器都由 Python 运行；期望输出由你所用语言的参考解（没有时用另一份）计算，然后照常评判。结果保存在 `.hc/cache/cases/<pack>/<problem>/<language>.json`，当 hc、`problem.yaml`、`generator.py`、参考解或生成用例改变时会重新构造。
 - 生成器失败、构造出的输入与摘要不符或不合法，以及参考解在生成的输入上失败，都是题目的错误，而不是对你的解答的判题结果：运行会停止，并指出文件和用例。`hc validate --run` 和 `hc pack check` 总是重新构造这些用例，从不读缓存，以便发现不确定的生成器。
+- `hc test --generate <name> --args '{…}' --seed N` 用 `generator.py` 中的函数构造一个自定义输入，像 `-i` 那样运行，但不会往 `cases.jsonl` 添加用例，也不改动缓存；期望输出由参考解计算。用这种方式分别在 `n` 和 `n/2` 上计时，可以看出解答的用时如何增长。
 - `hc cases list` 把生成用例显示为它的调用，例如 `distinct(n=100000) seed 7`；报告中失败的生成用例显示为调用加上截断的输入。`hc cases list --expand` 会运行 `generator.py`，显示它当前生成的输入（加上 `--json` 时，输出为存储用例那样的行，便于脚本检查），不检查摘要。
 - `hc validate` 对超过 100 KB 的存储用例给出警告，`hc pack check` 则判为失败。
 

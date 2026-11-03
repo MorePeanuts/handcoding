@@ -356,6 +356,57 @@ func (a *App) Run(ctx context.Context, p *problem.Problem, l lang.Language, sel 
 	if !a.HasSolution(p, l) {
 		return nil, fmt.Errorf("no %s solution for %s yet; run `hc start %s -l %s`", l.Name(), p.Slug, a.WS.Ref(p), l.ID())
 	}
+	return a.run(ctx, p, l, filepath.Dir(a.SolutionPath(p, l)), sel, o)
+}
+
+// RunFile runs the solution in file instead of the user's, like Run: a
+// solution kept elsewhere, such as a slow solution an author times in
+// .hc/scratch/. The file is copied into a directory of its own, so it must
+// not need files beside it.
+func (a *App) RunFile(ctx context.Context, p *problem.Problem, l lang.Language, file string, sel []runner.Selected, o RunOptions) (*runner.Report, error) {
+	if err := a.CheckLang(p, l); err != nil {
+		return nil, err
+	}
+	code, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	dir, err := os.MkdirTemp("", "hc-file-*")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(dir)
+	if err := os.WriteFile(filepath.Join(dir, l.SolutionFile()), code, 0o644); err != nil {
+		return nil, err
+	}
+	return a.run(ctx, p, l, dir, sel, o)
+}
+
+// FileLang is the language of a solution file: name when given, which must
+// fit the file's extension, else the language whose solution files have
+// that extension.
+func (a *App) FileLang(file, name string) (lang.Language, error) {
+	ext := filepath.Ext(file)
+	if name != "" {
+		l, err := a.Langs.Get(name)
+		if err != nil {
+			return nil, err
+		}
+		if want := filepath.Ext(l.SolutionFile()); ext != want {
+			return nil, fmt.Errorf("%s is not a %s file (%s)", file, l.Name(), want)
+		}
+		return l, nil
+	}
+	for _, l := range a.Langs.All() {
+		if filepath.Ext(l.SolutionFile()) == ext {
+			return l, nil
+		}
+	}
+	return nil, fmt.Errorf("cannot tell the language of %s from its extension; give it with --lang", file)
+}
+
+// run runs the solution in dir, after building the generated cases of sel.
+func (a *App) run(ctx context.Context, p *problem.Problem, l lang.Language, dir string, sel []runner.Selected, o RunOptions) (*runner.Report, error) {
 	if err := l.Setup(ctx, o.Stderr); err != nil {
 		return nil, err
 	}
@@ -372,7 +423,7 @@ func (a *App) Run(ctx context.Context, p *problem.Problem, l lang.Language, sel 
 	if err != nil {
 		return nil, err
 	}
-	rep, err := runner.Run(ctx, l, p, filepath.Dir(a.SolutionPath(p, l)), sel, opts)
+	rep, err := runner.Run(ctx, l, p, dir, sel, opts)
 	if rep != nil {
 		rep.Toolchain = tc
 	}
