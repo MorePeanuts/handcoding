@@ -68,7 +68,7 @@ A driver only **decodes the inputs, calls the user's code and encodes the result
   {"id": 1, "output": [0,1], "error": "", "elapsed_ns": 1234}
   ```
 
-  A non-empty `error` is a Runtime Error; keep only the stack frames of the user's code if you can, and start the message with `invalid input:` when the input does not fit its structure. `elapsed_ns` covers only the time spent in the user's code.
+  A non-empty `error` is a Runtime Error; keep only the stack frames of the user's code if you can, and start the message with `invalid input:` when the input does not fit its structure. `elapsed_ns` covers only the time spent in the user's code: the function call, or for a class problem the sum of the constructor and method calls, each timed after its arguments are decoded and before its result is encoded.
 - The user's stdout and stderr go straight to the terminal, so print debugging works.
 - Cases without a result line become Runtime Error, or Time Limit Exceeded when the run timed out (`runner.Run`).
 - Checkers (`judge.compare: checker`) are not the driver's business either: they are Python for every solution language, run through `lang.Checker`, which the Python language implements, and `judge.Checked` turns their results into verdicts. Nor are generated cases: `runner.Generate` runs the problem's `generator.py` through `lang.Generator` (Python again) before the driver starts, and the driver gets their inputs like any other.

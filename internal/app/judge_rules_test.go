@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/lang"
@@ -901,5 +902,47 @@ func TestRunInvalidCase(t *testing.T) {
 	sel, _ := app.Select(cases, []int{1}, false)
 	if rep, err := a.Run(context.Background(), p, l, sel, app.RunOptions{}); err != nil || rep.Verdict != runner.Accepted {
 		t.Fatalf("case 1: %v %+v", err, rep)
+	}
+}
+
+const sleeperYAML = `slug: sleeper
+title: Sleeper
+kind: class
+class:
+  name: Sleeper
+  constructor:
+    - name: ms
+      type: integer
+  methods:
+    - name: nap
+      params:
+        - name: ms
+          type: integer
+      returns: integer
+judge:
+  compare: exact
+`
+
+// TestClassTiming checks that a class problem's time adds up the
+// constructor and every method call, which are timed one by one.
+func TestClassTiming(t *testing.T) {
+	requireTools(t, "go", "python3")
+	a := newWorkspace(t)
+	p := addProblem(t, a, "sleeper", sleeperYAML, `{"input":{"ops":["Sleeper","nap","nap"],"args":[[30],[30],[30]]},"expected":[null,30,30]}`+"\n")
+	solutions := map[string]string{
+		"go":     "package main\n\nimport \"time\"\n\ntype Sleeper struct{}\n\nfunc Constructor(ms int) Sleeper {\n\ttime.Sleep(time.Duration(ms) * time.Millisecond)\n\treturn Sleeper{}\n}\n\nfunc (s *Sleeper) Nap(ms int) int {\n\ttime.Sleep(time.Duration(ms) * time.Millisecond)\n\treturn ms\n}\n",
+		"python": "import time\n\n\nclass Sleeper:\n    def __init__(self, ms):\n        time.sleep(ms / 1000)\n\n    def nap(self, ms):\n        time.sleep(ms / 1000)\n        return ms\n",
+	}
+	cases, _ := p.LoadCases()
+	sel, _ := app.Select(cases, nil, true)
+	for langID, code := range solutions {
+		l := writeSolution(t, a, p, langID, code)
+		rep, err := a.Run(context.Background(), p, l, sel, app.RunOptions{})
+		if err != nil {
+			t.Fatalf("%s: %v", langID, err)
+		}
+		if c := rep.Cases[0]; c.Verdict != runner.Accepted || c.Elapsed < 90*time.Millisecond {
+			t.Errorf("%s: %s in %s, want Accepted in at least 90ms", langID, c.Verdict, c.Elapsed)
+		}
 	}
 }

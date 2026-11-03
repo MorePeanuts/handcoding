@@ -153,3 +153,36 @@ func TestStarterRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+// A class problem times each call on its own: arguments are decoded before
+// the timed section and results encoded after it.
+func TestClassCallTiming(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go not in PATH")
+	}
+	p := &problem.Problem{Slug: "f", Kind: problem.KindClass, Class: &problem.Class{
+		Name:        "Stack",
+		Constructor: []problem.Param{{Name: "nums", Type: "integer[]"}},
+		Methods: []problem.Method{
+			{Name: "push", Params: []problem.Param{{Name: "head", Type: problem.TypeListNode}}, Returns: problem.TypeVoid},
+			{Name: "top", Returns: problem.TypeListNode},
+		},
+	}}
+	dir := t.TempDir()
+	if err := (Language{}).Prepare(dir, p); err != nil {
+		t.Fatal(err)
+	}
+	src, err := os.ReadFile(filepath.Join(dir, driverFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"\thcArg0 := hcJSON[[]int](hcAt(args[0], 0))\n\thcStart()\n\tobj := Constructor(hcArg0)\n\thcStop()\n",
+		"\t\t\thcArg0 := hcDecList0(hcAt(a, 0))\n\t\t\thcStart()\n\t\t\tobj.Push(hcArg0)\n\t\t\thcStop()\n",
+		"\t\t\thcStart()\n\t\t\tret := obj.Top()\n\t\t\thcStop()\n\t\t\tout[i] = hcEncList0(ret)\n",
+	} {
+		if !strings.Contains(string(src), want) {
+			t.Errorf("driver does not contain %q:\n%s", want, src)
+		}
+	}
+}
