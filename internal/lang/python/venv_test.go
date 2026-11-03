@@ -181,6 +181,70 @@ func TestVenvWithoutUV(t *testing.T) {
 	}
 }
 
+// With Version, the environment has that minor version: uv is asked for
+// it, an environment of another version is created again, and without uv
+// the newest of that version on PATH creates it.
+func TestVenvVersion(t *testing.T) {
+	f := newFakeEnv(t)
+	f.uv("3.12.4")
+	v := f.venv()
+	if err := v.Ensure(context.Background(), &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	f.uv("3.10.18")
+	v = f.venv()
+	v.Version = "3.10"
+	var out bytes.Buffer
+	if err := v.Ensure(context.Background(), &out); err != nil {
+		t.Fatal(err)
+	}
+	f.wantLogged(f.bin + "/uv venv --no-project --python 3.10 " + v.Dir)
+	if !strings.Contains(out.String(), "has Python 3.12.4, not 3.10; creating it again") {
+		t.Errorf("version change not reported:\n%s", out.String())
+	}
+	if ver, err := version(context.Background(), v.Python()); err != nil || ver != "3.10.18" {
+		t.Errorf("environment: %q, %v", ver, err)
+	}
+
+	f = newFakeEnv(t)
+	f.python(filepath.Join(f.bin, "python3"), "3.12.1")
+	f.python(filepath.Join(f.bin, "python3.10"), "3.10.4")
+	f.python(filepath.Join(f.bin, "python3.11"), "3.11.2")
+	v = f.venv()
+	v.Version = "3.10"
+	if err := v.Ensure(context.Background(), &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	f.wantLogged(f.bin + "/python3.10 -m venv " + v.Dir)
+}
+
+// Without a Python of Version, the newest creates the environment, with a
+// warning, and is kept: nothing better can be had.
+func TestVenvVersionMissing(t *testing.T) {
+	f := newFakeEnv(t)
+	f.python(filepath.Join(f.bin, "python3"), "3.12.1")
+	v := f.venv()
+	v.Version = "3.10"
+	var out bytes.Buffer
+	if err := v.Ensure(context.Background(), &out); err != nil {
+		t.Fatal(err)
+	}
+	f.wantLogged(f.bin + "/python3 -m venv " + v.Dir)
+	if !strings.Contains(out.String(), "warning: no Python 3.10 on PATH") {
+		t.Errorf("no warning:\n%s", out.String())
+	}
+	before := f.logged()
+	v = f.venv()
+	v.Version = "3.10"
+	out.Reset()
+	if err := v.Ensure(context.Background(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(f.logged(), "-m venv") != strings.Count(before, "-m venv") || out.Len() != 0 {
+		t.Errorf("environment created again:\n%s\n%s", f.logged(), out.String())
+	}
+}
+
 func TestVenvNoPython(t *testing.T) {
 	f := newFakeEnv(t)
 	f.python(filepath.Join(f.bin, "python3"), "3.9.6")
