@@ -347,7 +347,7 @@ hc 自带若干 skill，向编码智能体讲解它的题目协议和工作流�
 | `hc-cases` | 题目怎么评判：评判规则、参考解、checker 和测试用例 |
 | `hc-pack` | 维护题目包：收录题目、分组、保持 slug 不变、协议版本、CI 和发布 |
 
-工作区得到哪些 skill 取决于它的类型：练习工作区得到 `hc-problem` 和 `hc-cases`，题目包的检出目录（见[编写题目包](#编写题目包)）三个都有。它们被安装到 `.claude/skills/`（供 Claude Code）和 `.agents/skills/`（供 Codex），并在 `AGENTS.md` 的一个区块中列出，这个区块还告诉智能体把临时文件放在 `.hc/scratch/` 中：新工作区由 `hc init` 安装，任何工作区中 `hc gen`、`hc fix` 和 `hc skill install` 也会安装。Claude Code 本身不读取 `AGENTS.md`，所以工作区没有 `CLAUDE.md` 时，hc 还会创建一个导入它的 `CLAUDE.md`（`@AGENTS.md`）；你已有的 `CLAUDE.md` 归你所有，hc 从不触碰。由于它们就在工作区里，在工作区中启动的任何 Claude Code 或 Codex 会话都能使用：让它"写一道 hc 题……"、"为这道 hc 题生成用例"或"把这道题加进题目包"即可。skill 引用协议的章节（`hc docs protocol <section>`），而不是重复其内容。
+工作区得到哪些 skill 取决于它的类型：练习工作区得到 `hc-problem` 和 `hc-cases`，题目包的检出目录（见[编写题目包](#编写题目包)）三个都有。它们被安装到 `.claude/skills/`（供 Claude Code）和 `.agents/skills/`（供 Codex），并在 `AGENTS.md` 的一个区块中列出，这个区块还告诉智能体把临时文件放在 `.hc/scratch/<slug>/` 中，每道题一个目录，这样同时处理不同题目的智能体（例如并行运行的几个 `hc gen`）不会互相覆盖文件：新工作区由 `hc init` 安装，任何工作区中 `hc gen`、`hc fix` 和 `hc skill install` 也会安装。Claude Code 本身不读取 `AGENTS.md`，所以工作区没有 `CLAUDE.md` 时，hc 还会创建一个导入它的 `CLAUDE.md`（`@AGENTS.md`）；你已有的 `CLAUDE.md` 归你所有，hc 从不触碰。由于它们就在工作区里，在工作区中启动的任何 Claude Code 或 Codex 会话都能使用：让它"写一道 hc 题……"、"为这道 hc 题生成用例"或"把这道题加进题目包"即可。skill 引用协议的章节（`hc docs protocol <section>`），而不是重复其内容。
 
 ```sh
 hc skill list               # 这个工作区得到的 skill；每个 skill 是否安装、是否最新、是否过期或被修改，以及由哪个 hc 版本安装
