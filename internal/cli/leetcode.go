@@ -36,7 +36,7 @@ Log in first with hc leetcode login. hc keeps the session in your user
 configuration directory, never in the workspace. LeetCode results are not
 recorded in hc's history.`,
 	}
-	cmd.AddCommand(newLeetCodeLoginCmd(root), newLeetCodeLogoutCmd(), newLeetCodeTestCmd(root), newLeetCodeSubmitCmd(root))
+	cmd.AddCommand(newLeetCodeLoginCmd(root), newLeetCodeLogoutCmd(), newLeetCodeStatusCmd(), newLeetCodeTestCmd(root), newLeetCodeSubmitCmd(root))
 	return cmd
 }
 
@@ -261,6 +261,78 @@ so log out in the browser too to end it there.`,
 	}
 	cmd.Flags().StringVar(&siteName, "site", "", "com or cn (default: every site)")
 	return cmd
+}
+
+func newLeetCodeStatusCmd() *cobra.Command {
+	var siteName string
+	cmd := &cobra.Command{
+		Use:   "status",
+		Short: "Show which LeetCode sites hc is logged in to",
+		Long: `Show whether hc has a session of each site, or of --site, and check it with
+LeetCode: as whom it signs in, or that LeetCode no longer accepts it (it has
+expired, or the browser logged out), in which case log in again.
+
+The exit status is 0 when hc is logged in (to --site, or to some site) and
+every session it saved works, else 1.`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var sites []leetcode.Site
+			if siteName != "" {
+				site, err := leetcode.SiteByName(siteName)
+				if err != nil {
+					return err
+				}
+				sites = append(sites, site)
+			}
+			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
+			defer stop()
+			status, path, err := app.LeetCodeStatus(ctx, sites...)
+			if err != nil {
+				return err
+			}
+			if !printLeetCodeStatus(status, path) {
+				return errSilent
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&siteName, "site", "", "com or cn (default: every site)")
+	return cmd
+}
+
+// printLeetCodeStatus prints the state of hc's sessions and reports whether
+// hc is logged in and every saved session works.
+func printLeetCodeStatus(status []app.LeetCodeSiteStatus, path string) bool {
+	saved, ok := 0, true
+	for _, s := range status {
+		if s.Saved {
+			saved++
+		}
+	}
+	if saved == 0 && len(status) > 1 {
+		fmt.Println("Not logged in to LeetCode; run `hc leetcode login`.")
+		return false
+	}
+	for _, s := range status {
+		site := fmt.Sprintf("leetcode.%-4s", s.Site.Name)
+		switch {
+		case !s.Saved:
+			fmt.Printf("%s %s\n", site, ui.Faint.Render(fmt.Sprintf("not logged in (hc leetcode login --site %s)", s.Site.Name)))
+			ok = ok && len(status) > 1
+		case s.Err == nil:
+			fmt.Printf("%s %s as %s\n", site, ui.Green.Render("logged in"), s.User)
+		case errors.Is(s.Err, leetcode.ErrNotSignedIn):
+			fmt.Printf("%s %s; log in again with `hc leetcode login --site %s`\n", site, ui.Red.Render("session no longer accepted"), s.Site.Name)
+			ok = false
+		default:
+			fmt.Printf("%s %s: %v\n", site, ui.Red.Render("could not check the session"), leetCodeErr(s.Err, s.Site))
+			ok = false
+		}
+	}
+	if saved > 0 {
+		fmt.Println(ui.Faint.Render("Sessions are kept in " + path + "."))
+	}
+	return ok
 }
 
 type leetCodeOptions struct {

@@ -139,6 +139,49 @@ func LeetCodeSites() ([]string, error) {
 	return names, nil
 }
 
+// LeetCodeSiteStatus is the state of hc's session of a site.
+type LeetCodeSiteStatus struct {
+	Site leetcode.Site
+	// Saved reports whether hc has a session of the site.
+	Saved bool
+	// User is the user the session signs in as, when LeetCode accepts it.
+	User string
+	// Err is why a saved session does not sign in: leetcode.ErrNotSignedIn
+	// when LeetCode no longer accepts it, another error when it could not
+	// be checked.
+	Err error
+}
+
+// LeetCodeStatus checks the sessions hc saved of sites, or of every site
+// when none is given, with LeetCode. It also returns where the sessions are
+// kept.
+func LeetCodeStatus(ctx context.Context, sites ...leetcode.Site) ([]LeetCodeSiteStatus, string, error) {
+	if len(sites) == 0 {
+		sites = leetCodeSites
+	}
+	all, path, err := loadLeetCodeSessions()
+	if err != nil {
+		return nil, path, err
+	}
+	out := make([]LeetCodeSiteStatus, len(sites))
+	var wg sync.WaitGroup
+	for i, site := range sites {
+		out[i].Site = site
+		sess, ok := all[site.Name]
+		if !ok {
+			continue
+		}
+		out[i].Saved = true
+		wg.Go(func() {
+			c := leetcode.NewClient(site, "")
+			c.Session = &sess
+			out[i].User, out[i].Err = c.Username(ctx)
+		})
+	}
+	wg.Wait()
+	return out, path, nil
+}
+
 // LeetCodeBrowserLogin is a login through the browser, as LeetCode's VS Code
 // extension logs in: LeetCode's authorize-login page, opened in a browser
 // signed in to the site, redirects to a callback with the browser's cookies.
