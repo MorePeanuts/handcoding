@@ -24,8 +24,8 @@ import (
 //
 // It is created on first use: with uv when it is installed, which downloads
 // a Python if there is none, otherwise with the newest Python MinVersion+ on
-// PATH. A virtual environment cannot be moved, so one whose interpreter no
-// longer runs is created again.
+// PATH (or of Version, when it is set). A virtual environment cannot be
+// moved, so one whose interpreter no longer runs is created again.
 type Venv struct {
 	// Dir is the environment's directory.
 	Dir string
@@ -35,6 +35,11 @@ type Venv struct {
 	// Pyright, when set, is a pyrightconfig.json pointing pyright at the
 	// environment. It is written only if it does not exist.
 	Pyright string
+	// Version, when set, is the minor version of Python the environment
+	// has, such as "3.10". A pack checkout's has MinVersion, which the
+	// pack's content must run on. An environment of another version is
+	// created again when one of Version can be had.
+	Version string
 	// Log receives progress messages when Ensure is given no writer; nil
 	// means os.Stderr.
 	Log io.Writer
@@ -68,10 +73,18 @@ func (v *Venv) Ensure(ctx context.Context, w io.Writer) error {
 		return v.failed
 	}
 	w = v.writer(w)
-	if _, err := version(ctx, v.Python()); err != nil {
+	ver, err := version(ctx, v.Python())
+	recreate := err != nil
+	switch {
+	case err != nil:
 		if _, err := os.Stat(v.Dir); err == nil {
 			fmt.Fprintf(w, "%s no longer runs (moved workspace or removed Python?); creating it again\n", v.Label)
 		}
+	case v.Version != "" && !sameMinor(ver, v.Version) && v.canGet(ctx):
+		fmt.Fprintf(w, "%s has Python %s, not %s; creating it again\n", v.Label, ver, v.Version)
+		recreate = true
+	}
+	if recreate {
 		if err := v.create(ctx, w); err != nil {
 			v.failed = err
 			return err
@@ -127,18 +140,25 @@ func (v *Venv) create(ctx context.Context, w io.Writer) error {
 	}
 	var install []string
 	if uv, err := exec.LookPath("uv"); err == nil {
-		fmt.Fprintf(w, "Creating %s with uv (it downloads Python %s+ if none is installed)…\n", v.Label, MinVersion)
-		if err := run(ctx, uv, "venv", "--no-project", "--python", ">="+MinVersion, v.Dir); err != nil {
+		want, label := ">="+MinVersion, MinVersion+"+"
+		if v.Version != "" {
+			want, label = v.Version, v.Version
+		}
+		fmt.Fprintf(w, "Creating %s with uv (it downloads Python %s if none is installed)…\n", v.Label, label)
+		if err := run(ctx, uv, "venv", "--no-project", "--python", want, v.Dir); err != nil {
 			os.RemoveAll(v.Dir)
 			return fmt.Errorf("create %s with uv: %w", v.Label, err)
 		}
 		install = []string{uv, "pip", "install", "--python", v.Python(), "debugpy"}
 	} else {
-		py, ver, err := findPython(ctx)
+		py, ver, err := findPython(ctx, v.Version)
 		if err != nil {
 			return fmt.Errorf("cannot create %s: %w", v.Label, err)
 		}
 		fmt.Fprintf(w, "Creating %s with %s (Python %s)…\n", v.Label, py, ver)
+		if v.Version != "" && !sameMinor(ver, v.Version) {
+			fmt.Fprintf(w, "warning: no Python %s on PATH, so the pack's Python is not run on the oldest version the protocol supports here, only in its CI; install uv, or Python %s\n", v.Version, v.Version)
+		}
 		if err := run(ctx, py, "-m", "venv", v.Dir); err != nil {
 			os.RemoveAll(v.Dir)
 			return fmt.Errorf("create %s with %s (on Debian and Ubuntu this needs the python3-venv package): %w", v.Label, py, err)
@@ -188,10 +208,27 @@ func (v *Venv) writePyright(w io.Writer) {
 
 var pythonNameRE = regexp.MustCompile(`^python(3(\.\d+)?)?(\.exe)?$`)
 
+// canGet reports whether an environment of Version can be created: uv
+// downloads any version, or one is on PATH.
+func (v *Venv) canGet(ctx context.Context) bool {
+	if _, err := exec.LookPath("uv"); err == nil {
+		return true
+	}
+	_, ver, err := findPython(ctx, v.Version)
+	return err == nil && sameMinor(ver, v.Version)
+}
+
+// sameMinor reports whether version ver (3.10.4) is of minor version minor
+// (3.10).
+func sameMinor(ver, minor string) bool {
+	return ver == minor || strings.HasPrefix(ver, minor+".")
+}
+
 // findPython returns the newest Python MinVersion+ among python3, python and
-// python3.N on PATH.
-func findPython(ctx context.Context) (path, ver string, err error) {
+// python3.N on PATH: of minor version want if there is one and want is set.
+func findPython(ctx context.Context, want string) (path, ver string, err error) {
 	var older []string
+	var wantPath, wantVer string
 	seen := map[string]bool{}
 	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
 		entries, err := os.ReadDir(dir)
@@ -212,10 +249,18 @@ func findPython(ctx context.Context) (path, ver string, err error) {
 			case err != nil:
 			case !lang.AtLeast(v, MinVersion):
 				older = append(older, fmt.Sprintf("%s is %s", p, v))
-			case path == "" || !lang.AtLeast(ver, v):
-				path, ver = p, v
+			default:
+				if path == "" || !lang.AtLeast(ver, v) {
+					path, ver = p, v
+				}
+				if want != "" && sameMinor(v, want) && (wantPath == "" || !lang.AtLeast(wantVer, v)) {
+					wantPath, wantVer = p, v
+				}
 			}
 		}
+	}
+	if wantPath != "" {
+		return wantPath, wantVer, nil
 	}
 	if path != "" {
 		return path, ver, nil

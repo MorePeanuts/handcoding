@@ -59,7 +59,7 @@ hc pack check               # 像 CI 那样检查整个题目包
 
 流程与练习工作区相同（见[自己出题](how-to-use_zh.md#自己出题)、[用编码智能体生成用例](how-to-use_zh.md#用编码智能体生成用例)），只是题目写到题目包的 `problems/` 下，并且只用 slug 来指代。如果题目包有分组，再把 slug 加到 `pack.yaml` 的某个分组中。
 
-只有通过 `hc pack check` 的题目才能合入：它合法、[已就绪](protocol_zh.md#就绪)（判题规则 `judge.compare` 已经确定）、每个用例都有期望输出，并且每个参考解都通过每个用例。参考解必须能在协议支持的最旧工具链上运行（见[语言版本](protocol_zh.md#语言版本)），CI 用 Python 3.10 运行 Python 参考解。`hc fetch` 有意不设置判题规则，因为确定它需要阅读题面：这是 `hc gen` 的工作。
+只有通过 `hc pack check` 的题目才能合入：它合法、[已就绪](protocol_zh.md#就绪)（判题规则 `judge.compare` 已经确定）、每个用例都有期望输出，并且每个参考解都通过每个用例。参考解必须能在协议支持的最旧工具链上运行（见[语言版本](protocol_zh.md#语言版本)），CI 用 Python 3.10 运行 Python 参考解，hc 在 checkout 中也是如此。`hc fetch` 有意不设置判题规则，因为确定它需要阅读题面：这是 `hc gen` 的工作。
 
 如果某道题无法用协议表达，不要绕过去（比如用一个判别别的东西的判题程序，或者改动题面去迁就）：去提一个 [issue](https://github.com/MorePeanuts/handcoding/issues)，说明缺少什么，并在协议支持之前先不收录这道题。`hc pack init` 写入的 `AGENTS.md` 也这样告诉智能体。
 

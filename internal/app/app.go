@@ -58,16 +58,22 @@ func LanguageID(name string) (string, error) {
 }
 
 // pythonLanguage runs solutions with python.interpreter from hc.yaml if it
-// is set, and otherwise in a virtual environment in the workspace.
+// is set, and otherwise in a virtual environment in the workspace: of the
+// oldest Python the protocol supports in a pack checkout, whose content
+// must run on it, as its CI checks; of the newest otherwise.
 func pythonLanguage(ws *workspace.Workspace) python.Language {
 	if ws.Config.Python.Interpreter != "" {
 		return python.Language{Interpreter: ws.Config.Python.Interpreter}
 	}
-	return python.Language{Venv: &python.Venv{
+	v := &python.Venv{
 		Dir:     ws.VenvPath(),
 		Label:   filepath.Join(workspace.StateDir, workspace.VenvDir),
 		Pyright: filepath.Join(ws.Root, workspace.PyrightConfig),
-	}}
+	}
+	if ws.Kind == workspace.Authoring {
+		v.Version = python.MinVersion
+	}
+	return python.Language{Venv: v}
 }
 
 // SyncEnv creates the Python virtual environment again and returns the
