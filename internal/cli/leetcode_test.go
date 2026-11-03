@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -92,6 +93,42 @@ func TestCaseSuggestion(t *testing.T) {
 	want := `hc cases add regression/two-sum --input '{"nums":[3,3],"target":6}' --expected '[0,1]' --note 'from LeetCode: Wrong Answer'`
 	if !strings.Contains(out, want) {
 		t.Errorf("suggestion:\n%s\nwant %s", out, want)
+	}
+}
+
+func TestPrintLeetCodeStatus(t *testing.T) {
+	com, cn := leetcode.SiteCom, leetcode.SiteCN
+	for _, tc := range []struct {
+		name   string
+		status []app.LeetCodeSiteStatus
+		ok     bool
+		want   []string
+	}{
+		{"none", []app.LeetCodeSiteStatus{{Site: com}, {Site: cn}}, false,
+			[]string{"Not logged in to LeetCode; run `hc leetcode login`."}},
+		{"one site", []app.LeetCodeSiteStatus{{Site: com}, {Site: cn, Saved: true, User: "alice"}}, true,
+			[]string{"leetcode.com  not logged in", "leetcode.cn   logged in as alice", "Sessions are kept in /cfg/leetcode.json."}},
+		{"--site", []app.LeetCodeSiteStatus{{Site: com}}, false,
+			[]string{"leetcode.com  not logged in (hc leetcode login --site com)"}},
+		{"expired", []app.LeetCodeSiteStatus{{Site: com, Saved: true, Err: leetcode.ErrNotSignedIn}, {Site: cn, Saved: true, User: "alice"}}, false,
+			[]string{"session no longer accepted; log in again with `hc leetcode login --site com`"}},
+		{"unchecked", []app.LeetCodeSiteStatus{{Site: cn, Saved: true, Err: io.ErrUnexpectedEOF}}, false,
+			[]string{"could not check the session: unexpected EOF"}},
+	} {
+		var ok bool
+		out := captureFunc(t, func() { ok = printLeetCodeStatus(tc.status, "/cfg/leetcode.json") })
+		if ok != tc.ok {
+			t.Errorf("%s: ok = %v", tc.name, ok)
+		}
+		for _, want := range tc.want {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s: output lacks %q:\n%s", tc.name, want, out)
+			}
+		}
+		// The file is named only when it holds a session.
+		if saved := slices.ContainsFunc(tc.status, func(s app.LeetCodeSiteStatus) bool { return s.Saved }); saved != strings.Contains(out, "/cfg/leetcode.json") {
+			t.Errorf("%s: sessions file shown = %v:\n%s", tc.name, !saved, out)
+		}
 	}
 }
 

@@ -386,6 +386,7 @@ Set breakpoints in your solution file, start `hc debug --headless`, then pick "h
 
 ```sh
 hc leetcode login --site cn          # once per site: authorize hc in the browser
+hc leetcode status                   # which sites hc is logged in to, and as whom
 hc leetcode test two-sum             # run on LeetCode's example testcases
 hc leetcode test two-sum -i $'[3,3]\n6'   # or on your own, in LeetCode's format
 hc leetcode submit two-sum -l python # submit to your account
@@ -406,7 +407,7 @@ The authorization page is not a documented API of LeetCode's. If it stops workin
 
 Paste it when `hc leetcode login --paste` asks (nothing is shown as you paste), or pipe it in (`pbpaste | hc leetcode login --site cn` on macOS). hc finds `LEETCODE_SESSION` in what you paste.
 
-Either way, hc checks the session with LeetCode and saves it, readable by you only, in `hc/leetcode.json` of your user configuration directory (`~/Library/Application Support` on macOS, `~/.config` on Linux), never in the workspace. A session lasts a few weeks; when LeetCode refuses one, log in again. `hc leetcode logout` forgets the sessions of every site, or of `--site`, but only in hc: LeetCode keeps a session valid until it expires, so log out in the browser to end it there.
+Either way, hc checks the session with LeetCode and saves it, readable by you only, in `hc/leetcode.json` of your user configuration directory (`~/Library/Application Support` on macOS, `~/.config` on Linux), never in the workspace. A session lasts a few weeks; when LeetCode refuses one, log in again. `hc leetcode status` checks each saved session with LeetCode and shows the user it signs in as, or that LeetCode no longer accepts it; its exit status is 1 unless hc is logged in (to `--site`, or to some site) and every saved session works. `hc leetcode logout` forgets the sessions of every site, or of `--site`, but only in hc: LeetCode keeps a session valid until it expires, so log out in the browser to end it there.
 
 **Code.** hc sends the solution `hc test` would run (`-l` as there), turned into LeetCode's code: Python drops its imports from `hc_runtime` (LeetCode defines `ListNode`, `TreeNode` and `Node` itself), and Go its `package main`. A Python function problem must be a method of `class Solution` there; hc also accepts a module-level function, LeetCode does not.
 

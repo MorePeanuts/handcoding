@@ -122,6 +122,47 @@ func TestLeetCodeSessions(t *testing.T) {
 	}
 }
 
+// Status checks each saved session with LeetCode, and reports the sites
+// without one.
+func TestLeetCodeStatus(t *testing.T) {
+	path := isolateConfig(t)
+	srv := userStatus(t)
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "down", http.StatusInternalServerError)
+	}))
+	t.Cleanup(down.Close)
+	ctx := context.Background()
+	com := leetcode.Site{Name: leetcode.SiteCom.Name, Base: srv.URL}
+	cn := leetcode.Site{Name: leetcode.SiteCN.Name, Base: srv.URL}
+
+	status, saved, err := app.LeetCodeStatus(ctx, com, cn)
+	if err != nil || saved != path || len(status) != 2 || status[0].Saved || status[1].Saved {
+		t.Fatalf("LeetCodeStatus without sessions = %+v, %q, %v", status, saved, err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"com": {"session": "good"}, "cn": {"session": "expired"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	status, _, err = app.LeetCodeStatus(ctx, com, cn)
+	if err != nil || len(status) != 2 {
+		t.Fatalf("LeetCodeStatus = %+v, %v", status, err)
+	}
+	if s := status[0]; !s.Saved || s.User != "alice" || s.Err != nil {
+		t.Errorf("com: %+v", s)
+	}
+	if s := status[1]; !s.Saved || s.User != "" || !errors.Is(s.Err, leetcode.ErrNotSignedIn) {
+		t.Errorf("cn: %+v", s)
+	}
+
+	status, _, err = app.LeetCodeStatus(ctx, leetcode.Site{Name: leetcode.SiteCom.Name, Base: down.URL})
+	if err != nil || len(status) != 1 || !status[0].Saved || status[0].Err == nil || errors.Is(status[0].Err, leetcode.ErrNotSignedIn) {
+		t.Errorf("unreachable site: %+v, %v", status, err)
+	}
+}
+
 // The browser login takes the session from the authorize-login redirect, at
 // its own path only, once.
 func TestLeetCodeBrowserLogin(t *testing.T) {

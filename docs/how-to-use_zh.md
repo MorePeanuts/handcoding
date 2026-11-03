@@ -386,6 +386,7 @@ table.insert(dap.configurations.python, { type = "hc", name = "hc attach", reque
 
 ```sh
 hc leetcode login --site cn          # 每个站点一次：在浏览器中授权 hc
+hc leetcode status                   # hc 登录了哪些站点，以谁的身份
 hc leetcode test two-sum             # 在 LeetCode 的示例测试用例上运行
 hc leetcode test two-sum -i $'[3,3]\n6'   # 或者用自己的输入，采用 LeetCode 的格式
 hc leetcode submit two-sum -l python # 提交到你的账号
@@ -406,7 +407,7 @@ hc leetcode login --port 8765         # 在服务器上
 
 在 `hc leetcode login --paste` 询问时粘贴（粘贴时不会显示任何内容），或者通过管道传入（macOS 上是 `pbpaste | hc leetcode login --site cn`）。hc 从粘贴的内容中找出 `LEETCODE_SESSION`。
 
-无论哪种方式，hc 都会向 LeetCode 验证会话，然后保存到用户配置目录（macOS 上是 `~/Library/Application Support`，Linux 上是 `~/.config`）下的 `hc/leetcode.json`，只有你自己可读，绝不会放在工作区里。会话的有效期是几周；LeetCode 拒绝它时，重新登录即可。`hc leetcode logout` 忘掉所有站点的会话，或者 `--site` 指定的那个，但只是 hc 不再保存：会话在过期之前在 LeetCode 那边仍然有效，要让它失效，需要在浏览器中退出登录。
+无论哪种方式，hc 都会向 LeetCode 验证会话，然后保存到用户配置目录（macOS 上是 `~/Library/Application Support`，Linux 上是 `~/.config`）下的 `hc/leetcode.json`，只有你自己可读，绝不会放在工作区里。会话的有效期是几周；LeetCode 拒绝它时，重新登录即可。`hc leetcode status` 向 LeetCode 逐个验证已保存的会话，显示它登录的用户名，或者 LeetCode 已不再接受它；只有 hc 已登录（`--site` 指定的站点，或者任意一个站点）且每个已保存的会话都有效时，退出码才是 0，否则是 1。`hc leetcode logout` 忘掉所有站点的会话，或者 `--site` 指定的那个，但只是 hc 不再保存：会话在过期之前在 LeetCode 那边仍然有效，要让它失效，需要在浏览器中退出登录。
 
 **代码。** hc 发送的是 `hc test` 会运行的那份解答（`-l` 的用法相同），并转换成 LeetCode 的代码：Python 去掉从 `hc_runtime` 的导入（LeetCode 自己定义了 `ListNode`、`TreeNode` 和 `Node`），Go 去掉 `package main`。Python 的函数题在 LeetCode 上必须是 `class Solution` 的方法；hc 也接受模块级函数，但 LeetCode 不接受。
 
