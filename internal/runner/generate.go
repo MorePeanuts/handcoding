@@ -36,18 +36,26 @@ type GeneratedCaseError struct {
 	Reason string
 	// Detail is the traceback or the program's output.
 	Detail string
+	// Custom is set for a case that is not in cases.jsonl, such as a
+	// generator call given to hc test: the call may be what is wrong.
+	Custom bool
 }
 
 func (e *GeneratedCaseError) Error() string {
 	where := "cannot be loaded"
-	if e.Case > 0 {
+	switch {
+	case e.Custom:
+		where = "failed on the custom generated input"
+	case e.Case > 0:
 		where = fmt.Sprintf("failed on generated case %d", e.Case)
 	}
 	msg := fmt.Sprintf("%s %s", e.Path, where)
 	if e.Reason != "" {
 		msg += ": " + e.Reason
 	}
-	msg += " (the problem's generated cases are broken; this is not a verdict on your solution)"
+	if !e.Custom {
+		msg += " (the problem's generated cases are broken; this is not a verdict on your solution)"
+	}
 	if d := strings.TrimSpace(e.Detail); d != "" {
 		msg += "\n" + d
 	}

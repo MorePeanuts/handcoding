@@ -171,12 +171,16 @@ else the pack's default locale.
 }
 
 type testOptions struct {
-	lang    string
-	cases   []int
-	all     bool
-	input   string
-	verbose bool
-	pause   bool
+	lang     string
+	cases    []int
+	all      bool
+	input    string
+	generate string
+	args     string
+	seed     int64
+	file     string
+	verbose  bool
+	pause    bool
 }
 
 func newTestCmd(root *rootOptions) *cobra.Command {
@@ -191,34 +195,33 @@ use --case to pick cases, --all for every case, or --input to try your own input
   hc test two-sum
   hc test two-sum -c 4 -c 5
   hc test two-sum --input '{"nums":[1,2,3],"target":5}'
+  hc test two-sum --generate distinct --args '{"n":50000}' --seed 3
+  hc test two-sum --all --file .hc/scratch/two-sum/slow.py
 
-With --input, the expected output is computed by the reference solution when
-the problem has one.`,
+With --input or --generate, the expected output is computed by the reference
+solution when the problem has one. --generate builds the input with a function
+of the problem's generator.py, as a generated case of cases.jsonl would, without
+adding the case.
+
+--file runs another solution file instead of yours, such as a draft or a slow
+solution whose time per case you want to see; its language comes from its
+extension unless --lang is given.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if o.pause {
 				defer pause()
 			}
-			return root.withProblem(args[0], o.lang, func(a *app.App, p *problem.Problem, l lang.Language) error {
-				sel, err := selectForTest(cmd, a, p, o)
+			if o.file == "" {
+				return root.withProblem(args[0], o.lang, func(a *app.App, p *problem.Problem, l lang.Language) error {
+					return runTest(cmd, a, p, l, o)
+				})
+			}
+			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
+				l, err := a.FileLang(o.file, o.lang)
 				if err != nil {
 					return err
 				}
-				if len(sel) == 0 {
-					return fmt.Errorf("%s has no test cases; add some with `hc cases add` or generate them with `hc gen %s`", p.Slug, a.WS.Ref(p))
-				}
-				ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
-				defer stop()
-				fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Running %d case(s) of %s [%s]…", len(sel), p.Slug, toolchainLabel(l))))
-				rep, err := a.Run(ctx, p, l, sel, app.RunOptions{Stdout: os.Stdout, Stderr: os.Stderr})
-				if err != nil {
-					return err
-				}
-				ui.PrintReport(os.Stdout, p, rep, ui.ReportOptions{Verbose: o.verbose, Ref: a.WS.Ref(p)})
-				if rep.Verdict != runner.Accepted && !rep.Verdict.Unjudged() {
-					return errSilent
-				}
-				return nil
+				return runTest(cmd, a, p, l, o)
 			})
 		},
 	}
@@ -226,13 +229,70 @@ the problem has one.`,
 	cmd.Flags().IntSliceVarP(&o.cases, "case", "c", nil, "case numbers to run (1-based, repeatable)")
 	cmd.Flags().BoolVarP(&o.all, "all", "a", false, "run all cases (without recording a submission)")
 	cmd.Flags().StringVarP(&o.input, "input", "i", "", "custom input as a JSON object (see `hc cases list`)")
+	cmd.Flags().StringVar(&o.generate, "generate", "", "build a custom input with this function of generator.py")
+	cmd.Flags().StringVar(&o.args, "args", "", "the generator's keyword arguments as a JSON object")
+	cmd.Flags().Int64Var(&o.seed, "seed", 0, "the seed of the generator's rng")
+	cmd.Flags().StringVar(&o.file, "file", "", "run this solution file instead of yours")
 	cmd.Flags().BoolVarP(&o.verbose, "verbose", "v", false, "show every case in full")
 	cmd.Flags().BoolVar(&o.pause, "pause", false, "wait for Enter before exiting")
 	_ = cmd.Flags().MarkHidden("pause")
 	return cmd
 }
 
-func selectForTest(cmd *cobra.Command, a *app.App, p *problem.Problem, o *testOptions) ([]runner.Selected, error) {
+// runTest runs hc test with the solution of l: the user's, or o.file.
+func runTest(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.Language, o *testOptions) error {
+	sel, err := selectForTest(cmd, a, p, l, o)
+	if err != nil {
+		return err
+	}
+	if len(sel) == 0 {
+		return fmt.Errorf("%s has no test cases; add some with `hc cases add` or generate them with `hc gen %s`", p.Slug, a.WS.Ref(p))
+	}
+	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
+	defer stop()
+	what := p.Slug
+	if o.file != "" {
+		what = o.file
+	}
+	fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Running %d case(s) of %s [%s]…", len(sel), what, toolchainLabel(l))))
+	ro := app.RunOptions{Stdout: os.Stdout, Stderr: os.Stderr}
+	var rep *runner.Report
+	if o.file != "" {
+		rep, err = a.RunFile(ctx, p, l, o.file, sel, ro)
+	} else {
+		rep, err = a.Run(ctx, p, l, sel, ro)
+	}
+	if err != nil {
+		return err
+	}
+	ui.PrintReport(os.Stdout, p, rep, ui.ReportOptions{Verbose: o.verbose, Ref: a.WS.Ref(p)})
+	if rep.Verdict != runner.Accepted && !rep.Verdict.Unjudged() {
+		return errSilent
+	}
+	return nil
+}
+
+func selectForTest(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.Language, o *testOptions) ([]runner.Selected, error) {
+	switch {
+	case o.input != "" && o.generate != "":
+		return nil, errors.New("give either --input or --generate")
+	case o.generate == "" && (o.args != "" || cmd.Flags().Changed("seed")):
+		return nil, errors.New("--args and --seed go with --generate")
+	case o.generate != "":
+		g, err := parseGenerate(o.generate, o.args, o.seed)
+		if err != nil {
+			return nil, err
+		}
+		c := problem.Case{Generate: g, Note: "custom generated input"}
+		if err := p.ValidateCase(c); err != nil {
+			return nil, err
+		}
+		sel := []runner.Selected{{Index: 1, Case: c}}
+		if err := a.BuildCase(cmd.Context(), p, l, sel, app.RunOptions{Stderr: os.Stderr}); err != nil {
+			return nil, err
+		}
+		return sel, nil
+	}
 	if o.input != "" {
 		c, err := parseInput(p, o.input)
 		if err != nil {
