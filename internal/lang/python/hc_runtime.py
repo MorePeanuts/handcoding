@@ -976,15 +976,16 @@ def main(meta):
             try:
                 res["output"] = call(solution, meta, c["input"], clock)
                 json.dumps(res["output"])
-            except InputError as e:
-                res["output"] = None
-                res["error"] = "invalid input: %s" % e
-            except RecursionError as e:
-                res["output"] = None
-                res["error"] = "RecursionError: %s" % e
             except Exception as e:  # noqa: BLE001
+                # Stop first: formatting the error is not the user's time.
+                clock.stop()
                 res["output"] = None
-                res["error"] = _user_traceback(e)
+                if isinstance(e, InputError):
+                    res["error"] = "invalid input: %s" % e
+                elif isinstance(e, RecursionError):
+                    res["error"] = "RecursionError: %s" % e
+                else:
+                    res["error"] = _user_traceback(e)
             clock.stop()
             res["elapsed_ns"] = clock.elapsed
             if clock.write(res):
