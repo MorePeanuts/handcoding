@@ -42,9 +42,18 @@ func New(ws *workspace.Workspace) *App {
 // added here.
 func Languages(ws *workspace.Workspace) *lang.Registry {
 	return lang.NewRegistry(
-		golang.Language{},
+		goLanguage(ws),
 		pythonLanguage(ws),
 	)
+}
+
+// goLanguage keeps the programs it builds in the workspace's cache, so that
+// a run of unchanged code needs no new program.
+func goLanguage(ws *workspace.Workspace) golang.Language {
+	if ws.Root == "" {
+		return golang.Language{}
+	}
+	return golang.Language{BuildCache: filepath.Join(ws.StatePath(), "cache", "build", "go")}
 }
 
 // LanguageID resolves a language ID or alias (e.g. "py") to the ID stored in
@@ -505,13 +514,9 @@ func (a *App) Submit(ctx context.Context, p *problem.Problem, l lang.Language, o
 	if err != nil {
 		return nil, nil, err
 	}
-	var total time.Duration
-	for _, c := range rep.Cases {
-		total += c.Elapsed
-	}
 	sub := &store.Submission{
 		Pack: p.Pack, Slug: p.Slug, Lang: l.ID(), Verdict: string(rep.Verdict),
-		Passed: rep.Passed, Total: rep.Total, ElapsedMs: total.Milliseconds(), Code: string(code),
+		Passed: rep.Passed, Total: rep.Total, ElapsedMs: rep.Elapsed.Milliseconds(), Code: string(code),
 		Details: EncodeReport(p, rep),
 	}
 	st, err := a.Store()

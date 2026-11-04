@@ -60,7 +60,8 @@ type Language interface {
 	// the solution file. It is called before every run and must be idempotent.
 	Prepare(dir string, p *problem.Problem) error
 	// Build compiles or syntax-checks the program. Build artifacts go to
-	// binDir. Compilation failures are reported as *CompileError.
+	// binDir, or to a cache of the driver's from which Command runs them.
+	// Compilation failures are reported as *CompileError.
 	Build(ctx context.Context, dir, binDir string) error
 	// Command returns the command that runs the driver.
 	Command(ctx context.Context, dir, binDir string) *exec.Cmd
