@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/MorePeanuts/handcoding/internal/judge"
 	"github.com/MorePeanuts/handcoding/internal/lang"
@@ -27,13 +28,19 @@ type App struct {
 	WS    *workspace.Workspace
 	Langs *lang.Registry
 	store *store.Store
+	// timeFactor and timeFloor make the time limit of a run (see
+	// timeLimit): hc's TimeFactor and TimeFloor, which tests lower.
+	timeFactor int
+	timeFloor  time.Duration
 }
 
 // New creates an App for the workspace.
 func New(ws *workspace.Workspace) *App {
 	return &App{
-		WS:    ws,
-		Langs: Languages(ws),
+		WS:         ws,
+		Langs:      Languages(ws),
+		timeFactor: TimeFactor,
+		timeFloor:  TimeFloor,
 	}
 }
 
@@ -431,6 +438,7 @@ func (a *App) run(ctx context.Context, p *problem.Problem, l lang.Language, dir 
 	if err != nil {
 		return nil, err
 	}
+	opts.TimeLimit = a.timeLimit(ctx, p, l, sel, o)
 	rep, err := runner.Run(ctx, l, p, dir, sel, opts)
 	if rep != nil {
 		rep.Toolchain = tc

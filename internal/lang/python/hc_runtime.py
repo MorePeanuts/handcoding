@@ -9,6 +9,7 @@
 import json
 import os
 import sys
+import threading
 import time
 import traceback
 
@@ -789,7 +790,73 @@ def _node_ref(t, node, nodes, name):
     raise RuntimeError("the returned node %r is not a node of %s" % (node, name))
 
 
-def _call_function(solution, meta, inp):
+class _Clock:
+    """The time of a case is the sum of its timed sections, the calls into
+    the user's code. With a time limit (HC_TIME_LIMIT_NS), a watchdog thread
+    reads the clock while the user's code runs, so a lock guards the clock
+    and the output."""
+
+    def __init__(self, out, limit):
+        self.out, self.limit = out, limit
+        self.lock = threading.Lock()
+        self.total = 0  # of the cases before self.case, the one running
+        self.case = None
+        self.elapsed = 0
+        self.timing = False
+        self.started = 0
+        if limit:
+            threading.Thread(target=self._watch, daemon=True).start()
+
+    def begin(self, case_id):
+        with self.lock:
+            self.case, self.elapsed, self.timing = case_id, 0, False
+
+    def start(self):
+        with self.lock:
+            self.timing = True
+            self.started = time.perf_counter_ns()
+
+    def stop(self):
+        now = time.perf_counter_ns()
+        with self.lock:
+            if self.timing:
+                self.elapsed += now - self.started
+                self.timing = False
+
+    def write(self, res):
+        """Write a case's result line; True when the total is over the
+        limit, and the run stops."""
+        with self.lock:
+            self.out.write(json.dumps(res, ensure_ascii=False) + "\n")
+            self.out.flush()
+            self.total += res["elapsed_ns"]
+            self.elapsed = 0
+            return bool(self.limit) and self.total > self.limit
+
+    def _watch(self):
+        # Ends the run when the limit is spent in the middle of a case, which
+        # may never return, with a result line marking the case. Time is
+        # spent only while a section is timed, and no faster than the clock
+        # runs, so it sleeps for what is left of the limit.
+        while True:
+            with self.lock:
+                spent = self.total + self.elapsed
+                if self.timing:
+                    spent += time.perf_counter_ns() - self.started
+                    if spent > self.limit:
+                        res = {"id": self.case, "output": None, "elapsed_ns": spent - self.total, "time_limit": True}
+                        self.out.write(json.dumps(res) + "\n")
+                        self.out.flush()
+                        for f in (sys.stdout, sys.stderr):
+                            try:
+                                f.flush()
+                            except Exception:  # noqa: BLE001
+                                pass
+                        os._exit(0)
+            time.sleep(max(self.limit - spent, 1000000) / 1e9)
+
+
+def _call_function(solution, meta, inp, clock):
     fn_meta = meta["function"]
     name = fn_meta["name"]
     if hasattr(solution, "Solution"):
@@ -800,9 +867,10 @@ def _call_function(solution, meta, inp):
     copied = fn_meta.get("returns_copy")
     if copied:
         orig = {id(n) for n in _reach(fn_meta["returns"], values[copied])}
-    start = time.perf_counter_ns()
-    ret = fn(*[values[p["name"]] for p in fn_meta["params"]])
-    elapsed = time.perf_counter_ns() - start
+    argv = [values[p["name"]] for p in fn_meta["params"]]
+    clock.start()
+    ret = fn(*argv)
+    clock.stop()
     if copied and any(id(n) in orig for n in _reach(fn_meta["returns"], ret)):
         raise RuntimeError("the returned structure shares nodes with %s; return a deep copy" % copied)
     output = meta.get("output")
@@ -814,14 +882,14 @@ def _call_function(solution, meta, inp):
             if not isinstance(ret, int) or not 0 <= ret <= len(a):
                 raise RuntimeError("returned length %r is outside [0, %d]" % (ret, len(a)))
             a = a[:ret]
-        return encode(t, a), elapsed
+        return encode(t, a)
     ref = fn_meta.get("returns_ref")
     if ref:
-        return _node_ref(fn_meta["returns"], ret, nodes[ref], ref), elapsed
-    return encode(fn_meta["returns"], ret), elapsed
+        return _node_ref(fn_meta["returns"], ret, nodes[ref], ref)
+    return encode(fn_meta["returns"], ret)
 
 
-def _call_class(solution, meta, inp):
+def _call_class(solution, meta, inp, clock):
     cls_meta = meta["class"]
     ops, args = inp.get("ops"), inp.get("args")
     if not ops or ops is None or args is None or len(ops) != len(args):
@@ -838,22 +906,23 @@ def _call_class(solution, meta, inp):
     # before its result is encoded.
     out = [None] * len(ops)
     argv = conv(cls_meta["constructor"], args[0])
-    start = time.perf_counter_ns()
+    clock.start()
     obj = cls(*argv)
-    elapsed = time.perf_counter_ns() - start
+    clock.stop()
     for i in range(1, len(ops)):
         m = methods.get(ops[i])
         if m is None:
             raise InputError("unknown method %r" % ops[i])
         argv = conv(m["params"], args[i])
-        start = time.perf_counter_ns()
-        ret = getattr(obj, ops[i])(*argv)
-        elapsed += time.perf_counter_ns() - start
+        method = getattr(obj, ops[i])
+        clock.start()
+        ret = method(*argv)
+        clock.stop()
         out[i] = None if m["returns"] == "void" else encode(m["returns"], ret)
-    return out, elapsed
+    return out
 
 
-def _call_round_trip(solution, meta, inp):
+def _call_round_trip(solution, meta, inp, clock):
     """Encode the input with one instance and decode the string with another
     one (or the same one), as LeetCode does: ser = Codec(); deser = Codec();
     ans = deser.deserialize(ser.serialize(root))."""
@@ -866,15 +935,17 @@ def _call_round_trip(solution, meta, inp):
     value = decode(param["type"], inp[param["name"]])
     cls = getattr(solution, cls_meta["name"])
 
-    start = time.perf_counter_ns()
+    clock.start()
     encoder = cls()
     data = getattr(encoder, enc["name"])(value)
+    clock.stop()
     if not isinstance(data, str):
         raise RuntimeError("%s must return a string, but returned %s %r" % (enc["name"], type(data).__name__, data))
+    clock.start()
     decoder = encoder if rt["instances"] == "same" else cls()
     ret = getattr(decoder, dec["name"])(data)
-    elapsed = time.perf_counter_ns() - start
-    return encode(dec["returns"], ret), elapsed
+    clock.stop()
+    return encode(dec["returns"], ret)
 
 
 def main(meta):
@@ -894,11 +965,16 @@ def main(meta):
         call = _call_class
     else:
         call = _call_function
+    # With a time limit, the run stops after the case whose time brings the
+    # total over it.
+    limit = int(os.environ.get("HC_TIME_LIMIT_NS") or 0)
     with open(os.environ["HC_OUT"], "w", encoding="utf-8", errors="backslashreplace") as out:
+        clock = _Clock(out, limit)
         for c in cases:
             res = {"id": c["id"], "output": None, "elapsed_ns": 0}
+            clock.begin(c["id"])
             try:
-                res["output"], res["elapsed_ns"] = call(solution, meta, c["input"])
+                res["output"] = call(solution, meta, c["input"], clock)
                 json.dumps(res["output"])
             except InputError as e:
                 res["output"] = None
@@ -909,5 +985,7 @@ def main(meta):
             except Exception as e:  # noqa: BLE001
                 res["output"] = None
                 res["error"] = _user_traceback(e)
-            out.write(json.dumps(res, ensure_ascii=False) + "\n")
-            out.flush()
+            clock.stop()
+            res["elapsed_ns"] = clock.elapsed
+            if clock.write(res):
+                break

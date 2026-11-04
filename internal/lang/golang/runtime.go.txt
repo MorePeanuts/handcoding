@@ -12,7 +12,9 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -39,28 +41,64 @@ type hcResult struct {
 	Output    json.RawMessage `json:"output"`
 	Error     string          `json:"error,omitempty"`
 	ElapsedNs int64           `json:"elapsed_ns"`
+	// TimeLimit marks the case hcWatch ended.
+	TimeLimit bool `json:"time_limit,omitempty"`
 }
 
 type hcInputError struct{ msg string }
 
 // The time of a case is the sum of its timed sections, the calls into the
 // user's code: a class problem times each call, not the decoding of its
-// arguments or the encoding of its results in between.
+// arguments or the encoding of its results in between. With a time limit,
+// hcWatch reads the clock while the user's code runs, so hcMu guards the
+// clock and the output.
 var (
+	hcMu        sync.Mutex
 	hcStartTime time.Time
 	hcElapsed   time.Duration
 	hcTiming    bool
+	// hcTotal is the time of the cases before hcCaseID, the one running.
+	hcTotal  time.Duration
+	hcCaseID int
+	hcOut    *os.File
+	hcEnc    *json.Encoder
 )
 
 func hcStart() {
+	hcMu.Lock()
 	hcTiming = true
 	hcStartTime = time.Now()
+	hcMu.Unlock()
 }
 
 func hcStop() {
+	now := time.Now()
+	hcMu.Lock()
 	if hcTiming {
-		hcElapsed += time.Since(hcStartTime)
+		hcElapsed += now.Sub(hcStartTime)
 		hcTiming = false
+	}
+	hcMu.Unlock()
+}
+
+// hcWatch ends the run when the time limit is spent in the middle of a
+// case, which may never return, with a result line marking the case. Time
+// is spent only while a section is timed, and no faster than the clock
+// runs, so it sleeps for what is left of the limit.
+func hcWatch(limit time.Duration) {
+	for {
+		hcMu.Lock()
+		spent := hcTotal + hcElapsed
+		if hcTiming {
+			spent += time.Since(hcStartTime)
+			if spent > limit {
+				_ = hcEnc.Encode(hcResult{ID: hcCaseID, ElapsedNs: (spent - hcTotal).Nanoseconds(), TimeLimit: true})
+				_ = hcOut.Sync()
+				os.Exit(0)
+			}
+		}
+		hcMu.Unlock()
+		time.Sleep(max(limit-spent, time.Millisecond))
 	}
 }
 
@@ -83,12 +121,35 @@ func main() {
 	defer out.Close()
 	enc := json.NewEncoder(out)
 	enc.SetEscapeHTML(false)
+	hcOut, hcEnc = out, enc
+	// With a time limit, the run stops after the case whose time brings the
+	// total over it.
+	var limit time.Duration
+	if s := os.Getenv("HC_TIME_LIMIT_NS"); s != "" {
+		n, err := strconv.ParseInt(s, 10, 64)
+		if err != nil || n <= 0 {
+			fmt.Fprintln(os.Stderr, "hc driver: bad HC_TIME_LIMIT_NS:", s)
+			os.Exit(2)
+		}
+		limit = time.Duration(n)
+		go hcWatch(limit)
+	}
 	for _, c := range cases {
-		if err := enc.Encode(hcRun(c)); err != nil {
+		res := hcRun(c)
+		hcMu.Lock()
+		err := enc.Encode(res)
+		_ = out.Sync()
+		hcTotal += time.Duration(res.ElapsedNs)
+		hcElapsed = 0
+		over := limit > 0 && hcTotal > limit
+		hcMu.Unlock()
+		if err != nil {
 			fmt.Fprintln(os.Stderr, "hc driver:", err)
 			os.Exit(2)
 		}
-		_ = out.Sync()
+		if over {
+			return
+		}
 	}
 }
 
@@ -106,7 +167,9 @@ func hcRun(c hcCase) (res hcResult) {
 			res.Error = strings.TrimRight(fmt.Sprintf("panic: %v\n%s", r, hcStack()), "\n")
 		}
 	}()
-	hcElapsed, hcTiming = 0, false
+	hcMu.Lock()
+	hcCaseID, hcElapsed, hcTiming = c.ID, 0, false
+	hcMu.Unlock()
 	v := hcNorm(reflect.ValueOf(hcCall(c.Input)))
 	var b strings.Builder
 	enc := json.NewEncoder(&b)

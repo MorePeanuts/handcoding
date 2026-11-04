@@ -44,6 +44,8 @@ func VerdictStyle(v runner.Verdict) lipgloss.Style {
 		return Green.Bold(true)
 	case runner.NoExpected, runner.NotJudged:
 		return Yellow.Bold(true)
+	case runner.NotRun:
+		return Faint
 	}
 	return Red.Bold(true)
 }
@@ -118,6 +120,8 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 			mark = "✔"
 		case runner.NoExpected, runner.NotJudged:
 			mark = "?"
+		case runner.NotRun:
+			mark = "·"
 		}
 		line := fmt.Sprintf("%s Case %-3d", style.Render(mark), c.Index)
 		if c.Verdict != runner.Accepted {
@@ -132,6 +136,10 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 		fmt.Fprintln(w, line)
 		// Show details for failures (all of them when verbose, otherwise the
 		// first one, like LeetCode) and for cases without expected output.
+		// A case that did not run has none.
+		if c.Verdict == runner.NotRun {
+			continue
+		}
 		detail := o.Verbose || c.Verdict.Unjudged() || (c.Verdict != runner.Accepted && !shownFailure)
 		if !detail {
 			continue

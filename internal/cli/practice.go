@@ -299,8 +299,14 @@ func selectForTest(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.La
 			return nil, err
 		}
 		sel := []runner.Selected{{Index: 1, Case: c}}
-		if _, _, err := a.ReferenceLang(p, ""); err == nil {
-			rep, _, err := a.RunReference(cmd.Context(), p, "", sel, app.RunOptions{})
+		// The reference in the solution's language, which also times the
+		// run, else another.
+		ref := ""
+		if _, ok := p.Reference(l.SolutionFile()); ok {
+			ref = l.ID()
+		}
+		if _, _, err := a.ReferenceLang(p, ref); err == nil {
+			rep, _, err := a.RunReference(cmd.Context(), p, ref, sel, app.RunOptions{})
 			if err == nil && len(rep.Cases) == 1 && rep.Cases[0].Verdict == runner.NoExpected {
 				sel[0].Case.Expected = rep.Cases[0].Output
 			} else if err == nil && len(rep.Cases) == 1 {

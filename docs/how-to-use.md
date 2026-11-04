@@ -25,7 +25,7 @@ English · [简体中文](how-to-use_zh.md)
   solutions/local/python/0001-two-sum/     your code: solution.py, plus generated hc_runtime.py and _hc_runner.py
   .hc/hc.db                                submission history (SQLite)
   .hc/venv/                                Python virtual environment managed by hc
-  .hc/cache/                               Go and uv caches for coding agents, generated cases (cases/), Go programs (build/)
+  .hc/cache/                               Go and uv caches for coding agents, generated cases (cases/), Go programs (build/), reference times (baseline/)
   pyrightconfig.json                       points pyright at .hc/venv
 ```
 
@@ -154,7 +154,16 @@ Run `hc <command> --help` for every flag.
 
 The report shows how long each case took in your code: the call of the function, or for a design problem the constructor and every method call, without decoding their arguments and encoding their results. The total at the bottom is the sum of these times, so it leaves out starting the program and reading the cases.
 
-`--file` runs a solution file kept anywhere instead of the one in `solutions/`, so you can compare drafts or time a slow solution against the reference (`--file` with the reference's own file shows its times). Its language comes from its extension, unless `-l` says otherwise. The file is run alone, copied into a directory of its own.
+`--file` runs a solution file kept anywhere instead of the one in `solutions/`, so you can compare drafts or check that a slow solution exceeds the [time limit](#time-limit) (`--file` with the reference's own file shows its times). Its language comes from its extension, unless `-l` says otherwise. The file is run alone, copied into a directory of its own.
+
+### Time limit
+
+As on LeetCode, a solution that is correct but too slow fails with Time Limit Exceeded. hc judges speed against the problem's reference solution in your language, timed on your machine ([the protocol's time limit](protocol.md#time-limit)): a run may take **30 times** what the reference takes on the same cases, in total, and at least **20ms**. These two values are provisional. The run stops at the case during which your total passes the limit: that case is Time Limit Exceeded (it is ended even if it would never return), and the cases after it are Not Run.
+
+- Thirty times leaves room for a different way of writing the same algorithm, such as a map where the reference uses an array, but not for a worse complexity on inputs as large as the problem's constraints allow. Whether a slower solution fails depends on the problem's cases: some problems cannot separate two complexities within their constraints, and then the slower one passes, as it would on LeetCode.
+- The first run of a problem times the reference: three runs on each case, of which hc keeps the fastest, in `.hc/cache/baseline/<pack>/<problem>/<language>.json`. hc notes it on stderr ("Timing the Go reference…"), and later runs, with any selection of cases, reuse the times. They are measured again when hc, your toolchain, `problem.yaml` or the reference change.
+- A problem without a reference in your language is not judged ([readiness](protocol.md#readiness)), so it has no time limit either. References, `hc cases build` and `hc validate --run` are never limited, and neither is `hc debug`.
+- The `timeout` of `hc.yaml` is another limit, on the wall-clock time of the whole run: it only guards against a solution that hangs.
 
 ## Getting problems
 
@@ -454,6 +463,6 @@ locales: [en]         # the statement languages of your own problems, the defaul
 - `hc fetch` imports problems with [structure inputs](protocol.md#structure-inputs) (a list with a cycle, intersecting lists, node references such as Lowest Common Ancestor), working out the structures from the difference between LeetCode's metadata, which describes its test data, and its template, which is the real signature: test data the template does not take becomes a hidden input, a value the template takes as a node becomes a `ref`, a node parameter missing from the test data becomes a `copy`, a `pos` makes a `cycle`, 160's `skipA` and `skipB` make a `join`, and a returned node gets `returns_ref`. The examples are mapped onto the new inputs. Example outputs that are not plain JSON, such as 142's "tail connects to node index 1", are left to `hc gen`. Problems 141, 142, 160, 236, 237 and 1379 of the regression set show them.
 - `hc fetch` imports problems with [LeetCode's `Node` types](protocol.md#leetcodes-node-types), `NestedInteger` and `Employee`, reading their signature from LeetCode's Go template. `returns_copy` (Clone Graph) is left to `hc gen`, and so are the examples of iterator problems such as Flatten Nested List Iterator, which LeetCode gives without the calls.
 - Problems that encode a value and decode it back (297, 449, 535) are judged as [round trips](protocol.md#round-trip-problems): only the decoded value is compared, so requirements on the encoding itself (449: "as compact as possible") are not checked. `hc fetch` imports them, reading the encoder, the decoder and whether they share an instance from the harness in LeetCode's template comment. Problems 297 and 535 of the regression set show both kinds.
-- Run time is measured, but memory is not limited.
+- Time is limited (see [Time limit](#time-limit)), but memory is not.
 - LeetCode premium problems cannot be fetched.
 - Problems with many valid answers that cannot all be listed ("return any valid answer") and randomized problems are judged by a [checker](protocol.md#checkers), which `hc gen` writes; problems 5, 108, 210, 324, 384 and 528 of the regression set have one. Checkers are Python, so these problems need Python 3.10 or later even when you solve them in Go; the virtual environment hc manages provides it.
