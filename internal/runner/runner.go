@@ -73,7 +73,9 @@ type Report struct {
 	Total        int
 	CompileError string
 	// Stderr holds the tail of the program's stderr if it crashed.
-	Stderr  string
+	Stderr string
+	// Elapsed is the sum of the cases' times: the time spent in the user's
+	// code, without starting the program or decoding the cases.
 	Elapsed time.Duration
 	// Toolchain is what the solution ran with, set by the caller; the zero
 	// value when unknown (e.g. a report decoded from history).
@@ -134,9 +136,7 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 	stderr := &tailBuffer{max: 16 << 10}
 	cmd.Stderr = io.MultiWriter(orDiscard(opts.Stderr), stderr)
 	cmd.WaitDelay = time.Second
-	start := time.Now()
 	runErr := cmd.Run()
-	rep.Elapsed = time.Since(start)
 	timedOut := errors.Is(runCtx.Err(), context.DeadlineExceeded)
 
 	results, err := readResults(outPath)
@@ -184,6 +184,7 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 		if cr.Verdict == Accepted {
 			rep.Passed++
 		}
+		rep.Elapsed += cr.Elapsed
 	}
 	if runErr != nil && len(results) < len(cases) {
 		rep.Stderr = stderr.String()

@@ -25,7 +25,7 @@ English · [简体中文](how-to-use_zh.md)
   solutions/local/python/0001-two-sum/     your code: solution.py, plus generated hc_runtime.py and _hc_runner.py
   .hc/hc.db                                submission history (SQLite)
   .hc/venv/                                Python virtual environment managed by hc
-  .hc/cache/                               Go and uv caches for coding agents, generated cases (cases/)
+  .hc/cache/                               Go and uv caches for coding agents, generated cases (cases/), Go programs (build/)
   pyrightconfig.json                       points pyright at .hc/venv
 ```
 
@@ -46,7 +46,7 @@ Solutions live in `solutions/<pack>/<lang>/<dir>/`, and the history keeps each s
 
 A workspace made by an older hc keeps its problems in `problems/` instead of `packs/`. hc stops there and says so: create a new workspace with `hc init <dir>` and move your problems into its `packs/local/problems/`. Solutions and history are not carried over.
 
-Each Go problem is a standalone module, and the driver sits next to `solution.go`. So gopls, `go build` and Delve breakpoints all work on your real file. The generated files are rewritten before every run, so don't edit them. `go.mod` follows your Go: its `go` line is your toolchain's version (`go 1.27` for Go 1.27.2), so your solutions can use everything it supports. hc builds with `GOTOOLCHAIN=local` and never downloads another toolchain.
+Each Go problem is a standalone module, and the driver sits next to `solution.go`. So gopls, `go build` and Delve breakpoints all work on your real file. The generated files are rewritten before every run, so don't edit them. `go.mod` follows your Go: its `go` line is your toolchain's version (`go 1.27` for Go 1.27.2), so your solutions can use everything it supports. hc builds with `GOTOOLCHAIN=local` and never downloads another toolchain. It keeps the programs it builds in `.hc/cache/build/go/`, by the content of the files they are built from, so a run of unchanged code builds nothing; on macOS that also saves the check the system makes of every new program on its first launch. The newest 32 are kept.
 
 Python solutions run in a virtual environment that hc manages in `.hc/venv`. hc creates it the first time a command needs Python (`hc init --lang python`, `hc start`, `test`, `submit`, `debug`, `cases build`, `validate --run`):
 
@@ -152,7 +152,7 @@ hc discard two-sum          # delete the solution and all its submissions
 
 Run `hc <command> --help` for every flag.
 
-The report shows how long each case took in your code: the call of the function, or for a design problem the constructor and every method call, without decoding their arguments and encoding their results.
+The report shows how long each case took in your code: the call of the function, or for a design problem the constructor and every method call, without decoding their arguments and encoding their results. The total at the bottom is the sum of these times, so it leaves out starting the program and reading the cases.
 
 `--file` runs a solution file kept anywhere instead of the one in `solutions/`, so you can compare drafts or time a slow solution against the reference (`--file` with the reference's own file shows its times). Its language comes from its extension, unless `-l` says otherwise. The file is run alone, copied into a directory of its own.
 

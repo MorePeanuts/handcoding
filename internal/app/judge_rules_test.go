@@ -1019,5 +1019,9 @@ func TestClassTiming(t *testing.T) {
 		if c := rep.Cases[0]; c.Verdict != runner.Accepted || c.Elapsed < 90*time.Millisecond {
 			t.Errorf("%s: %s in %s, want Accepted in at least 90ms", langID, c.Verdict, c.Elapsed)
 		}
+		// The total is the time of the cases, without starting the program.
+		if rep.Elapsed != rep.Cases[0].Elapsed {
+			t.Errorf("%s: total %s, want the case's %s", langID, rep.Elapsed, rep.Cases[0].Elapsed)
+		}
 	}
 }

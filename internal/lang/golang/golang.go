@@ -43,7 +43,11 @@ const (
 )
 
 // Language is the Go implementation of lang.Language.
-type Language struct{}
+type Language struct {
+	// BuildCache is where Build keeps programs, by the content of the
+	// module they are built from (see build.go); empty builds into binDir.
+	BuildCache string
+}
 
 var _ lang.Language = Language{}
 
@@ -62,15 +66,28 @@ func (Language) Setup(context.Context, io.Writer) error { return nil }
 
 var goVersionRE = regexp.MustCompile(`go(\d+(?:\.\d+)*)`)
 
-// detect runs `go env GOVERSION` once per process.
-var detect = sync.OnceValues(func() (lang.Toolchain, error) {
+// goEnv runs `go env` once per process for the settings a build depends on,
+// GOVERSION first.
+var goEnv = sync.OnceValues(func() ([]byte, error) {
 	if _, err := exec.LookPath("go"); err != nil {
-		return lang.Toolchain{}, errors.New("go toolchain not found in PATH")
+		return nil, errors.New("go toolchain not found in PATH")
 	}
-	out, err := exec.Command("go", "env", "GOVERSION").Output()
+	cmd := exec.Command("go", "env", "GOVERSION", "GOOS", "GOARCH", "GOFLAGS", "CGO_ENABLED", "GOEXPERIMENT")
+	cmd.Env = localToolchain()
+	out, err := cmd.Output()
 	if err != nil {
-		return lang.Toolchain{}, fmt.Errorf("go env GOVERSION: %w", err)
+		return nil, fmt.Errorf("go env GOVERSION: %w", err)
 	}
+	return out, nil
+})
+
+// detect reads the toolchain's version from goEnv.
+var detect = sync.OnceValues(func() (lang.Toolchain, error) {
+	env, err := goEnv()
+	if err != nil {
+		return lang.Toolchain{}, err
+	}
+	out, _, _ := bytes.Cut(env, []byte("\n"))
 	// "go1.27.2", or "devel go1.28-abcdef …" for a development build.
 	m := goVersionRE.FindStringSubmatch(string(out))
 	if m == nil {
@@ -514,26 +531,6 @@ func writeRoundTripCall(b *strings.Builder, p *problem.Problem) error {
 	b.WriteString("\thcStop()\n")
 	fmt.Fprintf(b, "\treturn %s\n", encodeExpr(dec.Returns, "ret"))
 	return nil
-}
-
-func (Language) Build(ctx context.Context, dir, binDir string) error {
-	cmd := exec.CommandContext(ctx, "go", "build", "-o", filepath.Join(binDir, binName), ".")
-	cmd.Dir = dir
-	cmd.Env = localToolchain()
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		if _, ok := errors.AsType[*exec.ExitError](err); ok {
-			return &lang.CompileError{Output: strings.TrimSpace(string(out))}
-		}
-		return err
-	}
-	return nil
-}
-
-func (Language) Command(ctx context.Context, dir, binDir string) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, filepath.Join(binDir, binName))
-	cmd.Dir = dir
-	return cmd
 }
 
 // DebugCommand starts Delve. Interactively it stops at the solution's entry
