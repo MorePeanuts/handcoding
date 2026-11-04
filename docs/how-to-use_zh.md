@@ -25,7 +25,7 @@
   solutions/local/python/0001-two-sum/     你的代码：solution.py，以及自动生成的 hc_runtime.py 和 _hc_runner.py
   .hc/hc.db                                提交历史（SQLite）
   .hc/venv/                                hc 管理的 Python 虚拟环境
-  .hc/cache/                               供编码智能体使用的 Go 和 uv 缓存，以及生成用例（cases/）
+  .hc/cache/                               供编码智能体使用的 Go 和 uv 缓存，以及生成用例（cases/）和 Go 程序（build/）
   pyrightconfig.json                       让 pyright 使用 .hc/venv
 ```
 
@@ -46,7 +46,7 @@ hc 无法读取的题目包（没有 `pack.yaml`、`pack.yaml` 不合法，或�
 
 旧版 hc 创建的工作区把题目放在 `problems/` 而不是 `packs/` 下。hc 遇到这种工作区会停下并说明：用 `hc init <dir>` 新建一个工作区，再把你的题目移到它的 `packs/local/problems/` 下。解答和提交历史不会迁移。
 
-每道 Go 题都是一个独立的 module，驱动文件就放在 `solution.go` 旁边。因此 gopls、`go build` 和 Delve 断点都直接作用在你自己的文件上。自动生成的文件每次运行前都会重写，不要手动修改。`go.mod` 跟随本机的 Go：其中的 `go` 行就是本机工具链的版本（Go 1.27.2 对应 `go 1.27`），所以你的解答可以使用它支持的所有特性。hc 用 `GOTOOLCHAIN=local` 构建，不会下载其他版本的工具链。
+每道 Go 题都是一个独立的 module，驱动文件就放在 `solution.go` 旁边。因此 gopls、`go build` 和 Delve 断点都直接作用在你自己的文件上。自动生成的文件每次运行前都会重写，不要手动修改。`go.mod` 跟随本机的 Go：其中的 `go` 行就是本机工具链的版本（Go 1.27.2 对应 `go 1.27`），所以你的解答可以使用它支持的所有特性。hc 用 `GOTOOLCHAIN=local` 构建，不会下载其他版本的工具链。构建出的程序按其源文件的内容保存在 `.hc/cache/build/go/` 中，所以代码没有改动时再次运行不会重新构建；在 macOS 上，这还省去了系统在每个新程序首次启动时做的检查。最多保留最近使用的 32 个。
 
 Python 解答在 hc 管理的虚拟环境 `.hc/venv` 中运行。第一次有命令需要 Python 时（`hc init --lang python`、`hc start`、`test`、`submit`、`debug`、`cases build`、`validate --run`），hc 会创建它：
 
@@ -152,7 +152,7 @@ hc discard two-sum          # 删除解答及其全部提交记录
 
 运行 `hc <command> --help` 查看所有参数。
 
-报告会列出每个用例在你的代码中花费的时间：函数题是函数调用本身，设计题是构造函数和每次方法调用，不含参数的解码和结果的编码。
+报告会列出每个用例在你的代码中花费的时间：函数题是函数调用本身，设计题是构造函数和每次方法调用，不含参数的解码和结果的编码。末尾的总用时是这些时间之和，不含启动程序和读取用例的时间。
 
 `--file` 运行放在任意位置的解答文件，而不是 `solutions/` 中的那份，便于比较不同的草稿，或者把一份慢速解与参考解比较用时（`--file` 指向参考解本身的文件即可看到它的用时）。它的语言由扩展名决定，除非用 `-l` 另行指定。这个文件会被复制到单独的目录中运行，所以不能依赖旁边的其他文件。
 

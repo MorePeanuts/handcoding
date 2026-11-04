@@ -143,16 +143,22 @@ func hcNorm(rv reflect.Value) any {
 	return rv.Interface()
 }
 
-// hcStack keeps only the frames inside the user's solution.
+// hcStack keeps only the frames inside the user's solution. The program is
+// built with -trimpath, so the frames name solution/solution.go; the
+// driver runs in the solution's directory, which gives the real path.
 func hcStack() string {
 	pcs := make([]uintptr, 64)
 	n := runtime.Callers(3, pcs)
 	frames := runtime.CallersFrames(pcs[:n])
+	file := "solution.go"
+	if wd, err := os.Getwd(); err == nil {
+		file = wd + string(os.PathSeparator) + file
+	}
 	var b strings.Builder
 	for {
 		f, more := frames.Next()
 		if strings.HasSuffix(f.File, "/solution.go") {
-			fmt.Fprintf(&b, "    %s\n        %s:%d\n", f.Function, f.File, f.Line)
+			fmt.Fprintf(&b, "    %s\n        %s:%d\n", f.Function, file, f.Line)
 		}
 		if !more {
 			break
