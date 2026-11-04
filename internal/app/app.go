@@ -430,18 +430,8 @@ func (a *App) run(ctx context.Context, p *problem.Problem, l lang.Language, dir 
 	return rep, err
 }
 
-// timeout is the time limit of a run of p: judge.timeout, else hc.yaml's.
-func (a *App) timeout(p *problem.Problem) time.Duration {
-	if p.Judge.Timeout != "" {
-		if d, err := time.ParseDuration(p.Judge.Timeout); err == nil {
-			return d
-		}
-	}
-	return a.WS.Config.TimeoutDuration()
-}
-
 func (a *App) runnerOpts(ctx context.Context, p *problem.Problem, sel []runner.Selected, o RunOptions) (runner.Options, error) {
-	opts := runner.Options{Timeout: a.timeout(p), Stdout: o.Stdout, Stderr: o.Stderr}
+	opts := runner.Options{Timeout: a.WS.Config.TimeoutDuration(), Stdout: o.Stdout, Stderr: o.Stderr}
 	if p.Judge.Compare == problem.CompareChecker && slices.ContainsFunc(sel, func(s runner.Selected) bool { return s.Case.HasExpected() }) {
 		c, err := a.checker(ctx, p, o.Stderr)
 		if err != nil {
@@ -479,10 +469,24 @@ func (a *App) checker(ctx context.Context, p *problem.Problem, w io.Writer) (lan
 	return c, nil
 }
 
+// NotReadyHint tells the user how to make p judgeable for solutions in l.
+func (a *App) NotReadyHint(p *problem.Problem, l lang.Language) string {
+	return p.NotReadyHint(a.WS.Ref(p), l.Name(), l.SolutionFile())
+}
+
+// SubmitError is why a solution of p in l cannot be submitted, nil when it
+// can: p must be ready for l.
+func (a *App) SubmitError(p *problem.Problem, l lang.Language) error {
+	if p.ReadyFor(l.SolutionFile()) {
+		return nil
+	}
+	return errors.New("cannot submit: " + a.NotReadyHint(p, l) + "; `hc test` shows your output meanwhile")
+}
+
 // Submit runs all cases and records the submission.
 func (a *App) Submit(ctx context.Context, p *problem.Problem, l lang.Language, o RunOptions) (*runner.Report, *store.Submission, error) {
-	if !p.Ready() {
-		return nil, nil, errors.New("cannot submit: " + p.NotReadyHint(a.WS.Ref(p)) + "; `hc test` shows your output meanwhile")
+	if err := a.SubmitError(p, l); err != nil {
+		return nil, nil, err
 	}
 	cases, err := p.LoadCases()
 	if err != nil {

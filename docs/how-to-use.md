@@ -182,6 +182,8 @@ Fetching a problem again from the other site adds the statements it lacks, witho
 
 A fetched problem is **not ready to submit** yet. LeetCode only publishes the examples, and not how answers are judged: whether order matters, whether several answers are valid. Until that is decided, `hc test` shows your output next to the example's answer without a verdict, and `hc submit` refuses. `hc gen` writes the full test suite and decides the judge rule from the statement, writing a checker when no built-in rule fits; you can also set `judge.compare` yourself (see the protocol's [compare modes](protocol.md#compare-modes)). The list marks such problems with `?` in the status column, where solved problems show `✔` and attempted ones `●`.
 
+A problem is judged only in the languages it has a reference solution in: a Go solution needs `reference/solution.go`, a Python one `reference/solution.py` (the protocol's [readiness](protocol.md#readiness)). Without one, `hc test` shows your output without a verdict, `hc submit` refuses and names the missing file, and the list shows `?` for the language you solve in. `hc gen` writes a reference in every language the pack is solved in.
+
 Premium problems are not available. Neither are problems whose signature uses types hc does not support yet (such as `MountainArray` in interactive problems); `hc fetch` says so.
 
 ### Your own problems
@@ -200,7 +202,7 @@ hc rm my-problem                    # remove a problem (--purge: your solutions 
 `hc fetch`, `hc new` and `hc import` write into `packs/local/problems/`. The format of a problem, from `problem.yaml` to the reference solution, is specified by the [problem protocol](protocol.md); `hc new` scaffolds one to fill in, and hc's regression set ([`testdata/regression`](../testdata/regression) in its repository) has complete examples of every feature.
 
 - `hc cases build` runs a reference solution: the Go one if there is one, else the Python one; `-l` picks one. It refuses problems judged with `any_of`, whose `expected` lists every acceptable answer and has to be written by hand.
-- `hc validate` reports every break of the protocol's [validity rules](protocol.md#validity-rules) as an error, with the case number and field. With `--run` it also runs every reference solution on every case, and through the checker if there is one. It warns about an undecided judge rule (no `judge.compare`), no cases, cases without `expected`, generated cases without a digest, stored cases over 100 KB, no case marked as an example, no reference solution, and statement images that do not exist. `hc test`, `hc submit` and `hc debug` refuse to run a case that breaks these rules, and name it.
+- `hc validate` reports every break of the protocol's [validity rules](protocol.md#validity-rules) as an error, with the case number and field. With `--run` it also runs every reference solution on every case, and through the checker if there is one. It warns about an undecided judge rule (no `judge.compare`), no cases, cases without `expected`, generated cases without a digest, stored cases over 100 KB, no case marked as an example, no reference solution or none in a language the pack is solved in, and statement images that do not exist. `hc test`, `hc submit` and `hc debug` refuse to run a case that breaks these rules, and name it.
 - `hc import` copies only the entries the protocol defines (anything else, such as editor files or a `solutions/` folder, is left behind), and refuses problems whose slug or ID is already among your own problems (`--force` replaces a problem with the same slug). Slugs and IDs only need to be unique within a pack, so importing a problem that an installed pack also has is fine. It also refuses a problem whose statements and titles do not match the locales of your own problems, as `hc validate` would report them: one without a statement in each of them, or with one in another locale.
 - `hc rm` deletes a problem's directory, and in a pack checkout takes its slug out of the groups of `pack.yaml`, keeping the file's comments and layout. It asks first (`--yes` skips the question) and refuses installed packs. Your solutions, submission history and star of the problem are kept, so a problem with the same slug added later gets them back; `--purge` deletes them as well.
 - `hc validate` without arguments also checks every installed pack's `pack.yaml`, and that its groups name problems of the pack. Each problem's directory name, slug and ID are checked against the rest of its pack.
@@ -307,7 +309,7 @@ To **reproduce a workspace** elsewhere, copy its `hc.yaml` into a new workspace 
 
 ### Checking a pack
 
-`hc pack check` is what a pack's CI runs before publishing. Run it in a pack checkout ([working on a pack](#working-on-a-pack)), or pass its directory: `hc pack check ./my-pack`. It checks that `pack.yaml` is valid and of a supported protocol, that its groups name problems of the pack, and that every problem loads, is valid, has a canonical directory name and a unique slug and ID, is ready (`judge.compare` is set), has cases that all have an expected output (or, generated, a digest) and none over 100 KB, a reference solution, and passes `hc validate --run`: every reference solution passes every case, generated ones built afresh. So it needs Go and Python 3.10+, and a reference that cannot be run is an error. It prints one line per problem and a summary, and exits non-zero on any failure.
+`hc pack check` is what a pack's CI runs before publishing. Run it in a pack checkout ([working on a pack](#working-on-a-pack)), or pass its directory: `hc pack check ./my-pack`. It checks that `pack.yaml` is valid and of a supported protocol, that its groups name problems of the pack, and that every problem loads, is valid, has a canonical directory name and a unique slug and ID, is ready (`judge.compare` is set), has cases that all have an expected output (or, generated, a digest) and none over 100 KB, a reference solution in every language of the pack's `languages`, and passes `hc validate --run`: every reference solution passes every case, generated ones built afresh. So it needs Go and Python 3.10+, and a reference that cannot be run is an error. It prints one line per problem and a summary, and exits non-zero on any failure.
 
 ## Test cases from a coding agent
 
@@ -319,7 +321,7 @@ hc fix two-sum -c 5 -m "answers in a different order should pass"
 
 `hc` runs the agent headless in the workspace (`claude -p` or `codex exec`). Before it starts, it installs or updates the workspace's skills (see [Agent skills](#agent-skills)); the agent follows **`hc-cases`**, and **`hc-problem`** for when the problem's definition itself is wrong. Following the skill, the agent:
 
-1. writes a reference solution, `reference/solution.py`, and a brute-force one to cross-check when that helps;
+1. writes a reference solution in every language the pack is solved in (`reference/solution.py`, `reference/solution.go`), and a brute-force one to cross-check when that helps;
 2. writes test **inputs** to `cases.jsonl`, covering edge cases and special structures, and large inputs as [generated cases](#generated-cases);
 3. runs `hc cases build`, so expected outputs come from running the reference, not from the model;
 4. runs `hc validate --run` until every reference passes.
@@ -430,7 +432,7 @@ language: go          # default solution language: go | python
 editor: nvim          # falls back to $VISUAL, $EDITOR, then vi
 theme: auto           # statement colors: auto | dark | light
 images: auto          # statement images: auto | kitty | blocks | none
-timeout: 10s          # wall-clock limit per run; a problem's judge.timeout overrides it
+timeout: 10s          # wall-clock limit of a run, its checker and its generators (protocol: run-limit)
 python:
   interpreter: python3.12  # Python 3.10+ to use instead of .hc/venv; e.g. a full path. Unset by default
 agent:

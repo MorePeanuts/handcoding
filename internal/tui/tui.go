@@ -97,6 +97,9 @@ type model struct {
 	// every problem's.
 	probs    []*problem.Problem
 	statuses map[string]app.ProblemStatus
+	// readyFor caches Problem.ReadyFor by pack/slug and solution file until
+	// the next reload, since the list asks on every render.
+	readyFor map[string]bool
 	// stars are the starred problems, by pack/slug.
 	stars     map[string]bool
 	visible   []int // indexes into probs
@@ -318,7 +321,7 @@ func (m *model) reload() error {
 	if len(tabs) == 0 && len(packs) > 0 && packs[0].Err == nil {
 		tabs = append(tabs, packTab{pack: packs[0]})
 	}
-	m.tabs, m.statuses = tabs, statuses
+	m.tabs, m.statuses, m.readyFor = tabs, statuses, map[string]bool{}
 	m.multiPack = len(tabs) > 1
 	if m.tab() == nil && len(tabs) > 0 {
 		m.pack = tabs[0].pack.Name

@@ -75,7 +75,7 @@ problems/<dir>/    one problem directory per problem; see Problem directory
 
 - `protocol` is read first. A tool that does not read the declared version refuses the pack without reading the rest of it ([Protocol versions](#protocol-versions)), since a newer protocol may add fields it does not know.
 - `name` is the pack's identity. Installed packs, solutions and submission history are keyed by it, so renaming a pack is a breaking change, as renaming a slug is for a problem. `local` is reserved for the problems a workspace holds outside any pack.
-- `languages` lists the languages the pack's problems can be solved in. Solutions in other languages are not supported, and tools MAY refuse to start one. Leaving it out means every language of the declared protocol, so a pack gets the languages a later protocol adds only when it declares that protocol. References may be written in any language of the protocol, whatever `languages` says, since they only compute expected outputs; checkers are Python in any case ([Checkers](#checkers)).
+- `languages` lists the languages the pack's problems can be solved in. Solutions in other languages are not supported, and tools MAY refuse to start one. Leaving it out means every language of the declared protocol, so a pack gets the languages a later protocol adds only when it declares that protocol. References may be written in any language of the protocol, whatever `languages` says. A solution is judged only in a language the problem has a reference in ([Readiness](#readiness)), so a problem SHOULD have one in every language of `languages`. Checkers are Python in any case ([Checkers](#checkers)).
 
 The language ids:
 
@@ -135,7 +135,7 @@ A problem is a directory holding these entries:
 | `description.<locale>.md` | for each other locale of the pack | The statement in that locale; see [Locales](#locales) |
 | `assets/` | no | Files the statements refer to, such as images |
 | `cases.jsonl` | no | The test cases; see [Cases](#cases) |
-| `reference/solution.py`, `reference/solution.go` | no | Reference solutions, any subset of the languages |
+| `reference/solution.py`, `reference/solution.go` | no | Reference solutions, any subset of the languages; a solution is judged only in a language that has one ([Readiness](#readiness)) |
 | `templates/solution.py`, `templates/solution.go` | no | Starter code, replacing the one generated from the signature |
 | `checker.py` | with `judge.compare: checker` only | The checker; see [Checkers](#checkers) |
 | `generator.py` | with generated cases only | The generators of the generated cases; see [Generators](#generators) |
@@ -171,7 +171,6 @@ A problem is a directory holding these entries:
 | `judge.output` | string | for a `void` function | none | Function problems only: a parameter or hidden input; see [In-place output](#in-place-output) | 1 |
 | `judge.output_length` | string | no | none | Function problems only: `return`; see [In-place output](#in-place-output) | 1 |
 | `judge.round_trip` | mapping | no | none | Class problems only: `encode`, `decode`, `instances`; see [Round-trip problems](#round-trip-problems) | 1 |
-| `judge.timeout` | string | no | the workspace's `timeout` (10s unless configured) | A positive duration such as `5s` or `500ms`; see [Timeout](#timeout) | 1 |
 | `source.site` | string | no | none | Free text, e.g. `leetcode.com` | 1 |
 | `source.url` | string | no | none | | 1 |
 
@@ -593,13 +592,15 @@ judge:
 {"input": {"nums": [3,2,2,3], "val": 3}, "expected": [2,2]}
 ```
 
-### Timeout
+### Run limit
 
-`judge.timeout` is a wall-clock limit for one whole run of a solution over the cases selected for it, not a per-case limit. It guards against hangs and infinite loops; it does not judge complexity. When it expires the run is stopped, and the cases without a result are Time Limit Exceeded; cases that finished keep their verdicts. A checker run and a generator run each get their own limit of the same duration, and so does a reference computing the expected outputs of generated cases. The default is the workspace's `timeout` (10s unless configured).
+A run of a solution over the cases selected for it has a wall-clock limit for the whole run, not for each case. It guards against hangs and infinite loops; it does not judge complexity. The limit belongs to the judge, not to the problem: hc's is `timeout` in the workspace's `hc.yaml`, 10s unless configured. When it expires the run is stopped, and the cases without a result are Time Limit Exceeded; cases that finished keep their verdicts. A checker run and a generator run each get their own limit of the same duration, and so does a reference computing the expected outputs of generated cases.
 
 ### Readiness
 
-A problem is **ready** when it has `judge.compare`. `judge.compare` has no default, and MUST be written out even for `exact`. A problem that is not ready is valid, but its judge rule is undecided: its cases are not judged (Not Judged), and it cannot be submitted.
+A problem is **ready** when it has `judge.compare`. `judge.compare` has no default, and MUST be written out even for `exact`. A problem that is not ready is valid, but its judge rule is undecided.
+
+A problem is **ready for a language** when it is ready and has a reference solution in that language (`reference/solution.py`, `reference/solution.go`). The cases of a solution in a language the problem is not ready for are not judged (Not Judged), and such a solution cannot be submitted. A problem SHOULD be ready for every language of its pack's `languages`.
 
 ### Verdicts
 
@@ -609,9 +610,9 @@ A run of a solution has one of these outcomes for each case:
 |---|---|
 | Compile Error | The solution does not build: a Go compile error, a Python syntax error. This is the outcome of the whole run, and no case runs |
 | Runtime Error | The case raised an error (an exception, a panic, an input the driver cannot decode, or a result the encoding cannot express), or the program exited before producing the case's result |
-| Time Limit Exceeded | The [timeout](#timeout) expired before the case produced its result |
+| Time Limit Exceeded | The [run limit](#run-limit) expired before the case produced its result |
 | No Expected Output | The case ran, but has no `expected` |
-| Not Judged | The case ran, but the problem is not [ready](#readiness) |
+| Not Judged | The case ran, but the problem is not [ready](#readiness) for the solution's language |
 | Wrong Answer | The output does not match `expected` under `judge.compare`, or the checker rejected it |
 | Accepted | The output matches, or the checker accepted it |
 
@@ -637,7 +638,7 @@ def check(input, output, expected):
 | `expected` | The case's `expected`, one valid answer | | |
 
 - Return values: `None` or `True` accepts; `False` rejects; a string rejects with that string as the message. A rejected case is a Wrong Answer, and its message is shown with it. Messages SHOULD say what is wrong: `"'bb' is not a substring of s"`.
-- `check` is called once per case that produced an output and has `expected`, in the order the cases ran, in one process that runs after the solution, with the [timeout](#timeout)'s duration as its own limit. Cases that already failed (Runtime Error, Time Limit Exceeded) or have no `expected` are not passed.
+- `check` is called once per case that produced an output and has `expected`, in the order the cases ran, in one process that runs after the solution, with the [run limit](#run-limit)'s duration as its own limit. Cases that already failed (Runtime Error, Time Limit Exceeded) or have no `expected` are not passed.
 - A checker that cannot be loaded, has no callable `check`, raises, returns anything else, or runs out of time is a broken problem, not a verdict on the solution: the run fails with an error naming `checker.py` and the case.
 - A checker MAY import the public names of `hc_runtime` ([Python](#python)) to rebuild structures, `decode("TreeNode", output)`, and otherwise only the standard library.
 - A checker MUST accept every correct output. For randomized problems (LeetCode 384, 528), whose outputs are checked for a plausible distribution, this means a correct solution MUST be rejected with negligible probability.
@@ -676,7 +677,7 @@ def distinct(rng, n):
 - Generators MUST be deterministic: a call MUST return the same input on every machine and supported Python version. They MUST NOT use the `random` module, which keeps only `random()` the same across Python versions, nor the time, the environment, files or the network, and MUST NOT let the iteration order of a set or dict keyed by strings, which hash randomization changes, into the input.
 - `digest` is `sha256:` and the lowercase hexadecimal SHA-256 of the input's canonical JSON: the input object in UTF-8, keys sorted, without whitespace, numbers as the generator wrote them, and strings escaping only `"`, `\`, control characters, U+2028 and U+2029. Tools write it (`hc cases build`); authors do not. An input that does not match the digest is a case the author never checked, so it is a broken problem.
 - The expected output of a generated case is the output of a reference solution on its input. A problem with generated cases MUST have a reference solution. A checker gets that output as `expected`. `judge.compare: any_of` cannot judge generated cases, since a reference finds one answer: such problems judge large cases with `unordered` or a checker.
-- The generators of a run's generated cases run in one process, before the solution, with the [timeout](#timeout)'s duration as their limit. A `generator.py` that cannot be loaded, lacks the function, raises, returns something else than a valid input or one that does not match the digest, or runs out of time is a broken problem, not a verdict on the solution, and so is a reference that fails on a generated input: the run fails with an error naming the file and the case.
+- The generators of a run's generated cases run in one process, before the solution, with the [run limit](#run-limit)'s duration as their limit. A `generator.py` that cannot be loaded, lacks the function, raises, returns something else than a valid input or one that does not match the digest, or runs out of time is a broken problem, not a verdict on the solution, and so is a reference that fails on a generated input: the run fails with an error naming the file and the case.
 - A generator MAY import the public names of `hc_runtime` ([Python](#python)), and otherwise only the standard library.
 
 ## Solution ABI
@@ -740,7 +741,6 @@ A valid pack satisfies every rule below, and so does each of its problems. `hc v
 11. `judge.compare`, when present, MUST be one of the [compare modes](#compare-modes). With `unordered` or `unordered_deep`, the judged value of a function or round-trip problem MUST be an array. A class problem that is not a round trip MUST NOT use `any_of`.
 12. `judge.tolerance`, when present, MUST be a finite number, 0 or more.
 13. `checker.py` MUST be present with `judge.compare: checker`, and absent otherwise.
-14. `judge.timeout`, when present, MUST be a positive duration.
 
 **cases.jsonl**
 

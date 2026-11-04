@@ -192,8 +192,8 @@ func TestLoadErrors(t *testing.T) {
 		yaml, want string
 	}{
 		{fn + "judgee:\n  compare: unordered\n", `unknown field "judgee"`},
-		// The field was renamed to timeout, with no alias.
-		{fn + "judge:\n  compare: exact\n  time_limit: 5s\n", `unknown field "time_limit"`},
+		// The run's wall-clock limit is the workspace's, not the problem's.
+		{fn + "judge:\n  compare: exact\n  timeout: 5s\n", `unknown field "timeout"`},
 		// kind is never inferred from the function or class section.
 		{strings.Replace(fn, "kind: function\n", "", 1), "problem.yaml: kind is required: function or class"},
 	}
@@ -216,12 +216,6 @@ func TestValidateJudgeOptions(t *testing.T) {
 		return &Problem{Slug: "x", Title: "X", Kind: KindFunction, Function: &Function{Name: "f", Returns: TypeInteger}}
 	}
 	p := base()
-	p.Judge.Timeout = "5"
-	p.Normalize()
-	if err := p.Validate(); err == nil || !strings.Contains(err.Error(), "judge.timeout") {
-		t.Errorf("timeout 5: %v", err)
-	}
-	p = base()
 	p.Judge.Compare = CompareUnordered
 	p.Normalize()
 	if err := p.Validate(); err == nil || !strings.Contains(err.Error(), "needs an array result") {

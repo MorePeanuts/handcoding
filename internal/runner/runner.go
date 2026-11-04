@@ -31,8 +31,10 @@ const (
 	CompileError Verdict = "Compile Error"
 	// NoExpected means the case ran but has no expected output to compare to.
 	NoExpected Verdict = "No Expected Output"
-	// NotJudged means the case ran, but the problem's judge rule is not
-	// decided yet (problem.Ready), so the output is shown without a verdict.
+	// NotJudged means the case ran, but the problem is not ready for the
+	// solution's language (problem.ReadyFor): its judge rule is not decided
+	// yet, or it has no reference in that language. The output is shown
+	// without a verdict.
 	NotJudged Verdict = "Not Judged"
 )
 
@@ -142,6 +144,7 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 		return nil, err
 	}
 	var toCheck []judge.CheckerCase
+	ready := p.ReadyFor(l.SolutionFile())
 	for _, sel := range cases {
 		cr := CaseResult{Index: sel.Index, Case: sel.Case}
 		res, ok := results[sel.Index]
@@ -161,7 +164,7 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 		default:
 			cr.Output = res.Output
 			cr.Elapsed = time.Duration(res.ElapsedNs)
-			cr.Verdict = judgeCase(p, sel.Case, res.Output, &cr)
+			cr.Verdict = judgeCase(p, ready, sel.Case, res.Output, &cr)
 			if cr.Verdict == "" {
 				input, err := json.Marshal(sel.Case.Input)
 				if err != nil {
@@ -190,12 +193,12 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 }
 
 // judgeCase returns the case's verdict, or "" when the problem's checker
-// has to decide it.
-func judgeCase(p *problem.Problem, c problem.Case, out json.RawMessage, cr *CaseResult) Verdict {
+// has to decide it. ready is whether p is ready for the solution's language.
+func judgeCase(p *problem.Problem, ready bool, c problem.Case, out json.RawMessage, cr *CaseResult) Verdict {
 	if !c.HasExpected() {
 		return NoExpected
 	}
-	if !p.Ready() {
+	if !ready {
 		return NotJudged
 	}
 	if p.Judge.Compare == problem.CompareChecker {

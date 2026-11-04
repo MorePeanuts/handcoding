@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
+	"github.com/MorePeanuts/handcoding/internal/ui"
 )
 
 // addProblem writes a problem into the workspace's own problems.
@@ -44,6 +46,19 @@ func addProblem(t *testing.T, a *app.App, dir, yaml, cases string) *problem.Prob
 	return p
 }
 
+// placeholderReferences gives p a reference file in every language it has
+// none in, so that solutions in each are judged (Problem.ReadyFor). The
+// tests that call it never run the references.
+func placeholderReferences(t *testing.T, p *problem.Problem) {
+	t.Helper()
+	for _, file := range []string{"solution.go", "solution.py"} {
+		if _, ok := p.Reference(file); ok {
+			continue
+		}
+		writeFile(t, filepath.Join(p.Dir, problem.ReferenceDir, file), "placeholder: never run\n")
+	}
+}
+
 // refused, as the verdict a test wants, means that the run refuses the case:
 // an invalid input never reaches the drivers.
 const refused runner.Verdict = ""
@@ -70,6 +85,7 @@ func TestOutputLength(t *testing.T) {
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	p := addProblem(t, a, "remove-dup", removeDupYAML, `{"input":{"nums":[1,1,2]},"expected":[1,2]}`+"\n")
+	placeholderReferences(t, p)
 	cases, _ := p.LoadCases()
 	sel, _ := app.Select(cases, nil, true)
 
@@ -145,6 +161,57 @@ func TestNotReady(t *testing.T) {
 	}
 	if _, _, err := a.Submit(context.Background(), p, l, app.RunOptions{}); err == nil || !strings.Contains(err.Error(), "hc gen local/remove-dup") {
 		t.Fatalf("submit error with two packs = %v", err)
+	}
+}
+
+// TestReadyPerLanguage checks that a problem is judged only for the
+// languages it has a reference in: a Go solution of a problem with a Python
+// reference alone is shown without a verdict and cannot be submitted, while
+// a Python one is judged.
+func TestReadyPerLanguage(t *testing.T) {
+	requireTools(t, "go", "python3")
+	a := newWorkspace(t)
+	p := addProblem(t, a, "remove-dup", removeDupYAML, `{"input":{"nums":[1,1,2]},"expected":[1,2],"example":true}`+"\n")
+	writeFile(t, filepath.Join(p.Dir, problem.ReferenceDir, "solution.py"),
+		"class Solution:\n    def removeDuplicates(self, nums):\n        k = 0\n        for x in nums:\n            if k == 0 or nums[k - 1] != x:\n                nums[k] = x\n                k += 1\n        return k\n")
+	if !p.Ready() || p.ReadyFor("solution.go") || !p.ReadyFor("solution.py") {
+		t.Fatalf("Ready %v, ReadyFor go %v, python %v", p.Ready(), p.ReadyFor("solution.go"), p.ReadyFor("solution.py"))
+	}
+	cases, _ := p.LoadCases()
+	sel, _ := app.Select(cases, nil, true)
+	ctx := context.Background()
+
+	goLang := writeSolution(t, a, p, "go", "package main\n\nfunc removeDuplicates(nums []int) int { return 1 }\n")
+	rep, err := a.Run(ctx, p, goLang, sel, app.RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Verdict != runner.NotJudged || string(rep.Cases[0].Output) != "[1]" {
+		t.Errorf("go run: %+v", rep)
+	}
+	want := "cannot submit: remove-dup has no Go reference solution yet: run `hc gen remove-dup`, or write reference/solution.go"
+	if _, _, err := a.Submit(ctx, p, goLang, app.RunOptions{}); err == nil || !strings.Contains(err.Error(), want) {
+		t.Errorf("go submit error = %v, want %q", err, want)
+	}
+	var b strings.Builder
+	ui.PrintReport(&b, p, rep, ui.ReportOptions{Ref: "remove-dup", Lang: goLang})
+	if !strings.Contains(b.String(), "no Go reference solution yet") {
+		t.Errorf("report does not say why the run was not judged:\n%s", b.String())
+	}
+
+	pyLang := writeSolution(t, a, p, "python", "class Solution:\n    def removeDuplicates(self, nums):\n        return 1\n")
+	if rep, _, err := a.Submit(ctx, p, pyLang, app.RunOptions{}); err != nil || rep.Verdict != runner.WrongAnswer {
+		t.Errorf("python submit: %v, %+v", err, rep)
+	}
+
+	// hc validate names the missing reference; hc pack check fails on it.
+	f := a.ValidateProblem(ctx, p, nil, "remove-dup", app.ValidateOptions{})
+	if !slices.ContainsFunc(f.Warnings, func(w string) bool { return strings.Contains(w, "no Go reference solution (reference/solution.go)") }) || !f.OK() {
+		t.Errorf("validate: errors %q, warnings %q", f.Errors, f.Warnings)
+	}
+	f = a.ValidateProblem(ctx, p, nil, "remove-dup", app.ValidateOptions{Strict: true})
+	if !slices.ContainsFunc(f.Errors, func(e string) bool { return strings.HasPrefix(e, "not ready: no Go reference solution") }) {
+		t.Errorf("strict validate: errors %q", f.Errors)
 	}
 }
 
@@ -229,6 +296,7 @@ func TestNonASCIIOutput(t *testing.T) {
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	p := addProblem(t, a, "echo", echoYAML, `{"input":{"s":"你好&<>"},"expected":"你好&<>!"}`+"\n")
+	placeholderReferences(t, p)
 	cases, _ := p.LoadCases()
 	sel, _ := app.Select(cases, nil, true)
 	tests := []struct {
@@ -510,8 +578,10 @@ func TestChecker(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(p.Dir, problem.ReferenceDir, "solution.py"), []byte(ref), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// Go solutions are judged only with a Go reference.
+	writeFile(t, filepath.Join(p.Dir, problem.ReferenceDir, "solution.go"), "package main\n\nimport \"slices\"\n\nfunc anyIndex(nums []int, target int) int { return slices.Index(nums, target) }\n")
 	ctx := context.Background()
-	if _, err := a.BuildCases(ctx, p, "", false); err != nil {
+	if _, err := a.BuildCases(ctx, p, "python", false); err != nil {
 		t.Fatal(err)
 	}
 	cases, _ := p.LoadCases()
@@ -576,9 +646,10 @@ func TestChecker(t *testing.T) {
 func TestBrokenChecker(t *testing.T) {
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
-	yaml := strings.Replace(anyIndexYAML, "  compare: checker\n", "  compare: checker\n  timeout: 2s\n", 1)
-	p := addProblem(t, a, "any-index", yaml,
+	a.WS.Config.Timeout = "2s"
+	p := addProblem(t, a, "any-index", anyIndexYAML,
 		`{"input":{"nums":[1,2],"target":1},"expected":0}`+"\n"+`{"input":{"nums":[1,2],"target":2},"expected":1}`+"\n")
+	placeholderReferences(t, p)
 	tests := []struct {
 		checker string
 		want    []string
@@ -664,6 +735,7 @@ func TestCheckerClassProblem(t *testing.T) {
 	args := `[[4]` + strings.Repeat(`,[]`, 50) + `]`
 	p := addProblem(t, a, "picker", pickerYAML, `{"input":{"ops":`+ops+`,"args":`+args+`},"expected":[null`+strings.Repeat(`,0`, 50)+`]}`+"\n")
 	addChecker(t, p, pickerChecker)
+	placeholderReferences(t, p)
 	tests := []struct {
 		lang, code string
 		want       runner.Verdict
@@ -813,6 +885,7 @@ func TestRoundTrip(t *testing.T) {
 	same := addProblem(t, a, "tree-codec-same",
 		strings.NewReplacer("slug: tree-codec", "slug: tree-codec-same", "instances: separate", "instances: same").Replace(treeCodecYAML), cases)
 	for _, p := range []*problem.Problem{separate, same} {
+		placeholderReferences(t, p)
 		if err := p.Validate(); err != nil {
 			t.Fatal(err)
 		}
@@ -878,6 +951,7 @@ func TestRunInvalidCase(t *testing.T) {
 	a := newWorkspace(t)
 	yaml := "slug: same\ntitle: Same\nkind: function\nfunction:\n  name: same\n  params:\n    - name: root\n      type: TreeNode\n  returns: TreeNode\njudge:\n  compare: exact\n"
 	p := addProblem(t, a, "same", yaml, `{"input":{"root":[1]},"expected":[1]}`+"\n"+`{"input":{"root":[null,1]},"expected":[]}`+"\n"+`{"input":{"root":[1]},"expected":[1,null]}`+"\n")
+	placeholderReferences(t, p)
 	l := mustLang(t, a, "python")
 	path, _, err := a.Start(p, l)
 	if err != nil {
@@ -929,6 +1003,7 @@ func TestClassTiming(t *testing.T) {
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	p := addProblem(t, a, "sleeper", sleeperYAML, `{"input":{"ops":["Sleeper","nap","nap"],"args":[[30],[30],[30]]},"expected":[null,30,30]}`+"\n")
+	placeholderReferences(t, p)
 	solutions := map[string]string{
 		"go":     "package main\n\nimport \"time\"\n\ntype Sleeper struct{}\n\nfunc Constructor(ms int) Sleeper {\n\ttime.Sleep(time.Duration(ms) * time.Millisecond)\n\treturn Sleeper{}\n}\n\nfunc (s *Sleeper) Nap(ms int) int {\n\ttime.Sleep(time.Duration(ms) * time.Millisecond)\n\treturn ms\n}\n",
 		"python": "import time\n\n\nclass Sleeper:\n    def __init__(self, ms):\n        time.sleep(ms / 1000)\n\n    def nap(self, ms):\n        time.sleep(ms / 1000)\n        return ms\n",

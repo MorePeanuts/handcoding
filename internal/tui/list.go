@@ -339,6 +339,21 @@ func (m *model) tabBar() string {
 	return clip(bar, m.width)
 }
 
+// ready reports whether p is ready for the language solutions are written
+// in now: whether they can be submitted.
+func (m *model) ready(p *problem.Problem) bool {
+	key := p.Ref() + "/" + m.lang.SolutionFile()
+	ok, seen := m.readyFor[key]
+	if !seen {
+		ok = p.ReadyFor(m.lang.SolutionFile())
+		if m.readyFor == nil {
+			m.readyFor = map[string]bool{}
+		}
+		m.readyFor[key] = ok
+	}
+	return ok
+}
+
 func (m *model) viewList() string {
 	var b strings.Builder
 	if m.multiPack {
@@ -355,7 +370,7 @@ func (m *model) viewList() string {
 		case app.StatusAttempted:
 			attempted++
 		}
-		if !p.Ready() {
+		if !m.ready(p) {
 			notReady++
 		}
 	}
@@ -440,7 +455,7 @@ func (m *model) viewProblems(b *strings.Builder, h int) {
 		switch status := m.statuses[p.Ref()]; {
 		case status == app.StatusSolved:
 			mark = ui.Green.Render("✔")
-		case !p.Ready():
+		case !m.ready(p):
 			mark = ui.Cyan.Render("?")
 		case status == app.StatusAttempted:
 			mark = ui.Yellow.Render("●")
