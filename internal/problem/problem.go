@@ -24,7 +24,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/goccy/go-yaml"
 )
@@ -188,11 +187,6 @@ type Judge struct {
 	// RoundTrip makes a class problem judge an encoder and a decoder
 	// together: decode(encode(x)) is judged, never the encoded value.
 	RoundTrip *RoundTrip `yaml:"round_trip,omitempty" json:"round_trip,omitempty"`
-	// Timeout is the wall clock limit for a whole run, e.g. "10s": it guards
-	// against hangs, and cases without a result when it expires are Time
-	// Limit Exceeded. The checker gets the same limit. Defaults to timeout in
-	// hc.yaml.
-	Timeout string `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
 // OutputLengthReturn judges Output[:k], where k is the return value.
@@ -509,11 +503,6 @@ func (p *Problem) Validate() error {
 	if t := p.Judge.Tolerance; t != nil && !(*t >= 0 && !math.IsInf(*t, 1)) {
 		errs = append(errs, fmt.Errorf("judge.tolerance %v must be a finite number, 0 or more (0 compares exactly)", *t))
 	}
-	if tl := p.Judge.Timeout; tl != "" {
-		if d, err := time.ParseDuration(tl); err != nil || d <= 0 {
-			errs = append(errs, fmt.Errorf("judge.timeout %q must be a positive duration such as \"5s\" or \"500ms\"", tl))
-		}
-	}
 	return errors.Join(errs...)
 }
 
@@ -607,10 +596,25 @@ func (p *Problem) RoundTripMethods() (encode, decode Method, ok bool) {
 // the author) to settle.
 func (p *Problem) Ready() bool { return p.Judge.Compare != "" }
 
-// NotReadyHint tells the user how to make an undecided problem judgeable;
-// ref is how commands name the problem.
-func (p *Problem) NotReadyHint(ref string) string {
-	return fmt.Sprintf("the judge rule of %s is not decided yet: run `hc gen %s`, or set judge.compare in problem.yaml", p.Slug, ref)
+// ReadyFor reports whether solutions in the language whose solution file is
+// file (solution.py, solution.go) are judged: the problem is Ready, and has
+// a reference solution in that language.
+func (p *Problem) ReadyFor(file string) bool {
+	_, ok := p.Reference(file)
+	return p.Ready() && ok
+}
+
+// NotReadyHint tells the user how to make p judgeable for solutions in the
+// language named langName (e.g. "Go") whose solution file is file, both
+// empty when unknown; ref is how commands name the problem.
+func (p *Problem) NotReadyHint(ref, langName, file string) string {
+	switch {
+	case !p.Ready():
+		return fmt.Sprintf("the judge rule of %s is not decided yet: run `hc gen %s`, or set judge.compare in problem.yaml", p.Slug, ref)
+	case file == "":
+		return fmt.Sprintf("%s has no reference solution in this language yet: run `hc gen %s`", p.Slug, ref)
+	}
+	return fmt.Sprintf("%s has no %s reference solution yet: run `hc gen %s`, or write %s/%s", p.Slug, langName, ref, ReferenceDir, file)
 }
 
 // EntryName is the name of the function or class the user implements.

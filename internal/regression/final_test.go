@@ -107,7 +107,7 @@ func TestProtocolFeatures(t *testing.T) {
 	if len(fs) < 50 || len(slices.Compact(slices.Clone(fs))) != len(fs) {
 		t.Fatalf("%d features, or duplicates: %q", len(fs), fs)
 	}
-	for _, want := range []string{"language go", "kind function", "judge.compare checker", field("Judge", "timeout"), translation} {
+	for _, want := range []string{"language go", "kind function", "judge.compare checker", field("Judge", "tolerance"), translation} {
 		if !slices.Contains(fs, want) {
 			t.Errorf("features lack %q", want)
 		}

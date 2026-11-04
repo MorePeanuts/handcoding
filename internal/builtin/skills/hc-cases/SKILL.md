@@ -66,9 +66,10 @@ Then the options:
 - In-place problems: `judge.output` and `output_length` belong to the
   definition and combine with every mode, `checker` included. Keep them
   (`hc docs protocol in-place-output`).
-- `judge.timeout` guards against hangs, not slow solutions
-  (`hc docs protocol timeout`). Leave it unset; if the reference needs a
-  large part of the default on your largest case, make the case smaller.
+- A run has a wall-clock limit that guards against hangs, not slow
+  solutions (`hc docs protocol run-limit`). It is the user's setting, not
+  the problem's: if the reference needs a large part of the default (10s)
+  on your largest case, make the case smaller.
 
 ## Reference solutions
 
@@ -76,6 +77,12 @@ Read `hc docs protocol solution-abi`, and `hc docs protocol python` or
 `hc docs protocol go` for the language you write. Expected outputs come
 from running the reference, never from you, so the reference must be
 right.
+
+**Write a reference in every language the pack is solved in.** A solution
+is judged only in a language the problem has a reference in
+(`hc docs protocol readiness`). The languages are `languages` in
+`pack.yaml`, every language when it has none, and every language for the
+workspace's own problems; `hc validate <slug>` names a missing reference.
 
 - Write `reference/solution.py` first. It must run on Python 3.10, the
   oldest version hc supports (`hc docs protocol language-versions`); import
@@ -88,8 +95,8 @@ right.
   library functions (`slices.Sorted`, `maps.Keys`, range over a function).
   `hc validate --run` checks this and names what is too new.
 
-**Prove the rule with a second reference.** When more than one output is
-acceptable, also write `reference/solution.go` so that it returns a
+**Prove the rule with the second reference.** When more than one output is
+acceptable, write `reference/solution.go` so that it returns a
 *different* valid answer than the Python one wherever the rule allows:
 another order, another valid answer, another (correct) random algorithm.
 `hc validate --run` runs both against the same expected outputs, so a rule
@@ -187,7 +194,7 @@ place, and run `hc validate <slug> --run`: some case must fail. If none
 does, add a case that catches it, with a `note` naming the mistake. Restore
 the real reference before anything else, and never run `hc cases build`
 while a wrong solution is in place: it would write wrong expected outputs.
-A slow but correct solution need not fail (the timeout does not judge
+A slow but correct solution need not fail (the run limit does not judge
 complexity).
 
 ## Generated cases
@@ -232,10 +239,11 @@ function of the problem's `generator.py`, and the case only names the call:
    report them, and never translate a statement or a title.
 2. [Decide the judge rule](#decide-the-judge-rule) and write it to
    problem.yaml.
-3. Write `reference/solution.py` ([Reference solutions](#reference-solutions)).
-4. If more than one output is acceptable, write the second reference in
-   `reference/solution.go`. For `checker`, write `checker.py`
-   ([Checkers](#checkers)).
+3. Write `reference/solution.py`, then a reference in every other
+   language the pack is solved in, `reference/solution.go`
+   ([Reference solutions](#reference-solutions)). If more than one output
+   is acceptable, make the Go one return a different valid answer.
+4. For `checker`, write `checker.py` ([Checkers](#checkers)).
 5. Add the inputs to `cases.jsonl` ([Test cases](#test-cases)), and the
    large ones as [generated cases](#generated-cases).
 6. Run `hc cases build <slug> --lang python` to compute `expected` with the
@@ -291,7 +299,7 @@ Report:
 - the judge rule, with the sentence of the statement it rests on;
 - for a checker, what it verifies, and for a randomized problem its
   false-reject probability per case;
-- what the second reference does differently, if there is one;
+- what the Go reference does differently, when more than one output is acceptable;
 - anything the statement requires that hc does not judge.
 
 ## Useful commands

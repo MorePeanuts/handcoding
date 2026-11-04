@@ -265,7 +265,7 @@ func runTest(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.Language
 	if err != nil {
 		return err
 	}
-	ui.PrintReport(os.Stdout, p, rep, ui.ReportOptions{Verbose: o.verbose, Ref: a.WS.Ref(p)})
+	ui.PrintReport(os.Stdout, p, rep, ui.ReportOptions{Verbose: o.verbose, Ref: a.WS.Ref(p), Lang: l})
 	if rep.Verdict != runner.Accepted && !rep.Verdict.Unjudged() {
 		return errSilent
 	}
@@ -356,8 +356,8 @@ func newSubmitCmd(root *rootOptions) *cobra.Command {
 				defer pause()
 			}
 			return root.withProblem(args[0], langName, func(a *app.App, p *problem.Problem, l lang.Language) error {
-				if !p.Ready() {
-					return errors.New("cannot submit: " + p.NotReadyHint(a.WS.Ref(p)) + "; `hc test` shows your output meanwhile")
+				if err := a.SubmitError(p, l); err != nil {
+					return err
 				}
 				ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 				defer stop()
@@ -366,7 +366,7 @@ func newSubmitCmd(root *rootOptions) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				ui.PrintReport(os.Stdout, p, rep, ui.ReportOptions{Verbose: verbose, Ref: a.WS.Ref(p)})
+				ui.PrintReport(os.Stdout, p, rep, ui.ReportOptions{Verbose: verbose, Ref: a.WS.Ref(p), Lang: l})
 				fmt.Println(ui.Faint.Render(fmt.Sprintf("Recorded as submission #%d (hc history %s)", sub.ID, a.WS.Ref(p))))
 				if rep.Verdict != runner.Accepted {
 					return errSilent

@@ -182,6 +182,8 @@ hc gen 146                  # 让题目就绪：生成测试用例并决定判�
 
 刚拉取的题目**还不能提交**。LeetCode 只公开示例，也不公开判题方式：顺序是否重要、是否有多个正确答案。在判题规则确定之前，`hc test` 会把你的输出和示例答案并排列出，但不给结论；`hc submit` 会拒绝提交。`hc gen` 会生成完整的测试用例，并根据题面决定判题规则，内置规则都不适用时编写判题程序；你也可以自己设置 `judge.compare`（见协议的[比较方式](protocol_zh.md#比较方式)）。题目列表会在状态列用 `?` 标记这类题目，已通过的题目在这一列显示 `✔`，尝试过的显示 `●`。
 
+题目只在有参考解的语言中评判：Go 解答需要 `reference/solution.go`，Python 解答需要 `reference/solution.py`（协议的[就绪](protocol_zh.md#就绪)）。没有对应的参考解时，`hc test` 只列出你的输出、不给结论，`hc submit` 拒绝提交并指出缺少的文件，题目列表对你所用的语言显示 `?`。`hc gen` 会为题目包支持的每种语言编写参考解。
+
 会员题目无法获取。签名中使用了 hc 暂不支持的类型（例如交互题中的 `MountainArray`）的题目也无法获取，`hc fetch` 会说明原因。
 
 ### 自己出题
@@ -200,7 +202,7 @@ hc rm my-problem                    # 删除题目（加 --purge 时连同你的
 `hc fetch`、`hc new` 和 `hc import` 都写入 `packs/local/problems/`。题目的格式，从 `problem.yaml` 到参考解，由[题目协议](protocol_zh.md)规定；`hc new` 会生成一个待填写的骨架，hc 的回归测试集（仓库中的 [`testdata/regression`](../testdata/regression)）则包含覆盖每项功能的完整例子。
 
 - `hc cases build` 运行一个参考解：有 Go 参考解时用 Go，否则用 Python；`-l` 可以指定。判题方式为 `any_of` 的题目会被拒绝，因为它的 `expected` 要列出所有可接受的答案，只能手写。
-- `hc validate` 把每一处违反协议[合法性规则](protocol_zh.md#合法性规则)的地方报为错误，并注明用例编号和字段。加上 `--run` 时，它还会在每个用例上运行每个参考解，有判题程序时交给判题程序判定。以下情况给出警告：判题规则未确定（没有 `judge.compare`）、没有用例、有用例缺少 `expected`、有生成用例缺少摘要、有存储的用例超过 100 KB、没有用例标记为示例、没有参考解，以及题面引用的图片不存在。`hc test`、`hc submit` 和 `hc debug` 拒绝运行违反这些规则的用例，并指出是哪一个。
+- `hc validate` 把每一处违反协议[合法性规则](protocol_zh.md#合法性规则)的地方报为错误，并注明用例编号和字段。加上 `--run` 时，它还会在每个用例上运行每个参考解，有判题程序时交给判题程序判定。以下情况给出警告：判题规则未确定（没有 `judge.compare`）、没有用例、有用例缺少 `expected`、有生成用例缺少摘要、有存储的用例超过 100 KB、没有用例标记为示例、没有参考解或缺少题目包所支持的某种语言的参考解，以及题面引用的图片不存在。`hc test`、`hc submit` 和 `hc debug` 拒绝运行违反这些规则的用例，并指出是哪一个。
 - `hc import` 只复制协议定义的条目（其余内容，如编辑器文件、`solutions/` 目录，不会被导入）；如果你自己的题目中已有相同的 slug 或编号，会拒绝导入（`--force` 会替换 slug 相同的题目）。slug 和编号只需在一个题目包内唯一，所以导入一道已安装题目包里也有的题目没有问题。题面和标题与你自己题目的语言区域不符的题目也会被拒绝，就像 `hc validate` 会报告的那样：缺少某个语言区域的题面，或者有其他语言区域的题面。
 - `hc rm` 删除题目的目录；在题目包检出目录中，还会把它的 slug 从 `pack.yaml` 的各个分组中移除，并保留该文件的注释和格式。它会先询问确认（`--yes` 跳过询问），并且拒绝修改已安装的题目包。你对这道题的解答、提交历史和收藏会保留，以后再添加同一 slug 的题目时会重新对应上；加 `--purge` 则一并删除。
 - 不带参数的 `hc validate` 还会检查每个已安装题目包的 `pack.yaml`，以及它的分组是否都指向本题目包的题目。每道题的目录名、slug 和编号都会与所在题目包的其他题目对照检查。
@@ -307,7 +309,7 @@ hc 只修改这个列表，`hc.yaml` 的其余部分保留原有的注释和顺�
 
 ### 检查题目包
 
-`hc pack check` 是题目包的 CI 在发布前运行的检查。在题目包的检出目录中运行它（见[编写题目包](#编写题目包)），或者传入它的目录：`hc pack check ./my-pack`。它检查 `pack.yaml` 合法且协议版本受支持，分组中列出的都是本包的题目，并且每道题都能加载、合法、目录名规范、slug 和 ID 唯一、已就绪（设置了 `judge.compare`）、有用例且每个用例都有期望输出（生成用例则有摘要）、没有超过 100 KB 的用例、有参考解，并通过 `hc validate --run`：每个参考解都通过每个用例，生成用例重新构造。因此它需要 Go 和 Python 3.10+，无法运行的参考解也算错误。它为每道题输出一行，最后输出汇总，任何一项失败都以非零状态退出。
+`hc pack check` 是题目包的 CI 在发布前运行的检查。在题目包的检出目录中运行它（见[编写题目包](#编写题目包)），或者传入它的目录：`hc pack check ./my-pack`。它检查 `pack.yaml` 合法且协议版本受支持，分组中列出的都是本包的题目，并且每道题都能加载、合法、目录名规范、slug 和 ID 唯一、已就绪（设置了 `judge.compare`）、有用例且每个用例都有期望输出（生成用例则有摘要）、没有超过 100 KB 的用例、对题目包 `languages` 中的每种语言都有参考解，并通过 `hc validate --run`：每个参考解都通过每个用例，生成用例重新构造。因此它需要 Go 和 Python 3.10+，无法运行的参考解也算错误。它为每道题输出一行，最后输出汇总，任何一项失败都以非零状态退出。
 
 ## 用编码智能体生成用例
 
@@ -319,7 +321,7 @@ hc fix two-sum -c 5 -m "answers in a different order should pass"
 
 `hc` 在工作区中以无头模式运行智能体（`claude -p` 或 `codex exec`）。启动前，它会安装或更新工作区的 skill（见[智能体 skill](#智能体-skill)）；智能体遵循 **`hc-cases`**，题目定义本身有误时还会用到 **`hc-problem`**。智能体按照 skill：
 
-1. 编写参考解 `reference/solution.py`，必要时再写一个暴力解用来交叉验证；
+1. 为题目包支持的每种语言编写参考解（`reference/solution.py`、`reference/solution.go`），必要时再写一个暴力解用来交叉验证；
 2. 把测试**输入**写入 `cases.jsonl`，覆盖边界情况和特殊结构，大规模输入写成[生成用例](#生成用例)；
 3. 运行 `hc cases build`，所以期望输出来自运行参考解，而不是模型自己写的；
 4. 反复运行 `hc validate --run`，直到每份参考解都通过。
@@ -430,7 +432,7 @@ language: go          # 默认解题语言：go | python
 editor: nvim          # 未设置时依次使用 $VISUAL、$EDITOR、vi
 theme: auto           # 题面配色：auto | dark | light
 images: auto          # 题面图片：auto | kitty | blocks | none
-timeout: 10s          # 每次运行的墙钟时限；题目的 judge.timeout 会覆盖它
+timeout: 10s          # 每次运行及其判题程序、生成器的墙钟时限（协议：运行时限）
 python:
   interpreter: python3.12  # 代替 .hc/venv 使用的 Python 3.10+，也可以是完整路径；默认不设置
 agent:

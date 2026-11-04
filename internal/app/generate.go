@@ -169,7 +169,7 @@ func (a *App) generateInputs(ctx context.Context, p *problem.Problem, sel []runn
 		return err
 	}
 	return runner.Generate(ctx, p, sel, runner.GenerateOptions{
-		Generator: g, Timeout: a.timeout(p), Name: a.WS.Rel(p.GeneratorPath()), CheckDigest: checkDigest,
+		Generator: g, Timeout: a.WS.Config.TimeoutDuration(), Name: a.WS.Rel(p.GeneratorPath()), CheckDigest: checkDigest,
 	})
 }
 

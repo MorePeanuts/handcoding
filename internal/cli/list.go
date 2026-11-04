@@ -106,7 +106,13 @@ func runList(cmd *cobra.Command, root *rootOptions, o listOptions) error {
 			status = "attempted"
 		}
 		tags := strings.Join(p.Tags, ",")
-		if !p.Ready() {
+		// Ready for the language the problem would be solved in: the
+		// default, unless its pack is not solved in it.
+		pl := l
+		if sl, _, err := a.SolutionLang(p, o.lang); err == nil {
+			pl = sl
+		}
+		if !p.ReadyFor(pl.SolutionFile()) {
 			tags = "[not ready: hc gen] " + tags
 		}
 		slug := p.Slug

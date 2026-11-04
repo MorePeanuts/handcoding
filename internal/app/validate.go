@@ -203,7 +203,18 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 	refs := a.ReferenceLangs(p)
 	if len(refs) == 0 {
 		gap("no reference solution")
-	} else if o.Run && len(errs) == 0 && len(cases) > 0 {
+	} else {
+		// A solution is judged only with a reference in its own language,
+		// so every language the pack is solved in needs one.
+		for _, l := range a.missingReferences(p) {
+			msg := fmt.Sprintf("no %s reference solution (%s/%s), so %s solutions are not judged: run `hc gen %s`, or write it", l.Name(), problem.ReferenceDir, l.SolutionFile(), l.Name(), name)
+			if o.Strict {
+				msg = "not ready: " + msg
+			}
+			gap(msg)
+		}
+	}
+	if len(refs) > 0 && o.Run && len(errs) == 0 && len(cases) > 0 {
 		sel, _ := Select(cases, nil, true)
 		// Generated cases are built afresh, never from the cache, so that
 		// their digests check the generator; the first reference that runs
@@ -255,6 +266,26 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 	}
 	f.Errors, f.Warnings = errs, warns
 	return f
+}
+
+// missingReferences are the languages p's pack is solved in that p has no
+// reference solution in, in the pack's order.
+func (a *App) missingReferences(p *problem.Problem) []lang.Language {
+	k, err := a.WS.Pack(p.Pack)
+	if err != nil {
+		return nil
+	}
+	var out []lang.Language
+	for _, id := range k.Languages() {
+		l, err := a.Langs.Get(id)
+		if err != nil {
+			continue
+		}
+		if _, ok := p.Reference(l.SolutionFile()); !ok {
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 // checkReference runs one reference solution on every case. Cases without an

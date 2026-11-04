@@ -26,7 +26,6 @@ function:
   returns: integer
 judge:
   compare: exact
-  timeout: 5s
 `
 
 const largestGenerator = `def descending(rng, n):

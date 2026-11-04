@@ -65,11 +65,9 @@ var exempt = map[string]string{
 	typeAs(problem.TypeEmployee, out):       "LeetCode only passes employees in (690); no problem returns one",
 	arrayOf(problem.TypeEmployee, out):      "LeetCode only passes employees in (690); no problem returns one",
 	arrayOf(problem.TypeNestedInteger, out): "LeetCode returns a NestedInteger (385) but never an array of them",
-	field("Judge", "timeout"): "hc-cases says to leave judge.timeout unset: it guards against hangs, " +
-		"and a reference must run well within the default",
-	packField("version"):  "informational: installs are pinned by commit",
-	packField("authors"):  "informational",
-	packField("homepage"): "informational",
+	packField("version"):                    "informational: installs are pinned by commit",
+	packField("authors"):                    "informational",
+	packField("homepage"):                   "informational",
 }
 
 // Directions of a value: decoded from a case, or encoded from a result.
