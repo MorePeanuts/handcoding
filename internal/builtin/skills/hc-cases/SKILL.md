@@ -181,7 +181,8 @@ case inputs must satisfy their rules as well as the statement's.
     node at the root or the tail);
   - large inputs near the constraint limits, as
     [generated cases](#generated-cases); when the problem tests
-    complexity, most of them in the worst shape of a slower solution
+    complexity, most of them in the worst shape of a slower solution, so
+    that those take most of the reference's time
     ([Time limits](#time-limits)).
 - Every input must satisfy the stated constraints and guarantees ("exactly
   one solution", "all values are unique"), by construction: for "exactly
@@ -230,8 +231,8 @@ function of the problem's `generator.py`, and the case only names the call:
   `hc cases add <slug> --generate <name> --args '{"n": 100000}' --seed 7`,
   or as `generate` lines in `cases.jsonl`, each with a `note` saying what
   it targets. Never write `digest`: `hc cases build` writes it.
-- Keep generated cases for size: a few near the constraint limits. Small
-  inputs stay stored, where a reader can see them.
+- Keep generated cases for size: large inputs only. Small inputs stay
+  stored, where a reader can see them.
 - A generated case has no `expected`, so a problem judged with `any_of`
   has none: if it needs large inputs, it needs `unordered` or a checker.
 - After changing `generator.py`, run `hc cases build <slug>` again: the
@@ -256,13 +257,20 @@ the cases decide whether a solution of a worse complexity fails.
   the ratio.
 - Make most large cases the slower solution's worst shape at the
   constraint limits (for a scan over pairs, the answer at the end; for a
-  recursion without memoization, no early exit), several of them, varied
-  in values and layout.
+  recursion without memoization, no early exit), varied in values and
+  layout, so that they take most of the reference's time: the ratio of
+  the totals is then close to their ratio. They need not outnumber the
+  small cases.
+- Stop adding large cases once the slower solution takes about 200 times
+  the reference in total, or as much as its largest ratio on one case
+  allows: more of them only slow every run down, the users' included.
 - A large input the slower solution gets through quickly (its answer
   found early, an order it likes) adds to the reference's time, not to the
   gap, and pulls the ratio down. Give it the worst shape as well, unless it
   targets something only a large input shows (overflow, deep recursion),
-  and keep such cases few.
+  and keep such cases few. What a small input shows (an early answer, a
+  length mismatch, a difference in the first letters) belongs in a small
+  case.
 - When the reference takes less than 1.25ms on all the cases (often in
   Go), the limit is 50ms whatever the ratio: the slower solution must
   spend that much in total, so give it enough worst-shape cases.
