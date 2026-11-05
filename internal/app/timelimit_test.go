@@ -252,6 +252,10 @@ func TestBaselineCache(t *testing.T) {
 	p := napProblem(t, a, `{"input":{"ms":5,"k":1},"expected":5}
 {"input":{"ms":6,"k":1},"expected":6}
 `)
+	// The solution is the reference, so only an overrunning sleep could
+	// exceed 3 times its time (on macOS runners, some do): the floor keeps
+	// the limit out of a test of the cache.
+	a.SetTimeLimit(3, time.Minute)
 	cases, _ := p.LoadCases()
 	l := writeSolution(t, a, p, "python", napSolutions["python"])
 	ctx := context.Background()
