@@ -2,12 +2,14 @@ package cli
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/skill"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
@@ -118,5 +120,27 @@ func TestSkillsInstalledForAgents(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, skill.Path(skill.Cases))); err != nil {
 		t.Errorf("gen did not reinstall the skill: %v", err)
+	}
+}
+
+// TestInitSuggestsOfficialPack checks that a new workspace is told how to
+// install the official LeetCode pack.
+func TestInitSuggestsOfficialPack(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout := os.Stdout
+	os.Stdout = w
+	err = runHC(t, "init", filepath.Join(t.TempDir(), "ws"))
+	os.Stdout = stdout
+	w.Close()
+	out, _ := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "hc pack install " + app.OfficialPack; !strings.Contains(string(out), want) {
+		t.Errorf("init printed %q, want it to contain %q", out, want)
 	}
 }

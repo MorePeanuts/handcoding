@@ -14,7 +14,7 @@
 
 ## 工作区
 
-`hc init` 创建一个空的工作区，默认位置是 `~/handcoding`：
+`hc init` 创建一个空的工作区，默认位置是 `~/handcoding`，并提示安装官方 LeetCode 题目包 [leetcode.hc](https://github.com/MorePeanuts/leetcode.hc)（见[题目包](#题目包)）：
 
 ```
 ~/handcoding/
@@ -280,7 +280,7 @@ def distinct(rng, n):
 [题目包](protocol_zh.md#题目包)是一个带有 `pack.yaml` 的现成题目目录，通常是一个 git 仓库。hc 调用 PATH 上的 `git` 来安装和更新题目包。
 
 ```sh
-hc pack install https://github.com/someone/handcoding-pack.git   # 把题目包克隆到 packs/<name>/
+hc pack install https://github.com/MorePeanuts/leetcode.hc.git   # 把题目包克隆到 packs/<name>/
 hc pack install ../my-pack --ref v1.2.0                          # 本地 git 仓库，指定 tag 或分支
 hc pack list                                # 题目包、版本、commit、来源和你的进度
 hc pack update                              # 更新所有题目包（也可以指定名字）
@@ -305,7 +305,7 @@ hc 把它安装的每个题目包记录在 `hc.yaml` 中，每次 `hc pack updat
 ```yaml
 packs:
   - name: leetcode
-    source: https://github.com/someone/handcoding-leetcode.git
+    source: https://github.com/MorePeanuts/leetcode.hc.git
     ref: v0.3.0        # 跟随的 tag 或分支；不写则跟随默认分支
     commit: 3f2a9c1…   # 已安装的 commit
   - name: mine
