@@ -171,7 +171,8 @@ case inputs must satisfy their rules as well as the statement's.
   yourself as the array of every acceptable answer (compute them with a
   throwaway script); `hc cases build` refuses, since a reference finds only
   one. That includes the examples.
-- Aim for 15 to 40 cases. What they cover matters, not how many; cover:
+- Aim for 15 to 40 cases, plus the worst-shape cases of a problem that
+  tests complexity. What they cover matters, not how many; cover:
   - every statement example (`"example": true`);
   - minimum sizes and empty inputs the constraints allow;
   - boundary values (minimum and maximum values, negative numbers,
@@ -180,8 +181,9 @@ case inputs must satisfy their rules as well as the statement's.
     reverse sorted; for structure inputs, no cycle, no intersection, a
     node at the root or the tail);
   - large inputs near the constraint limits, as
-    [generated cases](#generated-cases); when the problem tests
-    complexity, most of them in the worst shape of a slower solution
+    [generated cases](#generated-cases). When the problem tests
+    complexity, the worst shapes of a slower solution are most of all the
+    cases, more than every other case together
     ([Time limits](#time-limits)).
 - Every input must satisfy the stated constraints and guarantees ("exactly
   one solution", "all values are unique"), by construction: for "exactly
@@ -230,8 +232,8 @@ function of the problem's `generator.py`, and the case only names the call:
   `hc cases add <slug> --generate <name> --args '{"n": 100000}' --seed 7`,
   or as `generate` lines in `cases.jsonl`, each with a `note` saying what
   it targets. Never write `digest`: `hc cases build` writes it.
-- Keep generated cases for size: a few near the constraint limits. Small
-  inputs stay stored, where a reader can see them.
+- Keep generated cases for size: large inputs only. Small inputs stay
+  stored, where a reader can see them.
 - A generated case has no `expected`, so a problem judged with `any_of`
   has none: if it needs large inputs, it needs `unordered` or a checker.
 - After changing `generator.py`, run `hc cases build <slug>` again: the
@@ -254,15 +256,20 @@ the cases decide whether a solution of a worse complexity fails.
   weighted by the reference's time on each. Small cases weigh almost
   nothing: write as many as the edge cases need. The large cases decide
   the ratio.
-- Make most large cases the slower solution's worst shape at the
-  constraint limits (for a scan over pairs, the answer at the end; for a
-  recursion without memoization, no early exit), several of them, varied
-  in values and layout.
+- Make the slower solution's worst shape at the constraint limits (for a
+  scan over pairs, the answer at the end; for a recursion without
+  memoization, no early exit) most of all the cases: more worst-shape
+  cases than every other case together, varied in values and layout.
+  With only a few, the other cases and timing noise can keep a slower
+  solution under the limit; with many, it spends many times the limit
+  whichever slower solution a user writes.
 - A large input the slower solution gets through quickly (its answer
   found early, an order it likes) adds to the reference's time, not to the
   gap, and pulls the ratio down. Give it the worst shape as well, unless it
   targets something only a large input shows (overflow, deep recursion),
-  and keep such cases few.
+  and keep such cases few. What a small input shows (an early answer, a
+  length mismatch, a difference in the first letters) belongs in a small
+  case.
 - When the reference takes less than 1.25ms on all the cases (often in
   Go), the limit is 50ms whatever the ratio: the slower solution must
   spend that much in total, so give it enough worst-shape cases.
