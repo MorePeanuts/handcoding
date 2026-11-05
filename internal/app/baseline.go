@@ -20,11 +20,12 @@ import (
 
 // hc's time limit (the protocol's "Time limit"): a run may take TimeFactor
 // times what the reference in its language takes on the same cases, on the
-// same machine, and at least TimeFloor. Both are provisional until they are
-// checked on CI runners (#33).
+// same machine, that time counted as at least BaselineFloor, below which it
+// is mostly noise. The limit is so never under TimeFactor x BaselineFloor
+// (50ms). Both come from measurements on laptops and CI runners (#33).
 const (
-	TimeFactor = 30
-	TimeFloor  = 20 * time.Millisecond
+	TimeFactor    = 40
+	BaselineFloor = 1250 * time.Microsecond
 )
 
 // baselineRuns is how many runs of the reference a case's baseline is the
@@ -43,7 +44,7 @@ func (a *App) timeLimit(ctx context.Context, p *problem.Problem, l lang.Language
 		fmt.Fprintf(orDiscard(o.Stderr), "%s the run has no time limit: %v\n", ui.Yellow.Render("warning:"), err)
 		return 0
 	}
-	return max(time.Duration(a.timeFactor)*b, a.timeFloor)
+	return time.Duration(a.timeFactor) * max(b, a.baselineFloor)
 }
 
 // baseline is the time the reference in l takes on sel: the sum, over the

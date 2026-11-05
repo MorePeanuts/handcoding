@@ -90,7 +90,10 @@ workspace's own problems; `hc validate <slug>` names a missing reference.
 - Write an idiomatic implementation of the complexity the problem accepts,
   the way a good solution would: solutions are timed against it
   ([Time limits](#time-limits)), so neither a slow-constant version nor a
-  hyper-optimized one. If it is not obviously correct, also write a brute
+  hyper-optimized one. A slow constant raises the limit of every solution
+  and can let a worse complexity pass: of the usual solutions, take the
+  one with the least work per step (two pointers rather than a hash set
+  for each element). If it is not obviously correct, also write a brute
   force and cross-check the two on small random inputs with a throwaway
   script before you trust it.
 - A Go reference starts with `package main` (LeetCode's Go template omits
@@ -103,7 +106,9 @@ acceptable, write `reference/solution.go` so that it returns a
 *different* valid answer than the Python one wherever the rule allows:
 another order, another valid answer, another (correct) random algorithm.
 `hc validate --run` runs both against the same expected outputs, so a rule
-that is too strict fails there.
+that is too strict fails there. Make it differ in what it returns, not in
+its cost: it times the Go solutions, so it follows the bullet on the
+complexity and constant above.
 
 **Round trips:** give the Go reference another encoding than the Python
 one (preorder instead of level order, a hash instead of a counter), so the
@@ -234,16 +239,16 @@ function of the problem's `generator.py`, and the case only names the call:
 
 ## Time limits
 
-A run may take 30 times what the reference in its language takes on the
-same cases, in total, timed on the user's machine; beyond that it is Time
-Limit Exceeded (`hc docs protocol time-limit`). The factor is hc's, not
-the problem's: the cases decide whether a solution of a worse complexity
-fails.
+A run may take 40 times what the reference in its language takes on the
+same cases, in total (that time counted as at least 1.25ms), timed on the
+user's machine; beyond that it is Time Limit Exceeded
+(`hc docs protocol time-limit`). The factor is hc's, not the problem's:
+the cases decide whether a solution of a worse complexity fails.
 
 - A problem tests complexity when the statement requires one, a naive
   solution exceeds about 10^8 operations at the constraint limits, or
   there is a well-known brute force. Then its large cases must make that
-  slower solution exceed the limit with room to spare: about 60 times the
+  slower solution exceed the limit with room to spare: about 80 times the
   reference, twice the factor, since timings vary.
 - The ratio of the totals is the average of the ratios of the cases,
   weighted by the reference's time on each. Small cases weigh almost
@@ -258,6 +263,9 @@ fails.
   gap, and pulls the ratio down. Give it the worst shape as well, unless it
   targets something only a large input shows (overflow, deep recursion),
   and keep such cases few.
+- When the reference takes less than 1.25ms on all the cases (often in
+  Go), the limit is 50ms whatever the ratio: the slower solution must
+  spend that much in total, so give it enough worst-shape cases.
 - No number of cases takes the ratio past the largest ratio on one case:
   if the worst shape at the limits stays under the gap, more cases cannot
   fix it.
@@ -327,7 +335,8 @@ lines that hold a case) and the user's complaint.
    - a solution of the complexity the problem accepts is Time Limit
      Exceeded: the reference is hyper-optimized, or a case favors it; a
      slower one passes where the constraints allow a gap: the large cases
-     miss its worst shape ([Time limits](#time-limits));
+     miss its worst shape, or the reference in its language has a slow
+     constant ([Time limits](#time-limits));
    - the definition is wrong (signature, structure inputs): fix it with
      `hc-problem`;
    - nothing: the case is right and the user's solution is wrong. Then say

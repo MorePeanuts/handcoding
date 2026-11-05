@@ -28,19 +28,19 @@ type App struct {
 	WS    *workspace.Workspace
 	Langs *lang.Registry
 	store *store.Store
-	// timeFactor and timeFloor make the time limit of a run (see
-	// timeLimit): hc's TimeFactor and TimeFloor, which tests lower.
-	timeFactor int
-	timeFloor  time.Duration
+	// timeFactor and baselineFloor make the time limit of a run (see
+	// timeLimit): hc's TimeFactor and BaselineFloor, which tests change.
+	timeFactor    int
+	baselineFloor time.Duration
 }
 
 // New creates an App for the workspace.
 func New(ws *workspace.Workspace) *App {
 	return &App{
-		WS:         ws,
-		Langs:      Languages(ws),
-		timeFactor: TimeFactor,
-		timeFloor:  TimeFloor,
+		WS:            ws,
+		Langs:         Languages(ws),
+		timeFactor:    TimeFactor,
+		baselineFloor: BaselineFloor,
 	}
 }
 
