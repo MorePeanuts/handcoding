@@ -174,9 +174,10 @@ case inputs must satisfy their rules as well as the statement's.
   - tricky structures (skewed trees, one node, all equal, sorted and
     reverse sorted; for structure inputs, no cycle, no intersection, a
     node at the root or the tail);
-  - a few large inputs near the constraint limits, to catch solutions of a
-    worse complexity ([Time limits](#time-limits)), as
-    [generated cases](#generated-cases).
+  - large inputs near the constraint limits, as
+    [generated cases](#generated-cases); when the problem tests
+    complexity, most of them in the worst shape of a slower solution
+    ([Time limits](#time-limits)).
 - Every input must satisfy the stated constraints and guarantees ("exactly
   one solution", "all values are unique"), by construction: for "exactly
   one solution", build the answer in and keep every other pair from
@@ -244,14 +245,22 @@ fails.
   there is a well-known brute force. Then its large cases must make that
   slower solution exceed the limit with room to spare: about 60 times the
   reference, twice the factor, since timings vary.
-- The ratio of the totals never exceeds the largest ratio on one case, so
-  more cases of the same kind do not help. Widen the gap of each large
-  case: the constraint limits, in the slower solution's worst shape (for a
-  scan over pairs, the answer at the end; for a recursion without
-  memoization, no early exit).
-- Those cases should make up most of the reference's total. A large input
-  the slower solution gets through quickly (its answer found early) adds
-  to the reference's time, not to the gap.
+- The ratio of the totals is the average of the ratios of the cases,
+  weighted by the reference's time on each. Small cases weigh almost
+  nothing: write as many as the edge cases need. The large cases decide
+  the ratio.
+- Make most large cases the slower solution's worst shape at the
+  constraint limits (for a scan over pairs, the answer at the end; for a
+  recursion without memoization, no early exit), several of them, varied
+  in values and layout.
+- A large input the slower solution gets through quickly (its answer
+  found early, an order it likes) adds to the reference's time, not to the
+  gap, and pulls the ratio down. Give it the worst shape as well, unless it
+  targets something only a large input shows (overflow, deep recursion),
+  and keep such cases few.
+- No number of cases takes the ratio past the largest ratio on one case:
+  if the worst shape at the limits stays under the gap, more cases cannot
+  fix it.
 - Check it: write the slower solution in `.hc/scratch/<slug>/`, and run
   `hc test <slug> --all --file .hc/scratch/<slug>/slow.py`, or on one
   candidate input `hc test <slug> --generate <name> --args '{"n": 100000}' --file .hc/scratch/<slug>/slow.py`.
