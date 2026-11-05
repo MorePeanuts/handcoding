@@ -150,9 +150,11 @@ func TestTimeLimitClass(t *testing.T) {
 	cases, _ := p.LoadCases()
 	sel, _ := app.Select(cases, nil, true)
 	for langID, code := range sleepers {
-		// 100ms a call against 10ms: the first case alone spends the limit
-		// of the two, about 180ms.
-		l := writeSolution(t, a, p, langID, strings.ReplaceAll(code, "%d", "10"))
+		// 500ms a call against 10ms: the first case alone spends the limit
+		// of the two, about 180ms. Each of the references' six sleeps may
+		// overrun (by 10ms and more on macOS runners), so the margin must
+		// cover 18 overruns: it does up to about 88ms each.
+		l := writeSolution(t, a, p, langID, strings.ReplaceAll(code, "%d", "50"))
 		rep, err := a.Run(context.Background(), p, l, sel, app.RunOptions{})
 		if err != nil {
 			t.Fatalf("%s: %v", langID, err)
@@ -250,6 +252,10 @@ func TestBaselineCache(t *testing.T) {
 	p := napProblem(t, a, `{"input":{"ms":5,"k":1},"expected":5}
 {"input":{"ms":6,"k":1},"expected":6}
 `)
+	// The solution is the reference, so only an overrunning sleep could
+	// exceed 3 times its time (on macOS runners, some do): the floor keeps
+	// the limit out of a test of the cache.
+	a.SetTimeLimit(3, time.Minute)
 	cases, _ := p.LoadCases()
 	l := writeSolution(t, a, p, "python", napSolutions["python"])
 	ctx := context.Background()
