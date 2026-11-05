@@ -239,16 +239,16 @@ function of the problem's `generator.py`, and the case only names the call:
 
 ## Time limits
 
-A run may take 30 times what the reference in its language takes on the
-same cases, in total, timed on the user's machine; beyond that it is Time
-Limit Exceeded (`hc docs protocol time-limit`). The factor is hc's, not
-the problem's: the cases decide whether a solution of a worse complexity
-fails.
+A run may take 40 times what the reference in its language takes on the
+same cases, in total (that time counted as at least 1.25ms), timed on the
+user's machine; beyond that it is Time Limit Exceeded
+(`hc docs protocol time-limit`). The factor is hc's, not the problem's:
+the cases decide whether a solution of a worse complexity fails.
 
 - A problem tests complexity when the statement requires one, a naive
   solution exceeds about 10^8 operations at the constraint limits, or
   there is a well-known brute force. Then its large cases must make that
-  slower solution exceed the limit with room to spare: about 60 times the
+  slower solution exceed the limit with room to spare: about 80 times the
   reference, twice the factor, since timings vary.
 - The ratio of the totals is the average of the ratios of the cases,
   weighted by the reference's time on each. Small cases weigh almost
@@ -263,6 +263,9 @@ fails.
   gap, and pulls the ratio down. Give it the worst shape as well, unless it
   targets something only a large input shows (overflow, deep recursion),
   and keep such cases few.
+- When the reference takes less than 1.25ms on all the cases (often in
+  Go), the limit is 50ms whatever the ratio: the slower solution must
+  spend that much in total, so give it enough worst-shape cases.
 - No number of cases takes the ratio past the largest ratio on one case:
   if the worst shape at the limits stays under the gap, more cases cannot
   fix it.

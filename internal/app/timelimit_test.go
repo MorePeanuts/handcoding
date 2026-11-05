@@ -320,3 +320,34 @@ func TestTimeLimitNotReady(t *testing.T) {
 		t.Errorf("%s, stderr %q; want Not Judged without timing", rep.Verdict, stderr.String())
 	}
 }
+
+// TestBaselineFloor checks that a reference faster than the floor is timed
+// as the floor: the same run that exceeds 3 times the reference passes once
+// its time counts as 200ms.
+func TestBaselineFloor(t *testing.T) {
+	requireTools(t, "go", "python3")
+	a := newWorkspace(t)
+	// The references sleep 1ms (some 15ms with macOS's overruns), the
+	// solutions 200ms: far over 3 times the first, far under 3 times 200ms.
+	p := napProblem(t, a, `{"input":{"ms":1,"k":200},"expected":1}
+`)
+	cases, _ := p.LoadCases()
+	sel, _ := app.Select(cases, nil, true)
+	ctx := context.Background()
+	for langID, code := range napSolutions {
+		l := writeSolution(t, a, p, langID, code)
+		for _, tc := range []struct {
+			floor time.Duration
+			want  runner.Verdict
+		}{{0, runner.TimeLimit}, {200 * time.Millisecond, runner.Accepted}} {
+			a.SetTimeLimit(3, tc.floor)
+			rep, err := a.Run(ctx, p, l, sel, app.RunOptions{})
+			if err != nil {
+				t.Fatalf("%s: %v", langID, err)
+			}
+			if rep.Verdict != tc.want {
+				t.Errorf("%s, floor %s: %s, want %s", langID, tc.floor, rep.Verdict, tc.want)
+			}
+		}
+	}
+}
