@@ -14,7 +14,7 @@ English · [简体中文](how-to-use_zh.md)
 
 ## Workspace
 
-`hc init` creates an empty workspace, by default `~/handcoding`:
+`hc init` creates an empty workspace, by default `~/handcoding`, and suggests installing the official LeetCode pack, [leetcode.hc](https://github.com/MorePeanuts/leetcode.hc) (see [Packs](#packs)):
 
 ```
 ~/handcoding/
@@ -280,7 +280,7 @@ def distinct(rng, n):
 A [pack](protocol.md#packs) is a directory of ready-made problems with a `pack.yaml`, usually a git repository. hc runs the `git` on your PATH to install and update packs.
 
 ```sh
-hc pack install https://github.com/someone/handcoding-pack.git   # clone a pack into packs/<name>/
+hc pack install https://github.com/MorePeanuts/leetcode.hc.git   # clone a pack into packs/<name>/
 hc pack install ../my-pack --ref v1.2.0                          # a local git repository, at a tag or branch
 hc pack list                                # packs, versions, commits, sources and your progress
 hc pack update                              # update every pack (or name some)
@@ -305,7 +305,7 @@ hc records every pack it installs in `hc.yaml`, and updates the entry on every `
 ```yaml
 packs:
   - name: leetcode
-    source: https://github.com/someone/handcoding-leetcode.git
+    source: https://github.com/MorePeanuts/leetcode.hc.git
     ref: v0.3.0        # the tag or branch followed; absent: the default branch
     commit: 3f2a9c1…   # the commit installed
   - name: mine

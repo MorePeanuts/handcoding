@@ -23,6 +23,10 @@ import (
 // pack is a git checkout of the recorded commit, so updating it is a fetch
 // and a checkout.
 
+// OfficialPack is the source of leetcode.hc, the official LeetCode pack, which
+// a new workspace is told to install.
+const OfficialPack = "https://github.com/MorePeanuts/leetcode.hc.git"
+
 // PackOptions configure installing and updating packs.
 type PackOptions struct {
 	// Ref is the tag or branch to install or follow; empty keeps the

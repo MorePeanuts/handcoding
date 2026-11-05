@@ -85,7 +85,7 @@ func runList(cmd *cobra.Command, root *rootOptions, o listOptions) error {
 	}
 	if len(all) == 0 {
 		if loadErr == nil {
-			fmt.Fprintln(os.Stderr, "No problems yet: add some with `hc fetch <slug>` or `hc new <slug>`.")
+			fmt.Fprintln(os.Stderr, "No problems yet: install the official LeetCode pack with `hc pack install "+app.OfficialPack+"`, or add some with `hc fetch <slug>` or `hc new <slug>`.")
 		}
 		return nil
 	}

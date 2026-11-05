@@ -97,7 +97,7 @@ version: 0.3.0
 description: Classic LeetCode problems with Go and Python references.
 authors: [MorePeanuts]
 license: MIT
-homepage: https://github.com/MorePeanuts/handcoding-leetcode
+homepage: https://github.com/MorePeanuts/leetcode.hc
 languages: [go, python]
 locales: [en, zh-CN]
 groups:

@@ -61,12 +61,11 @@ To solve problems you need the toolchain of your language: Go 1.22+, or for Pyth
 
 ```sh
 hc init                 # create an empty workspace in ~/handcoding
-hc fetch two-sum        # import a problem from LeetCode
-hc gen two-sum          # let a coding agent write its test cases and judge rule
+hc pack install https://github.com/MorePeanuts/leetcode.hc.git   # the official LeetCode pack
 hc                      # open the problem list
 ```
 
-To solve in Python by default, run `hc init --lang python` instead; it also sets up the Python environment right away. Your problems live in the workspace's `packs/local/problems/`: `hc new` scaffolds one of your own, and `hc import` copies problem directories in. A new workspace starts with no problems: fetch them one by one, or install a pack of ready-made problems with `hc pack install <git-url>`, which clones it into `packs/` beside your own and records it in `hc.yaml` (see [packs](docs/how-to-use.md#packs)).
+To solve in Python by default, run `hc init --lang python` instead; it also sets up the Python environment right away. A new workspace starts with no problems. [leetcode.hc](https://github.com/MorePeanuts/leetcode.hc) is the official pack of ready-made LeetCode problems, with English and Chinese statements and Go and Python references: `hc pack install` clones it into `packs/` and records it in `hc.yaml`, and `hc pack update` brings its new problems (see [packs](docs/how-to-use.md#packs)). Your own problems live in the workspace's `packs/local/problems/`: `hc fetch two-sum` imports one from LeetCode and `hc gen two-sum` has a coding agent write its test cases and judge rule, `hc new` scaffolds one from scratch, and `hc import` copies problem directories in.
 
 Press `enter` on a problem. `hc` shows the statement, creates `solution.go` from the template and copies its path to the clipboard. Open it in your editor next door, then press `t` to test and `s` to submit.
 

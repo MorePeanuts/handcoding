@@ -61,12 +61,11 @@ Linux、macOS 和 Windows 的预编译二进制文件见 [Releases 页面](https
 
 ```sh
 hc init                 # 在 ~/handcoding 创建一个空的工作区
-hc fetch two-sum        # 从 LeetCode 导入一道题
-hc gen two-sum          # 让编码智能体生成测试用例和判题规则
+hc pack install https://github.com/MorePeanuts/leetcode.hc.git   # 官方 LeetCode 题目包
 hc                      # 打开题目列表
 ```
 
-如果默认用 Python 解题，改为执行 `hc init --lang python`，它还会立即创建 Python 环境。你的题目存放在工作区的 `packs/local/problems/` 下：`hc new` 生成一道自己的题目，`hc import` 把题目目录复制进来。新建的工作区里没有题目：可以逐道获取，也可以用 `hc pack install <git-url>` 安装一个现成的题目包，它会被克隆到旁边的 `packs/` 下，并记录在 `hc.yaml` 中（见[题目包](docs/how-to-use_zh.md#题目包)）。
+如果默认用 Python 解题，改为执行 `hc init --lang python`，它还会立即创建 Python 环境。新建的工作区里没有题目。[leetcode.hc](https://github.com/MorePeanuts/leetcode.hc) 是官方的 LeetCode 题目包，题面有中英文两种，参考解有 Go 和 Python 两种：`hc pack install` 把它克隆到 `packs/` 下并记录在 `hc.yaml` 中，`hc pack update` 获取它新增的题目（见[题目包](docs/how-to-use_zh.md#题目包)）。你自己的题目存放在工作区的 `packs/local/problems/` 下：`hc fetch two-sum` 从 LeetCode 导入一道题，`hc gen two-sum` 让编码智能体生成它的测试用例和判题规则，`hc new` 从零生成一道题，`hc import` 把题目目录复制进来。
 
 在列表里选一道题按 `enter`：hc 会显示题面，按模板生成 `solution.go`，并把文件路径复制到剪贴板。在旁边的编辑器里打开它，写完后按 `t` 测试、按 `s` 提交。
 

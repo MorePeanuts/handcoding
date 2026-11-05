@@ -21,7 +21,7 @@ version: 0.3.0
 description: Classic LeetCode problems with Go and Python references.
 authors: [MorePeanuts]
 license: MIT
-homepage: https://github.com/MorePeanuts/handcoding-leetcode
+homepage: https://github.com/MorePeanuts/leetcode.hc
 languages: [go, python]
 locales: [en, zh-CN]
 groups:
@@ -57,7 +57,7 @@ func TestLoad(t *testing.T) {
 		Titles:      map[string]string{"zh-CN": "力扣"},
 		Description: "Classic LeetCode problems with Go and Python references.",
 		Authors:     []string{"MorePeanuts"}, License: "MIT",
-		Homepage:  "https://github.com/MorePeanuts/handcoding-leetcode",
+		Homepage:  "https://github.com/MorePeanuts/leetcode.hc",
 		Languages: []string{"go", "python"},
 		Locales:   []string{"en", "zh-CN"},
 		Groups:    []Group{{Name: "arrays", Title: "Arrays", Titles: map[string]string{"zh-CN": "数组"}, Problems: []string{"two-sum", "rotate-array"}}},

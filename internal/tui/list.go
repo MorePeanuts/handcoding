@@ -473,15 +473,17 @@ func (m *model) viewProblems(b *strings.Builder, h int) {
 		}
 		b.WriteString(row + "\n")
 	}
+	used := max(len(m.visible)-m.offset, 1)
 	switch {
 	case len(m.probs) == 0 && m.group() != nil:
 		b.WriteString(ui.Faint.Render("  the group has no problems\n"))
 	case len(m.probs) == 0:
-		b.WriteString(ui.Faint.Render("  no problems yet: add some with hc fetch <slug> or hc new <slug>\n"))
+		b.WriteString(ui.Faint.Render("  no problems yet: install the LeetCode pack with\n    hc pack install " + app.OfficialPack + "\n  or add your own with hc fetch <slug> or hc new <slug>\n"))
+		used = 3
 	case len(m.visible) == 0:
 		b.WriteString(ui.Faint.Render("  no problems match\n"))
 	}
-	for i := max(len(m.visible)-m.offset, 1); i < h; i++ {
+	for i := used; i < h; i++ {
 		b.WriteString("\n")
 	}
 }

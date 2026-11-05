@@ -28,6 +28,8 @@ func newInitCmd(_ *rootOptions) *cobra.Command {
 		Long: `Create an empty handcoding workspace with the agent skills (see
 ` + "`hc skill`" + `). Your own problems go to its packs/local/problems/: add
 them with ` + "`hc fetch`" + ` (from LeetCode), ` + "`hc new`" + ` or ` + "`hc import`" + `.
+Ready-made problems come in packs: install the official LeetCode pack with
+` + "`hc pack install " + app.OfficialPack + "`" + `.
 
 hc finds the workspace from $HC_WORKSPACE, the nearest parent directory with
 hc.yaml, or ~/handcoding — so using the default lets you run hc anywhere.
@@ -65,15 +67,17 @@ python, hc also creates the workspace's Python virtual environment now.`,
 				setupEnv(cmd.Context(), l)
 			}
 			fmt.Printf("%s workspace at %s\n\n", ui.Green.Render("Created"), ws.Root)
-			fmt.Println("It has no problems yet. Next steps:")
-			fmt.Println("  hc fetch two-sum         fetch a problem from LeetCode")
-			fmt.Println("  hc gen two-sum           have an agent write its test cases")
-			fmt.Println("  hc new my-problem        or write a problem of your own")
-			fmt.Println("  hc pack install <url>    or install a pack of ready-made problems")
+			fmt.Println("It has no problems yet. Install the official LeetCode pack:")
+			fmt.Println("  hc pack install " + app.OfficialPack)
+			fmt.Println("\nThen:")
+			fmt.Println("  hc                       open the problem list")
 			fmt.Println("  hc start two-sum -e      start a problem in your editor")
 			fmt.Println("  hc test two-sum          run the examples")
 			fmt.Println("  hc submit two-sum        judge all cases")
-			fmt.Println("  hc                       open the problem list")
+			fmt.Println("\nOr add problems of your own:")
+			fmt.Println("  hc fetch <slug>          fetch a problem from LeetCode")
+			fmt.Println("  hc gen <slug>            have an agent write its test cases")
+			fmt.Println("  hc new <slug>            write a problem from scratch")
 			fmt.Println("\nTip: version your progress with `git init` in the workspace.")
 			return nil
 		},
