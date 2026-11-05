@@ -171,8 +171,7 @@ case inputs must satisfy their rules as well as the statement's.
   yourself as the array of every acceptable answer (compute them with a
   throwaway script); `hc cases build` refuses, since a reference finds only
   one. That includes the examples.
-- Aim for 15 to 40 cases, plus the worst-shape cases of a problem that
-  tests complexity. What they cover matters, not how many; cover:
+- Aim for 15 to 40 cases. What they cover matters, not how many; cover:
   - every statement example (`"example": true`);
   - minimum sizes and empty inputs the constraints allow;
   - boundary values (minimum and maximum values, negative numbers,
@@ -181,9 +180,9 @@ case inputs must satisfy their rules as well as the statement's.
     reverse sorted; for structure inputs, no cycle, no intersection, a
     node at the root or the tail);
   - large inputs near the constraint limits, as
-    [generated cases](#generated-cases). When the problem tests
-    complexity, the worst shapes of a slower solution are most of all the
-    cases, more than every other case together
+    [generated cases](#generated-cases); when the problem tests
+    complexity, most of them in the worst shape of a slower solution, so
+    that those take most of the reference's time
     ([Time limits](#time-limits)).
 - Every input must satisfy the stated constraints and guarantees ("exactly
   one solution", "all values are unique"), by construction: for "exactly
@@ -256,13 +255,14 @@ the cases decide whether a solution of a worse complexity fails.
   weighted by the reference's time on each. Small cases weigh almost
   nothing: write as many as the edge cases need. The large cases decide
   the ratio.
-- Make the slower solution's worst shape at the constraint limits (for a
-  scan over pairs, the answer at the end; for a recursion without
-  memoization, no early exit) most of all the cases: more worst-shape
-  cases than every other case together, varied in values and layout.
-  With only a few, the other cases and timing noise can keep a slower
-  solution under the limit; with many, it spends many times the limit
-  whichever slower solution a user writes.
+- Make most large cases the slower solution's worst shape at the
+  constraint limits (for a scan over pairs, the answer at the end; for a
+  recursion without memoization, no early exit), varied in values and
+  layout, so that they take most of the reference's time: the ratio of
+  the totals is then close to their ratio. They need not outnumber the
+  small cases, but more of them only help: the slower solution then
+  spends many times the limit, whichever one a user writes and however
+  the timings vary.
 - A large input the slower solution gets through quickly (its answer
   found early, an order it likes) adds to the reference's time, not to the
   gap, and pulls the ratio down. Give it the worst shape as well, unless it
