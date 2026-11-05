@@ -260,9 +260,10 @@ the cases decide whether a solution of a worse complexity fails.
   recursion without memoization, no early exit), varied in values and
   layout, so that they take most of the reference's time: the ratio of
   the totals is then close to their ratio. They need not outnumber the
-  small cases, but more of them only help: the slower solution then
-  spends many times the limit, whichever one a user writes and however
-  the timings vary.
+  small cases.
+- Stop adding large cases once the slower solution takes about 200 times
+  the reference in total, or as much as its largest ratio on one case
+  allows: more of them only slow every run down, the users' included.
 - A large input the slower solution gets through quickly (its answer
   found early, an order it likes) adds to the reference's time, not to the
   gap, and pulls the ratio down. Give it the worst shape as well, unless it
