@@ -948,7 +948,46 @@ def _call_round_trip(solution, meta, inp, clock):
     return encode(dec["returns"], ret)
 
 
+# Before Python 3.11, every Python call also takes C stack, and the main
+# thread's (8 MB on Linux and macOS) overflows near a depth of 10^4: the
+# process dies of a segmentation fault however high the recursion limit.
+# _with_stack runs the driver loops in a thread with a stack as large as that
+# limit may need (about 400 thousand simple calls; it is virtual memory, used
+# only as deep as the code goes), so that a solution, checker or generator
+# that raises the limit recurses as deep as on 3.11 and later. Under a
+# debugger, which traces only the thread it starts in, they run in place.
+_STACK_SIZE = 512 << 20
+
+
+def _with_stack(fn, *args):
+    if sys.version_info >= (3, 11) or sys.gettrace() is not None:
+        return fn(*args)
+    try:
+        threading.stack_size(_STACK_SIZE)
+    except (ValueError, RuntimeError):
+        return fn(*args)
+    result, raised = [], []
+
+    def run():
+        try:
+            result.append(fn(*args))
+        except BaseException as e:  # noqa: BLE001
+            raised.append(e)
+
+    t = threading.Thread(target=run, name="hc", daemon=True)
+    t.start()
+    threading.stack_size(0)
+    t.join()
+    if raised:
+        raise raised[0]
+    return result[0]
+
+
 def main(meta):
+    _with_stack(_main, meta)
+
+
+def _main(meta):
     here = os.path.dirname(os.path.abspath(__file__))
     if here not in sys.path:
         sys.path.insert(0, here)

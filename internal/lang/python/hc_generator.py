@@ -17,7 +17,7 @@ import os
 import sys
 import traceback
 
-from hc_runtime import Rng
+from hc_runtime import Rng, _with_stack
 
 
 def _traceback(exc, path):
@@ -86,4 +86,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    _with_stack(main)
