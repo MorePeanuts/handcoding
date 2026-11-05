@@ -206,6 +206,8 @@ func (a *App) expectGenerated(ctx context.Context, p *problem.Problem, l lang.La
 		}
 		sel[pos[j]].Case.Expected = cr.Output
 	}
+	// The run also times the reference on these inputs.
+	a.recordBaseline(p, l, todo, rep)
 	return nil
 }
 
@@ -284,7 +286,13 @@ func writeCasesCache(path, key string, gen []runner.Selected) {
 	for i, g := range gen {
 		c.Cases[i] = cachedCase{Input: g.Case.Input, Expected: g.Case.Expected}
 	}
-	data, err := json.Marshal(c)
+	writeCacheFile(path, c)
+}
+
+// writeCacheFile writes v as JSON to the cache file at path, replacing it
+// at once, best effort.
+func writeCacheFile(path string, v any) {
+	data, err := json.Marshal(v)
 	if err != nil {
 		return
 	}

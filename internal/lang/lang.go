@@ -33,6 +33,11 @@ import (
 const (
 	EnvCases = "HC_CASES"
 	EnvOut   = "HC_OUT"
+	// EnvTimeLimit is the run's time limit in nanoseconds, when it has one:
+	// the driver stops after the case whose time brings the total of the
+	// cases' times over it, and ends a case that would never return once
+	// the total is over it, with a result line marking the case.
+	EnvTimeLimit = "HC_TIME_LIMIT_NS"
 )
 
 // DebugOptions configure a debugging session.

@@ -66,9 +66,10 @@ func (Language) Setup(context.Context, io.Writer) error { return nil }
 
 var goVersionRE = regexp.MustCompile(`go(\d+(?:\.\d+)*)`)
 
-// goEnv runs `go env` once per process for the settings a build depends on,
-// GOVERSION first.
-var goEnv = sync.OnceValues(func() ([]byte, error) {
+// goEnv runs `go env` for the settings a build depends on, GOVERSION first:
+// once per process once it succeeds, so that a toolchain missing at first
+// is found when it appears on PATH.
+var goEnv = onceOK(func() ([]byte, error) {
 	if _, err := exec.LookPath("go"); err != nil {
 		return nil, errors.New("go toolchain not found in PATH")
 	}
@@ -81,8 +82,31 @@ var goEnv = sync.OnceValues(func() ([]byte, error) {
 	return out, nil
 })
 
+// onceOK is sync.OnceValues for a function that may fail: it calls f until
+// f succeeds, and keeps only that result.
+func onceOK[T any](f func() (T, error)) func() (T, error) {
+	var (
+		mu   sync.Mutex
+		done bool
+		v    T
+	)
+	return func() (T, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if done {
+			return v, nil
+		}
+		r, err := f()
+		if err != nil {
+			return r, err
+		}
+		v, done = r, true
+		return v, nil
+	}
+}
+
 // detect reads the toolchain's version from goEnv.
-var detect = sync.OnceValues(func() (lang.Toolchain, error) {
+var detect = onceOK(func() (lang.Toolchain, error) {
 	env, err := goEnv()
 	if err != nil {
 		return lang.Toolchain{}, err

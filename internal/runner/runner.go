@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/MorePeanuts/handcoding/internal/judge"
@@ -36,6 +37,9 @@ const (
 	// yet, or it has no reference in that language. The output is shown
 	// without a verdict.
 	NotJudged Verdict = "Not Judged"
+	// NotRun means the run stopped before the case: an earlier case exceeded
+	// the time limit, or the program ended.
+	NotRun Verdict = "Not Run"
 )
 
 // Selected is a case chosen for a run, with its 1-based index in cases.jsonl.
@@ -84,7 +88,13 @@ type Report struct {
 
 // Options configure a run.
 type Options struct {
+	// Timeout is the wall-clock limit of the run, which guards against
+	// hangs.
 	Timeout time.Duration
+	// TimeLimit, when positive, limits the total of the cases' times: the
+	// case whose time brings the total over it is Time Limit Exceeded, and
+	// the cases after it are Not Run.
+	TimeLimit time.Duration
 	// Stdout receives the program's standard output (user prints).
 	Stdout io.Writer
 	// Stderr receives the program's standard error.
@@ -131,6 +141,9 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 	defer cancel()
 	cmd := l.Command(runCtx, dir, work)
 	cmd.Env = append(envOrDefault(cmd.Env), lang.EnvCases+"="+casesPath, lang.EnvOut+"="+outPath)
+	if opts.TimeLimit > 0 {
+		cmd.Env = append(cmd.Env, lang.EnvTimeLimit+"="+strconv.FormatInt(opts.TimeLimit.Nanoseconds(), 10))
+	}
 	cmd.Stdin = nil
 	cmd.Stdout = orDiscard(opts.Stdout)
 	stderr := &tailBuffer{max: 16 << 10}
@@ -145,25 +158,35 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 	}
 	var toCheck []judge.CheckerCase
 	ready := p.ReadyFor(l.SolutionFile())
+	// Cases run in order, so the run stopped at the first case without a
+	// result, or at the case that exceeded the time limit.
+	var total time.Duration
+	stopped := false
 	for _, sel := range cases {
 		cr := CaseResult{Index: sel.Index, Case: sel.Case}
 		res, ok := results[sel.Index]
+		if ok && !stopped {
+			cr.Elapsed = time.Duration(res.ElapsedNs)
+			total += cr.Elapsed
+		}
 		switch {
+		case stopped:
+			cr.Verdict = NotRun
 		case !ok && timedOut:
-			cr.Verdict = TimeLimit
+			cr.Verdict, stopped = TimeLimit, true
 		case !ok:
-			cr.Verdict = RuntimeError
+			cr.Verdict, stopped = RuntimeError, true
 			cr.Error = "program exited before finishing this case"
 			if runErr != nil {
 				cr.Error += ": " + runErr.Error()
 			}
+		case res.TimeLimit || opts.TimeLimit > 0 && total > opts.TimeLimit:
+			cr.Verdict, stopped = TimeLimit, true
 		case res.Error != "":
 			cr.Verdict = RuntimeError
 			cr.Error = res.Error
-			cr.Elapsed = time.Duration(res.ElapsedNs)
 		default:
 			cr.Output = res.Output
-			cr.Elapsed = time.Duration(res.ElapsedNs)
 			cr.Verdict = judgeCase(p, ready, sel.Case, res.Output, &cr)
 			if cr.Verdict == "" {
 				input, err := json.Marshal(sel.Case.Input)
@@ -227,7 +250,7 @@ func overall(rep *Report) Verdict {
 			judged = true
 		case NotJudged:
 			notJudged = true
-		case NoExpected:
+		case NoExpected, NotRun:
 		default:
 			return c.Verdict
 		}
@@ -251,6 +274,9 @@ type driverResult struct {
 	Output    json.RawMessage `json:"output"`
 	Error     string          `json:"error"`
 	ElapsedNs int64           `json:"elapsed_ns"`
+	// TimeLimit marks a case the driver ended because the time limit was
+	// spent during it.
+	TimeLimit bool `json:"time_limit"`
 }
 
 // WriteCases writes the driver input file into dir and returns the paths of

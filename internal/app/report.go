@@ -44,7 +44,7 @@ func EncodeReport(p *problem.Problem, rep *runner.Report) string {
 	}
 	for _, c := range rep.Cases {
 		sc := storedCase{Index: c.Index, Verdict: string(c.Verdict), ElapsedNs: c.Elapsed.Nanoseconds(), Note: c.Case.Note}
-		if c.Verdict != runner.Accepted {
+		if c.Verdict != runner.Accepted && c.Verdict != runner.NotRun {
 			sc.Input = clipText(p.FormatInput(c.Case))
 			sc.Output = clipText(string(c.Output))
 			sc.Expected = clipText(string(c.Case.Expected))

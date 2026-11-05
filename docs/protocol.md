@@ -33,7 +33,7 @@ Protocol 1 does not define the following. Each would be a later, additive change
 
 - interactive problems, whose solution talks to a judge (issue #7);
 - `tests` problems, judged by test code instead of cases (issue #31);
-- judging performance, such as time limits relative to a reference (issue #33);
+- judging memory, or time otherwise than by the [time limit](#time-limit);
 - solution languages other than Go and Python.
 
 ## Packs
@@ -592,15 +592,24 @@ judge:
 {"input": {"nums": [3,2,2,3], "val": 3}, "expected": [2,2]}
 ```
 
+### Time limit
+
+A solution's speed is judged against the problem's reference solution in the same language, timed on the same machine:
+
+- The time of a case is the time spent in the solution's code: the function call, or for a class problem the sum of the constructor and method calls, without decoding their arguments or encoding their results.
+- The **time limit** of a run is a fixed multiple of the reference's total time on the cases selected for the run, and no less than a fixed minimum. The factor and the minimum belong to the judge, not to the problem, like the [run limit](#run-limit); hc's are in its documentation. A problem declares no time limit: whether a slower solution exceeds it depends on its cases.
+- Cases run in order. The case during which the total time of the run passes the time limit, or whose time brings the total over it, is Time Limit Exceeded, and the run stops: the cases after it are Not Run. A case that would never return is ended once the limit is spent.
+- Only a solution judged in its language ([Readiness](#readiness)) has a time limit. A reference solution has none.
+
 ### Run limit
 
-A run of a solution over the cases selected for it has a wall-clock limit for the whole run, not for each case. It guards against hangs and infinite loops; it does not judge complexity. The limit belongs to the judge, not to the problem: hc's is `timeout` in the workspace's `hc.yaml`, 10s unless configured. When it expires the run is stopped, and the cases without a result are Time Limit Exceeded; cases that finished keep their verdicts. A checker run and a generator run each get their own limit of the same duration, and so does a reference computing the expected outputs of generated cases.
+A run of a solution over the cases selected for it has a wall-clock limit for the whole run, not for each case. It guards against hangs, such as a solution blocked outside the timed calls; it does not judge complexity, which the [time limit](#time-limit) does. The limit belongs to the judge, not to the problem: hc's is `timeout` in the workspace's `hc.yaml`, 10s unless configured. When it expires the run is stopped: the first case without a result is Time Limit Exceeded, the cases after it are Not Run, and cases that finished keep their verdicts. A checker run and a generator run each get their own limit of the same duration, and so does a reference computing the expected outputs of generated cases.
 
 ### Readiness
 
 A problem is **ready** when it has `judge.compare`. `judge.compare` has no default, and MUST be written out even for `exact`. A problem that is not ready is valid, but its judge rule is undecided.
 
-A problem is **ready for a language** when it is ready and has a reference solution in that language (`reference/solution.py`, `reference/solution.go`). The cases of a solution in a language the problem is not ready for are not judged (Not Judged), and such a solution cannot be submitted. A problem SHOULD be ready for every language of its pack's `languages`.
+A problem is **ready for a language** when it is ready and has a reference solution in that language (`reference/solution.py`, `reference/solution.go`), which solutions in that language are timed against ([Time limit](#time-limit)). The cases of a solution in a language the problem is not ready for are not judged (Not Judged), and such a solution cannot be submitted. A problem SHOULD be ready for every language of its pack's `languages`.
 
 ### Verdicts
 
@@ -609,14 +618,15 @@ A run of a solution has one of these outcomes for each case:
 | Verdict | When |
 |---|---|
 | Compile Error | The solution does not build: a Go compile error, a Python syntax error. This is the outcome of the whole run, and no case runs |
-| Runtime Error | The case raised an error (an exception, a panic, an input the driver cannot decode, or a result the encoding cannot express), or the program exited before producing the case's result |
-| Time Limit Exceeded | The [run limit](#run-limit) expired before the case produced its result |
+| Runtime Error | The case raised an error (an exception, a panic, an input the driver cannot decode, or a result the encoding cannot express), or the program exited while the case ran |
+| Time Limit Exceeded | The run spent the [time limit](#time-limit) during the case, or the [run limit](#run-limit) expired before the case produced its result |
+| Not Run | The run stopped before the case, at an earlier case that was Time Limit Exceeded or after which the program exited |
 | No Expected Output | The case ran, but has no `expected` |
 | Not Judged | The case ran, but the problem is not [ready](#readiness) for the solution's language |
 | Wrong Answer | The output does not match `expected` under `judge.compare`, or the checker rejected it |
 | Accepted | The output matches, or the checker accepted it |
 
-The first three are decided before judging; No Expected Output is decided before Not Judged. The verdict of the whole run is the first case, in case order, whose verdict is Runtime Error, Time Limit Exceeded or Wrong Answer. Without one, it is Accepted if any case was accepted (or no case ran), else Not Judged if any case was not judged, else No Expected Output.
+The first four are decided before judging; No Expected Output is decided before Not Judged. The verdict of the whole run is the first case, in case order, whose verdict is Runtime Error, Time Limit Exceeded or Wrong Answer; Not Run cases follow it. Without one, it is Accepted if any case was accepted (or no case ran), else Not Judged if any case was not judged, else No Expected Output.
 
 A broken checker is not a verdict: see [Checkers](#checkers). Neither is a generated case that cannot be built: see [Generators](#generators).
 
@@ -638,7 +648,7 @@ def check(input, output, expected):
 | `expected` | The case's `expected`, one valid answer | | |
 
 - Return values: `None` or `True` accepts; `False` rejects; a string rejects with that string as the message. A rejected case is a Wrong Answer, and its message is shown with it. Messages SHOULD say what is wrong: `"'bb' is not a substring of s"`.
-- `check` is called once per case that produced an output and has `expected`, in the order the cases ran, in one process that runs after the solution, with the [run limit](#run-limit)'s duration as its own limit. Cases that already failed (Runtime Error, Time Limit Exceeded) or have no `expected` are not passed.
+- `check` is called once per case that produced an output and has `expected`, in the order the cases ran, in one process that runs after the solution, with the [run limit](#run-limit)'s duration as its own limit. Cases that already failed (Runtime Error, Time Limit Exceeded), did not run (Not Run) or have no `expected` are not passed.
 - A checker that cannot be loaded, has no callable `check`, raises, returns anything else, or runs out of time is a broken problem, not a verdict on the solution: the run fails with an error naming `checker.py` and the case.
 - A checker MAY import the public names of `hc_runtime` ([Python](#python)) to rebuild structures, `decode("TreeNode", output)`, and otherwise only the standard library.
 - A checker MUST accept every correct output. For randomized problems (LeetCode 384, 528), whose outputs are checked for a plausible distribution, this means a correct solution MUST be rejected with negligible probability.
