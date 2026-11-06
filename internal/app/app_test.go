@@ -204,6 +204,10 @@ func TestStartSubmitWrongAnswer(t *testing.T) {
 		if rep.Passed == 0 || rep.Passed == rep.Total {
 			t.Fatalf("%s: passed %d/%d", langID, rep.Passed, rep.Total)
 		}
+		// Every case ran, so the submission has a time.
+		if rep.Stopped || sub.ElapsedMs == nil {
+			t.Errorf("%s: stopped %v, elapsed %v, want a complete run with a time", langID, rep.Stopped, sub.ElapsedMs)
+		}
 	}
 	st, _ := a.Store()
 	subs, err := st.List(ctx, regression.Name, "two-sum")

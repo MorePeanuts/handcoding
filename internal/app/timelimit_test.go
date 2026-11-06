@@ -112,6 +112,9 @@ func TestTimeLimit(t *testing.T) {
 		if got := verdicts(rep); !sameVerdicts(got, want) || rep.Verdict != runner.TimeLimit {
 			t.Errorf("%s: %v (%s), want %v", langID, got, rep.Verdict, want)
 		}
+		if !rep.Stopped {
+			t.Errorf("%s: a run that stopped at the time limit is not Stopped", langID)
+		}
 		if e := rep.Cases[1].Elapsed; e >= time.Second {
 			t.Errorf("%s: the second case ran for %s, not ended at the limit", langID, e)
 		}

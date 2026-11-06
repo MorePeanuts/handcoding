@@ -81,6 +81,10 @@ type Report struct {
 	// Elapsed is the sum of the cases' times: the time spent in the user's
 	// code, without starting the program or decoding the cases.
 	Elapsed time.Duration
+	// Stopped is whether the run ended before its last case: at a time
+	// limit, a timeout or a crash. Elapsed then counts only the cases that
+	// ran, which compares with no other run, so it is not shown.
+	Stopped bool
 	// Toolchain is what the solution ran with, set by the caller; the zero
 	// value when unknown (e.g. a report decoded from history).
 	Toolchain lang.Toolchain
@@ -212,6 +216,7 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 	if runErr != nil && len(results) < len(cases) {
 		rep.Stderr = stderr.String()
 	}
+	rep.Stopped = stopped
 	rep.Verdict = overall(rep)
 	return rep, nil
 }

@@ -136,10 +136,7 @@ func (m *model) viewHistory() string {
 	rows := 0
 	for i := m.subOffset; i < min(m.subOffset+h, len(m.subs)); i++ {
 		s := m.subs[i]
-		elapsed := fmt.Sprintf("%dms", s.ElapsedMs)
-		if s.ElapsedMs == 0 {
-			elapsed = "<1ms"
-		}
+		elapsed := ui.SubmissionTime(s.ElapsedMs)
 		row := fmt.Sprintf("%-6s %s %-8s %-8s %-8s %s", fmt.Sprintf("#%d", s.ID),
 			padRight(ui.VerdictStyle(runner.Verdict(s.Verdict)).Render(s.Verdict), 20), s.Lang,
 			fmt.Sprintf("%d/%d", s.Passed, s.Total), elapsed, s.CreatedAt.Format("2006-01-02 15:04"))

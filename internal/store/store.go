@@ -16,13 +16,15 @@ import (
 type Submission struct {
 	ID int64
 	// Pack and Slug identify the problem.
-	Pack      string
-	Slug      string
-	Lang      string
-	Verdict   string
-	Passed    int
-	Total     int
-	ElapsedMs int64
+	Pack    string
+	Slug    string
+	Lang    string
+	Verdict string
+	Passed  int
+	Total   int
+	// ElapsedMs is the total time of the run, nil when it stopped early (see
+	// runner.Report.Stopped).
+	ElapsedMs *int64
 	Code      string
 	// Details is the judge report as JSON (see app.EncodeReport).
 	Details   string
@@ -118,10 +120,16 @@ func (s *Store) Add(ctx context.Context, sub *Submission) error {
 	if sub.CreatedAt.IsZero() {
 		sub.CreatedAt = time.Now()
 	}
+	// elapsed_ms is -1 for no time, which keeps the column NOT NULL as in
+	// the databases already written.
+	elapsed := int64(-1)
+	if sub.ElapsedMs != nil {
+		elapsed = *sub.ElapsedMs
+	}
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO submissions (pack, slug, lang, verdict, passed, total, elapsed_ms, code, details, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		sub.Pack, sub.Slug, sub.Lang, sub.Verdict, sub.Passed, sub.Total, sub.ElapsedMs, sub.Code, sub.Details, sub.CreatedAt.UnixMilli())
+		sub.Pack, sub.Slug, sub.Lang, sub.Verdict, sub.Passed, sub.Total, elapsed, sub.Code, sub.Details, sub.CreatedAt.UnixMilli())
 	if err != nil {
 		return err
 	}
@@ -299,10 +307,14 @@ type scanner interface{ Scan(dest ...any) error }
 
 func scan(r scanner) (Submission, error) {
 	var (
-		sub Submission
-		ts  int64
+		sub     Submission
+		elapsed int64
+		ts      int64
 	)
-	err := r.Scan(&sub.ID, &sub.Pack, &sub.Slug, &sub.Lang, &sub.Verdict, &sub.Passed, &sub.Total, &sub.ElapsedMs, &sub.Code, &sub.Details, &ts)
+	err := r.Scan(&sub.ID, &sub.Pack, &sub.Slug, &sub.Lang, &sub.Verdict, &sub.Passed, &sub.Total, &elapsed, &sub.Code, &sub.Details, &ts)
+	if elapsed >= 0 {
+		sub.ElapsedMs = &elapsed
+	}
 	sub.CreatedAt = time.UnixMilli(ts)
 	return sub, err
 }

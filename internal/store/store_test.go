@@ -50,6 +50,21 @@ func TestProblems(t *testing.T) {
 	if subs, _ := s.List(ctx, "leetcode", "two-sum"); len(subs) != 1 {
 		t.Errorf("DeleteProblem removed another pack's submissions")
 	}
+	// A submission whose run stopped early has no time.
+	ms := int64(42)
+	for _, want := range []*int64{nil, &ms} {
+		sub := &Submission{Pack: "local", Slug: "timed", Lang: "go", Verdict: "Accepted", ElapsedMs: want}
+		if err := s.Add(ctx, sub); err != nil {
+			t.Fatal(err)
+		}
+		got, err := s.Get(ctx, sub.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if (got.ElapsedMs == nil) != (want == nil) || want != nil && *got.ElapsedMs != *want {
+			t.Errorf("elapsed %v, want %v", got.ElapsedMs, want)
+		}
+	}
 	// Reopening must work.
 	s2, err := Open(path)
 	if err != nil {

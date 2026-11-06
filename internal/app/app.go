@@ -527,8 +527,12 @@ func (a *App) Submit(ctx context.Context, p *problem.Problem, l lang.Language, o
 	}
 	sub := &store.Submission{
 		Pack: p.Pack, Slug: p.Slug, Lang: l.ID(), Verdict: string(rep.Verdict),
-		Passed: rep.Passed, Total: rep.Total, ElapsedMs: rep.Elapsed.Milliseconds(), Code: string(code),
+		Passed: rep.Passed, Total: rep.Total, Code: string(code),
 		Details: EncodeReport(p, rep),
+	}
+	if !rep.Stopped {
+		ms := rep.Elapsed.Milliseconds()
+		sub.ElapsedMs = &ms
 	}
 	st, err := a.Store()
 	if err != nil {

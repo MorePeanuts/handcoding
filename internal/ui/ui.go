@@ -177,13 +177,34 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 		fmt.Fprintln(w, indent(strings.TrimSpace(rep.Stderr), "    "))
 	}
 	if rep.Verdict == runner.NotJudged {
-		summary := fmt.Sprintf("%s · %d case(s) ran · %s", VerdictStyle(rep.Verdict).Render(string(rep.Verdict)), rep.Total, FormatDuration(rep.Elapsed))
+		summary := fmt.Sprintf("%s · %d case(s) ran", VerdictStyle(rep.Verdict).Render(string(rep.Verdict)), rep.Total) + totalTime(rep)
 		fmt.Fprintln(w, "\n"+summary)
 		fmt.Fprintln(w, Faint.Render("Compare your output with the expected one yourself; "+o.notReadyHint(p)+"."))
 		return
 	}
-	summary := fmt.Sprintf("%s · %d/%d passed · %s", VerdictStyle(rep.Verdict).Render(string(rep.Verdict)), rep.Passed, rep.Total, FormatDuration(rep.Elapsed))
+	summary := fmt.Sprintf("%s · %d/%d passed", VerdictStyle(rep.Verdict).Render(string(rep.Verdict)), rep.Passed, rep.Total) + totalTime(rep)
 	fmt.Fprintln(w, "\n"+summary)
+}
+
+// totalTime is the summary's total time, empty for a run that stopped early.
+func totalTime(rep *runner.Report) string {
+	if rep.Stopped {
+		return ""
+	}
+	return " · " + FormatDuration(rep.Elapsed)
+}
+
+// SubmissionTime renders a submission's total time for the history, a dash
+// for one whose run stopped early.
+func SubmissionTime(ms *int64) string {
+	switch {
+	case ms == nil:
+		return "—"
+	case *ms == 0:
+		return "<1ms"
+	default:
+		return fmt.Sprintf("%dms", *ms)
+	}
 }
 
 // FormatDuration renders short durations compactly.

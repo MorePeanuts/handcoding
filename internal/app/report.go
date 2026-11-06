@@ -31,6 +31,7 @@ type storedReport struct {
 	Passed       int          `json:"passed"`
 	Total        int          `json:"total"`
 	ElapsedNs    int64        `json:"elapsed_ns"`
+	Stopped      bool         `json:"stopped,omitempty"`
 	CompileError string       `json:"compile_error,omitempty"`
 	Stderr       string       `json:"stderr,omitempty"`
 	Cases        []storedCase `json:"cases"`
@@ -40,7 +41,7 @@ type storedReport struct {
 func EncodeReport(p *problem.Problem, rep *runner.Report) string {
 	sr := storedReport{
 		Verdict: string(rep.Verdict), Passed: rep.Passed, Total: rep.Total,
-		ElapsedNs: rep.Elapsed.Nanoseconds(), CompileError: rep.CompileError, Stderr: clipText(rep.Stderr),
+		ElapsedNs: rep.Elapsed.Nanoseconds(), Stopped: rep.Stopped, CompileError: rep.CompileError, Stderr: clipText(rep.Stderr),
 	}
 	for _, c := range rep.Cases {
 		sc := storedCase{Index: c.Index, Verdict: string(c.Verdict), ElapsedNs: c.Elapsed.Nanoseconds(), Note: c.Case.Note}
@@ -72,7 +73,7 @@ func DecodeReport(s string) *runner.Report {
 	}
 	rep := &runner.Report{
 		Verdict: runner.Verdict(sr.Verdict), Passed: sr.Passed, Total: sr.Total,
-		Elapsed: time.Duration(sr.ElapsedNs), CompileError: sr.CompileError, Stderr: sr.Stderr,
+		Elapsed: time.Duration(sr.ElapsedNs), Stopped: sr.Stopped, CompileError: sr.CompileError, Stderr: sr.Stderr,
 	}
 	for _, sc := range sr.Cases {
 		cr := runner.CaseResult{
