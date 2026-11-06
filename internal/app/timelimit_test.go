@@ -15,6 +15,10 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/runner"
 )
 
+// The tests of this file do not run in parallel: they time sleeping
+// solutions against limits a few times their references' times, which
+// other tests competing for the machine would make flaky.
+
 // nap(ms, k) sleeps: the references for ms milliseconds, the solutions of
 // these tests k times as long, or forever for k = 0. They return ms.
 const napYAML = `slug: nap

@@ -112,6 +112,7 @@ func requirePython(t *testing.T) {
 }
 
 func TestListRendersAndNavigates(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	view := h.view()
 	for _, want := range []string{"handcoding", "Two Sum", "LRU Cache", "enter open"} {
@@ -129,6 +130,7 @@ func TestListRendersAndNavigates(t *testing.T) {
 }
 
 func TestListSearchAndFilter(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	h.press("/", "m", "a", "x", "i", "enter")
 	if len(h.m.visible) != 1 || h.m.selected().Slug != "maximum-depth-of-binary-tree" {
@@ -146,6 +148,7 @@ func TestListSearchAndFilter(t *testing.T) {
 
 // A new workspace has no problems; the list says how to add some.
 func TestListEmptyWorkspace(t *testing.T) {
+	t.Parallel()
 	ws, err := workspace.Create(t.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)
@@ -188,6 +191,7 @@ func (h *harness) openModel(opts Options) *model {
 
 // With a single pack, there is no tab bar (the empty local pack has no tab).
 func TestListSinglePack(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	view := h.view()
 	if first, _, _ := strings.Cut(view, "\n"); !strings.HasPrefix(first, "handcoding") {
@@ -206,6 +210,7 @@ func TestListSinglePack(t *testing.T) {
 // their progress, tab and shift+tab switch packs, and search applies to the
 // pack shown.
 func TestListPackTabs(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	addLocal(t, h.m, "0001-two-sum")
 	view := h.view()
@@ -251,6 +256,7 @@ func TestListPackTabs(t *testing.T) {
 
 // The tab bar keeps the current tab visible on a narrow terminal.
 func TestListTabBarScrolls(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	addLocal(t, h.m, "0001-two-sum")
 	h.m.Update(tea.WindowSizeMsg{Width: 20, Height: 30})
@@ -270,6 +276,7 @@ func TestListTabBarScrolls(t *testing.T) {
 // c chooses a group of the pack, or every problem, each with its progress;
 // each pack remembers its group.
 func TestListGroups(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	all := len(h.m.probs)
 	h.press("c")
@@ -331,6 +338,7 @@ func TestListGroups(t *testing.T) {
 // An empty pack has no tab once another pack has problems, even when it was
 // the pack shown last, unless --pack names it.
 func TestListHidesEmptyPacks(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	st, _ := h.m.app.Store()
 	if err := st.SetPref(context.Background(), "", prefPack, "local"); err != nil {
@@ -349,6 +357,7 @@ func TestListHidesEmptyPacks(t *testing.T) {
 // the pack shown last under the cursor; enter opens a pack's list, and esc
 // comes back. --pack and --group skip the picker.
 func TestPackPicker(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	addLocal(t, h.m, "0001-two-sum")
 	st, _ := h.m.app.Store()
@@ -392,6 +401,7 @@ func TestPackPicker(t *testing.T) {
 // --pack and --group open that pack's tab, and that group in it; a
 // remembered pack or group that no longer exists falls back silently.
 func TestListOptionsAndFallback(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	addLocal(t, h.m, "0001-two-sum")
 	if m := h.openModel(Options{Pack: regression.Name}); m.pack != regression.Name || m.group() != nil {
@@ -425,6 +435,7 @@ func TestListOptionsAndFallback(t *testing.T) {
 }
 
 func TestEnterOpensDetailAndCopiesPath(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	h.press("enter")
 	if h.m.top() != screenDetail {
@@ -460,6 +471,7 @@ func TestEnterOpensDetailAndCopiesPath(t *testing.T) {
 // v shows the statement without starting the problem, also in another
 // language; an action that needs the solution creates it.
 func TestViewDoesNotStart(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	p := h.m.selected()
 	h.press("v")
@@ -489,6 +501,7 @@ func TestViewDoesNotStart(t *testing.T) {
 // list marks it, the starred filter keeps only starred problems, and a new
 // session still has the stars.
 func TestStars(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	p := h.m.selected()
 	h.press("m")
@@ -520,6 +533,7 @@ func TestStars(t *testing.T) {
 }
 
 func TestDetailOpensStatementImages(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	var opened []string
 	h.m.open = func(paths []string) error { opened = paths; return nil }
@@ -566,6 +580,7 @@ func twoSum(nums []int, target int) []int {
 `
 
 func TestRunSubmitHistoryAndDiscard(t *testing.T) {
+	t.Parallel()
 	requireGo(t)
 	// two-sum has generated cases.
 	requirePython(t)
@@ -651,6 +666,7 @@ func TestRunSubmitHistoryAndDiscard(t *testing.T) {
 }
 
 func TestResetAsksFirst(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	h.press("enter")
 	l, _ := h.m.app.Lang("go")
@@ -671,6 +687,7 @@ func TestResetAsksFirst(t *testing.T) {
 // TestNotReadyProblem: a problem without a decided judge rule is marked in
 // the list, test shows outputs without a verdict, and submit is refused.
 func TestNotReadyProblem(t *testing.T) {
+	t.Parallel()
 	requireGo(t)
 	h := newHarness(t)
 	p := h.m.selected()
@@ -709,6 +726,7 @@ func TestNotReadyProblem(t *testing.T) {
 // i cycles the locales of the pack shown: titles in the list, the
 // statement in the detail screen. The pack remembers its locale.
 func TestSwitchLocale(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	if view := h.view(); !strings.Contains(view, "Two Sum") || !strings.Contains(view, "locale: en") {
 		t.Errorf("list in en:\n%s", view)
@@ -768,6 +786,7 @@ func addSubs(t *testing.T, m *model, details string, refs ...string) {
 // problems; o opens a submission's problem above it, whose own h shows
 // only that problem's.
 func TestHistoryOfEveryProblem(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	addLocal(t, h.m, "0001-two-sum")
 	addSubs(t, h.m, "", "regression/lru-cache", "local/two-sum", "regression/two-sum")
@@ -825,6 +844,7 @@ func TestHistoryOfEveryProblem(t *testing.T) {
 
 // In a problem, h shows only its submissions, without a problem column.
 func TestHistoryOfProblem(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	addSubs(t, h.m, "", "regression/lru-cache", "regression/two-sum", "regression/two-sum")
 	h.press("v", "h")
@@ -848,6 +868,7 @@ func TestHistoryOfProblem(t *testing.T) {
 // A submission whose problem no longer exists can be viewed and deleted;
 // the actions that need the problem say it is gone.
 func TestHistoryOfRemovedProblem(t *testing.T) {
+	t.Parallel()
 	h := newHarness(t)
 	details := app.EncodeReport(h.m.selected(), &runner.Report{Verdict: runner.WrongAnswer, Passed: 1, Total: 2})
 	addSubs(t, h.m, details, "regression/gone", "gone-pack/two-sum")
@@ -883,6 +904,7 @@ func TestHistoryOfRemovedProblem(t *testing.T) {
 
 // h works on a list without problems.
 func TestHistoryOfEmptyWorkspace(t *testing.T) {
+	t.Parallel()
 	ws, err := workspace.Create(t.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)

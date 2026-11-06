@@ -18,6 +18,7 @@ import (
 )
 
 func TestInitPack(t *testing.T) {
+	t.Parallel()
 	dir := filepath.Join(t.TempDir(), "My Pack")
 	res, err := app.InitPack(dir, app.InitPackOptions{Title: "My pack", HCVersion: "v0.2.0"})
 	if err != nil {
@@ -143,6 +144,7 @@ func TestInitPack(t *testing.T) {
 
 // A development build cannot be pinned: CI installs the latest release.
 func TestInitPackUnpinned(t *testing.T) {
+	t.Parallel()
 	dir := filepath.Join(t.TempDir(), "pack")
 	res, err := app.InitPack(dir, app.InitPackOptions{Name: "algos", HCVersion: "dev"})
 	if err != nil {
@@ -173,6 +175,7 @@ func TestInitPackUnpinned(t *testing.T) {
 // InitPack in an existing git repository (here, a directory of one) says
 // where the repository is.
 func TestInitPackInRepository(t *testing.T) {
+	t.Parallel()
 	repo := t.TempDir()
 	if err := os.Mkdir(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
@@ -188,6 +191,7 @@ func TestInitPackInRepository(t *testing.T) {
 }
 
 func TestInitPackRefuses(t *testing.T) {
+	t.Parallel()
 	newPack := func(t *testing.T) string {
 		dir := filepath.Join(t.TempDir(), "pack")
 		if _, err := app.InitPack(dir, app.InitPackOptions{HCVersion: "dev"}); err != nil {
@@ -236,6 +240,7 @@ func TestInitPackRefuses(t *testing.T) {
 
 // InitPack writes nothing when any of its files exists, and lists them.
 func TestInitPackConflicts(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	mine := map[string]string{
 		".gitignore":                         "mine\n",
@@ -276,6 +281,7 @@ func TestInitPackConflicts(t *testing.T) {
 }
 
 func TestPackNameFor(t *testing.T) {
+	t.Parallel()
 	for dir, want := range map[string]string{
 		"/x/my-pack":         "my-pack",
 		"/x/My Pack":         "my-pack",
@@ -291,6 +297,7 @@ func TestPackNameFor(t *testing.T) {
 }
 
 func TestReleaseVersion(t *testing.T) {
+	t.Parallel()
 	for v, want := range map[string]bool{
 		"v0.2.0":                          true,
 		"v1.10.3":                         true,

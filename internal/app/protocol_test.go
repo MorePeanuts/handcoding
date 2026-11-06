@@ -12,6 +12,7 @@ import (
 // TestProtocolLanguages checks that hc has a driver for every language of the
 // protocol it implements, and none for a language outside it.
 func TestProtocolLanguages(t *testing.T) {
+	t.Parallel()
 	got := Languages(&workspace.Workspace{}).IDs()
 	want := problem.Languages(problem.Protocol)
 	slices.Sort(got)
@@ -24,6 +25,7 @@ func TestProtocolLanguages(t *testing.T) {
 // A pack checkout runs its Python on the oldest version the protocol
 // supports, as its CI does; a practice workspace on the newest.
 func TestPythonVersionByKind(t *testing.T) {
+	t.Parallel()
 	for kind, want := range map[workspace.Kind]string{workspace.Authoring: python.MinVersion, workspace.Practice: ""} {
 		if v := pythonLanguage(&workspace.Workspace{Kind: kind}).Venv; v == nil || v.Version != want {
 			t.Errorf("kind %d: venv %+v, want version %q", kind, v, want)

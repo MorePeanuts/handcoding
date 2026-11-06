@@ -39,6 +39,7 @@ def down(n):
 // checker: before Python 3.11 that overflows the main thread's C stack, so
 // the drivers run in a thread with a larger one (#113).
 func TestDeepRecursion(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	a.SetTimeLimit(0, 0)

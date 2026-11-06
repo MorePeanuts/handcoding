@@ -24,7 +24,8 @@ import (
 )
 
 // isolateConfig points the user's configuration directory into a temporary
-// one, so that tests never touch the real LeetCode sessions.
+// one, so that tests never touch the real LeetCode sessions. It sets the
+// environment, so the tests that call it cannot run in parallel.
 func isolateConfig(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -241,6 +242,7 @@ func TestLeetCodeBrowserLogin(t *testing.T) {
 }
 
 func TestLeetCodeProblem(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		source       problem.Source
 		site, want   string
@@ -263,6 +265,7 @@ func TestLeetCodeProblem(t *testing.T) {
 }
 
 func TestLeetCodeCase(t *testing.T) {
+	t.Parallel()
 	twoSum := &problem.Problem{Slug: "two-sum", Kind: problem.KindFunction, Function: &problem.Function{
 		Name:    "twoSum",
 		Params:  []problem.Param{{Name: "nums", Type: "integer[]"}, {Name: "target", Type: "integer"}},
@@ -350,6 +353,7 @@ func fakeLeetCode(t *testing.T, typed *string) *leetcode.Client {
 }
 
 func TestLeetCodeTestAndSubmit(t *testing.T) {
+	t.Parallel()
 	a := newWorkspace(t)
 	for _, l := range a.Langs.All() {
 		if _, ok := l.(lang.LeetCoder); !ok {

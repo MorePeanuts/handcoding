@@ -11,6 +11,7 @@ import (
 
 // A problem keeps its newest app.KeepAgentLogs logs.
 func TestAgentLogs(t *testing.T) {
+	t.Parallel()
 	a := newWorkspace(t)
 	p := addProblem(t, a, "largest", largestYAML, "")
 	dir := a.AgentLogDir(p)

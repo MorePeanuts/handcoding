@@ -20,6 +20,7 @@ const wrongTwoSum = "class Solution:\n    def twoSum(self, nums, target):\n     
 // else of a new run of every case; a restored submission counts as a run
 // of its code.
 func TestDebugCase(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "python3")
 	a := newWorkspace(t)
 	ctx := context.Background()

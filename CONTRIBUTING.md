@@ -27,6 +27,8 @@ go run ./cmd/hc -w /tmp/hc-dev test two-sum
 
 The regression set is a pack, so it is also a workspace of its own (a pack checkout, see [working on a pack](docs/how-to-use.md#working-on-a-pack)): after changing its cases, `go run ./cmd/hc -w testdata/regression cases build <slug> --force -l python` regenerates their expected outputs in place. Its `.gitignore` keeps hc's state and your solutions out of git.
 
+The tests of `internal/app` and `internal/tui` run in parallel (`t.Parallel()`), each in its own workspace, and a new one should too, unless it sets the environment (`t.Setenv`, which Go refuses in a parallel test: the LeetCode session and git tests) or times solutions against a time limit (`timelimit_test.go`), which other tests competing for the machine would make flaky. Go runs those first, one at a time, and the parallel ones after them.
+
 ## Code layout
 
 ```
