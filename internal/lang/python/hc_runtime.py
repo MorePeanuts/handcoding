@@ -6,6 +6,7 @@
 # before every run.
 # Compatible with Python 3.10+, the minimum of the problem protocol.
 
+import array
 import json
 import os
 import sys
@@ -169,6 +170,40 @@ class Employee:
 
 _MASK64 = (1 << 64) - 1
 
+# Rng is splitmix64: the state goes up by _GAMMA with every number drawn,
+# and a number is a mix of the state:
+#
+#     s = (s + _GAMMA) & _MASK64
+#     z = ((s ^ (s >> 30)) * 0xBF58476D1CE4E5B9) & _MASK64
+#     z = ((z ^ (z >> 27)) * 0x94D049BB133111EB) & _MASK64
+#     z ^= z >> 31
+#
+# Since the states are a counter, Rng mixes _BATCH of them at once, as one
+# integer of _BATCH 128-bit lanes (a number in the low half of each, room for
+# its product with a 64-bit constant in the high half): the arithmetic of a
+# batch costs CPython about as much as that of a few numbers drawn one by one.
+# A method then takes the numbers in order, so that every method keeps
+# drawing exactly the numbers it did one by one; generated cases are recorded
+# by the digests of their inputs, which depend on them (TestRng pins some,
+# and TestRngEquivalence compares every method with the plain
+# implementation).
+_GAMMA = 0x9E3779B97F4A7C15
+_BATCH = 256
+# 1 in every lane, and 2**64 - 1: built from bytes, which is quicker than
+# summing the lanes for a module every run imports.
+_LANES = int.from_bytes((b"\x01" + bytes(15)) * _BATCH, "little")
+_LANE_MASK = int.from_bytes((b"\xff" * 8 + bytes(8)) * _BATCH, "little")
+# The steps from the state before a batch to each of its states.
+_STEPS = int.from_bytes(
+    b"".join((((i + 1) * _GAMMA) & _MASK64).to_bytes(16, "little") for i in range(_BATCH)),
+    "little",
+)
+_BATCH_STEP = (_BATCH * _GAMMA) & _MASK64
+# 2**64: a number below n < 2**64 is z % n, unless z falls in the incomplete
+# last block of _SPAN % n values, which is drawn again. z is kept if it is
+# below _SPAN - _SPAN % n, which a z of at most _SPAN - n always is.
+_SPAN = 1 << 64
+
 
 class Rng:
     """The random number generator generator.py functions get, seeded with
@@ -177,20 +212,57 @@ class Rng:
     promise."""
 
     def __init__(self, seed=0):
-        self._state = seed & _MASK64
+        # The numbers mixed and not drawn yet, the next one last, and the
+        # state after them.
+        self._mixed = []
+        self._pop = self._mixed.pop
+        self._end = seed & _MASK64
+
+    @property
+    def _state(self):
+        return (self._end - len(self._mixed) * _GAMMA) & _MASK64
+
+    def _mix(self):
+        # Mixes the next batch into _mixed, which must be empty, and draws
+        # the first of it.
+        s = self._end
+        p = (s * _LANES + _STEPS) & _LANE_MASK
+        p = (((p ^ (p >> 30)) & _LANE_MASK) * 0xBF58476D1CE4E5B9) & _LANE_MASK
+        p = (((p ^ (p >> 27)) & _LANE_MASK) * 0x94D049BB133111EB) & _LANE_MASK
+        p = (p ^ (p >> 31)) & _LANE_MASK
+        words = array.array("Q")
+        if words.itemsize == 8:
+            words.frombytes(p.to_bytes(16 * _BATCH, "little"))
+            if sys.byteorder != "little":
+                words.byteswap()
+            mixed = words[::2].tolist()
+        else:
+            mixed = [(p >> (128 * i)) & _MASK64 for i in range(_BATCH)]
+        mixed.reverse()
+        self._mixed.extend(mixed)
+        self._end = (s + _BATCH_STEP) & _MASK64
+        return self._pop()
 
     def _next(self):
-        self._state = (self._state + 0x9E3779B97F4A7C15) & _MASK64
-        z = self._state
-        z = ((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9) & _MASK64
-        z = ((z ^ (z >> 27)) * 0x94D049BB133111EB) & _MASK64
-        return z ^ (z >> 31)
+        try:
+            return self._pop()
+        except IndexError:
+            return self._mix()
 
     def _below(self, n):
         # Uniform in [0, n), by rejection, from as many 64-bit words as n
         # needs.
         if n <= 0:
             raise ValueError("empty range")
+        if n < _SPAN:
+            pop = self._pop
+            while True:
+                try:
+                    z = pop()
+                except IndexError:
+                    z = self._mix()
+                if z <= _SPAN - n or z < _SPAN - _SPAN % n:
+                    return z % n
         words = (n.bit_length() + 63) // 64
         span = 1 << (64 * words)
         limit = span - span % n
@@ -203,7 +275,11 @@ class Rng:
 
     def random(self):
         """A float in [0, 1)."""
-        return (self._next() >> 11) * (1.0 / (1 << 53))
+        try:
+            z = self._pop()
+        except IndexError:
+            z = self._mix()
+        return (z >> 11) * (1.0 / (1 << 53))
 
     def randint(self, a, b):
         """An integer in [a, b], both included."""
@@ -211,22 +287,55 @@ class Rng:
             raise TypeError("randint takes integers")
         if a > b:
             raise ValueError("randint(%d, %d): empty range" % (a, b))
-        return a + self._below(b - a + 1)
+        n = b - a + 1
+        if n >= _SPAN:
+            return a + self._below(n)
+        pop = self._pop
+        while True:
+            try:
+                z = pop()
+            except IndexError:
+                z = self._mix()
+            if z <= _SPAN - n or z < _SPAN - _SPAN % n:
+                return a + z % n
 
     def uniform(self, a, b):
         """A float between a and b."""
-        return a + (b - a) * self.random()
+        d = b - a
+        try:
+            z = self._pop()
+        except IndexError:
+            z = self._mix()
+        return a + d * ((z >> 11) * (1.0 / (1 << 53)))
 
     def choice(self, seq):
         """An element of the non-empty sequence seq."""
-        if len(seq) == 0:
+        n = len(seq)
+        if n == 0:
             raise IndexError("cannot choose from an empty sequence")
-        return seq[self._below(len(seq))]
+        # A length is below 2**63, so one word.
+        pop = self._pop
+        while True:
+            try:
+                z = pop()
+            except IndexError:
+                z = self._mix()
+            if z <= _SPAN - n or z < _SPAN - _SPAN % n:
+                return seq[z % n]
 
     def shuffle(self, x):
         """Shuffles the list x in place."""
+        pop = self._pop
         for i in range(len(x) - 1, 0, -1):
-            j = self._below(i + 1)
+            n = i + 1
+            while True:
+                try:
+                    z = pop()
+                except IndexError:
+                    z = self._mix()
+                if z <= _SPAN - n or z < _SPAN - _SPAN % n:
+                    break
+            j = z % n
             x[i], x[j] = x[j], x[i]
 
     def sample(self, population, k):
@@ -236,17 +345,35 @@ class Rng:
         n = len(population)
         if not 0 <= k <= n:
             raise ValueError("sample larger than population or negative")
+        pop = self._pop
         if 3 * k <= n:
             picked, out = set(), []
+            if n:
+                limit = _SPAN - _SPAN % n
             while len(out) < k:
-                j = self._below(n)
+                while True:
+                    try:
+                        z = pop()
+                    except IndexError:
+                        z = self._mix()
+                    if z < limit:
+                        break
+                j = z % n
                 if j not in picked:
                     picked.add(j)
                     out.append(population[j])
             return out
         pool = list(population)
         for i in range(k):
-            j = i + self._below(n - i)
+            m = n - i
+            while True:
+                try:
+                    z = pop()
+                except IndexError:
+                    z = self._mix()
+                if z <= _SPAN - m or z < _SPAN - _SPAN % m:
+                    break
+            j = i + z % m
             pool[i], pool[j] = pool[j], pool[i]
         return pool[:k]
 

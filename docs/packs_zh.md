@@ -69,7 +69,7 @@ hc pack check               # 像 CI 那样检查整个题目包
 
 1. 用 `go install github.com/MorePeanuts/handcoding/cmd/hc@<version>` 安装 hc；
 2. 写入一个设置了 `python.interpreter: python3` 的 `hc.yaml`，让 hc 用这个 Python 判题，而不是创建虚拟环境（`hc.yaml` 不提交）；
-3. 运行 `hc pack check`；
+3. 运行 `hc pack check`，它同时检查的题数与运行器的 CPU 数相同，最多 4 道（见[检查题目包](how-to-use_zh.md#检查题目包)）；
 4. 运行 `hc skill install --force`，如果它改动了任何已提交的技能或 `AGENTS.md` 就失败：仓库中的技能必须属于检查这个题目包的 hc。
 
 **固定版本。** `<version>` 是运行 `hc pack init` 的 hc 的版本。hc 的开发版没有可以固定的发布版本，这时工作流安装 `@latest`，并附一条注释提醒你固定它：把 `latest` 换成一个发布版本，例如 `v0.2.0`。固定 hc 的版本可以避免 hc 发布新版本时 CI 跟着改变。

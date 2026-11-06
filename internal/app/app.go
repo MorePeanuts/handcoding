@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/MorePeanuts/handcoding/internal/judge"
@@ -32,6 +33,9 @@ type App struct {
 	// timeLimit): hc's TimeFactor and BaselineFloor, which tests change.
 	timeFactor    int
 	baselineFloor time.Duration
+	// untimedRuns is above 0 while reference runs are no baselines (see
+	// untimed).
+	untimedRuns atomic.Int32
 }
 
 // New creates an App for the workspace.
