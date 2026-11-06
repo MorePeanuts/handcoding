@@ -74,6 +74,10 @@ func (m *model) updateHistory(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if s != nil {
 			m.askRestore(*s)
 		}
+	case "d":
+		if s != nil {
+			m.askDebug(*s)
+		}
 	case "x", "delete", "backspace":
 		if s != nil {
 			m.askDelete(*s)
@@ -84,20 +88,44 @@ func (m *model) updateHistory(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *model) askRestore(s store.Submission) {
 	m.ask(fmt.Sprintf("Replace your current %s solution with submission #%d?", s.Lang, s.ID), func() tea.Cmd {
+		if path, ok := m.restore(s); ok {
+			m.message = ui.Green.Render(fmt.Sprintf("restored #%d into ", s.ID)) + displayPath(path)
+		}
+		return nil
+	})
+}
+
+// askDebug restores s and debugs it on its first failure, which the
+// restore remembers (app.RestoreSubmission).
+func (m *model) askDebug(s store.Submission) {
+	m.ask(fmt.Sprintf("Replace your current %s solution with submission #%d and debug it?", s.Lang, s.ID), func() tea.Cmd {
 		l, err := m.app.Lang(s.Lang)
 		if err != nil {
 			m.message = ui.Red.Render(err.Error())
 			return nil
 		}
-		path, err := m.app.Restore(m.current, l, s.Code)
-		if err != nil {
-			m.message = ui.Red.Render(err.Error())
+		if _, ok := m.restore(s); !ok {
 			return nil
 		}
-		m.message = ui.Green.Render(fmt.Sprintf("restored #%d into ", s.ID)) + displayPath(path)
-		m.refresh()
-		return nil
+		m.message = ui.Green.Render(fmt.Sprintf("restored #%d", s.ID))
+		return m.debug(m.current, l)
 	})
+}
+
+// restore makes s the current solution, reporting failures in the message.
+func (m *model) restore(s store.Submission) (string, bool) {
+	l, err := m.app.Lang(s.Lang)
+	if err != nil {
+		m.message = ui.Red.Render(err.Error())
+		return "", false
+	}
+	path, err := m.app.RestoreSubmission(m.current, l, s)
+	if err != nil {
+		m.message = ui.Red.Render(err.Error())
+		return "", false
+	}
+	m.refresh()
+	return path, true
 }
 
 func (m *model) askDelete(s store.Submission) {
@@ -157,7 +185,7 @@ func (m *model) viewHistory() string {
 	}
 	body := strings.TrimSuffix(b.String(), "\n")
 	sub := ui.Cyan.Render("History") + "  " + ui.Faint.Render(plural(len(m.subs), "submission"))
-	return m.frame(m.problemTitle(p), sub, body, "↑↓ move", "enter view", "r restore", "x delete", "esc back")
+	return m.frame(m.problemTitle(p), sub, body, "↑↓ move", "enter view", "r restore", "d debug", "x delete", "esc back")
 }
 
 func (m *model) renderSubmission() {
@@ -187,6 +215,9 @@ func (m *model) updateSubmission(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		m.askRestore(*m.sub)
 		return m, nil
+	case "d":
+		m.askDebug(*m.sub)
+		return m, nil
 	case "x", "delete", "backspace":
 		m.askDelete(*m.sub)
 		return m, nil
@@ -201,5 +232,5 @@ func (m *model) viewSubmission() string {
 	sub := fmt.Sprintf("%s  %s  %s  %s", ui.Cyan.Render(fmt.Sprintf("Submission #%d", s.ID)),
 		ui.VerdictStyle(runner.Verdict(s.Verdict)).Render(s.Verdict), ui.Faint.Render(s.Lang),
 		ui.Faint.Render(s.CreatedAt.Format("2006-01-02 15:04:05")))
-	return m.frame(m.problemTitle(m.current), sub, m.subView.View(), "↑↓ scroll", "r restore", "x delete", "esc back")
+	return m.frame(m.problemTitle(m.current), sub, m.subView.View(), "↑↓ scroll", "r restore", "d debug", "x delete", "esc back")
 }

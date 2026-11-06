@@ -78,7 +78,7 @@ hc                      # 打开题目列表
 hc start two-sum -e     # 创建解答并在编辑器中打开
 hc test two-sum         # 运行示例用例
 hc submit two-sum       # 用全部用例判题，并记录这次提交
-hc debug two-sum -c 4   # 调试第 4 个用例
+hc debug two-sum        # 调试第一个失败的用例（-c 4：第 4 个用例）
 ```
 
 ## 文档

@@ -360,6 +360,10 @@ func Select(cases []problem.Case, indices []int, all bool) ([]runner.Selected, e
 type RunOptions struct {
 	Stdout io.Writer
 	Stderr io.Writer
+	// Custom is whether the cases are not the problem's own, such as the
+	// input of hc test --input: the run is then not remembered for
+	// debugging (see LastFailure).
+	Custom bool
 }
 
 // Run runs the user's solution against the selected cases, building the
@@ -371,7 +375,15 @@ func (a *App) Run(ctx context.Context, p *problem.Problem, l lang.Language, sel 
 	if !a.HasSolution(p, l) {
 		return nil, fmt.Errorf("no %s solution for %s yet; run `hc start %s -l %s`", l.Name(), p.Slug, a.WS.Ref(p), l.ID())
 	}
-	return a.run(ctx, p, l, filepath.Dir(a.SolutionPath(p, l)), sel, o)
+	code, err := os.ReadFile(a.SolutionPath(p, l))
+	if err != nil {
+		return nil, err
+	}
+	rep, err := a.run(ctx, p, l, filepath.Dir(a.SolutionPath(p, l)), sel, o)
+	if err == nil && !o.Custom {
+		a.recordRun(p, l, code, sel, rep)
+	}
+	return rep, err
 }
 
 // RunFile runs the solution in file instead of the user's, like Run: a

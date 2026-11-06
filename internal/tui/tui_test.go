@@ -568,6 +568,11 @@ func TestRunSubmitHistoryAndDiscard(t *testing.T) {
 	// two-sum has generated cases.
 	requirePython(t)
 	h := newHarness(t)
+	// The list leaves running to the problem's screens.
+	h.press("t", "s", "d")
+	if h.m.top() != screenList || h.m.run != nil || strings.Contains(h.view(), "t test") {
+		t.Fatalf("the list runs: screen %v, run %+v\n%s", h.m.top(), h.m.run, h.view())
+	}
 	h.press("enter") // creates the solution
 	l, _ := h.m.app.Lang("go")
 	path := h.m.app.SolutionPath(h.m.current, l)
@@ -597,6 +602,21 @@ func TestRunSubmitHistoryAndDiscard(t *testing.T) {
 	h.press("h")
 	if h.m.top() != screenHistory || len(h.m.subs) != 1 {
 		t.Fatalf("history: screen %v, %d subs", h.m.top(), len(h.m.subs))
+	}
+	// d restores the submission, which remembers its run, then debugs it.
+	if err := os.WriteFile(path, []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.press("d")
+	if h.m.confirm == nil {
+		t.Fatal("debugging a submission did not ask first")
+	}
+	h.press("y")
+	if data, _ := os.ReadFile(path); string(data) != twoSumGo {
+		t.Fatalf("not restored:\n%s", data)
+	}
+	if d, ok := h.m.app.LastFailure(h.m.current, l); !ok || d.Index != 1 {
+		t.Fatalf("the restored submission's run: %+v %v", d, ok)
 	}
 	h.press("enter")
 	view = h.view()
