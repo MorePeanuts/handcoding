@@ -64,10 +64,7 @@ func newHistoryCmd(root *rootOptions) *cobra.Command {
 			tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 			fmt.Fprintln(tw, "ID\tPROBLEM\tLANG\tVERDICT\tPASSED\tTIME\tSUBMITTED")
 			for _, s := range subs {
-				elapsed := fmt.Sprintf("%dms", s.ElapsedMs)
-				if s.ElapsedMs == 0 {
-					elapsed = "<1ms"
-				}
+				elapsed := ui.SubmissionTime(s.ElapsedMs)
 				fmt.Fprintf(tw, "#%d\t%s\t%s\t%s\t%d/%d\t%s\t%s\n", s.ID, name(s), s.Lang,
 					ui.VerdictStyle(runner.Verdict(s.Verdict)).Render(s.Verdict), s.Passed, s.Total, elapsed,
 					s.CreatedAt.Format("2006-01-02 15:04"))
