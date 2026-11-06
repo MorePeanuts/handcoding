@@ -165,6 +165,47 @@ func TestReferences(t *testing.T) {
 	}
 }
 
+// ProblemOf resolves a stored pack and slug exactly: never an id, a
+// directory name or a slug prefix of another problem.
+func TestProblemOf(t *testing.T) {
+	w := newWorkspace(t)
+	installPack(t, w, "leetcode", "protocol: 1\nname: leetcode\n")
+	installPack(t, w, "broken", "protocol: 2\nname: broken\n")
+	writeProblem(t, w, "leetcode", "0141-linked-list-cycle-ii", problemYAML("141", "linked-list-cycle-ii"))
+	writeProblem(t, w, "leetcode", "0002-two-sum", problemYAML("2", "add-two-numbers"))
+	writeProblem(t, w, "leetcode", "lru-cache", problemYAML("3", "lfu-cache"))
+	writeProblem(t, w, "leetcode", "0042-trap", "slug: trap\ntitle: [x\n")
+	writeProblem(t, w, pack.LocalName, "0001-two-sum", problemYAML("1", "two-sum"))
+
+	if p, err := w.ProblemOf("leetcode", "linked-list-cycle-ii"); err != nil || p.Ref() != "leetcode/linked-list-cycle-ii" {
+		t.Errorf("exact slug: %v, %v", p, err)
+	}
+	if p, err := w.ProblemOf("local", "two-sum"); err != nil || p.Ref() != "local/two-sum" {
+		t.Errorf("local/two-sum: %v, %v", p, err)
+	}
+	for _, slug := range []string{
+		"linked-list-cycle", // a prefix of another slug
+		"141",               // another problem's id
+		"two-sum",           // another problem's directory name, without its id
+		"0002-two-sum",      // another problem's directory name
+		"lru-cache",         // another problem's directory name
+	} {
+		p, err := w.ProblemOf("leetcode", slug)
+		if want := "problem leetcode/" + slug + " no longer exists"; err == nil || err.Error() != want {
+			t.Errorf("%s: %v, %v; want %q", slug, p, err, want)
+		}
+	}
+	if _, err := w.ProblemOf("leetcode", "trap"); err == nil || !strings.Contains(err.Error(), "0042-trap/problem.yaml") {
+		t.Errorf("broken problem: %v, want its load error", err)
+	}
+	if _, err := w.ProblemOf("nope", "two-sum"); err == nil || err.Error() != "problem nope/two-sum no longer exists (no pack nope in this workspace)" {
+		t.Errorf("missing pack: %v", err)
+	}
+	if _, err := w.ProblemOf("broken", "x"); err == nil || !strings.Contains(err.Error(), "problem broken/x: pack broken cannot be read") || !strings.Contains(err.Error(), "protocol 2") {
+		t.Errorf("broken pack: %v", err)
+	}
+}
+
 func TestBrokenPacks(t *testing.T) {
 	w := newWorkspace(t)
 	writeProblem(t, w, pack.LocalName, "mine", problemYAML("", "mine"))
