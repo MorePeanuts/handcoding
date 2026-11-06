@@ -28,17 +28,17 @@ func (n NestedInteger) GetList() []*NestedInteger { return n.list }
 
 func hcDecNested0(raw json.RawMessage) *NestedInteger {
 	if !strings.HasPrefix(strings.TrimSpace(string(raw)), "[") {
-		return &NestedInteger{isInt: true, value: hcJSON[int](raw)}
+		return &NestedInteger{isInt: true, value: hcDec0(raw, hcParseInt)}
 	}
 	n := &NestedInteger{}
-	for _, x := range hcJSON[[]json.RawMessage](raw) {
+	for _, x := range hcRaw1(raw) {
 		n.list = append(n.list, hcDecNested0(x))
 	}
 	return n
 }
 
 func hcDecNested1(raw json.RawMessage) []*NestedInteger {
-	parts := hcJSON[[]json.RawMessage](raw)
+	parts := hcRaw1(raw)
 	out := make([]*NestedInteger, len(parts))
 	for i, p := range parts {
 		out[i] = hcDecNested0(p)

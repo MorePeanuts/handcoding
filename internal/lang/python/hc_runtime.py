@@ -397,25 +397,64 @@ def _elem(t):
     return t[:-2]
 
 
+def _same(v):
+    return v
+
+
+# decode and encode dispatch on the type once: the codec of each type is
+# built on first use and kept. A class problem's case can make a million
+# calls, most of them with scalars, whose codec is _same.
+_DECODER_OF = {}
+_ENCODER_OF = {}
+
+
+def _decoder(t):
+    d = _DECODER_OF.get(t)
+    if d is None:
+        d = _DECODER_OF[t] = _make_decoder(t)
+    return d
+
+
+def _encoder(t):
+    e = _ENCODER_OF.get(t)
+    if e is None:
+        e = _ENCODER_OF[t] = _make_encoder(t)
+    return e
+
+
 def decode(t, v):
+    return _decoder(t)(v)
+
+
+def _make_decoder(t):
     base, depth = _split(t)
     if depth:
-        if not isinstance(v, list):
-            raise InputError("expected array for %s, got %r" % (t, v))
-        return [decode(_elem(t), x) for x in v]
+        elem = _decoder(_elem(t))
+
+        def dec(v):
+            if not isinstance(v, list):
+                raise InputError("expected array for %s, got %r" % (t, v))
+            if elem is _same:
+                return list(v)
+            return [elem(x) for x in v]
+        return dec
     if base == "ListNode":
-        dummy = cur = ListNode()
-        for x in v or []:
-            cur.next = ListNode(x)
-            cur = cur.next
-        return dummy.next
+        return _dec_list
     if base == "TreeNode":
-        return _build_tree(v or [])
+        return lambda v: _build_tree(v or [])
     if base in _DECODERS:
-        return _DECODERS[base](v)
+        return _DECODERS[base]
     if base == "double":
-        return float(v)
-    return v
+        return float
+    return _same
+
+
+def _dec_list(v):
+    dummy = cur = ListNode()
+    for x in v or []:
+        cur.next = ListNode(x)
+        cur = cur.next
+    return dummy.next
 
 
 def _build_tree(vals, cls=TreeNode):
@@ -440,40 +479,62 @@ def _build_tree(vals, cls=TreeNode):
 
 
 def encode(t, v):
+    return _encoder(t)(v)
+
+
+def _make_encoder(t):
     base, depth = _split(t)
     if depth:
-        if v is None:
-            return []
-        return [encode(_elem(t), x) for x in v]
+        elem = _encoder(_elem(t))
+
+        def enc(v):
+            if v is None:
+                return []
+            if elem is _same:
+                return list(v)
+            return [elem(x) for x in v]
+        return enc
     if base == "ListNode":
-        out = []
-        while v is not None:
-            if len(out) >= _MAX_NODES:
-                raise RuntimeError("linked list too long (cycle?)")
-            out.append(v.val)
-            v = v.next
-        return out
+        return _enc_list
     if base == "TreeNode":
-        out, queue, head = [], [v], 0
-        while head < len(queue):
-            if len(out) >= _MAX_NODES:
-                raise RuntimeError("tree too large (cycle?)")
-            node = queue[head]
-            head += 1
-            if node is None:
-                out.append(None)
-                continue
-            out.append(node.val)
-            queue.append(node.left)
-            queue.append(node.right)
-        while out and out[-1] is None:
-            out.pop()
-        return out
+        return _enc_tree
     if base in _ENCODERS:
-        return _ENCODERS[base](v)
-    if base == "double" and v is not None:
-        return float(v)
-    return v
+        return _ENCODERS[base]
+    if base == "double":
+        return _enc_double
+    return _same
+
+
+def _enc_list(v):
+    out = []
+    while v is not None:
+        if len(out) >= _MAX_NODES:
+            raise RuntimeError("linked list too long (cycle?)")
+        out.append(v.val)
+        v = v.next
+    return out
+
+
+def _enc_tree(v):
+    out, queue, head = [], [v], 0
+    while head < len(queue):
+        if len(out) >= _MAX_NODES:
+            raise RuntimeError("tree too large (cycle?)")
+        node = queue[head]
+        head += 1
+        if node is None:
+            out.append(None)
+            continue
+        out.append(node.val)
+        queue.append(node.left)
+        queue.append(node.right)
+    while out and out[-1] is None:
+        out.pop()
+    return out
+
+
+def _enc_double(v):
+    return float(v) if v is not None else v
 
 
 def _reach(t, root):
@@ -920,8 +981,14 @@ def _node_ref(t, node, nodes, name):
 class _Clock:
     """The time of a case is the sum of its timed sections, the calls into
     the user's code. With a time limit (HC_TIME_LIMIT_NS), a watchdog thread
-    reads the clock while the user's code runs, so a lock guards the clock
-    and the output."""
+    reads the clock while the user's code runs. A class problem's case can
+    make a million calls, so start and stop take no lock: started is the
+    start of the timed section (None between sections) and elapsed the time
+    of the case's sections before it, which stop updates in that order and
+    the watchdog reads in the other, so that it never counts a section
+    twice. The lock guards the rest: the case, the total and the output."""
+
+    __slots__ = ("out", "limit", "lock", "total", "case", "elapsed", "started")
 
     def __init__(self, out, limit):
         self.out, self.limit = out, limit
@@ -929,32 +996,35 @@ class _Clock:
         self.total = 0  # of the cases before self.case, the one running
         self.case = None
         self.elapsed = 0
-        self.timing = False
-        self.started = 0
+        self.started = None
         if limit:
             threading.Thread(target=self._watch, daemon=True).start()
 
     def begin(self, case_id):
         with self.lock:
-            self.case, self.elapsed, self.timing = case_id, 0, False
+            self.case, self.elapsed, self.started = case_id, 0, None
 
     def start(self):
-        with self.lock:
-            self.timing = True
-            self.started = time.perf_counter_ns()
+        self.started = time.perf_counter_ns()
 
     def stop(self):
         now = time.perf_counter_ns()
-        with self.lock:
-            if self.timing:
-                self.elapsed += now - self.started
-                self.timing = False
+        started = self.started
+        if started is not None:
+            self.started = None
+            self.elapsed += now - started
 
-    def write(self, res):
-        """Write a case's result line; True when the total is over the
-        limit, and the run stops."""
+    def write(self, res, output=None):
+        """Write a case's result line, with its output already encoded if
+        it has one; True when the total is over the limit, and the run
+        stops."""
+        if output is None:
+            line = json.dumps(res, ensure_ascii=False)
+        else:
+            # What json.dumps(res) writes, without encoding the output again.
+            line = '{"id": %s, "output": %s, "elapsed_ns": %d}' % (json.dumps(res["id"]), output, res["elapsed_ns"])
         with self.lock:
-            self.out.write(json.dumps(res, ensure_ascii=False) + "\n")
+            self.out.write(line + "\n")
             self.out.flush()
             self.total += res["elapsed_ns"]
             self.elapsed = 0
@@ -968,8 +1038,9 @@ class _Clock:
         while True:
             with self.lock:
                 spent = self.total + self.elapsed
-                if self.timing:
-                    spent += time.perf_counter_ns() - self.started
+                started = self.started
+                if started is not None:
+                    spent += time.perf_counter_ns() - started
                     if spent > self.limit:
                         res = {"id": self.case, "output": None, "elapsed_ns": spent - self.total, "time_limit": True}
                         self.out.write(json.dumps(res) + "\n")
@@ -1021,31 +1092,59 @@ def _call_class(solution, meta, inp, clock):
     ops, args = inp.get("ops"), inp.get("args")
     if not ops or ops is None or args is None or len(ops) != len(args):
         raise InputError("ops and args must be non-empty and of equal length")
-    methods = {m["name"]: m for m in cls_meta["methods"]}
     cls = getattr(solution, cls_meta["name"])
 
-    def conv(params, raw):
-        if len(raw) != len(params):
-            raise InputError("expected %d arguments, got %r" % (len(params), raw))
-        return [decode(p["type"], a) for p, a in zip(params, raw)]
+    # A case can make a million calls, so what a call needs is looked up once
+    # per method: the number of arguments, their decoders (None when every
+    # argument is a scalar, as json.loads decoded it), the result's encoder
+    # (None for a void method) and, from its first call, the bound method.
+    # A method problem.yaml gives no params takes none, as in the Go driver.
+    def sig(params, returns):
+        params = params or []
+        decoders = [_decoder(p["type"]) for p in params]
+        if all(d is _same for d in decoders):
+            decoders = None
+        return [len(params), decoders, None if returns == "void" else _encoder(returns), None]
+
+    methods = {m["name"]: sig(m["params"], m["returns"]) for m in cls_meta["methods"]}
 
     # Each call is timed on its own, after its arguments are decoded and
-    # before its result is encoded.
+    # before its result is encoded; in the loop, clock.start and clock.stop
+    # are written out.
+    pc, same = time.perf_counter_ns, _same
     out = [None] * len(ops)
-    argv = conv(cls_meta["constructor"], args[0])
+    n, decoders, _, _ = sig(cls_meta["constructor"], "void")
+    argv = args[0]
+    if len(argv) != n:
+        raise InputError("expected %d arguments, got %r" % (n, argv))
+    if decoders is not None:
+        argv = [d(a) for d, a in zip(decoders, argv)]
     clock.start()
     obj = cls(*argv)
     clock.stop()
     for i in range(1, len(ops)):
-        m = methods.get(ops[i])
+        op = ops[i]
+        m = methods.get(op)
         if m is None:
-            raise InputError("unknown method %r" % ops[i])
-        argv = conv(m["params"], args[i])
-        method = getattr(obj, ops[i])
-        clock.start()
+            raise InputError("unknown method %r" % op)
+        n, decoders, enc, method = m
+        argv = args[i]
+        if len(argv) != n:
+            raise InputError("expected %d arguments, got %r" % (n, argv))
+        if decoders is not None:
+            argv = [d(a) for d, a in zip(decoders, argv)]
+        if method is None:
+            method = m[3] = getattr(obj, op)
+        clock.started = pc()
         ret = method(*argv)
-        clock.stop()
-        out[i] = None if m["returns"] == "void" else encode(m["returns"], ret)
+        now = pc()
+        started = clock.started
+        clock.started = None
+        clock.elapsed += now - started
+        if enc is same:
+            out[i] = ret
+        elif enc is not None:
+            out[i] = enc(ret)
     return out
 
 
@@ -1099,14 +1198,14 @@ def main(meta):
         clock = _Clock(out, limit)
         for c in cases:
             res = {"id": c["id"], "output": None, "elapsed_ns": 0}
+            output = None
             clock.begin(c["id"])
             try:
-                res["output"] = call(solution, meta, c["input"], clock)
-                json.dumps(res["output"])
+                output = json.dumps(call(solution, meta, c["input"], clock), ensure_ascii=False)
             except Exception as e:  # noqa: BLE001
                 # Stop first: formatting the error is not the user's time.
                 clock.stop()
-                res["output"] = None
+                output = None
                 if isinstance(e, InputError):
                     res["error"] = "invalid input: %s" % e
                 elif isinstance(e, RecursionError):
@@ -1115,5 +1214,5 @@ def main(meta):
                     res["error"] = _user_traceback(e)
             clock.stop()
             res["elapsed_ns"] = clock.elapsed
-            if clock.write(res):
+            if clock.write(res, output):
                 break

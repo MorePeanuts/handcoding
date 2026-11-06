@@ -1,6 +1,7 @@
 package problem
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -113,6 +114,9 @@ func ValidateType(t string, allowVoid bool) error {
 // The error names the offending element, e.g. `[2]: must be integer, got
 // string "x"`.
 func CheckValue(t string, raw json.RawMessage) error {
+	if scalarsOK(t, raw) {
+		return nil
+	}
 	v, err := decodeValue(raw)
 	if err != nil {
 		return err
@@ -125,6 +129,10 @@ func CheckValue(t string, raw json.RawMessage) error {
 // (that is []), no trailing nulls in a level order, and [0,1] for a QuadNode
 // that is not a leaf. A value in any other form matches no output.
 func checkOutput(t string, raw json.RawMessage) error {
+	// Scalars and arrays of them have no other output form.
+	if scalarsOK(t, raw) {
+		return nil
+	}
 	v, err := decodeValue(raw)
 	if err != nil {
 		return err
@@ -166,6 +174,89 @@ func scalarOK(t string, raw []byte) bool {
 		return string(raw) == "true" || string(raw) == "false"
 	}
 	return false
+}
+
+// scalarsOK reports whether raw is a valid JSON value plainly of t, a scalar
+// type or an array type of one, which CheckValue would accept, without
+// decoding it (see scalarOK); false means CheckValue has to tell. Large
+// inputs and outputs are mostly arrays of numbers, which decoding into
+// values would cost as much as running a solution on them.
+func scalarsOK(t string, raw []byte) bool {
+	switch base, _ := SplitArray(t); base {
+	case TypeInteger, TypeLong, TypeDouble, TypeString, TypeBoolean:
+		return json.Valid(raw) && validScalarsOK(t, trimSpace(raw))
+	}
+	return false
+}
+
+// validScalarsOK is scalarsOK for a valid JSON value without surrounding
+// whitespace.
+func validScalarsOK(t string, raw []byte) bool {
+	if !strings.HasSuffix(t, "[]") {
+		return scalarOK(t, raw)
+	}
+	elems, ok := validElements(raw)
+	if !ok {
+		return false
+	}
+	elem := strings.TrimSuffix(t, "[]")
+	for _, e := range elems {
+		if !validScalarsOK(elem, e) {
+			return false
+		}
+	}
+	return true
+}
+
+// arrayElements splits raw into its elements, as json.Unmarshal into a
+// []json.RawMessage does, without decoding them; false when raw is not a
+// valid JSON array.
+func arrayElements(raw []byte) ([]json.RawMessage, bool) {
+	if !json.Valid(raw) {
+		return nil, false
+	}
+	return validElements(trimSpace(raw))
+}
+
+// validElements is arrayElements for a valid JSON value without surrounding
+// whitespace: it only has to find the commas between its elements.
+func validElements(raw []byte) ([]json.RawMessage, bool) {
+	if len(raw) < 2 || raw[0] != '[' {
+		return nil, false
+	}
+	out := []json.RawMessage{}
+	depth, start, str, esc := 0, 1, false, false
+	for i := 1; i < len(raw)-1; i++ {
+		switch c := raw[i]; {
+		case str:
+			switch {
+			case esc:
+				esc = false
+			case c == '\\':
+				esc = true
+			case c == '"':
+				str = false
+			}
+		case c == '"':
+			str = true
+		case c == '[' || c == '{':
+			depth++
+		case c == ']' || c == '}':
+			depth--
+		case c == ',' && depth == 0:
+			out = append(out, trimSpace(raw[start:i]))
+			start = i + 1
+		}
+	}
+	if last := trimSpace(raw[start : len(raw)-1]); len(last) > 0 {
+		out = append(out, last)
+	}
+	return out, true
+}
+
+// trimSpace trims JSON's whitespace.
+func trimSpace(b []byte) []byte {
+	return bytes.Trim(b, " \t\r\n")
 }
 
 // checkOutputForm checks the output form of a value checkValue accepted.

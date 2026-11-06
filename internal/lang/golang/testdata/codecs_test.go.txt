@@ -1,0 +1,153 @@
+package main
+
+// TestDriverCodecs (codecs_test.go in the parent directory) runs these tests
+// in a module with a generated driver: the driver's own parsers and encoder
+// must decode, refuse and encode every value as encoding/json does.
+
+import (
+	"bytes"
+	"encoding/json"
+	"math"
+	"reflect"
+	"testing"
+)
+
+// catch returns f's result, or what it panicked with.
+func catch(f func() any) (v any, p any) {
+	defer func() { p = recover() }()
+	return f(), nil
+}
+
+// inputs are values of every kind, compact or not, valid or not.
+var inputs = []string{
+	`0`, `-0`, `7`, `-12`, `01`, `1.5`, `-1.25e3`, `1e2`, `1E+2`, `1e-2`, `1.`, `.5`, `-`, `+1`, `1e400`, `-1e400`,
+	`9223372036854775807`, `-9223372036854775808`, `9223372036854775808`, `123456789012345678`, `1234567890123456789`,
+	`true`, `false`, `null`, `nul`, `tru`, `"a"`, `""`, `"ab"`, `"é"`, `"a\"b"`, `"é"`, `"😀"`, `"\ud800"`,
+	`"a\/b\\c\n"`, `"<&>"`, "\"\x7f\"", "\"\xff\"", "\"a\tb\"", `"\x"`, `"abc`, `"\u12"`,
+	`[]`, `[ ]`, `[1]`, `[1,2,3]`, `[1, 2]`, ` [1]`, `[1] `, `[1,]`, `[,1]`, `[1 2]`, `[01]`, `[1,null]`, `[null]`, `[1.5]`,
+	`[-0,9]`, `[[1],[2,3]]`, `[[],[1]]`, `[[1],null]`, `[[1],[2]`, `[[1],[2]]]`, `[[1,[2]]]`, `[["a","b"],["c"]]`,
+	`["a","bb",""]`, `["a",1]`, `[true,false]`, `[1,"x"]`, `{"a":1}`, `[{"a":1},{}]`, `[{"a":[1,{"b":null}]}]`,
+	`[{"a" :1}]`, `[{"a":1,}]`, `[{1:1}]`, `[[1],{"a":1}]`, `[[[1]]]`, `[["c"]]`, `["\ud800"]`, `[1e0]`,
+}
+
+func TestDecoders(t *testing.T) {
+	type decoder struct {
+		name       string
+		fast, slow func(json.RawMessage) any
+	}
+	decoders := []decoder{
+		{"int", func(r json.RawMessage) any { return hcDec0(r, hcParseInt) }, func(r json.RawMessage) any { return hcJSON[int](r) }},
+		{"int64", func(r json.RawMessage) any { return hcDec0(r, hcParseLong) }, func(r json.RawMessage) any { return hcJSON[int64](r) }},
+		{"float64", func(r json.RawMessage) any { return hcDec0(r, hcParseDouble) }, func(r json.RawMessage) any { return hcJSON[float64](r) }},
+		{"bool", func(r json.RawMessage) any { return hcDec0(r, hcParseBool) }, func(r json.RawMessage) any { return hcJSON[bool](r) }},
+		{"string", func(r json.RawMessage) any { return hcDec0(r, hcParseString) }, func(r json.RawMessage) any { return hcJSON[string](r) }},
+		{"[]int", func(r json.RawMessage) any { return hcDec1(r, hcParseInt) }, func(r json.RawMessage) any { return hcJSON[[]int](r) }},
+		{"[]int64", func(r json.RawMessage) any { return hcDec1(r, hcParseLong) }, func(r json.RawMessage) any { return hcJSON[[]int64](r) }},
+		{"[]float64", func(r json.RawMessage) any { return hcDec1(r, hcParseDouble) }, func(r json.RawMessage) any { return hcJSON[[]float64](r) }},
+		{"[]bool", func(r json.RawMessage) any { return hcDec1(r, hcParseBool) }, func(r json.RawMessage) any { return hcJSON[[]bool](r) }},
+		{"[]string", func(r json.RawMessage) any { return hcDec1(r, hcParseString) }, func(r json.RawMessage) any { return hcJSON[[]string](r) }},
+		{"[]*int", func(r json.RawMessage) any { return hcDec1(r, hcParseIntPtr) }, func(r json.RawMessage) any { return hcJSON[[]*int](r) }},
+		{"[][]int", func(r json.RawMessage) any { return hcDec2(r, hcParseInt) }, func(r json.RawMessage) any { return hcJSON[[][]int](r) }},
+		{"[][]string", func(r json.RawMessage) any { return hcDec2(r, hcParseString) }, func(r json.RawMessage) any { return hcJSON[[][]string](r) }},
+		{"[][]*int", func(r json.RawMessage) any { return hcDec2(r, hcParseIntPtr) }, func(r json.RawMessage) any { return hcJSON[[][]*int](r) }},
+		{"[]json.RawMessage", func(r json.RawMessage) any { return hcRaw1(r) }, func(r json.RawMessage) any { return hcJSON[[]json.RawMessage](r) }},
+		{"[][]json.RawMessage", func(r json.RawMessage) any { return hcDec2(r, hcParseRaw) }, func(r json.RawMessage) any { return hcJSON[[][]json.RawMessage](r) }},
+	}
+	for _, d := range decoders {
+		for _, in := range inputs {
+			fast, fastPanic := catch(func() any { return d.fast(json.RawMessage(in)) })
+			slow, slowPanic := catch(func() any { return d.slow(json.RawMessage(in)) })
+			if !reflect.DeepEqual(fast, slow) || !reflect.DeepEqual(fastPanic, slowPanic) {
+				t.Errorf("%s %s: decoded as %#v (panic %v), encoding/json gives %#v (panic %v)", d.name, in, fast, fastPanic, slow, slowPanic)
+			}
+		}
+	}
+}
+
+// The parsers read what hc writes themselves, without encoding/json.
+func TestFastPaths(t *testing.T) {
+	array := func(parse func([]byte) (int, int)) func([]byte) int {
+		return func(b []byte) int { _, n := hcParseArray(b, parse); return n }
+	}
+	for _, tt := range []struct {
+		in    string
+		parse func([]byte) int
+	}{
+		{`[1,-2,30]`, array(hcParseInt)},
+		{`[-0]`, array(hcParseInt)},
+		{`[[1],[],[2,3]]`, func(b []byte) int { _, n := hcParseRaw(b); return n }},
+		{`["a","é",""]`, func(b []byte) int { _, n := hcParseArray(b, hcParseString); return n }},
+		{`["LRUCache","put"]`, func(b []byte) int { _, n := hcParseArray(b, hcParseString); return n }},
+		{`[1,null,2]`, func(b []byte) int { _, n := hcParseArray(b, hcParseIntPtr); return n }},
+		{`[1.5,-2e3,0]`, func(b []byte) int { _, n := hcParseArray(b, hcParseDouble); return n }},
+		{`[true,false]`, func(b []byte) int { _, n := hcParseArray(b, hcParseBool); return n }},
+		{`[{"id":1,"input":{"args":[[2],[1,1]],"ops":["LRUCache","put"]}},{"id":2,"input":{"s":"a\"<b"}}]`,
+			func(b []byte) int { _, n := hcParseArray(b, hcParseCase); return n }},
+	} {
+		if n := tt.parse([]byte(tt.in)); n != len(tt.in) {
+			t.Errorf("%s: parsed %d bytes, want all %d", tt.in, n, len(tt.in))
+		}
+	}
+}
+
+// Cases files hcParseCase reads are read as encoding/json reads them.
+func TestCases(t *testing.T) {
+	for _, in := range []string{
+		`[]`,
+		`[{"id":1,"input":{}}]`,
+		`[{"id":1,"input":{"nums":[1,2],"target":3}},{"id":12,"input":{"s":"a\"b"}}]`,
+		`[{"id":1,"input":{"a":1,"a":2}}]`,
+		`[{"id":1,"input":{"a":1}},]`,
+		`[{"input":{"a":1},"id":1}]`,
+		`[{"id":1,"input":{"a":1},"x":2}]`,
+		`[{"id":1.0,"input":{"a":1}}]`,
+		`[{"id":1,"input":{"ab":1}}]`,
+		`[{"id":1,"input":null}]`,
+		`[{"id":1, "input":{"a":1}}]`,
+		`[{"id":1,"input":{"a":1}}`,
+		`[{"id":1,"input":{"a":1}}}]`,
+		`[{"id":1,"input":{"a":1,}}]`,
+		`[{"id":1,"input":{"a":}}]`,
+		`[{"ID":1,"input":{"a":1}}]`,
+	} {
+		var want []hcCase
+		werr := json.Unmarshal([]byte(in), &want)
+		got, n := hcParseArray([]byte(in), hcParseCase)
+		if n == 0 || n != len(in) {
+			continue // read by encoding/json
+		}
+		if werr != nil || !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: read as %#v, encoding/json reads %#v (%v)", in, got, want, werr)
+		}
+	}
+}
+
+// oldEncode is how outputs were encoded before hcEncode.
+func oldEncode(v any) (json.RawMessage, error) {
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(hcNorm(reflect.ValueOf(v))); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(b.Bytes(), []byte("\n")), nil
+}
+
+func TestEncode(t *testing.T) {
+	var nilInts []int
+	var nilAny []any
+	var nilStrings []string
+	for _, v := range []any{
+		nil, 0, -5, 1 << 62, int64(-1 << 63), true, false, "", "abc", "a<b>&c", "é", "a\"b", "a\\b", "\x01", "\x7f", "\xff",
+		" ", 1.5, 0.1 + 0.2, math.Copysign(0, -1), 1e21, 1e-7, 1e20, 5e-324, math.NaN(), math.Inf(-1), byte(3),
+		[]int{}, nilInts, []int{1, -2}, []int64{3}, []bool{true}, []string{"a", "<", "é"}, nilStrings, [][]int{{1}, nil, {}},
+		[]float64{1.5, 2}, []float64(nil), [][]string{nil, {"x"}}, nilAny, []any{nil, 1, "a", []int(nil), []any{true, nil}},
+		[]any{1, math.NaN()}, []any{[]float64{math.Inf(1)}}, [][][]int{{{1}}, nil}, []*int{nil}, map[string]any{"b": 1, "a": []int(nil)},
+	} {
+		got, gerr := hcEncode(v)
+		want, werr := oldEncode(v)
+		if string(got) != string(want) || (gerr == nil) != (werr == nil) || gerr != nil && gerr.Error() != werr.Error() {
+			t.Errorf("hcEncode(%#v) = %s (%v), want %s (%v)", v, got, gerr, want, werr)
+		}
+	}
+}

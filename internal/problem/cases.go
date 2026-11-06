@@ -529,9 +529,11 @@ func validateClassExpected(c Case, sigs []Method) error {
 	if !c.HasExpected() {
 		return nil
 	}
-	var expected []json.RawMessage
-	if err := json.Unmarshal(c.Expected, &expected); err != nil {
-		return errors.New("expected: must be an array with one return value per op")
+	expected, ok := arrayElements(c.Expected)
+	if !ok {
+		if err := json.Unmarshal(c.Expected, &expected); err != nil {
+			return errors.New("expected: must be an array with one return value per op")
+		}
 	}
 	if len(expected) != len(sigs) {
 		return fmt.Errorf("expected has %d entries but there are %d ops", len(expected), len(sigs))

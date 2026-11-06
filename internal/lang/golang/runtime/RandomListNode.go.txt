@@ -10,7 +10,7 @@ func hcNodeLinks(n *Node) []*Node { return []*Node{n.Next, n.Random} }
 
 // hcDecNode0 reads [[val, randomIndex or null], ...].
 func hcDecNode0(raw json.RawMessage) *Node {
-	pairs := hcJSON[[][]*int](raw)
+	pairs := hcDec2(raw, hcParseIntPtr)
 	nodes := make([]*Node, len(pairs))
 	for i, p := range pairs {
 		if len(p) != 2 || p[0] == nil {

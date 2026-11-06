@@ -7,6 +7,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -15,7 +16,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
+	"unicode/utf8"
 )
 
 // ListNode is a node of a singly-linked list.
@@ -50,13 +53,20 @@ type hcInputError struct{ msg string }
 // The time of a case is the sum of its timed sections, the calls into the
 // user's code: a class problem times each call, not the decoding of its
 // arguments or the encoding of its results in between. With a time limit,
-// hcWatch reads the clock while the user's code runs, so hcMu guards the
-// clock and the output.
+// hcWatch reads the clock while the user's code runs. A class problem's case
+// can make a million calls, so hcStart and hcStop take no lock: the clock is
+// two atomics, the start of the timed section (hcNotTiming between
+// sections) and the time of the case's sections before it, which hcStop
+// updates in that order and hcWatch reads in the other, so that it never
+// counts a section twice. hcMu guards the rest: the case, the total and the
+// output.
 var (
-	hcMu        sync.Mutex
-	hcStartTime time.Time
-	hcElapsed   time.Duration
-	hcTiming    bool
+	// hcBase is the origin of the clock: time.Since reads only the
+	// monotonic clock.
+	hcBase    = time.Now()
+	hcStartNs atomic.Int64
+	hcElapsed atomic.Int64
+	hcMu      sync.Mutex
 	// hcTotal is the time of the cases before hcCaseID, the one running.
 	hcTotal  time.Duration
 	hcCaseID int
@@ -64,21 +74,17 @@ var (
 	hcEnc    *json.Encoder
 )
 
+const hcNotTiming = -1
+
 func hcStart() {
-	hcMu.Lock()
-	hcTiming = true
-	hcStartTime = time.Now()
-	hcMu.Unlock()
+	hcStartNs.Store(int64(time.Since(hcBase)))
 }
 
 func hcStop() {
-	now := time.Now()
-	hcMu.Lock()
-	if hcTiming {
-		hcElapsed += now.Sub(hcStartTime)
-		hcTiming = false
+	now := int64(time.Since(hcBase))
+	if start := hcStartNs.Swap(hcNotTiming); start != hcNotTiming {
+		hcElapsed.Add(now - start)
 	}
-	hcMu.Unlock()
 }
 
 // hcWatch ends the run when the time limit is spent in the middle of a
@@ -88,9 +94,9 @@ func hcStop() {
 func hcWatch(limit time.Duration) {
 	for {
 		hcMu.Lock()
-		spent := hcTotal + hcElapsed
-		if hcTiming {
-			spent += time.Since(hcStartTime)
+		spent := hcTotal + time.Duration(hcElapsed.Load())
+		if start := hcStartNs.Load(); start != hcNotTiming {
+			spent += time.Since(hcBase) - time.Duration(start)
 			if spent > limit {
 				_ = hcEnc.Encode(hcResult{ID: hcCaseID, ElapsedNs: (spent - hcTotal).Nanoseconds(), TimeLimit: true})
 				_ = hcOut.Sync()
@@ -108,10 +114,13 @@ func main() {
 		fmt.Fprintln(os.Stderr, "hc driver:", err)
 		os.Exit(2)
 	}
-	var cases []hcCase
-	if err := json.Unmarshal(data, &cases); err != nil {
-		fmt.Fprintln(os.Stderr, "hc driver: decode cases:", err)
-		os.Exit(2)
+	cases, n := hcParseArray(data, hcParseCase)
+	if n == 0 || n != len(data) {
+		cases = nil
+		if err := json.Unmarshal(data, &cases); err != nil {
+			fmt.Fprintln(os.Stderr, "hc driver: decode cases:", err)
+			os.Exit(2)
+		}
 	}
 	out, err := os.Create(os.Getenv("HC_OUT"))
 	if err != nil {
@@ -122,6 +131,7 @@ func main() {
 	enc := json.NewEncoder(out)
 	enc.SetEscapeHTML(false)
 	hcOut, hcEnc = out, enc
+	hcStartNs.Store(hcNotTiming)
 	// With a time limit, the run stops after the case whose time brings the
 	// total over it.
 	var limit time.Duration
@@ -140,7 +150,7 @@ func main() {
 		err := enc.Encode(res)
 		_ = out.Sync()
 		hcTotal += time.Duration(res.ElapsedNs)
-		hcElapsed = 0
+		hcElapsed.Store(0)
 		over := limit > 0 && hcTotal > limit
 		hcMu.Unlock()
 		if err != nil {
@@ -158,7 +168,7 @@ func hcRun(c hcCase) (res hcResult) {
 	defer func() {
 		if r := recover(); r != nil {
 			hcStop()
-			res.ElapsedNs = hcElapsed.Nanoseconds()
+			res.ElapsedNs = hcElapsed.Load()
 			res.Output = nil
 			if ie, ok := r.(hcInputError); ok {
 				res.Error = "invalid input: " + ie.msg
@@ -168,20 +178,124 @@ func hcRun(c hcCase) (res hcResult) {
 		}
 	}()
 	hcMu.Lock()
-	hcCaseID, hcElapsed, hcTiming = c.ID, 0, false
+	hcCaseID = c.ID
+	hcElapsed.Store(0)
+	hcStartNs.Store(hcNotTiming)
 	hcMu.Unlock()
-	v := hcNorm(reflect.ValueOf(hcCall(c.Input)))
-	var b strings.Builder
-	enc := json.NewEncoder(&b)
-	// Write & < > as they are, as Python's json module does.
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(v); err != nil {
+	out, err := hcEncode(hcCall(c.Input))
+	if err != nil {
 		res.Error = "encode output: " + err.Error()
 		return res
 	}
-	res.Output = json.RawMessage(strings.TrimSuffix(b.String(), "\n"))
-	res.ElapsedNs = hcElapsed.Nanoseconds()
+	res.Output = out
+	res.ElapsedNs = hcElapsed.Load()
 	return res
+}
+
+// Outputs are encoded as encoding/json encodes them after hcNorm, with
+// SetEscapeHTML(false): & < > as they are, as Python's json module writes
+// them. hcAppend writes the values most outputs are made of (integers,
+// booleans, plain ASCII strings and slices of them) itself, and the others
+// with encoding/json, value by value: a class problem's output has a value
+// per call. Should encoding/json fail on one, hcEncode encodes the output
+// again as a whole, so that the error is the one it gives.
+func hcEncode(v any) (json.RawMessage, error) {
+	if b, ok := hcAppend(nil, v); ok {
+		return b, nil
+	}
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(hcNorm(reflect.ValueOf(v))); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(b.Bytes(), []byte("\n")), nil
+}
+
+// hcAppend appends the JSON encoding of v to b; false when encoding/json
+// fails on a value of it.
+func hcAppend(b []byte, v any) ([]byte, bool) {
+	switch v := v.(type) {
+	case nil:
+		return append(b, "null"...), true
+	case int:
+		return strconv.AppendInt(b, int64(v), 10), true
+	case int64:
+		return strconv.AppendInt(b, v, 10), true
+	case bool:
+		return strconv.AppendBool(b, v), true
+	case string:
+		return hcAppendString(b, v)
+	case []any:
+		return hcAppendSlice(b, v, hcAppend)
+	case []int:
+		return hcAppendSlice(b, v, hcAppendInt[int])
+	case []int64:
+		return hcAppendSlice(b, v, hcAppendInt[int64])
+	case []bool:
+		return hcAppendSlice(b, v, hcAppendBool)
+	case []string:
+		return hcAppendSlice(b, v, hcAppendString)
+	case [][]int:
+		return hcAppendSlice(b, v, hcAppendInts)
+	}
+	return hcAppendJSON(b, v)
+}
+
+func hcAppendInt[T int | int64](b []byte, n T) ([]byte, bool) {
+	return strconv.AppendInt(b, int64(n), 10), true
+}
+
+func hcAppendBool(b []byte, v bool) ([]byte, bool) { return strconv.AppendBool(b, v), true }
+
+func hcAppendInts(b []byte, s []int) ([]byte, bool) {
+	return hcAppendSlice(b, s, hcAppendInt[int])
+}
+
+// hcAppendSlice writes a nil slice as [], as hcNorm has it.
+func hcAppendSlice[T any](b []byte, s []T, elem func([]byte, T) ([]byte, bool)) ([]byte, bool) {
+	b = append(b, '[')
+	for i, x := range s {
+		if i > 0 {
+			b = append(b, ',')
+		}
+		var ok bool
+		if b, ok = elem(b, x); !ok {
+			return b, false
+		}
+	}
+	return append(b, ']'), true
+}
+
+// hcAppendString writes printable ASCII without quotes and backslashes,
+// which every encoder writes as it is, and leaves other strings to
+// encoding/json.
+func hcAppendString(b []byte, s string) ([]byte, bool) {
+	for i := 0; i < len(s); i++ {
+		if c := s[i]; c < 0x20 || c > 0x7e || c == '"' || c == '\\' {
+			return hcAppendJSON(b, s)
+		}
+	}
+	b = append(b, '"')
+	b = append(b, s...)
+	return append(b, '"'), true
+}
+
+var (
+	hcJSONBuf bytes.Buffer
+	hcJSONEnc = func() *json.Encoder {
+		enc := json.NewEncoder(&hcJSONBuf)
+		enc.SetEscapeHTML(false)
+		return enc
+	}()
+)
+
+func hcAppendJSON(b []byte, v any) ([]byte, bool) {
+	hcJSONBuf.Reset()
+	if err := hcJSONEnc.Encode(hcNorm(reflect.ValueOf(v))); err != nil {
+		return b, false
+	}
+	return append(b, bytes.TrimSuffix(hcJSONBuf.Bytes(), []byte("\n"))...), true
 }
 
 // hcNorm turns nil slices into empty arrays so that a nil []int is judged
@@ -268,8 +382,347 @@ func hcJSON[T any](raw json.RawMessage) T {
 	return v
 }
 
+// Inputs are decoded without encoding/json where they can be: a class
+// problem's case decodes every argument of every call. hc writes the cases
+// as compact JSON, and the parsers below read the part of it that every
+// version of encoding/json reads the same way: JSON without whitespace,
+// whose strings are valid UTF-8 and escape no surrogate. A parser parses the
+// value its input starts with, returning it and its length, or 0 for a
+// value it does not read; encoding/json then decodes the value (or refuses
+// it, with the error it gives). The parsers of values read integers,
+// numbers, booleans, strings without escapes and arrays of them.
+
+// hcDec0 decodes a value with parse.
+func hcDec0[T any](raw json.RawMessage, parse func([]byte) (T, int)) T {
+	if v, n := parse(raw); n > 0 && n == len(raw) {
+		return v
+	}
+	return hcJSON[T](raw)
+}
+
+// hcDec1 decodes an array of values with parse.
+func hcDec1[T any](raw json.RawMessage, parse func([]byte) (T, int)) []T {
+	if v, n := hcParseArray(raw, parse); n > 0 && n == len(raw) {
+		return v
+	}
+	return hcJSON[[]T](raw)
+}
+
+// hcDec2 decodes an array of arrays of values with parse.
+func hcDec2[T any](raw json.RawMessage, parse func([]byte) (T, int)) [][]T {
+	row := func(b []byte) ([]T, int) { return hcParseArray(b, parse) }
+	if v, n := hcParseArray(raw, row); n > 0 && n == len(raw) {
+		return v
+	}
+	return hcJSON[[][]T](raw)
+}
+
+// hcRaw1 splits an array into its elements.
+func hcRaw1(raw json.RawMessage) []json.RawMessage {
+	return hcDec1(raw, hcParseRaw)
+}
+
+// hcParseArray parses an array of values parse parses: [] is an empty
+// slice, not nil, as encoding/json has it, and null is left to it.
+func hcParseArray[T any](b []byte, parse func([]byte) (T, int)) ([]T, int) {
+	if len(b) < 2 || b[0] != '[' {
+		return nil, 0
+	}
+	if b[1] == ']' {
+		return []T{}, 2
+	}
+	var out []T
+	for i := 1; ; {
+		v, n := parse(b[i:])
+		if n == 0 {
+			return nil, 0
+		}
+		out = append(out, v)
+		i += n
+		if i == len(b) {
+			return nil, 0
+		}
+		switch b[i] {
+		case ']':
+			return out, i + 1
+		case ',':
+			i++
+		default:
+			return nil, 0
+		}
+	}
+}
+
+// hcParseCase parses a case as hc writes it, {"id":1,"input":{"name":value,
+// ...}}, without a name twice.
+func hcParseCase(b []byte) (hcCase, int) {
+	const id, input = `{"id":`, `,"input":{`
+	if !bytes.HasPrefix(b, []byte(id)) {
+		return hcCase{}, 0
+	}
+	i := len(id)
+	c := hcCase{Input: map[string]json.RawMessage{}}
+	var n int
+	if c.ID, n = hcParseInt(b[i:]); n == 0 || !bytes.HasPrefix(b[i+n:], []byte(input)) {
+		return hcCase{}, 0
+	}
+	i += n + len(input)
+	for i < len(b) && b[i] != '}' {
+		if len(c.Input) > 0 {
+			if b[i] != ',' {
+				return hcCase{}, 0
+			}
+			i++
+		}
+		key, n := hcParseString(b[i:])
+		if _, dup := c.Input[key]; n == 0 || dup {
+			return hcCase{}, 0
+		}
+		i += n
+		if i == len(b) || b[i] != ':' {
+			return hcCase{}, 0
+		}
+		i++
+		if n = hcSkip(b[i:]); n == 0 {
+			return hcCase{}, 0
+		}
+		c.Input[key] = json.RawMessage(b[i : i+n])
+		i += n
+	}
+	// The input's closing brace, then the case's.
+	if i+1 >= len(b) || b[i+1] != '}' {
+		return hcCase{}, 0
+	}
+	return c, i + 2
+}
+
+// hcSkip returns the length of the value b starts with, or 0.
+func hcSkip(b []byte) int {
+	if len(b) == 0 {
+		return 0
+	}
+	switch c := b[0]; {
+	case c == '"':
+		return hcSkipString(b)
+	case c == '[', c == '{':
+		end := byte(']')
+		if c == '{' {
+			end = '}'
+		}
+		if len(b) > 1 && b[1] == end {
+			return 2
+		}
+		for i := 1; ; {
+			if c == '{' {
+				n := hcSkipString(b[i:])
+				if n == 0 || i+n == len(b) || b[i+n] != ':' {
+					return 0
+				}
+				i += n + 1
+			}
+			n := hcSkip(b[i:])
+			if n == 0 || i+n == len(b) {
+				return 0
+			}
+			i += n
+			switch b[i] {
+			case end:
+				return i + 1
+			case ',':
+				i++
+			default:
+				return 0
+			}
+		}
+	case c == 't':
+		if bytes.HasPrefix(b, []byte("true")) {
+			return 4
+		}
+	case c == 'f':
+		if bytes.HasPrefix(b, []byte("false")) {
+			return 5
+		}
+	case c == 'n':
+		if bytes.HasPrefix(b, []byte("null")) {
+			return 4
+		}
+	default:
+		return hcNumber(b)
+	}
+	return 0
+}
+
+// hcSkipString returns the length of the string b starts with, or 0: it
+// takes valid UTF-8, and escapes but those of surrogates, which versions of
+// encoding/json read differently.
+func hcSkipString(b []byte) int {
+	if len(b) == 0 || b[0] != '"' {
+		return 0
+	}
+	for i := 1; i < len(b); {
+		switch c := b[i]; {
+		case c == '"':
+			return i + 1
+		case c < 0x20:
+			return 0
+		case c == '\\':
+			if i+1 == len(b) {
+				return 0
+			}
+			switch b[i+1] {
+			case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
+				i += 2
+			case 'u':
+				if i+6 > len(b) {
+					return 0
+				}
+				r, err := strconv.ParseUint(string(b[i+2:i+6]), 16, 16)
+				if err != nil || 0xd800 <= r && r <= 0xdfff {
+					return 0
+				}
+				i += 6
+			default:
+				return 0
+			}
+		case c < utf8.RuneSelf:
+			i++
+		default:
+			r, size := utf8.DecodeRune(b[i:])
+			if r == utf8.RuneError && size == 1 {
+				return 0
+			}
+			i += size
+		}
+	}
+	return 0
+}
+
+// hcNumber returns the length of the number b starts with, or 0.
+func hcNumber(b []byte) int {
+	i := 0
+	if i < len(b) && b[i] == '-' {
+		i++
+	}
+	start := i
+	for i < len(b) && '0' <= b[i] && b[i] <= '9' {
+		i++
+	}
+	if i == start || i-start > 1 && b[start] == '0' {
+		return 0
+	}
+	if i < len(b) && b[i] == '.' {
+		i++
+		start = i
+		for i < len(b) && '0' <= b[i] && b[i] <= '9' {
+			i++
+		}
+		if i == start {
+			return 0
+		}
+	}
+	if i < len(b) && (b[i] == 'e' || b[i] == 'E') {
+		i++
+		if i < len(b) && (b[i] == '+' || b[i] == '-') {
+			i++
+		}
+		start = i
+		for i < len(b) && '0' <= b[i] && b[i] <= '9' {
+			i++
+		}
+		if i == start {
+			return 0
+		}
+	}
+	return i
+}
+
+// hcParseInteger parses an integer that fits in bits, without a fraction
+// or an exponent, which encoding/json refuses for Go integers.
+func hcParseInteger(b []byte, bits int) (int64, int) {
+	n := hcNumber(b)
+	digits := b[:n]
+	neg := n > 0 && digits[0] == '-'
+	if neg {
+		digits = digits[1:]
+	}
+	if n == 0 || len(digits) > 18 || bits < 64 {
+		// Rare: strconv tells whether it fits.
+		v, err := strconv.ParseInt(string(b[:n]), 10, bits)
+		if err != nil {
+			return 0, 0
+		}
+		return v, n
+	}
+	var v int64
+	for _, c := range digits {
+		if c < '0' || c > '9' {
+			return 0, 0
+		}
+		v = v*10 + int64(c-'0')
+	}
+	if neg {
+		v = -v
+	}
+	return v, n
+}
+
+func hcParseInt(b []byte) (int, int) {
+	v, n := hcParseInteger(b, strconv.IntSize)
+	return int(v), n
+}
+
+func hcParseLong(b []byte) (int64, int) { return hcParseInteger(b, 64) }
+
+func hcParseIntPtr(b []byte) (*int, int) {
+	if bytes.HasPrefix(b, []byte("null")) {
+		return nil, 4
+	}
+	v, n := hcParseInt(b)
+	if n == 0 {
+		return nil, 0
+	}
+	return &v, n
+}
+
+func hcParseDouble(b []byte) (float64, int) {
+	n := hcNumber(b)
+	if n == 0 {
+		return 0, 0
+	}
+	f, err := strconv.ParseFloat(string(b[:n]), 64)
+	if err != nil {
+		return 0, 0
+	}
+	return f, n
+}
+
+func hcParseBool(b []byte) (bool, int) {
+	switch {
+	case bytes.HasPrefix(b, []byte("true")):
+		return true, 4
+	case bytes.HasPrefix(b, []byte("false")):
+		return false, 5
+	}
+	return false, 0
+}
+
+// hcParseString parses a string without escapes.
+func hcParseString(b []byte) (string, int) {
+	n := hcSkipString(b)
+	if n == 0 || bytes.IndexByte(b[:n], '\\') >= 0 {
+		return "", 0
+	}
+	return string(b[1 : n-1]), n
+}
+
+// hcParseRaw takes a value as it is, as json.RawMessage does.
+func hcParseRaw(b []byte) (json.RawMessage, int) {
+	n := hcSkip(b)
+	return json.RawMessage(b[:n]), n
+}
+
 func hcDecChar0(raw json.RawMessage) byte {
-	s := hcJSON[string](raw)
+	s := hcDec0(raw, hcParseString)
 	if len(s) != 1 {
 		panic(hcInputError{fmt.Sprintf("character must be a 1-byte string, got %q", s)})
 	}
@@ -277,7 +730,7 @@ func hcDecChar0(raw json.RawMessage) byte {
 }
 
 func hcDecChar1(raw json.RawMessage) []byte {
-	parts := hcJSON[[]json.RawMessage](raw)
+	parts := hcRaw1(raw)
 	out := make([]byte, len(parts))
 	for i, p := range parts {
 		out[i] = hcDecChar0(p)
@@ -286,7 +739,7 @@ func hcDecChar1(raw json.RawMessage) []byte {
 }
 
 func hcDecChar2(raw json.RawMessage) [][]byte {
-	parts := hcJSON[[]json.RawMessage](raw)
+	parts := hcRaw1(raw)
 	out := make([][]byte, len(parts))
 	for i, p := range parts {
 		out[i] = hcDecChar1(p)
@@ -295,7 +748,7 @@ func hcDecChar2(raw json.RawMessage) [][]byte {
 }
 
 func hcDecChar3(raw json.RawMessage) [][][]byte {
-	parts := hcJSON[[]json.RawMessage](raw)
+	parts := hcRaw1(raw)
 	out := make([][][]byte, len(parts))
 	for i, p := range parts {
 		out[i] = hcDecChar2(p)
@@ -333,7 +786,7 @@ func hcEncChar3(v [][][]byte) any {
 }
 
 func hcDecList0(raw json.RawMessage) *ListNode {
-	vals := hcJSON[[]int](raw)
+	vals := hcDec1(raw, hcParseInt)
 	dummy := &ListNode{}
 	cur := dummy
 	for _, v := range vals {
@@ -344,7 +797,7 @@ func hcDecList0(raw json.RawMessage) *ListNode {
 }
 
 func hcDecList1(raw json.RawMessage) []*ListNode {
-	parts := hcJSON[[]json.RawMessage](raw)
+	parts := hcRaw1(raw)
 	out := make([]*ListNode, len(parts))
 	for i, p := range parts {
 		out[i] = hcDecList0(p)
@@ -374,7 +827,7 @@ func hcEncList1(heads []*ListNode) any {
 }
 
 func hcDecTree0(raw json.RawMessage) *TreeNode {
-	vals := hcJSON[[]*int](raw)
+	vals := hcDec1(raw, hcParseIntPtr)
 	if len(vals) == 0 || vals[0] == nil {
 		return nil
 	}
@@ -398,7 +851,7 @@ func hcDecTree0(raw json.RawMessage) *TreeNode {
 }
 
 func hcDecTree1(raw json.RawMessage) []*TreeNode {
-	parts := hcJSON[[]json.RawMessage](raw)
+	parts := hcRaw1(raw)
 	out := make([]*TreeNode, len(parts))
 	for i, p := range parts {
 		out[i] = hcDecTree0(p)

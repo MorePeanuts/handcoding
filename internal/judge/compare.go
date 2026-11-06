@@ -31,6 +31,9 @@ func OptionsFor(p *problem.Problem) Options {
 
 // Equal reports whether got matches expected under opts.
 func Equal(opts Options, expected, got json.RawMessage) (bool, error) {
+	if sameText(opts, expected, got) {
+		return true, nil
+	}
 	exp, err := decode(expected)
 	if err != nil {
 		return false, fmt.Errorf("decode expected: %w", err)
@@ -62,6 +65,18 @@ func Equal(opts Options, expected, got json.RawMessage) (bool, error) {
 	default:
 		return false, fmt.Errorf("unknown compare mode %q", opts.Mode)
 	}
+}
+
+// sameText reports whether got is the text of expected, a JSON value,
+// which every mode but any_of (whose expected holds the answers) accepts:
+// the output an accepted solution writes most often, which decoding would
+// cost as much as the solution's run on large outputs.
+func sameText(opts Options, expected, got json.RawMessage) bool {
+	switch opts.Mode {
+	case "", problem.CompareExact, problem.CompareUnordered, problem.CompareUnorderedDeep:
+		return bytes.Equal(expected, got) && json.Valid(got)
+	}
+	return false
 }
 
 func decode(raw json.RawMessage) (any, error) {

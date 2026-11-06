@@ -9,7 +9,7 @@ func hcNodeLinks(n *Node) []*Node { return n.Neighbors }
 // hcDecNode0 builds a graph from its adjacency list: node i (1-based) has
 // value i, and the result is node 1.
 func hcDecNode0(raw json.RawMessage) *Node {
-	adj := hcJSON[[][]int](raw)
+	adj := hcDec2(raw, hcParseInt)
 	nodes := make([]*Node, len(adj))
 	for i := range nodes {
 		nodes[i] = &Node{Val: i + 1}

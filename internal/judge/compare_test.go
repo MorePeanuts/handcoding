@@ -30,6 +30,11 @@ func TestEqual(t *testing.T) {
 		{"unordered with tolerance", problem.CompareUnordered, 1e-5, `[1.0,2.0]`, `[2.000001,1.0]`, true},
 		{"any of", problem.CompareAnyOf, 0, `[[0,1],[1,0]]`, `[1,0]`, true},
 		{"any of miss", problem.CompareAnyOf, 0, `[[0,1],[1,0]]`, `[1,1]`, false},
+		// The same text is equal, except to any_of's list of answers.
+		{"same text", problem.CompareExact, 1e-5, `[[1,2.5],null,"a",{"k":[]}]`, `[[1,2.5],null,"a",{"k":[]}]`, true},
+		{"same text unordered", problem.CompareUnordered, 1e-5, `[[1,2.5],[2.5,1]]`, `[[1,2.5],[2.5,1]]`, true},
+		{"same text unordered deep", problem.CompareUnorderedDeep, 0, `[["b","a"],["a"]]`, `[["b","a"],["a"]]`, true},
+		{"same text any of", problem.CompareAnyOf, 0, `[[0,1],[1,0]]`, `[[0,1],[1,0]]`, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
