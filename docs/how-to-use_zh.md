@@ -56,7 +56,7 @@ Python 在 hc 管理的虚拟环境 `.hc/venv` 中运行：包括 Python 解答�
 2. 否则从 PATH 上的 `python3`、`python` 和 `python3.N` 中选出最新的 Python 3.12+，用 `-m venv` 创建。Debian 和 Ubuntu（包括 WSL）把 `venv` 中安装 pip 的部分单独打包为 `python3.X-venv`；没有它时，hc 改用 `-m venv --without-pip` 创建环境。判题不需要任何第三方包，所以这个环境可以正常使用，只是缺少用于 headless 调试的 debugpy；hc 会给出警告，指明要安装的包（或者安装 uv），然后运行 `hc env sync`；
 3. 否则 hc 停下并给出指引：需要 Python 3.12+ 及其原因；在你的系统上安装 uv 的命令（macOS 上为 `brew install uv` 或安装脚本，Linux 上为安装脚本，Windows 上为 `winget install --id=astral-sh.uv -e` 或 PowerShell 安装程序）和 [uv 安装页面](https://docs.astral.sh/uv/getting-started/installation/)；或者安装 Python 3.12+；或者设置 `python.interpreter`；然后运行 `hc env sync`。指引中会说明找到了什么（`/usr/bin/python3 is 3.9.6`）。hc 只打印命令，从不运行安装程序。
 
-每个需要 Python 的命令都以同样的方式报告这一错误，并在前面说明是什么需要 Python（`judging two-sum with checker.py needs Python 3.12 or later: …`）；TUI 在运行输出中显示同样的内容。
+每个需要 Python 的命令都以同样的方式报告这一错误，并在前面说明是什么需要 Python（`judging two-sum with checker.py needs Python 3.12 or later: …`）；TUI 在运行输出中显示同样的内容。`hc validate` 和 `hc pack check` 在受影响的每条检查结果中只给出它的第一行，并在所有检查结果之后只打印一次指引。
 
 在题目包的 checkout 中（见[编写题目包](packs_zh.md)），环境改用 Python 3.12，即协议支持的最旧版本，题目包的参考解、判题程序和生成器都必须能在它上面运行：用 `uv venv --python 3.12` 创建，没有 uv 时用 PATH 上最新的 `python3.12`。这样 `hc validate --run` 和 `hc pack check` 与题目包的 CI 使用同一个 Python。已有的环境版本不对时会重新创建；找不到 Python 3.12 时（没有 uv，PATH 上也没有），hc 使用最新的版本并给出警告。
 

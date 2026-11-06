@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
+	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/skill"
@@ -743,7 +744,7 @@ the reference solutions on every case and require them to pass. Validates
 			}
 			defer a.Close()
 			opts := app.ValidateOptions{Run: run, Stderr: os.Stderr, Jobs: jobs}
-			bad := 0
+			var sum app.ValidateSummary
 			if len(args) > 0 {
 				probs := make([]*problem.Problem, len(args))
 				for i, arg := range args {
@@ -751,15 +752,16 @@ the reference solutions on every case and require them to pass. Validates
 						return err
 					}
 				}
-				bad = a.ValidateProblems(cmd.Context(), probs, opts, func(f app.Finding) { printFinding(f) }).Failed
+				sum = a.ValidateProblems(cmd.Context(), probs, opts, func(f app.Finding) { printFinding(f) })
 			} else {
-				sum, err := a.ValidateWorkspace(cmd.Context(), opts, func(f app.Finding) { printFinding(f) })
-				if err != nil {
-					return err
-				}
-				bad = sum.Failed + sum.PackErrors
+				sum, err = a.ValidateWorkspace(cmd.Context(), opts, func(f app.Finding) { printFinding(f) })
 			}
-			if bad > 0 {
+			// The findings point to it.
+			printPythonSetup(sum.PythonSetup)
+			if err != nil {
+				return err
+			}
+			if bad := sum.Failed + sum.PackErrors; bad > 0 {
 				return fmt.Errorf("%d pack(s) or problem(s) with errors", bad)
 			}
 			return nil
@@ -781,10 +783,24 @@ func jobsFlag(cmd *cobra.Command, jobs *int) {
 // changed it, and prints the findings.
 func validateOne(cmd *cobra.Command, a *app.App, p *problem.Problem) error {
 	name := a.WS.Ref(p)
-	if !printFinding(a.ValidateProblem(cmd.Context(), p, nil, name, app.ValidateOptions{})) {
+	f := a.ValidateProblem(cmd.Context(), p, nil, name, app.ValidateOptions{})
+	ok := printFinding(f)
+	printPythonSetup(f.PythonSetup)
+	if !ok {
 		return errors.New(name + " is invalid")
 	}
 	return nil
+}
+
+// printPythonSetup shows, after the findings of hc validate or hc pack
+// check, the whole message of the failure to set up Python, se, that they
+// give only the summary of (app.SetupPointer): how to get Python. Nil
+// prints nothing.
+func printPythonSetup(se *python.SetupError) {
+	if se == nil {
+		return
+	}
+	fmt.Printf("\n%s %s\n", ui.Yellow.Render("How to set up Python:"), se.Error())
 }
 
 // printFinding prints what validating a pack or problem found, and reports

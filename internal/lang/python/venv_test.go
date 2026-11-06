@@ -260,6 +260,10 @@ func TestVenvNoPython(t *testing.T) {
 	if se.Cause != nil || len(se.Found) != 1 || se.Found[0] != f.bin+"/python3 is 3.11.9" {
 		t.Errorf("SetupError %+v", se)
 	}
+	// The first line, without the guide.
+	if s := se.Summary(); s != "cannot create .hc/venv: there is no uv, and no Python 3.12 or later on PATH ("+f.bin+"/python3 is 3.11.9)" {
+		t.Errorf("Summary = %q", s)
+	}
 	for _, want := range []string{
 		"cannot create .hc/venv: there is no uv, and no Python 3.12 or later on PATH (" + f.bin + "/python3 is 3.11.9).\n",
 		"generators and checkers", UVInstallURL, "python.interpreter", "then run `hc env sync`",
@@ -335,6 +339,9 @@ esac
 	err := f.venv().Ensure(context.Background(), &bytes.Buffer{})
 	if se, ok := errors.AsType[*SetupError](err); !ok || se.Tool != f.bin+"/python3" || !strings.Contains(err.Error(), "venv is broken") || !strings.Contains(err.Error(), "`hc env sync`") {
 		t.Errorf("Ensure = %v", err)
+	} else if s := se.Summary(); s != "cannot create .hc/venv with "+f.bin+"/python3: exit status 1" {
+		// The first line of the cause, without what to do.
+		t.Errorf("Summary = %q", s)
 	}
 }
 

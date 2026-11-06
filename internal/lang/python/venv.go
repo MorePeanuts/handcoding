@@ -215,23 +215,32 @@ type SetupError struct {
 }
 
 func (e *SetupError) Error() string {
-	var b strings.Builder
-	b.WriteString("cannot create " + e.Env)
-	if e.Tool != "" {
-		b.WriteString(" with " + e.Tool)
-	}
 	if e.Cause != nil {
-		fmt.Fprintf(&b, ": %v\n", e.Cause)
-		fmt.Fprintf(&b, "Fix that, then run `hc env sync`; or set python.interpreter in hc.yaml to a Python %s or later, which hc then uses as it is.", MinVersion)
-		return b.String()
+		return fmt.Sprintf("%s: %v\nFix that, then run `hc env sync`; or set python.interpreter in hc.yaml to a Python %s or later, which hc then uses as it is.", e.head(), e.Cause, MinVersion)
 	}
-	fmt.Fprintf(&b, ": there is no uv, and no Python %s or later on PATH", MinVersion)
+	return e.Summary() + ".\n\n" + Guide(runtime.GOOS)
+}
+
+// Summary is the first line of the message, without what to do: for
+// reports that repeat the error, such as hc validate's findings, which
+// show the whole message once.
+func (e *SetupError) Summary() string {
+	if e.Cause != nil {
+		cause, _, _ := strings.Cut(e.Cause.Error(), "\n")
+		return e.head() + ": " + cause
+	}
+	s := fmt.Sprintf("%s: there is no uv, and no Python %s or later on PATH", e.head(), MinVersion)
 	if len(e.Found) > 0 {
-		b.WriteString(" (" + strings.Join(e.Found, ", ") + ")")
+		s += " (" + strings.Join(e.Found, ", ") + ")"
 	}
-	b.WriteString(".\n\n")
-	b.WriteString(Guide(runtime.GOOS))
-	return b.String()
+	return s
+}
+
+func (e *SetupError) head() string {
+	if e.Tool != "" {
+		return "cannot create " + e.Env + " with " + e.Tool
+	}
+	return "cannot create " + e.Env
 }
 
 func (e *SetupError) Unwrap() error { return e.Cause }

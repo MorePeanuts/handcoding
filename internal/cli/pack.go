@@ -492,10 +492,14 @@ and a summary, and fails if anything is wrong.`,
 			opts := app.ValidateOptions{Stderr: os.Stderr, Jobs: jobs}
 			sum, err := a.CheckPack(cmd.Context(), opts, func(f app.Finding) { printFinding(f) })
 			if err != nil {
+				printPythonSetup(sum.PythonSetup)
 				return err
 			}
 			name := a.WS.WritablePack().Name
 			fmt.Println()
+			// The guide to setting up Python, which findings point to,
+			// comes after the summary.
+			defer printPythonSetup(sum.PythonSetup)
 			if sum.OK() {
 				fmt.Printf("%s %s: %d problem(s), all pass\n", ui.Green.Render("ok  "), name, sum.Problems)
 				return nil
