@@ -412,6 +412,29 @@ func (p *Problem) ValidateCase(c Case) error {
 	return p.validateExpected(c)
 }
 
+// ValidateExpected checks the expected output of a case, if it has one,
+// whose input is valid: it has the shape the judge compares outputs in, as
+// ValidateCase checks it. It is how the expected outputs a reference
+// computes for generated cases are checked, whose inputs were checked when
+// they were built.
+func (p *Problem) ValidateExpected(c Case) error {
+	if !c.HasExpected() {
+		return nil
+	}
+	if _, _, ok := p.RoundTripMethods(); ok || p.Kind != KindClass {
+		return p.validateExpected(c)
+	}
+	ops, err := classOps(c)
+	if err != nil {
+		return err
+	}
+	sigs, err := p.classSigs(ops)
+	if err != nil {
+		return err
+	}
+	return validateClassExpected(c, sigs)
+}
+
 // validateExpected checks the shape of a function or round-trip problem's
 // expected output, if the case has one.
 func (p *Problem) validateExpected(c Case) error {
@@ -434,20 +457,55 @@ func (p *Problem) validateExpected(c Case) error {
 	return nil
 }
 
+// validateClassCase checks a class case. A design problem's case can make
+// hundreds of thousands of calls, so scalar arguments and return values,
+// most of them, are checked on their text (see scalarOK).
 func (p *Problem) validateClassCase(c Case) error {
-	var ops []string
-	var args [][]json.RawMessage
-	if err := json.Unmarshal(c.Input["ops"], &ops); err != nil {
-		return errors.New(`"ops" must be an array of method names`)
+	ops, err := classOps(c)
+	if err != nil {
+		return err
 	}
+	var args [][]json.RawMessage
 	if err := json.Unmarshal(c.Input["args"], &args); err != nil {
 		return errors.New(`"args" must be an array of argument arrays, one per op`)
 	}
 	if len(ops) != len(args) {
 		return fmt.Errorf("ops has %d entries but args has %d", len(ops), len(args))
 	}
+	sigs, err := p.classSigs(ops)
+	if err != nil {
+		return err
+	}
+	for i, m := range sigs {
+		if len(args[i]) != len(m.Params) {
+			return fmt.Errorf("op %d (%s): takes %d argument(s), got %d", i+1, m.Name, len(m.Params), len(args[i]))
+		}
+		for j, prm := range m.Params {
+			if scalarOK(prm.Type, args[i][j]) {
+				continue
+			}
+			if err := CheckValue(prm.Type, args[i][j]); err != nil {
+				return fmt.Errorf("op %d (%s) argument %q: %w", i+1, m.Name, prm.Name, err)
+			}
+		}
+	}
+	return validateClassExpected(c, sigs)
+}
+
+// classOps decodes a class case's ops.
+func classOps(c Case) ([]string, error) {
+	var ops []string
+	if err := json.Unmarshal(c.Input["ops"], &ops); err != nil {
+		return nil, errors.New(`"ops" must be an array of method names`)
+	}
+	return ops, nil
+}
+
+// classSigs are the signatures of a class case's ops: the constructor
+// first, then methods of the class.
+func (p *Problem) classSigs(ops []string) ([]Method, error) {
 	if len(ops) == 0 || ops[0] != p.Class.Name {
-		return fmt.Errorf("first op must be the constructor %q", p.Class.Name)
+		return nil, fmt.Errorf("first op must be the constructor %q", p.Class.Name)
 	}
 	methods := map[string]Method{}
 	for _, m := range p.Class.Methods {
@@ -458,20 +516,16 @@ func (p *Problem) validateClassCase(c Case) error {
 	for i, op := range ops[1:] {
 		m, ok := methods[op]
 		if !ok {
-			return fmt.Errorf("op %d: unknown method %q", i+2, op)
+			return nil, fmt.Errorf("op %d: unknown method %q", i+2, op)
 		}
 		sigs[i+1] = m
 	}
-	for i, m := range sigs {
-		if len(args[i]) != len(m.Params) {
-			return fmt.Errorf("op %d (%s): takes %d argument(s), got %d", i+1, m.Name, len(m.Params), len(args[i]))
-		}
-		for j, prm := range m.Params {
-			if err := CheckValue(prm.Type, args[i][j]); err != nil {
-				return fmt.Errorf("op %d (%s) argument %q: %w", i+1, m.Name, prm.Name, err)
-			}
-		}
-	}
+	return sigs, nil
+}
+
+// validateClassExpected checks a class case's expected output, if it has
+// one, against the signatures of its ops.
+func validateClassExpected(c Case, sigs []Method) error {
 	if !c.HasExpected() {
 		return nil
 	}
@@ -479,8 +533,8 @@ func (p *Problem) validateClassCase(c Case) error {
 	if err := json.Unmarshal(c.Expected, &expected); err != nil {
 		return errors.New("expected: must be an array with one return value per op")
 	}
-	if len(expected) != len(ops) {
-		return fmt.Errorf("expected has %d entries but there are %d ops", len(expected), len(ops))
+	if len(expected) != len(sigs) {
+		return fmt.Errorf("expected has %d entries but there are %d ops", len(expected), len(sigs))
 	}
 	for i, m := range sigs {
 		if m.Returns == TypeVoid {
@@ -489,7 +543,12 @@ func (p *Problem) validateClassCase(c Case) error {
 			}
 			continue
 		}
-		if err := checkOutput(outputForm(m.Returns), expected[i]); err != nil {
+		// Scalars have no other output form than their input form.
+		t := outputForm(m.Returns)
+		if scalarOK(t, expected[i]) {
+			continue
+		}
+		if err := checkOutput(t, expected[i]); err != nil {
 			return fmt.Errorf("expected[%d] (%s): %w", i, m.Name, err)
 		}
 	}

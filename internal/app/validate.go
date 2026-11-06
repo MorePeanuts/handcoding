@@ -218,11 +218,14 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 		sel, _ := Select(cases, nil, true)
 		// Generated cases are built afresh, never from the cache, so that
 		// their digests check the generator; the first reference that runs
-		// computes their expected outputs, which the others must match.
+		// computes their expected outputs, in the run that checks it on
+		// every case, and the others must match them. Every reference so
+		// runs every case once.
 		if err := a.generateInputs(ctx, p, sel, true, o.Stderr); err != nil {
 			errs = append(errs, lines(err)...)
 			refs = nil
 		}
+		expect := generated > 0
 		for _, l := range refs {
 			tc, err := l.Toolchain()
 			if err != nil {
@@ -233,11 +236,14 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 				errs = append(errs, fmt.Sprintf("%s reference not run: %v", l.Name(), err))
 				continue
 			}
-			if err := a.expectGenerated(ctx, p, l, sel, o.Stderr); err != nil {
-				errs = append(errs, lines(err)...)
+			refErrs, ok := a.checkReference(ctx, p, l, sel, expect, o.Stderr)
+			if !ok {
+				// The other references have no expected outputs to match
+				// on the generated cases.
+				errs = append(errs, refErrs...)
 				break
 			}
-			refErrs := a.checkReference(ctx, p, l, sel, o.Stderr)
+			expect = false
 			// The reference ran on the local toolchain, which may well be
 			// newer than the protocol's oldest.
 			if mc, ok := l.(lang.MinVersionChecker); ok && len(refErrs) == 0 {
@@ -289,20 +295,57 @@ func (a *App) missingReferences(p *problem.Problem) []lang.Language {
 }
 
 // checkReference runs one reference solution on every case. Cases without an
-// expected output only have to run.
-func (a *App) checkReference(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, stderr io.Writer) []string {
+// expected output only have to run. With expect, the reference computes the
+// expected outputs of the generated cases in that run, and sets them in sel:
+// it is judged on them trivially, or by the checker (see
+// runner.Options.ExpectGenerated), and the run times it on them, as
+// expectGenerated's run would. ok is false when it could not compute them
+// all, which leaves the other references nothing to match on them.
+func (a *App) checkReference(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, expect bool, stderr io.Writer) (errs []string, ok bool) {
 	if stderr == nil {
 		stderr = io.Discard
 	}
-	rep, _, err := a.RunReference(ctx, p, l.ID(), sel, RunOptions{Stderr: stderr})
+	rep, _, err := a.runReference(ctx, p, l.ID(), sel, RunOptions{Stderr: stderr}, expect)
 	switch {
 	case err != nil:
-		return []string{fmt.Sprintf("%s reference: %v", l.Name(), err)}
+		return []string{fmt.Sprintf("%s reference: %v", l.Name(), err)}, !expect
 	case rep.Verdict == runner.CompileError:
-		return []string{fmt.Sprintf("%s reference does not compile:\n%s", l.Name(), strings.TrimRight(rep.CompileError, "\n"))}
+		return []string{fmt.Sprintf("%s reference does not compile:\n%s", l.Name(), strings.TrimRight(rep.CompileError, "\n"))}, !expect
 	}
-	var errs []string
+	// unexpected is whether a case is generated and got no expected output.
+	unexpected := func(c runner.CaseResult) bool { return expect && c.Case.Generated() && !c.Case.HasExpected() }
+	if expect {
+		var gen []runner.Selected
+		var times []runner.CaseResult
+		ok = true
+		for i, c := range rep.Cases {
+			switch {
+			case unexpected(c):
+				ok = false
+			case c.Case.Generated():
+				sel[i].Case.Expected = c.Case.Expected
+				gen, times = append(gen, sel[i]), append(times, c)
+			}
+		}
+		if ok {
+			a.recordBaseline(p, l, gen, &runner.Report{Cases: times})
+		}
+	} else {
+		ok = true
+	}
+	reported := false
 	for _, c := range rep.Cases {
+		if unexpected(c) && c.Verdict != runner.NotRun {
+			// The first generated case the reference fails on: the
+			// problem's generated cases cannot be built.
+			if !reported {
+				file, _ := p.Reference(l.SolutionFile())
+				ge := &runner.GeneratedCaseError{Path: a.WS.Rel(file), Case: c.Index, Reason: "the reference solution: " + string(c.Verdict), Detail: c.Error}
+				errs = append(errs, lines(ge)...)
+				reported = true
+			}
+			continue
+		}
 		switch c.Verdict {
 		case runner.Accepted, runner.NoExpected, runner.NotJudged:
 		case runner.WrongAnswer:
@@ -317,7 +360,7 @@ func (a *App) checkReference(ctx context.Context, p *problem.Problem, l lang.Lan
 			errs = append(errs, fmt.Sprintf("%s reference, case %d: %s %s", l.Name(), c.Index, c.Verdict, c.Error))
 		}
 	}
-	return errs
+	return errs, ok
 }
 
 // clip shortens s to n bytes.

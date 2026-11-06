@@ -446,7 +446,12 @@ func (a *App) run(ctx context.Context, p *problem.Problem, l lang.Language, dir 
 	if err := a.Materialize(ctx, p, l, sel, o); err != nil {
 		return nil, err
 	}
-	opts, err := a.runnerOpts(ctx, p, sel, o)
+	// The cases are validated once, here: neither this run nor the
+	// reference's runs that time it validate them.
+	if err := runner.Validate(p, sel); err != nil {
+		return nil, err
+	}
+	opts, err := a.runnerOpts(ctx, p, sel, o, false)
 	if err != nil {
 		return nil, err
 	}
@@ -458,9 +463,13 @@ func (a *App) run(ctx context.Context, p *problem.Problem, l lang.Language, dir 
 	return rep, err
 }
 
-func (a *App) runnerOpts(ctx context.Context, p *problem.Problem, sel []runner.Selected, o RunOptions) (runner.Options, error) {
-	opts := runner.Options{Timeout: a.WS.Config.TimeoutDuration(), Stdout: o.Stdout, Stderr: o.Stderr}
-	if p.Judge.Compare == problem.CompareChecker && slices.ContainsFunc(sel, func(s runner.Selected) bool { return s.Case.HasExpected() }) {
+// runnerOpts are the options of a run on sel. With expectGenerated, the
+// outputs of the generated cases become their expected outputs (see
+// runner.Options.ExpectGenerated).
+func (a *App) runnerOpts(ctx context.Context, p *problem.Problem, sel []runner.Selected, o RunOptions, expectGenerated bool) (runner.Options, error) {
+	opts := runner.Options{Timeout: a.WS.Config.TimeoutDuration(), Stdout: o.Stdout, Stderr: o.Stderr, ExpectGenerated: expectGenerated}
+	judged := func(s runner.Selected) bool { return s.Case.HasExpected() || expectGenerated && s.Case.Generated() }
+	if p.Judge.Compare == problem.CompareChecker && slices.ContainsFunc(sel, judged) {
 		c, err := a.checker(ctx, p, o.Stderr)
 		if err != nil {
 			return opts, err
@@ -587,8 +596,17 @@ func (a *App) ReferenceLangs(p *problem.Problem) []lang.Language {
 	return out
 }
 
-// RunReference runs the reference solution in a scratch directory.
+// RunReference runs the reference solution in a scratch directory. Unlike
+// Run, it does not validate the cases, which the caller has done (see
+// runner.Validate).
 func (a *App) RunReference(ctx context.Context, p *problem.Problem, langName string, sel []runner.Selected, o RunOptions) (*runner.Report, lang.Language, error) {
+	return a.runReference(ctx, p, langName, sel, o, false)
+}
+
+// runReference is RunReference, and with expectGenerated takes the outputs
+// of the generated cases as their expected outputs (see
+// runner.Options.ExpectGenerated).
+func (a *App) runReference(ctx context.Context, p *problem.Problem, langName string, sel []runner.Selected, o RunOptions, expectGenerated bool) (*runner.Report, lang.Language, error) {
 	l, path, err := a.ReferenceLang(p, langName)
 	if err != nil {
 		return nil, nil, err
@@ -617,7 +635,7 @@ func (a *App) RunReference(ctx context.Context, p *problem.Problem, langName str
 	if err := os.WriteFile(filepath.Join(dir, l.SolutionFile()), code, 0o644); err != nil {
 		return nil, nil, err
 	}
-	opts, err := a.runnerOpts(ctx, p, sel, o)
+	opts, err := a.runnerOpts(ctx, p, sel, o, expectGenerated)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -771,6 +789,7 @@ func (a *App) buildGenerated(ctx context.Context, p *problem.Problem, langName s
 		return err
 	}
 	var failed []string
+	validated := false
 	for _, l := range a.ReferenceLangs(p) {
 		if l.ID() == first.ID() {
 			continue
@@ -782,6 +801,13 @@ func (a *App) buildGenerated(ctx context.Context, p *problem.Problem, langName s
 		if err != nil {
 			res.Unchecked = append(res.Unchecked, fmt.Sprintf("%s reference not checked on generated cases: %v", l.Name(), err))
 			continue
+		}
+		// The expected outputs are judged against, so they must be valid.
+		if !validated {
+			if err := runner.Validate(p, redo); err != nil {
+				return err
+			}
+			validated = true
 		}
 		rep, _, err := a.RunReference(ctx, p, l.ID(), redo, RunOptions{Stderr: os.Stderr})
 		if err != nil {

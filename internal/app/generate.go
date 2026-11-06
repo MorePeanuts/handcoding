@@ -175,7 +175,9 @@ func (a *App) generateInputs(ctx context.Context, p *problem.Problem, sel []runn
 
 // expectGenerated sets the expected outputs of the generated cases in sel
 // that have none, to the outputs of the reference in l. A reference that
-// fails on one is a *runner.GeneratedCaseError.
+// fails on one is a *runner.GeneratedCaseError. The outputs are validated
+// by the run that judges against them (runner.Validate), which only then
+// knows which cases it runs.
 func (a *App) expectGenerated(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, w io.Writer) error {
 	var todo []runner.Selected
 	var pos []int

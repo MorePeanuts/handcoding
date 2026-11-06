@@ -98,6 +98,10 @@ func TestRegressionReferences(t *testing.T) {
 			if err := a.Materialize(ctx, p, mustLang(t, a, "python"), sel, app.RunOptions{}); err != nil {
 				t.Fatal(err)
 			}
+			// References do not validate the cases they run.
+			if err := runner.Validate(p, sel); err != nil {
+				t.Fatal(err)
+			}
 			for _, langID := range []string{"python", "go"} {
 				rep, _, err := a.RunReference(ctx, p, langID, sel, app.RunOptions{})
 				if err != nil {
