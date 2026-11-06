@@ -95,7 +95,8 @@ A pack installed in a practice workspace (`packs/<name>/`, beside `hc.yaml`) is 
 Run `hc` (or `hc list`) to open the problem list. It works best with the terminal split in two: `hc` on one side, your editor on the other.
 
 - Press `enter` on a problem to open it. The statement is shown, the solution file is created from the template, and its absolute path is **copied to the clipboard**. In the editor, `:e <paste>` and start writing. To read a statement without starting the problem, press `v` instead: nothing is created or copied until an action such as `e`, `t` or `y` needs the solution.
-- Test, submit and debug are available from the statement and the result screen, not from the list, as on LeetCode; history is available everywhere. Results appear in the TUI, with your program's own output listed separately below them.
+- Test, submit and debug are available from the statement and the result screen, not from the list, as on LeetCode. Results appear in the TUI, with your program's own output listed separately below them.
+- `h` on the list shows every submission of the workspace, newest first, with its problem; `o` there opens the submission's problem, and `esc` comes back. `h` in a problem (the statement or the result screen) shows only that problem's submissions.
 - The debugger takes over the terminal. The screen is cleared before it starts, and the TUI comes back when it exits. `d` debugs the first case your code fails, as [`hc debug`](#debugging) picks it. In the history, `d` restores the submission and debugs its first failure.
 - Statement images are drawn in the terminal. kitty and Ghostty show the original image. Other truecolor terminals show a block-character approximation that loses detail; press `o` to open the original in your image viewer. See [`images`](#configuration) to choose the mode.
 - Statement colors follow the terminal background. If they look wrong, set `theme` in `hc.yaml`.
@@ -110,12 +111,12 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 |---|---|---|---|
 | `enter` | Open the problem (and copy the solution path) | `e` | Open the solution in your editor |
 | `t` | Test on the examples (in a problem) | `s` | Submit, all cases (in a problem) |
-| `d` | Debug the first failing case (in a problem) | `h` | Submission history: code, judge details, restore, debug, delete |
+| `d` | Debug the first failing case (in a problem) | `h` | Submission history (the workspace's on the list, the problem's in a problem): code, judge details, restore, debug, delete |
 | `y` | Copy the solution path again | `L` | Switch language |
 | `r` | Reset to the template | `D` | Discard: delete the solution and its history, back to not started |
 | `/` | Search | `f` | Filter: all / unsolved / solved / starred |
 | `tab` / `shift+tab` | Next / previous pack | `c` | Choose a group of the pack |
-| `v` | View the statement only | `o` | Open the statement's images (statement view) |
+| `v` | View the statement only | `o` | Open the statement's images (statement view); the submission's problem (workspace history) |
 | `i` | Switch the statement language | `esc` / `q` | Back (`esc` on the list: to the pack picker); `q` on the list quits |
 | `m` | Star or unstar the problem (`★` in the list) | `ctrl+c` | Quit |
 

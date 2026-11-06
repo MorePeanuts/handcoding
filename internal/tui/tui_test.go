@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/regression"
 	"github.com/MorePeanuts/handcoding/internal/runner"
+	"github.com/MorePeanuts/handcoding/internal/store"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
@@ -741,5 +743,166 @@ func TestSwitchLocale(t *testing.T) {
 	h.press("enter")
 	if view := h.view(); !strings.Contains(view, "no zh-CN statement") || !strings.Contains(view, "You may assume") {
 		t.Errorf("fallback to en:\n%s", view)
+	}
+}
+
+// addSubs records a submission of each pack/slug, the first the newest.
+func addSubs(t *testing.T, m *model, details string, refs ...string) {
+	t.Helper()
+	st, err := m.app.Store()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	for i, ref := range refs {
+		pk, slug, _ := strings.Cut(ref, "/")
+		s := store.Submission{Pack: pk, Slug: slug, Lang: "go", Verdict: string(runner.WrongAnswer), Passed: 1, Total: 2,
+			Code: "package main // " + ref + "\n", Details: details, CreatedAt: now.Add(-time.Duration(i) * time.Minute)}
+		if err := st.Add(context.Background(), &s); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// The list's h shows every submission of the workspace, naming their
+// problems; o opens a submission's problem above it, whose own h shows
+// only that problem's.
+func TestHistoryOfEveryProblem(t *testing.T) {
+	h := newHarness(t)
+	addLocal(t, h.m, "0001-two-sum")
+	addSubs(t, h.m, "", "regression/lru-cache", "local/two-sum", "regression/two-sum")
+	h.press("j", "h")
+	if h.m.top() != screenHistory || !h.m.historyAll() || len(h.m.subs) != 3 {
+		t.Fatalf("h on the list: screen %v, %d subs", h.m.top(), len(h.m.subs))
+	}
+	view := h.view()
+	for _, want := range []string{"All submissions", "3 submissions", "PROBLEM", "regression/lru-cache", "local/two-sum", "o problem"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("history lacks %q:\n%s", want, view)
+		}
+	}
+	if got := strings.Count(view, "\n") + 1; got != 30 {
+		t.Errorf("history has %d lines, want 30", got)
+	}
+
+	h.press("o")
+	if h.m.top() != screenDetail || h.m.current.Ref() != "regression/lru-cache" || !h.m.viewing {
+		t.Fatalf("o: screen %v, problem %v", h.m.top(), h.m.current)
+	}
+	if h.m.app.HasSolution(h.m.current, h.m.lang) {
+		t.Error("o created the solution")
+	}
+	h.press("h")
+	if h.m.top() != screenHistory || h.m.historyAll() || len(h.m.subs) != 1 || strings.Contains(h.view(), "PROBLEM") {
+		t.Fatalf("h in the problem: %d subs\n%s", len(h.m.subs), h.view())
+	}
+	h.press("esc", "esc")
+	if h.m.top() != screenHistory || !h.m.historyAll() || len(h.m.subs) != 3 || h.m.subCursor != 0 {
+		t.Fatalf("back: screen %v, %d subs, cursor %d", h.m.top(), len(h.m.subs), h.m.subCursor)
+	}
+
+	// From a submission, o replaces it with the problem's statement.
+	h.press("j", "enter")
+	if h.m.top() != screenSubmission || h.m.current.Ref() != "local/two-sum" {
+		t.Fatalf("enter: screen %v, problem %v", h.m.top(), h.m.current)
+	}
+	if view := h.view(); !strings.Contains(view, "// local/two-sum") || !strings.Contains(view, "o problem") {
+		t.Errorf("submission:\n%s", view)
+	}
+	h.press("o")
+	if h.m.top() != screenDetail || h.m.current.Ref() != "local/two-sum" {
+		t.Fatalf("o from the submission: screen %v, problem %v", h.m.top(), h.m.current)
+	}
+	h.press("esc")
+	if h.m.top() != screenHistory || !h.m.historyAll() || h.m.subCursor != 1 {
+		t.Fatalf("esc: screen %v, cursor %d", h.m.top(), h.m.subCursor)
+	}
+	h.press("esc")
+	if h.m.top() != screenList || len(h.m.histories) != 0 {
+		t.Fatalf("esc: screen %v, %d history scopes", h.m.top(), len(h.m.histories))
+	}
+}
+
+// In a problem, h shows only its submissions, without a problem column.
+func TestHistoryOfProblem(t *testing.T) {
+	h := newHarness(t)
+	addSubs(t, h.m, "", "regression/lru-cache", "regression/two-sum", "regression/two-sum")
+	h.press("v", "h")
+	if h.m.top() != screenHistory || h.m.historyAll() || len(h.m.subs) != 2 {
+		t.Fatalf("h in two-sum: screen %v, %d subs", h.m.top(), len(h.m.subs))
+	}
+	view := h.view()
+	if strings.Contains(view, "PROBLEM") || strings.Contains(view, "o problem") || !strings.Contains(view, "1. Two Sum") {
+		t.Errorf("problem history:\n%s", view)
+	}
+	h.press("o")
+	if h.m.top() != screenHistory {
+		t.Errorf("o in a problem's history: screen %v", h.m.top())
+	}
+	h.press("esc")
+	if h.m.top() != screenDetail || h.m.current.Slug != "two-sum" {
+		t.Errorf("esc: screen %v, problem %v", h.m.top(), h.m.current)
+	}
+}
+
+// A submission whose problem no longer exists can be viewed and deleted;
+// the actions that need the problem say it is gone.
+func TestHistoryOfRemovedProblem(t *testing.T) {
+	h := newHarness(t)
+	details := app.EncodeReport(h.m.selected(), &runner.Report{Verdict: runner.WrongAnswer, Passed: 1, Total: 2})
+	addSubs(t, h.m, details, "regression/gone", "gone-pack/two-sum")
+	h.press("h")
+	if len(h.m.subs) != 2 || !strings.Contains(h.view(), "gone-pack/two-sum") {
+		t.Fatalf("history:\n%s", h.view())
+	}
+	for _, key := range []string{"o", "r", "d"} {
+		h.press(key)
+		if h.m.top() != screenHistory || h.m.confirm != nil || !strings.Contains(h.view(), "problem regression/gone no longer exists") {
+			t.Errorf("%s: screen %v, confirm %v\n%s", key, h.m.top(), h.m.confirm, h.view())
+		}
+	}
+	h.press("enter")
+	view := h.view()
+	if h.m.top() != screenSubmission || h.m.current != nil {
+		t.Fatalf("enter: screen %v, problem %v", h.m.top(), h.m.current)
+	}
+	for _, want := range []string{"regression/gone", "no longer exists", "1/2 passed", "// regression/gone"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("submission lacks %q:\n%s", want, view)
+		}
+	}
+	h.press("r")
+	if h.m.confirm != nil || !strings.Contains(h.view(), "problem regression/gone no longer exists") {
+		t.Errorf("r on the submission:\n%s", h.view())
+	}
+	h.press("x", "y")
+	if h.m.top() != screenHistory || len(h.m.subs) != 1 || h.m.subs[0].Ref() != "gone-pack/two-sum" {
+		t.Fatalf("after delete: screen %v, %d subs", h.m.top(), len(h.m.subs))
+	}
+}
+
+// h works on a list without problems.
+func TestHistoryOfEmptyWorkspace(t *testing.T) {
+	ws, err := workspace.Create(t.TempDir(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := app.New(ws)
+	t.Cleanup(func() { a.Close() })
+	l, _ := a.Lang("go")
+	m, err := newModel(context.Background(), a, Options{Lang: l, Theme: "dark"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &harness{t: t, m: m}
+	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	h.press("h", "enter", "o", "r", "d", "x")
+	view := h.view()
+	if m.top() != screenHistory || m.confirm != nil || !strings.Contains(view, "No submissions yet") || strings.Contains(view, "press esc") {
+		t.Errorf("empty history:\n%s", view)
+	}
+	h.press("esc")
+	if m.top() != screenList {
+		t.Errorf("esc: screen %v", m.top())
 	}
 }

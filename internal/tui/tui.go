@@ -3,8 +3,16 @@
 // It is a small stack of screens:
 //
 //	list ─enter─▶ detail (statement + solution path) ─t/s─▶ result
-//	  │                │
-//	  └──────h─────────┴──▶ history ─enter─▶ submission
+//	  │             │                                         │
+//	  │             └────h────┬───────────────────────────────┘
+//	  │                       ▼
+//	  │             history of the problem ─enter─▶ submission
+//	  │
+//	  └──h──▶ history of every problem ─enter─▶ submission
+//	                  │                             │
+//	                  └──────o──────┬───────────────┘
+//	                                ▼
+//	                  detail of the submission's problem (esc: back to the history)
 //
 // Test and submit run inside the TUI. Only the editor and the debugger take
 // over the terminal (they are interactive programs themselves); the screen
@@ -120,7 +128,9 @@ type model struct {
 	// locales are the locales the packs are shown in, by pack name.
 	locales map[string]*packLocale
 
-	// current is the problem shown by the detail, result and history screens.
+	// current is the problem shown by the detail, result and history screens
+	// (and the submission screen, nil there for a problem that no longer
+	// exists).
 	current *problem.Problem
 	// viewing is set when the detail screen only shows the statement: hc
 	// creates no solution file until an action needs one.
@@ -133,7 +143,9 @@ type model struct {
 	result  viewport.Model
 	spinner spinner.Model
 
-	// history screens
+	// history screens: histories has a scope for each history screen on
+	// the stack, the one shown last.
+	histories []historyScope
 	subs      []store.Submission
 	subCursor int
 	subOffset int
@@ -267,9 +279,17 @@ func (m *model) push(s screen) {
 	m.layout()
 }
 
+// pop goes back to the screen beneath. Back on a history screen, which may
+// list another scope than the one popped, it re-reads its submissions.
 func (m *model) pop() {
 	if len(m.stack) > 1 {
+		if m.top() == screenHistory {
+			m.closeHistory()
+		}
 		m.stack = m.stack[:len(m.stack)-1]
+	}
+	if m.top() == screenHistory {
+		m.loadHistory()
 	}
 	m.layout()
 }
@@ -410,7 +430,7 @@ func (m *model) refresh() {
 	if err := m.reload(); err != nil {
 		m.message = ui.Red.Render(err.Error())
 	}
-	if m.current != nil && (m.top() == screenHistory || m.top() == screenSubmission) {
+	if m.top() == screenHistory || m.top() == screenSubmission {
 		m.loadHistory()
 	}
 }
