@@ -35,7 +35,7 @@ func capture(t *testing.T, args ...string) (string, error) {
 // a local problem whose slug the set also has.
 func packWorkspace(t *testing.T) string {
 	t.Helper()
-	t.Setenv("PATH", t.TempDir())
+	fakeUV(t)
 	dir := filepath.Join(t.TempDir(), "ws")
 	if err := runHC(t, "init", dir); err != nil {
 		t.Fatal(err)

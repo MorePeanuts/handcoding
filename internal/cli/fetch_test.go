@@ -65,7 +65,7 @@ func fakeLeetCode(t *testing.T) {
 // localesWorkspace creates a workspace whose own problems are in locales.
 func localesWorkspace(t *testing.T, locales string) string {
 	t.Helper()
-	t.Setenv("PATH", t.TempDir())
+	fakeUV(t)
 	dir := filepath.Join(t.TempDir(), "ws")
 	if err := runHC(t, "init", dir); err != nil {
 		t.Fatal(err)
@@ -205,7 +205,7 @@ func TestFetchDefaultLocale(t *testing.T) {
 
 	// Without locales in hc.yaml the local pack is in English, from either
 	// site.
-	t.Setenv("PATH", t.TempDir())
+	fakeUV(t)
 	dir = filepath.Join(t.TempDir(), "ws")
 	if err := runHC(t, "init", dir); err != nil {
 		t.Fatal(err)
@@ -238,7 +238,7 @@ func TestImportLocales(t *testing.T) {
 		}
 	}
 	// The local pack is in English only by default.
-	t.Setenv("PATH", t.TempDir())
+	fakeUV(t)
 	plain := filepath.Join(t.TempDir(), "ws")
 	if err := runHC(t, "init", plain); err != nil {
 		t.Fatal(err)

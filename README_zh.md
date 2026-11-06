@@ -52,7 +52,7 @@ go install github.com/MorePeanuts/handcoding/cmd/hc@latest
 
 Linux、macOS 和 Windows 的预编译二进制文件见 [Releases 页面](https://github.com/MorePeanuts/handcoding/releases)。
 
-答题需要对应语言的工具链：Go 1.22+；Python 则需要 [uv](https://docs.astral.sh/uv/)（推荐）或 Python 3.12+。hc 在工作区中为 Python 解答创建专用的虚拟环境，第一次需要 Python 时自动创建。有了 uv，即使系统自带的 Python 太旧（macOS 自带 3.9）也能用：uv 会下载一个新版本。以下为可选依赖：
+用 Go 答题需要 Go 1.22+；无论用哪种语言答题都需要 Python 3.12+：除了运行 Python 解答，大多数题目带有的生成器和判题程序也用 Python 运行。最简单的办法是安装 [uv](https://docs.astral.sh/uv/getting-started/installation/)（推荐；`brew install uv`，或 `curl -LsSf https://astral.sh/uv/install.sh | sh`），即使系统自带的 Python 太旧（macOS 自带 3.9），它也会下载一个新版本；PATH 上的 Python 3.12+ 也可以。`hc init` 会在工作区中为它创建虚拟环境，两者都找不到时会说明如何安装。以下为可选依赖：
 
 - [Delve](https://github.com/go-delve/delve)：调试 Go；
 - `claude` 或 `codex`：生成测试用例。
@@ -65,7 +65,7 @@ hc pack install https://github.com/MorePeanuts/leetcode.hc.git   # 官方 LeetCo
 hc                      # 打开题目列表
 ```
 
-如果默认用 Python 解题，改为执行 `hc init --lang python`，它还会立即创建 Python 环境。新建的工作区里没有题目。[leetcode.hc](https://github.com/MorePeanuts/leetcode.hc) 是官方的 LeetCode 题目包，题面有中英文两种，参考解有 Go 和 Python 两种：`hc pack install` 把它克隆到 `packs/` 下并记录在 `hc.yaml` 中，`hc pack update` 获取它新增的题目（见[题目包](docs/how-to-use_zh.md#题目包)）。你自己的题目存放在工作区的 `packs/local/problems/` 下：`hc fetch two-sum` 从 LeetCode 导入一道题，`hc gen two-sum` 让编码智能体生成它的测试用例和判题规则，`hc new` 从零生成一道题，`hc import` 把题目目录复制进来。
+如果默认用 Python 解题，改为执行 `hc init --lang python`。如果 `hc init` 既找不到 uv 也找不到 Python 3.12+，它仍会创建工作区，然后说明如何安装并以错误退出；装好其中之一后，在工作区中运行 `hc env sync`。新建的工作区里没有题目。[leetcode.hc](https://github.com/MorePeanuts/leetcode.hc) 是官方的 LeetCode 题目包，题面有中英文两种，参考解有 Go 和 Python 两种：`hc pack install` 把它克隆到 `packs/` 下并记录在 `hc.yaml` 中，`hc pack update` 获取它新增的题目（见[题目包](docs/how-to-use_zh.md#题目包)）。你自己的题目存放在工作区的 `packs/local/problems/` 下：`hc fetch two-sum` 从 LeetCode 导入一道题，`hc gen two-sum` 让编码智能体生成它的测试用例和判题规则，`hc new` 从零生成一道题，`hc import` 把题目目录复制进来。
 
 在列表里选一道题按 `enter`：hc 会显示题面，按模板生成 `solution.go`，并把文件路径复制到剪贴板。在旁边的编辑器里打开它，写完后按 `t` 测试、按 `s` 提交。
 

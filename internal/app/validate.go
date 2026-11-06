@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
+	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
@@ -60,6 +61,30 @@ type Finding struct {
 	Cases    int
 	Errors   []string
 	Warnings []string
+	// PythonSetup is the failure to set up Python that some of Errors and
+	// Warnings report, nil if none does. They give its Summary, and say
+	// that its whole message, how to get Python, comes after the findings
+	// (SetupPointer), so that it is not repeated for every problem.
+	PythonSetup *python.SetupError
+}
+
+// SetupPointer follows, in a finding, the Summary of its PythonSetup.
+const SetupPointer = " (see how to set up Python below)"
+
+// setupNote formats the errors of one finding, shortening those that are a
+// failure to set up Python to its Summary and SetupPointer, and keeps the
+// first of them.
+type setupNote struct{ err *python.SetupError }
+
+func (n *setupNote) text(err error) string {
+	se, ok := errors.AsType[*python.SetupError](err)
+	if !ok {
+		return err.Error()
+	}
+	if n.err == nil {
+		n.err = se
+	}
+	return strings.Replace(err.Error(), se.Error(), se.Summary()+SetupPointer, 1)
 }
 
 // OK reports whether nothing is wrong; warnings are allowed.
@@ -72,6 +97,20 @@ type ValidateSummary struct {
 	Problems, Failed int
 	// PackErrors is the number of packs whose manifest has errors.
 	PackErrors int
+	// PythonSetup is the first PythonSetup of the findings, whose whole
+	// message the caller shows once, after them.
+	PythonSetup *python.SetupError
+}
+
+// add counts the finding of a problem (or of one that failed to load).
+func (s *ValidateSummary) add(f Finding) {
+	s.Problems++
+	if !f.OK() {
+		s.Failed++
+	}
+	if s.PythonSetup == nil {
+		s.PythonSetup = f.PythonSetup
+	}
 }
 
 // OK reports whether every pack and problem is valid.
@@ -120,10 +159,7 @@ func (a *App) ValidateWorkspace(ctx context.Context, o ValidateOptions, report f
 	err = a.validateItems(ctx, items, o, func(it validateItem) {
 		switch {
 		case it.p != nil || it.failed:
-			sum.Problems++
-			if !it.f.OK() {
-				sum.Failed++
-			}
+			sum.add(it.f)
 		default:
 			sum.PackErrors++
 		}
@@ -142,10 +178,7 @@ func (a *App) ValidateProblems(ctx context.Context, probs []*problem.Problem, o 
 		items[i] = validateItem{p: p, name: a.WS.Ref(p)}
 	}
 	_ = a.validateItems(ctx, items, o, func(it validateItem) {
-		sum.Problems++
-		if !it.f.OK() {
-			sum.Failed++
-		}
+		sum.add(it.f)
 		report(it.f)
 	})
 	return sum
@@ -272,6 +305,7 @@ func lines(err error) []string { return strings.Split(err.Error(), "\n") }
 func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*problem.Problem, name string, o ValidateOptions) Finding {
 	f := Finding{Name: name, Problem: p}
 	var errs, warns []string
+	setup := &setupNote{}
 	if err := p.Validate(); err != nil {
 		errs = append(errs, lines(err)...)
 	}
@@ -374,21 +408,21 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 		// every case, and the others must match them. Every reference so
 		// runs every case once.
 		if err := a.generateInputs(ctx, p, sel, true, o.Stderr); err != nil {
-			errs = append(errs, lines(err)...)
+			errs = append(errs, strings.Split(setup.text(err), "\n")...)
 			refs = nil
 		}
 		expect := generated > 0
 		for _, l := range refs {
 			tc, err := l.Toolchain()
 			if err != nil {
-				gap(fmt.Sprintf("%s reference not run: %v", l.Name(), err))
+				gap(fmt.Sprintf("%s reference not run: %s", l.Name(), setup.text(err)))
 				continue
 			}
 			if err := tc.Err(); err != nil {
 				errs = append(errs, fmt.Sprintf("%s reference not run: %v", l.Name(), err))
 				continue
 			}
-			refErrs, ok := a.checkReference(ctx, p, l, sel, expect, o.Stderr)
+			refErrs, ok := a.checkReference(ctx, p, l, sel, expect, setup, o.Stderr)
 			if !ok {
 				// The other references have no expected outputs to match
 				// on the generated cases.
@@ -422,7 +456,7 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 	for _, err := range pack.IdentityErrors(p, peers) {
 		errs = append(errs, err.Error())
 	}
-	f.Errors, f.Warnings = errs, warns
+	f.Errors, f.Warnings, f.PythonSetup = errs, warns, setup.err
 	return f
 }
 
@@ -452,15 +486,16 @@ func (a *App) missingReferences(p *problem.Problem) []lang.Language {
 // it is judged on them trivially, or by the checker (see
 // runner.Options.ExpectGenerated), and the run times it on them, as
 // expectGenerated's run would. ok is false when it could not compute them
-// all, which leaves the other references nothing to match on them.
-func (a *App) checkReference(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, expect bool, stderr io.Writer) (errs []string, ok bool) {
+// all, which leaves the other references nothing to match on them. setup
+// formats the run's error.
+func (a *App) checkReference(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, expect bool, setup *setupNote, stderr io.Writer) (errs []string, ok bool) {
 	if stderr == nil {
 		stderr = io.Discard
 	}
 	rep, _, err := a.runReference(ctx, p, l.ID(), sel, RunOptions{Stderr: stderr}, expect)
 	switch {
 	case err != nil:
-		return []string{fmt.Sprintf("%s reference: %v", l.Name(), err)}, !expect
+		return []string{fmt.Sprintf("%s reference: %s", l.Name(), setup.text(err))}, !expect
 	case rep.Verdict == runner.CompileError:
 		return []string{fmt.Sprintf("%s reference does not compile:\n%s", l.Name(), strings.TrimRight(rep.CompileError, "\n"))}, !expect
 	}

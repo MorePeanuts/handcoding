@@ -14,7 +14,6 @@ import (
 	"slices"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
-	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/version"
@@ -141,16 +140,13 @@ func (a *App) generator(ctx context.Context, p *problem.Problem, w io.Writer) (l
 	if !ok {
 		return nil, errors.New("python cannot run generators")
 	}
-	needs := fmt.Sprintf("%s has cases built by %s, which needs Python %s or later", p.Slug, problem.GeneratorFile, python.MinVersion)
-	if err := l.Setup(ctx, w); err != nil {
-		return nil, fmt.Errorf("%s: %w", needs, err)
-	}
-	tc, err := l.Toolchain()
+	why := fmt.Sprintf("building %s's generated cases with %s", p.Slug, problem.GeneratorFile)
+	tc, err := SetUp(ctx, l, w, why)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", needs, err)
+		return nil, err
 	}
 	if err := tc.Err(); err != nil {
-		return nil, fmt.Errorf("%s: %w", needs, err)
+		return nil, needsPython(why, err)
 	}
 	return g, nil
 }

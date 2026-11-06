@@ -18,7 +18,7 @@ func installed(dir, name string) bool {
 // A practice workspace and a pack checkout get their own skill sets, and
 // `hc skill install` without names brings a workspace back to its set.
 func TestSkillSetsByContext(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
+	fakeUV(t)
 	practice := filepath.Join(t.TempDir(), "ws")
 	if err := runHC(t, "init", practice); err != nil {
 		t.Fatal(err)

@@ -95,6 +95,63 @@ func pythonLanguage(ws *workspace.Workspace) python.Language {
 	return python.Language{Venv: v}
 }
 
+// SetUpPython creates the workspace's Python virtual environment unless it
+// is ready, as hc init and hc pack init do, so that the user learns at once
+// when there is no Python to create it with (a *python.SetupError). With
+// python.interpreter set in hc.yaml it does nothing.
+func (a *App) SetUpPython(ctx context.Context, w io.Writer) error {
+	l, err := a.Langs.Get("python")
+	if err != nil {
+		return err
+	}
+	return l.Setup(ctx, w)
+}
+
+// SetUpEnv prepares l's environment (see lang.Language.Setup), writing
+// progress to w. why says what needs it, such as "running two-sum's Python
+// solution": Python's errors, a *python.SetupError above all, are
+// prefixed with it, as "<why> needs Python 3.12 or later: ", so that every
+// command reports a missing Python the same way.
+func SetUpEnv(ctx context.Context, l lang.Language, w io.Writer, why string) error {
+	if err := l.Setup(ctx, w); err != nil {
+		return wrapPython(l, why, err)
+	}
+	return nil
+}
+
+// SetUp is SetUpEnv, then the detection of l's toolchain, whose failure is
+// prefixed the same way.
+func SetUp(ctx context.Context, l lang.Language, w io.Writer, why string) (lang.Toolchain, error) {
+	if err := SetUpEnv(ctx, l, w, why); err != nil {
+		return lang.Toolchain{}, err
+	}
+	tc, err := l.Toolchain()
+	if err != nil {
+		return tc, wrapPython(l, why, err)
+	}
+	return tc, nil
+}
+
+// SolutionNeeds is why a run of p's solution needs its language, for
+// SetUp: "running two-sum's Python solution".
+func SolutionNeeds(p *problem.Problem) string {
+	return fmt.Sprintf("running %s's Python solution", p.Slug)
+}
+
+// wrapPython prefixes err with why l is needed when l is Python.
+func wrapPython(l lang.Language, why string, err error) error {
+	if _, ok := l.(python.Language); ok {
+		return needsPython(why, err)
+	}
+	return err
+}
+
+// needsPython says, in front of err, a failure to set up Python, what
+// needs it.
+func needsPython(why string, err error) error {
+	return fmt.Errorf("%s needs Python %s or later: %w", why, python.MinVersion, err)
+}
+
 // SyncEnv creates the Python virtual environment again and returns the
 // toolchain it provides. Progress goes to w.
 func (a *App) SyncEnv(ctx context.Context, w io.Writer) (lang.Toolchain, error) {
@@ -438,12 +495,9 @@ func (a *App) FileLang(file, name string) (lang.Language, error) {
 
 // run runs the solution in dir, after building the generated cases of sel.
 func (a *App) run(ctx context.Context, p *problem.Problem, l lang.Language, dir string, sel []runner.Selected, o RunOptions) (*runner.Report, error) {
-	if err := l.Setup(ctx, o.Stderr); err != nil {
-		return nil, err
-	}
 	// The user's code may well run on an old toolchain; the report carries
 	// the toolchain so the front ends can warn.
-	tc, err := l.Toolchain()
+	tc, err := SetUp(ctx, l, o.Stderr, SolutionNeeds(p))
 	if err != nil {
 		return nil, err
 	}
@@ -496,16 +550,13 @@ func (a *App) checker(ctx context.Context, p *problem.Problem, w io.Writer) (lan
 	if !ok {
 		return nil, errors.New("python cannot run checkers")
 	}
-	needs := fmt.Sprintf("%s is judged by %s, which needs Python %s or later", p.Slug, problem.CheckerFile, python.MinVersion)
-	if err := l.Setup(ctx, w); err != nil {
-		return nil, fmt.Errorf("%s: %w", needs, err)
-	}
-	tc, err := l.Toolchain()
+	why := fmt.Sprintf("judging %s with %s", p.Slug, problem.CheckerFile)
+	tc, err := SetUp(ctx, l, w, why)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", needs, err)
+		return nil, err
 	}
 	if err := tc.Err(); err != nil {
-		return nil, fmt.Errorf("%s: %w", needs, err)
+		return nil, needsPython(why, err)
 	}
 	return c, nil
 }
@@ -615,12 +666,9 @@ func (a *App) runReference(ctx context.Context, p *problem.Problem, langName str
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := l.Setup(ctx, o.Stderr); err != nil {
-		return nil, nil, err
-	}
 	// Expected outputs and pack references must come from a toolchain the
 	// protocol supports.
-	tc, err := l.Toolchain()
+	tc, err := SetUp(ctx, l, o.Stderr, fmt.Sprintf("running %s's Python reference solution", p.Slug))
 	if err != nil {
 		return nil, nil, err
 	}

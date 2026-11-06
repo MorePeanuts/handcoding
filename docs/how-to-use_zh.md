@@ -31,7 +31,7 @@
   .claude/  .agents/                       智能体 skill
 ```
 
-`hc init --lang python` 把默认解题语言设为 Python（即 `hc.yaml` 中的 `language`，默认为 `go`），并立即创建下文介绍的 Python 环境。如果创建失败，例如既没有 uv 也没有 Python 3.12+，`hc init` 会给出警告，但仍然创建工作区。
+`hc init --lang python` 把默认解题语言设为 Python（即 `hc.yaml` 中的 `language`，默认为 `go`）。无论哪种语言，`hc init` 都会创建下文介绍的 Python 环境，因为大多数题目即使用 Go 作答也需要 Python。如果无法创建，即既没有 uv 也没有 Python 3.12+，`hc init` 仍会创建工作区，然后说明如何安装并以非零状态退出；装好后在工作区中运行 `hc env sync`。
 
 `hc` 按以下顺序查找工作区：`-w <dir>`、`$HC_WORKSPACE`、包含 `hc.yaml` 或 `pack.yaml`（题目包的检出目录，见[编写题目包](#编写题目包)）的最近一级父目录、`~/handcoding`。所以在任何目录下都可以运行它。
 
@@ -50,14 +50,17 @@ hc 无法读取的题目包（没有 `pack.yaml`、`pack.yaml` 不合法，或�
 
 每道 Go 题都是一个独立的 module，驱动文件就放在 `solution.go` 旁边。因此 gopls、`go build` 和 Delve 断点都直接作用在你自己的文件上。自动生成的文件每次运行前都会重写，不要手动修改。`go.mod` 跟随本机的 Go：其中的 `go` 行就是本机工具链的版本（Go 1.27.2 对应 `go 1.27`），所以你的解答可以使用它支持的所有特性。hc 用 `GOTOOLCHAIN=local` 构建，不会下载其他版本的工具链。构建出的程序按其源文件的内容保存在 `.hc/cache/build/go/` 中，所以代码没有改动时再次运行不会重新构建；在 macOS 上，这还省去了系统在每个新程序首次启动时做的检查。最多保留最近使用的 32 个。
 
-Python 解答在 hc 管理的虚拟环境 `.hc/venv` 中运行。第一次有命令需要 Python 时（`hc init --lang python`、`hc start`、`test`、`submit`、`debug`、`cases build`、`validate --run`），hc 会创建它：
+Python 在 hc 管理的虚拟环境 `.hc/venv` 中运行：包括 Python 解答，以及大多数题目带有的[生成器](protocol_zh.md#生成器)和[判题程序](protocol_zh.md#判题程序)，无论解答用哪种语言。`hc init` 和 `hc pack init` 会创建它；环境不存在时（例如刚克隆的题目包），第一个需要 Python 的命令（`hc start`、`test`、`submit`、`debug`、`cases build`、`validate --run`、`gen`、TUI 中的运行）也会创建它：
 
-1. 如果装了 [uv](https://docs.astral.sh/uv/)，用 `uv venv --python '>=3.12'` 创建；本机没有合适的 Python 时，uv 会自动下载一个；
-2. 否则从 PATH 上的 `python3`、`python` 和 `python3.N` 中选出最新的 Python 3.12+，用 `-m venv` 创建。在 Debian 和 Ubuntu 上这需要安装 `python3-venv` 包。
+1. 如果 PATH 上有 [uv](https://docs.astral.sh/uv/)，用 `uv venv --python '>=3.12'` 创建（本机没有合适的 Python 时，uv 会自动下载一个），再用 `uv pip` 安装 debugpy；
+2. 否则从 PATH 上的 `python3`、`python` 和 `python3.N` 中选出最新的 Python 3.12+，用 `-m venv` 创建。Debian 和 Ubuntu（包括 WSL）把 `venv` 中安装 pip 的部分单独打包为 `python3.X-venv`；没有它时，hc 改用 `-m venv --without-pip` 创建环境。判题不需要任何第三方包，所以这个环境可以正常使用，只是缺少用于 headless 调试的 debugpy；hc 会给出警告，指明要安装的包（或者安装 uv），然后运行 `hc env sync`；
+3. 否则 hc 停下并给出指引：需要 Python 3.12+ 及其原因；在你的系统上安装 uv 的命令（macOS 上为 `brew install uv` 或安装脚本，Linux 上为安装脚本，Windows 上为 `winget install --id=astral-sh.uv -e` 或 PowerShell 安装程序）和 [uv 安装页面](https://docs.astral.sh/uv/getting-started/installation/)；或者安装 Python 3.12+；或者设置 `python.interpreter`；然后运行 `hc env sync`。指引中会说明找到了什么（`/usr/bin/python3 is 3.9.6`）。hc 只打印命令，从不运行安装程序。
+
+每个需要 Python 的命令都以同样的方式报告这一错误，并在前面说明是什么需要 Python（`judging two-sum with checker.py needs Python 3.12 or later: …`）；TUI 在运行输出中显示同样的内容。`hc validate` 和 `hc pack check` 在受影响的每条检查结果中只给出它的第一行，并在所有检查结果之后只打印一次指引。
 
 在题目包的 checkout 中（见[编写题目包](packs_zh.md)），环境改用 Python 3.12，即协议支持的最旧版本，题目包的参考解、判题程序和生成器都必须能在它上面运行：用 `uv venv --python 3.12` 创建，没有 uv 时用 PATH 上最新的 `python3.12`。这样 `hc validate --run` 和 `hc pack check` 与题目包的 CI 使用同一个 Python。已有的环境版本不对时会重新创建；找不到 Python 3.12 时（没有 uv，PATH 上也没有），hc 使用最新的版本并给出警告。
 
-环境中装有 debugpy，用于 headless 调试。下载 Python 和安装 debugpy 需要联网，但只需一次；判题始终离线。如果环境失效（工作区被移动，或者它所用的 Python 被删除），hc 会重新创建。`hc env sync` 可以随时重建它，例如在装好 uv 之后。hc 还会在工作区根目录写入 `pyrightconfig.json`（已有时不覆盖），让 pyright 和 basedpyright 用同一个解释器检查你的解答。如果想用自己的 Python（conda、自行编译的版本），在 `hc.yaml` 中设置 `python.interpreter`，hc 就不再创建虚拟环境。
+环境中装有 debugpy，用于 headless 调试。下载 Python 和安装 debugpy 需要联网，但只需一次；判题始终离线。如果环境失效（工作区被移动，或者它所用的 Python 被删除），hc 会重新创建。`hc env sync` 可以随时重建它：hc 无法创建环境时，在装好 uv 或 Python 之后运行它；或者用它补装 debugpy。hc 还会在工作区根目录写入 `pyrightconfig.json`（已有时不覆盖），让 pyright 和 basedpyright 用同一个解释器检查你的解答。如果想用自己的 Python（conda、自行编译的版本），在 `hc.yaml` 中设置 `python.interpreter`，hc 就原样使用它，不再创建虚拟环境，也不显示指引。
 
 支持的最低版本是 Python 3.12 和 Go 1.22（见协议的[语言版本](protocol_zh.md#语言版本)）。你自己的解答可以使用工具链支持的任何特性：`hc test`、`hc submit` 和 `hc debug` 会注明所用的工具链（`[Python 3.12.9]`），版本过旧时只给出警告。题目附带的代码必须能在最低版本上运行，所以 `hc cases build` 和 `hc validate --run` 拒绝在过旧的工具链上运行参考解。更新的工具链没有问题：`hc validate --run`（因而 `hc pack check`）还会对照 Go 1.22 检查每个 Go 参考解，做法是在 go 指令为 `go 1.22` 的模块中对它运行 go vet，它会报告更新的语言特性和标准库符号。
 

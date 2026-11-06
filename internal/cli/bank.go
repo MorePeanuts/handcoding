@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
+	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/skill"
@@ -37,8 +38,14 @@ hc.yaml, or ~/handcoding — so using the default lets you run hc anywhere.
 A pack checkout (a directory with pack.yaml) needs no init: hc opens it as a
 workspace as it is, so init refuses a directory in one.
 
---lang sets the default solution language (language in hc.yaml). With
-python, hc also creates the workspace's Python virtual environment now.`,
+--lang sets the default solution language (language in hc.yaml).
+
+init also creates the workspace's Python virtual environment, .hc/venv,
+whatever the language: Python runs Python solutions, and the generators and
+checkers that most problems have (see ` + "`hc env`" + `). It uses uv if it is on
+PATH, else the newest Python 3.12+ on PATH. With neither, the workspace is
+created all the same, but init prints how to get one and exits with an
+error; run ` + "`hc env sync`" + ` in the workspace afterwards.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := ""
@@ -63,9 +70,9 @@ python, hc also creates the workspace's Python virtual environment now.`,
 			if _, err := skill.Install(ws.Root, skill.Practice, skill.Set(skill.Practice), opts); err != nil {
 				return err
 			}
-			if l, err := app.New(ws).Lang(""); err == nil && l.ID() == "python" {
-				setupEnv(cmd.Context(), l)
-			}
+			a := app.New(ws)
+			defer a.Close()
+			envErr := a.SetUpPython(cmd.Context(), os.Stderr)
 			fmt.Printf("%s workspace at %s\n\n", ui.Green.Render("Created"), ws.Root)
 			fmt.Println("It has no problems yet. Install the official LeetCode pack:")
 			fmt.Println("  hc pack install " + app.OfficialPack)
@@ -79,6 +86,10 @@ python, hc also creates the workspace's Python virtual environment now.`,
 			fmt.Println("  hc gen <slug>            have an agent write its test cases")
 			fmt.Println("  hc new <slug>            write a problem from scratch")
 			fmt.Println("\nTip: version your progress with `git init` in the workspace.")
+			if envErr != nil {
+				fmt.Println()
+				return fmt.Errorf("the workspace at %s is created, but not its Python environment: %w", ws.Root, envErr)
+			}
 			return nil
 		},
 	}
@@ -733,7 +744,7 @@ the reference solutions on every case and require them to pass. Validates
 			}
 			defer a.Close()
 			opts := app.ValidateOptions{Run: run, Stderr: os.Stderr, Jobs: jobs}
-			bad := 0
+			var sum app.ValidateSummary
 			if len(args) > 0 {
 				probs := make([]*problem.Problem, len(args))
 				for i, arg := range args {
@@ -741,15 +752,16 @@ the reference solutions on every case and require them to pass. Validates
 						return err
 					}
 				}
-				bad = a.ValidateProblems(cmd.Context(), probs, opts, func(f app.Finding) { printFinding(f) }).Failed
+				sum = a.ValidateProblems(cmd.Context(), probs, opts, func(f app.Finding) { printFinding(f) })
 			} else {
-				sum, err := a.ValidateWorkspace(cmd.Context(), opts, func(f app.Finding) { printFinding(f) })
-				if err != nil {
-					return err
-				}
-				bad = sum.Failed + sum.PackErrors
+				sum, err = a.ValidateWorkspace(cmd.Context(), opts, func(f app.Finding) { printFinding(f) })
 			}
-			if bad > 0 {
+			// The findings point to it.
+			printPythonSetup(sum.PythonSetup)
+			if err != nil {
+				return err
+			}
+			if bad := sum.Failed + sum.PackErrors; bad > 0 {
 				return fmt.Errorf("%d pack(s) or problem(s) with errors", bad)
 			}
 			return nil
@@ -771,10 +783,24 @@ func jobsFlag(cmd *cobra.Command, jobs *int) {
 // changed it, and prints the findings.
 func validateOne(cmd *cobra.Command, a *app.App, p *problem.Problem) error {
 	name := a.WS.Ref(p)
-	if !printFinding(a.ValidateProblem(cmd.Context(), p, nil, name, app.ValidateOptions{})) {
+	f := a.ValidateProblem(cmd.Context(), p, nil, name, app.ValidateOptions{})
+	ok := printFinding(f)
+	printPythonSetup(f.PythonSetup)
+	if !ok {
 		return errors.New(name + " is invalid")
 	}
 	return nil
+}
+
+// printPythonSetup shows, after the findings of hc validate or hc pack
+// check, the whole message of the failure to set up Python, se, that they
+// give only the summary of (app.SetupPointer): how to get Python. Nil
+// prints nothing.
+func printPythonSetup(se *python.SetupError) {
+	if se == nil {
+		return
+	}
+	fmt.Printf("\n%s %s\n", ui.Yellow.Render("How to set up Python:"), se.Error())
 }
 
 // printFinding prints what validating a pack or problem found, and reports

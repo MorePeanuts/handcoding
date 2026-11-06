@@ -52,7 +52,7 @@ go install github.com/MorePeanuts/handcoding/cmd/hc@latest
 
 Prebuilt binaries for Linux, macOS and Windows are on the [releases page](https://github.com/MorePeanuts/handcoding/releases).
 
-To solve problems you need the toolchain of your language: Go 1.22+, or for Python, [uv](https://docs.astral.sh/uv/) (recommended) or Python 3.12+. hc runs Python solutions in a virtual environment of its own, created in the workspace the first time it needs Python. With uv, that works even where the system Python is too old (macOS ships 3.9): uv downloads a newer one. Optional extras:
+You need Go 1.22+ to solve in Go, and Python 3.12+ in any language: besides Python solutions, Python runs the generators and checkers that most problems have. The easiest way to get it is [uv](https://docs.astral.sh/uv/getting-started/installation/) (recommended; `brew install uv`, or `curl -LsSf https://astral.sh/uv/install.sh | sh`), which downloads a Python even where the system one is too old (macOS ships 3.9); a Python 3.12+ on PATH works too. `hc init` sets up a virtual environment for it in the workspace, and says how to get uv or Python if it finds neither. Optional extras:
 
 - [Delve](https://github.com/go-delve/delve) for debugging Go;
 - `claude` or `codex` for generating test cases.
@@ -65,7 +65,7 @@ hc pack install https://github.com/MorePeanuts/leetcode.hc.git   # the official 
 hc                      # open the problem list
 ```
 
-To solve in Python by default, run `hc init --lang python` instead; it also sets up the Python environment right away. A new workspace starts with no problems. [leetcode.hc](https://github.com/MorePeanuts/leetcode.hc) is the official pack of ready-made LeetCode problems, with English and Chinese statements and Go and Python references: `hc pack install` clones it into `packs/` and records it in `hc.yaml`, and `hc pack update` brings its new problems (see [packs](docs/how-to-use.md#packs)). Your own problems live in the workspace's `packs/local/problems/`: `hc fetch two-sum` imports one from LeetCode and `hc gen two-sum` has a coding agent write its test cases and judge rule, `hc new` scaffolds one from scratch, and `hc import` copies problem directories in.
+To solve in Python by default, run `hc init --lang python` instead. If `hc init` finds neither uv nor Python 3.12+, it creates the workspace, prints how to install them and exits with an error; install one, then run `hc env sync` in the workspace. A new workspace starts with no problems. [leetcode.hc](https://github.com/MorePeanuts/leetcode.hc) is the official pack of ready-made LeetCode problems, with English and Chinese statements and Go and Python references: `hc pack install` clones it into `packs/` and records it in `hc.yaml`, and `hc pack update` brings its new problems (see [packs](docs/how-to-use.md#packs)). Your own problems live in the workspace's `packs/local/problems/`: `hc fetch two-sum` imports one from LeetCode and `hc gen two-sum` has a coding agent write its test cases and judge rule, `hc new` scaffolds one from scratch, and `hc import` copies problem directories in.
 
 Press `enter` on a problem. `hc` shows the statement, creates `solution.go` from the template and copies its path to the clipboard. Open it in your editor next door, then press `t` to test and `s` to submit.
 

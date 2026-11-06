@@ -59,7 +59,13 @@ installs this hc's version, or the latest release when this hc is a
 development build.
 
 dir must not be in a workspace, and hc refuses to overwrite any file: it
-checks them all before it writes one. hc does not run ` + "`git init`" + `.`,
+checks them all before it writes one. hc does not run ` + "`git init`" + `.
+
+init then creates the checkout's Python virtual environment, .hc/venv, on
+Python 3.12, the oldest the protocol supports, which the pack's content must
+run on (see ` + "`hc env`" + `): with uv if it is on PATH, else with a Python on PATH.
+With neither, the pack is created all the same, but init prints how to get
+one and exits with an error; run ` + "`hc env sync`" + ` in the pack afterwards.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := "."
@@ -70,6 +76,7 @@ checks them all before it writes one. hc does not run ` + "`git init`" + `.`,
 			if err != nil {
 				return err
 			}
+			envErr := setUpPackPython(cmd, res.Root)
 			fmt.Printf("%s the pack %s at %s\n", ui.Green.Render("Created"), res.Manifest.Name, res.Root)
 			for _, f := range res.Files {
 				fmt.Println(ui.Faint.Render("     " + f))
@@ -95,12 +102,28 @@ checks them all before it writes one. hc does not run ` + "`git init`" + `.`,
 			fmt.Println("  hc pack check            check the pack, as its CI does")
 			fmt.Println("  git push                 publish it; tag releases (v0.1.0), with version in pack.yaml")
 			fmt.Println("\nWriting packs: https://github.com/MorePeanuts/handcoding/blob/main/docs/packs.md")
+			if envErr != nil {
+				fmt.Println()
+				return fmt.Errorf("the pack at %s is created, but not its Python environment: %w", res.Root, envErr)
+			}
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&name, "name", "", "the pack's name (default: the directory's name in kebab-case)")
 	cmd.Flags().StringVar(&title, "title", "", "the pack's display title")
 	return cmd
+}
+
+// setUpPackPython creates the Python environment of the pack checkout at
+// root, as hc init does a workspace's.
+func setUpPackPython(cmd *cobra.Command, root string) error {
+	ws, err := workspace.Open(root)
+	if err != nil {
+		return err
+	}
+	a := app.New(ws)
+	defer a.Close()
+	return a.SetUpPython(cmd.Context(), os.Stderr)
 }
 
 // shellQuote quotes s for a shell when it needs it.
@@ -469,10 +492,14 @@ and a summary, and fails if anything is wrong.`,
 			opts := app.ValidateOptions{Stderr: os.Stderr, Jobs: jobs}
 			sum, err := a.CheckPack(cmd.Context(), opts, func(f app.Finding) { printFinding(f) })
 			if err != nil {
+				printPythonSetup(sum.PythonSetup)
 				return err
 			}
 			name := a.WS.WritablePack().Name
 			fmt.Println()
+			// The guide to setting up Python, which findings point to,
+			// comes after the summary.
+			defer printPythonSetup(sum.PythonSetup)
 			if sum.OK() {
 				fmt.Printf("%s %s: %d problem(s), all pass\n", ui.Green.Render("ok  "), name, sum.Problems)
 				return nil
