@@ -103,8 +103,12 @@ func (a *App) baseline(ctx context.Context, p *problem.Problem, l lang.Language,
 
 // recordBaseline adds the times of a run of the reference in l on sel to
 // its baseline, best effort: a run made anyway, such as the one computing
-// the expected outputs of generated cases, saves one.
+// the expected outputs of generated cases, saves one. Untimed runs (see
+// untimed) are not added.
 func (a *App) recordBaseline(p *problem.Problem, l lang.Language, sel []runner.Selected, rep *runner.Report) {
+	if a.untimedRuns.Load() > 0 {
+		return
+	}
 	key, err := a.baselineKey(p, l)
 	if err != nil {
 		return
@@ -120,6 +124,16 @@ func (a *App) recordBaseline(p *problem.Problem, l lang.Language, sel []runner.S
 	if c.record(l, rep, digests) == nil {
 		writeCacheFile(path, c)
 	}
+}
+
+// untimed keeps the runs of references from adding to their baselines until
+// the function it returns is called: while other processes compete for the
+// machine, as when problems are validated at once, a reference's times say
+// little about those of a run on its own. Baselines serve only time limits, and the run
+// that needs one times the reference then.
+func (a *App) untimed() (restore func()) {
+	a.untimedRuns.Add(1)
+	return func() { a.untimedRuns.Add(-1) }
 }
 
 // baselinePath is the cache of the times of p's reference in l.

@@ -165,7 +165,7 @@ As on LeetCode, a solution that is correct but too slow fails with Time Limit Ex
 
 - Forty times leaves room for a different way of writing the same algorithm, such as a map where the reference uses an array, but not for a worse complexity on inputs as large as the problem's constraints allow. Whether a slower solution fails depends on the problem's cases: some problems cannot separate two complexities within their constraints, and then the slower one passes, as it would on LeetCode.
 - The first run of a problem times the reference: three runs on each case, of which hc keeps the fastest, in `.hc/cache/baseline/<pack>/<problem>/<language>.json`. hc notes it on stderr ("Timing the Go reference…"), and later runs, with any selection of cases, reuse the times. They are measured again when hc, your toolchain, `problem.yaml` or the reference change.
-- A problem without a reference in your language is not judged ([readiness](protocol.md#readiness)), so it has no time limit either. References, `hc cases build` and `hc validate --run` are never limited, and neither is `hc debug`.
+- A problem without a reference in your language is not judged ([readiness](protocol.md#readiness)), so it has no time limit either. References, `hc cases build` and `hc validate --run` are never limited, and neither is `hc debug`. Their runs of a reference on generated cases, which compute the expected outputs, count as one of its three timed runs, except while `hc validate` or `hc pack check` checks several problems at once (`--jobs`).
 - The `timeout` of `hc.yaml` is another limit, on the wall-clock time of the whole run: it guards against a solution that hangs. It can also come first: when the reference takes more than a fortieth of it on the run's cases (250ms with the default 10s, as Python references can on problems with many large cases), a much slower solution reaches the `timeout` before the time limit. The verdict is the same, Time Limit Exceeded, only after the whole `timeout`.
 
 ## Getting problems
@@ -322,6 +322,8 @@ To **reproduce a workspace** elsewhere, copy its `hc.yaml` into a new workspace 
 ### Checking a pack
 
 `hc pack check` is what a pack's CI runs before publishing. Run it in a pack checkout ([working on a pack](#working-on-a-pack)), or pass its directory: `hc pack check ./my-pack`. It checks that `pack.yaml` is valid and of a supported protocol, that its groups name problems of the pack, and that every problem loads, is valid, has a canonical directory name and a unique slug and ID, is ready (`judge.compare` is set), has cases that all have an expected output (or, generated, a digest) and none over 100 KB, a reference solution in every language of the pack's `languages`, and passes `hc validate --run`: every reference solution passes every case, generated ones built afresh. So it needs Go and Python 3.10+, and a reference that cannot be run is an error. It prints one line per problem and a summary, and exits non-zero on any failure.
+
+`hc pack check` and `hc validate` check several problems at once: `--jobs` (`-j`) of them, by default one per CPU and at most 4. The lines come in the same order as one at a time, each as soon as its problem and those before it are done, and the output of a problem's reference runs comes just before its line. Reference runs made at once are not timed for [time limits](#time-limit), since they compete for the machine; `-j 1` checks one problem after another and times them as before.
 
 ## Test cases from a coding agent
 

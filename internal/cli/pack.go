@@ -437,7 +437,8 @@ workspace's own problems, cannot be removed.`,
 }
 
 func newPackCheckCmd(root *rootOptions) *cobra.Command {
-	return &cobra.Command{
+	var jobs int
+	cmd := &cobra.Command{
 		Use:   "check [dir]",
 		Short: "Check a pack checkout before publishing it (what its CI runs)",
 		Long: `Check the pack checkout dir, or the current workspace, which must be a pack
@@ -447,7 +448,8 @@ name problems of the pack, and every problem loads, is valid (as
 ` + "`hc validate --run`" + `: every reference solution passes every case, so the Go
 and Python toolchains must be installed.
 
-Prints one line per problem and a summary, and fails if anything is wrong.`,
+Checks --jobs problems at once, and prints one line per problem, in order,
+and a summary, and fails if anything is wrong.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var a *app.App
@@ -464,7 +466,7 @@ Prints one line per problem and a summary, and fails if anything is wrong.`,
 				}
 			}
 			defer a.Close()
-			opts := app.ValidateOptions{Stderr: os.Stderr}
+			opts := app.ValidateOptions{Stderr: os.Stderr, Jobs: jobs}
 			sum, err := a.CheckPack(cmd.Context(), opts, func(f app.Finding) { printFinding(f) })
 			if err != nil {
 				return err
@@ -486,4 +488,6 @@ Prints one line per problem and a summary, and fails if anything is wrong.`,
 			return fmt.Errorf("pack %s does not pass the check", name)
 		},
 	}
+	jobsFlag(cmd, &jobs)
+	return cmd
 }

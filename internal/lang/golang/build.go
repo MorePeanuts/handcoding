@@ -11,14 +11,27 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
 )
 
 // KeepBuilds is how many programs a BuildCache holds: beyond it, Build
-// removes the least recently used.
+// removes the least recently used, except those used in the last
+// KeepRecent, which it may be about to run.
 const KeepBuilds = 32
+
+// KeepRecent is how long a program of a BuildCache is kept after Build last
+// built it or found it there: from Build to Command, which runs it, and
+// while it runs, so that the builds of other runs at the same time (hc
+// validate --jobs, another hc) do not remove it in the meantime.
+const KeepRecent = 10 * time.Minute
+
+// cacheMu orders, within the process, Build's finding or creating a
+// program's directory, which marks it used, before or after a pruning, which
+// otherwise could remove a directory it has seen unused just as it is used.
+var cacheMu sync.Mutex
 
 // Build compiles the module in dir. With a BuildCache, the program goes to
 // a directory of the cache named by a hash of the module's files and the
@@ -34,12 +47,7 @@ func (l Language) Build(ctx context.Context, dir, binDir string) error {
 		return err
 	}
 	if l.BuildCache != "" {
-		if _, err := os.Stat(bin); err == nil {
-			now := time.Now()
-			_ = os.Chtimes(filepath.Dir(bin), now, now)
-			return nil
-		}
-		if err := os.MkdirAll(filepath.Dir(bin), 0o755); err != nil {
+		if hit, err := use(bin); hit || err != nil {
 			return err
 		}
 	}
@@ -69,9 +77,35 @@ func (l Language) Build(ctx context.Context, dir, binDir string) error {
 		}
 	}
 	if l.BuildCache != "" {
+		cacheMu.Lock()
+		touch(filepath.Dir(bin))
 		pruneBuilds(l.BuildCache)
+		cacheMu.Unlock()
 	}
 	return nil
+}
+
+// use marks the directory of the cached program bin used, creating it if
+// need be, and reports whether bin is there.
+func use(bin string) (hit bool, err error) {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	dir := filepath.Dir(bin)
+	if _, err := os.Stat(bin); err == nil {
+		touch(dir)
+		return true, nil
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return false, err
+	}
+	touch(dir)
+	return false, nil
+}
+
+// touch marks the directory of a cached program used now, best effort.
+func touch(dir string) {
+	now := time.Now()
+	_ = os.Chtimes(dir, now, now)
 }
 
 func (l Language) Command(ctx context.Context, dir, binDir string) *exec.Cmd {
@@ -126,7 +160,8 @@ func buildKey(dir string) (string, error) {
 }
 
 // pruneBuilds removes the least recently used programs of the cache beyond
-// KeepBuilds, best effort.
+// KeepBuilds, but none used in the last KeepRecent, best effort. The
+// caller holds cacheMu.
 func pruneBuilds(cache string) {
 	entries, err := os.ReadDir(cache)
 	if err != nil || len(entries) <= KeepBuilds {
@@ -145,7 +180,10 @@ func pruneBuilds(cache string) {
 		builds = append(builds, build{filepath.Join(cache, e.Name()), info.ModTime()})
 	}
 	slices.SortFunc(builds, func(a, b build) int { return b.used.Compare(a.used) })
+	recent := time.Now().Add(-KeepRecent)
 	for _, b := range builds[min(KeepBuilds, len(builds)):] {
-		os.RemoveAll(b.path)
+		if b.used.Before(recent) {
+			os.RemoveAll(b.path)
+		}
 	}
 }

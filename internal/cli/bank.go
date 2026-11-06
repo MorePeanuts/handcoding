@@ -717,31 +717,31 @@ func newCasesEditCmd(root *rootOptions) *cobra.Command {
 
 func newValidateCmd(root *rootOptions) *cobra.Command {
 	var run bool
+	var jobs int
 	cmd := &cobra.Command{
 		Use:   "validate [problem]...",
 		Short: "Check packs and problems against the protocol (all by default)",
 		Long: `Validate problem.yaml, cases.jsonl and starter generation, and the identity
 of each problem within its pack (directory name, unique slug and id). Without
 arguments, also check every installed pack's pack.yaml. With --run, also run
-the reference solutions on every case and require them to pass.`,
+the reference solutions on every case and require them to pass. Validates
+--jobs problems at once, and prints their findings in order.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, err := root.openApp()
 			if err != nil {
 				return err
 			}
 			defer a.Close()
-			opts := app.ValidateOptions{Run: run, Stderr: os.Stderr}
+			opts := app.ValidateOptions{Run: run, Stderr: os.Stderr, Jobs: jobs}
 			bad := 0
 			if len(args) > 0 {
-				for _, arg := range args {
-					p, err := a.WS.Problem(arg)
-					if err != nil {
+				probs := make([]*problem.Problem, len(args))
+				for i, arg := range args {
+					if probs[i], err = a.WS.Problem(arg); err != nil {
 						return err
 					}
-					if f := a.ValidateProblem(cmd.Context(), p, nil, a.WS.Ref(p), opts); !printFinding(f) {
-						bad++
-					}
 				}
+				bad = a.ValidateProblems(cmd.Context(), probs, opts, func(f app.Finding) { printFinding(f) }).Failed
 			} else {
 				sum, err := a.ValidateWorkspace(cmd.Context(), opts, func(f app.Finding) { printFinding(f) })
 				if err != nil {
@@ -756,7 +756,15 @@ the reference solutions on every case and require them to pass.`,
 		},
 	}
 	cmd.Flags().BoolVar(&run, "run", false, "run the reference solutions on every case")
+	jobsFlag(cmd, &jobs)
 	return cmd
+}
+
+// jobsFlag adds --jobs, the number of problems hc validates at once, to
+// cmd.
+func jobsFlag(cmd *cobra.Command, jobs *int) {
+	cmd.Flags().IntVarP(jobs, "jobs", "j", app.DefaultJobs(),
+		"problems to validate at once (1: one after another, timing references for time limits)")
 }
 
 // validateOne validates p, without running references, after a command

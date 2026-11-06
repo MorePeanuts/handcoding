@@ -1,13 +1,16 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/pack"
@@ -30,7 +33,20 @@ type ValidateOptions struct {
 	// Stderr receives the output of reference runs, such as the creation of
 	// the Python environment. Nil discards it.
 	Stderr io.Writer
+	// Jobs is how many problems ValidateWorkspace and ValidateProblems
+	// validate at once; 0 is 1. While more than one are, the output of a
+	// problem's reference runs goes to Stderr just before its finding is
+	// reported, and the runs add nothing to the references' baselines
+	// for time limits (see untimed). Findings are reported in the same order either way.
+	Jobs int
 }
+
+// DefaultJobs is the number of problems hc validate and hc pack check
+// validate at once by default: one per CPU, at most 4. A problem with
+// references in two languages, a generator or a checker keeps more than
+// one process busy at times, and more jobs mostly add memory and
+// contention.
+func DefaultJobs() int { return min(runtime.NumCPU(), 4) }
 
 // Finding is what validating one pack or problem found.
 type Finding struct {
@@ -62,9 +78,10 @@ type ValidateSummary struct {
 func (s ValidateSummary) OK() bool { return s.Failed == 0 && s.PackErrors == 0 }
 
 // ValidateWorkspace validates every pack of the workspace and its problems,
-// pack by pack, and passes each finding to report as it is made: the
-// manifest, its groups against the problems, problems that fail to load, and
-// every problem (see ValidateProblem).
+// pack by pack, and passes each finding to report, in that order, as soon
+// as it and those before it are made: the manifest, its groups against the
+// problems, problems that fail to load, and every problem (see
+// ValidateProblem), o.Jobs problems at once.
 func (a *App) ValidateWorkspace(ctx context.Context, o ValidateOptions, report func(Finding)) (ValidateSummary, error) {
 	var sum ValidateSummary
 	packs, err := a.WS.Packs()
@@ -73,40 +90,175 @@ func (a *App) ValidateWorkspace(ctx context.Context, o ValidateOptions, report f
 	}
 	all, _ := a.WS.Problems()
 	qualify := workspace.SpansPacks(all)
+	var items []validateItem
 	for _, k := range packs {
 		label := "pack " + k.Name
 		if k.Err != nil {
-			sum.PackErrors++
-			report(Finding{Name: label, Errors: lines(k.Err)})
+			items = append(items, validateItem{f: Finding{Name: label, Errors: lines(k.Err)}})
 			continue
 		}
 		probs, failed, err := k.Problems()
 		if err != nil {
-			return sum, err
+			// Returned once the findings before it are reported.
+			items = append(items, validateItem{err: err})
+			break
 		}
 		if err := k.Manifest.ValidateProblems(probs); err != nil {
-			sum.PackErrors++
-			report(Finding{Name: label, Errors: lines(err)})
+			items = append(items, validateItem{f: Finding{Name: label, Errors: lines(err)}})
 		}
 		for _, f := range failed {
-			sum.Problems++
-			sum.Failed++
-			report(Finding{Name: a.WS.Rel(f.Dir), Errors: lines(f)})
+			items = append(items, validateItem{f: Finding{Name: a.WS.Rel(f.Dir), Errors: lines(f)}, failed: true})
 		}
 		for _, p := range probs {
 			name := p.Slug
 			if qualify {
 				name = p.Ref()
 			}
-			f := a.ValidateProblem(ctx, p, probs, name, o)
-			sum.Problems++
-			if !f.OK() {
-				sum.Failed++
-			}
-			report(f)
+			items = append(items, validateItem{p: p, peers: probs, name: name})
 		}
 	}
-	return sum, nil
+	err = a.validateItems(ctx, items, o, func(it validateItem) {
+		switch {
+		case it.p != nil || it.failed:
+			sum.Problems++
+			if !it.f.OK() {
+				sum.Failed++
+			}
+		default:
+			sum.PackErrors++
+		}
+		report(it.f)
+	})
+	return sum, err
+}
+
+// ValidateProblems validates the problems probs (see ValidateProblem), each
+// named as WS.Ref names it, o.Jobs at once, and passes each finding to
+// report, in their order, as soon as it and those before it are made.
+func (a *App) ValidateProblems(ctx context.Context, probs []*problem.Problem, o ValidateOptions, report func(Finding)) ValidateSummary {
+	var sum ValidateSummary
+	items := make([]validateItem, len(probs))
+	for i, p := range probs {
+		items[i] = validateItem{p: p, name: a.WS.Ref(p)}
+	}
+	_ = a.validateItems(ctx, items, o, func(it validateItem) {
+		sum.Problems++
+		if !it.f.OK() {
+			sum.Failed++
+		}
+		report(it.f)
+	})
+	return sum
+}
+
+// validateItem is a problem to validate (p), a finding made already (f: a
+// pack's, or of a problem that failed to load), or an error that ends the
+// validation.
+type validateItem struct {
+	p      *problem.Problem
+	peers  []*problem.Problem
+	name   string
+	f      Finding
+	failed bool
+	err    error
+}
+
+// validateItems validates the problems of items, o.Jobs at once, and passes
+// the items, with their findings, to report in their order, from the
+// calling goroutine, up to an item's error, which it returns.
+func (a *App) validateItems(ctx context.Context, items []validateItem, o ValidateOptions, report func(validateItem)) error {
+	var todo []int
+	for i, it := range items {
+		if it.p != nil {
+			todo = append(todo, i)
+		}
+	}
+	jobs := min(max(o.Jobs, 1), len(todo))
+	if jobs <= 1 {
+		for _, it := range items {
+			if it.err != nil {
+				return it.err
+			}
+			if it.p != nil {
+				it.f = a.ValidateProblem(ctx, it.p, it.peers, it.name, o)
+			}
+			report(it)
+		}
+		return nil
+	}
+	if o.Run {
+		a.setUp(ctx, items, o.Stderr)
+	}
+	// A reference timed while other problems run makes a noisy baseline.
+	defer a.untimed()()
+	// A problem's output is kept until its finding is reported, so that it
+	// comes before it, as it does one problem at a time.
+	type result struct {
+		f      Finding
+		stderr bytes.Buffer
+	}
+	results := make([]result, len(items))
+	done := make([]chan struct{}, len(items))
+	next := make(chan int, len(todo))
+	for _, i := range todo {
+		done[i] = make(chan struct{})
+		next <- i
+	}
+	close(next)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	for range jobs {
+		wg.Go(func() {
+			for i := range next {
+				po := o
+				if o.Stderr != nil {
+					po.Stderr = &results[i].stderr
+				}
+				results[i].f = a.ValidateProblem(ctx, items[i].p, items[i].peers, items[i].name, po)
+				close(done[i])
+			}
+		})
+	}
+	for i, it := range items {
+		if it.err != nil {
+			// Only the last item has one, after every problem.
+			return it.err
+		}
+		if it.p != nil {
+			<-done[i]
+			if o.Stderr != nil {
+				_, _ = o.Stderr.Write(results[i].stderr.Bytes())
+			}
+			it.f = results[i].f
+		}
+		report(it)
+	}
+	return nil
+}
+
+// setUp prepares, before problems are validated at once, what their
+// reference runs would each prepare on first use: the environment of every
+// language they run in (the Python environment, whose progress goes to w),
+// and the detection of its toolchain. A failure is left to each problem to
+// report, as it would be one problem at a time.
+func (a *App) setUp(ctx context.Context, items []validateItem, w io.Writer) {
+	need := map[string]bool{}
+	for _, it := range items {
+		if it.p == nil {
+			continue
+		}
+		for _, l := range a.ReferenceLangs(it.p) {
+			need[l.ID()] = true
+		}
+		if it.p.HasGenerator() || it.p.Judge.Compare == problem.CompareChecker {
+			need["python"] = true
+		}
+	}
+	for _, l := range a.Langs.All() {
+		if need[l.ID()] && l.Setup(ctx, w) == nil {
+			_, _ = l.Toolchain()
+		}
+	}
 }
 
 func lines(err error) []string { return strings.Split(err.Error(), "\n") }

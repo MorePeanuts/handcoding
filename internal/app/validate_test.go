@@ -1,14 +1,19 @@
 package app_test
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
+	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
+	"github.com/MorePeanuts/handcoding/internal/regression"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 )
 
@@ -139,5 +144,120 @@ func TestValidateGeneratedOutputs(t *testing.T) {
 		case tt.err != "" && (err == nil || !strings.Contains(err.Error(), tt.err)):
 			t.Errorf("case %d: error = %v, want %q", tt.index, err, tt.err)
 		}
+	}
+}
+
+// finding is what a test compares of an app.Finding.
+type finding struct {
+	Name             string
+	Cases            int
+	Errors, Warnings []string
+}
+
+func (f finding) String() string {
+	return fmt.Sprintf("%s (%d cases) %q %q", f.Name, f.Cases, f.Errors, f.Warnings)
+}
+
+// TestValidateJobs validates the regression set, with a local pack of two
+// problems that fail before it, problem by problem and several at once:
+// the findings, their order and the summary are the same, a problem's
+// output comes just before its finding, and runs made at once leave no
+// baselines.
+func TestValidateJobs(t *testing.T) {
+	requireTools(t, "go", "python3")
+	a := newWorkspace(t)
+	a.WS.Config.Locales = []string{"en", "zh-CN"}
+	local := filepath.Join(a.WS.WritablePack().Dir, pack.ProblemsDir)
+	// A problem whose expected output is wrong, which only running its
+	// references finds, and whose Python reference prints to stderr.
+	temp := filepath.Join(local, "2469-convert-the-temperature")
+	if err := os.CopyFS(temp, os.DirFS(filepath.Join(regression.ProblemsDir(), "2469-convert-the-temperature"))); err != nil {
+		t.Fatal(err)
+	}
+	replaceIn(t, filepath.Join(temp, "cases.jsonl"), "[309.65,97.7]", "[309.65,97.8]")
+	replaceIn(t, filepath.Join(temp, "reference", "solution.py"), "class Solution", "import sys\nprint(\"from the local reference\", file=sys.stderr)\n\n\nclass Solution")
+	// A problem that does not load.
+	if err := os.MkdirAll(filepath.Join(local, "0002-broken"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(local, "0002-broken", "problem.yaml"), []byte("kind: [\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	validate := func(o app.ValidateOptions) (app.ValidateSummary, []finding, string) {
+		t.Helper()
+		var out bytes.Buffer
+		o.Stderr = &out
+		var fs []finding
+		sum, err := a.ValidateWorkspace(ctx, o, func(f app.Finding) {
+			fs = append(fs, finding{f.Name, f.Cases, f.Errors, f.Warnings})
+			fmt.Fprintf(&out, "finding %s\n", f.Name)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return sum, fs, out.String()
+	}
+	sum1, f1, _ := validate(app.ValidateOptions{Jobs: 1})
+	if len(f1) < 40 || sum1.Failed != 1 || sum1.PackErrors != 0 {
+		t.Fatalf("one at a time: %+v, %d findings", sum1, len(f1))
+	}
+	sum4, f4, _ := validate(app.ValidateOptions{Jobs: 4})
+	if sum4 != sum1 || !slices.EqualFunc(f4, f1, func(a, b finding) bool { return a.String() == b.String() }) {
+		t.Errorf("4 at a time: %+v, one at a time %+v", sum4, sum1)
+		for i := range max(len(f1), len(f4)) {
+			if i >= len(f1) || i >= len(f4) || f1[i].String() != f4[i].String() {
+				t.Errorf("finding %d differs", i)
+			}
+		}
+	}
+
+	// With the references run, only the problem with the wrong expected
+	// output fails besides.
+	sumRun, fRun, out := validate(app.ValidateOptions{Run: true, Jobs: 4})
+	if sumRun.Problems != sum1.Problems || sumRun.Failed != sum1.Failed+1 || len(fRun) != len(f1) {
+		t.Fatalf("run 4 at a time: %+v, %d findings; without running %+v", sumRun, len(fRun), sum1)
+	}
+	for i, f := range fRun {
+		want := f1[i]
+		if f.Name == "local/convert-the-temperature" {
+			if len(f.Errors) == 0 || !strings.Contains(strings.Join(f.Errors, "\n"), "case 1: Wrong Answer") {
+				t.Errorf("%s: errors %q, want a Wrong Answer", f.Name, f.Errors)
+			}
+			want.Errors = f.Errors
+		}
+		if f.String() != want.String() {
+			t.Errorf("run 4 at a time, finding %d:\n got %s\nwant %s", i, f, want)
+		}
+	}
+	// Its output comes after the finding before it, and before its own.
+	before := strings.Index(out, "finding local/convert-the-temperature\n")
+	after := strings.LastIndex(out[:max(before, 0)], "finding ")
+	if before < 0 || after < 0 || strings.Count(out, "from the local reference") == 0 ||
+		strings.Count(out, "from the local reference") != strings.Count(out[after:before], "from the local reference") {
+		t.Errorf("output of the local reference out of place:\n%s", out)
+	}
+	baselines := filepath.Join(a.WS.StatePath(), "cache", "baseline")
+	if _, err := os.Stat(baselines); !os.IsNotExist(err) {
+		t.Errorf("runs made at once left baselines: %v", err)
+	}
+
+	// One at a time, the reference that computes the expected outputs of
+	// generated cases is timed, as always.
+	p, err := a.WS.Problem("regression/two-sum")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := a.ValidateProblems(ctx, []*problem.Problem{p}, app.ValidateOptions{Run: true, Jobs: 4}, func(f app.Finding) {
+		if !f.OK() {
+			t.Errorf("%s: %q", f.Name, f.Errors)
+		}
+	})
+	if sum.Problems != 1 || sum.Failed != 0 {
+		t.Errorf("two-sum: %+v", sum)
+	}
+	if _, err := os.Stat(filepath.Join(baselines, "regression", "two-sum")); err != nil {
+		t.Errorf("no baseline: %v", err)
 	}
 }
