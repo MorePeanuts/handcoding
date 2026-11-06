@@ -60,6 +60,16 @@ func goType(t string) (string, error) {
 	return strings.Repeat("[]", depth) + g, nil
 }
 
+// parsers name the runtime's parsers of scalar types, which hcDec0, hcDec1
+// and hcDec2 take.
+var parsers = map[string]string{
+	problem.TypeInteger: "hcParseInt",
+	problem.TypeLong:    "hcParseLong",
+	problem.TypeDouble:  "hcParseDouble",
+	problem.TypeBoolean: "hcParseBool",
+	problem.TypeString:  "hcParseString",
+}
+
 // decodeExpr returns a Go expression decoding raw (a json.RawMessage
 // expression) into the Go type for t.
 func decodeExpr(t, raw string) (string, error) {
@@ -70,6 +80,9 @@ func decodeExpr(t, raw string) (string, error) {
 	base, depth := problem.SplitArray(t)
 	if name, ok := special[base]; ok {
 		return fmt.Sprintf("hcDec%s%d(%s)", name, depth, raw), nil
+	}
+	if parse, ok := parsers[base]; ok && depth <= 2 {
+		return fmt.Sprintf("hcDec%d(%s, %s)", depth, raw, parse), nil
 	}
 	return fmt.Sprintf("hcJSON[%s](%s)", g, raw), nil
 }

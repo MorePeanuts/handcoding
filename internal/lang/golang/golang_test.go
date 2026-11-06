@@ -173,7 +173,7 @@ func TestClassCallTiming(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"\thcArg0 := hcJSON[[]int](hcAt(args[0], 0))\n\thcStart()\n\tobj := Constructor(hcArg0)\n\thcStop()\n",
+		"\thcArg0 := hcDec1(hcAt(args[0], 0), hcParseInt)\n\thcStart()\n\tobj := Constructor(hcArg0)\n\thcStop()\n",
 		"\t\t\thcArg0 := hcDecList0(hcAt(a, 0))\n\t\t\thcStart()\n\t\t\tobj.Push(hcArg0)\n\t\t\thcStop()\n",
 		"\t\t\thcStart()\n\t\t\tret := obj.Top()\n\t\t\thcStop()\n\t\t\tout[i] = hcEncList0(ret)\n",
 	} {

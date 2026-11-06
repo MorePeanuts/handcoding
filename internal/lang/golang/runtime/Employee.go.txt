@@ -7,15 +7,15 @@ type Employee struct {
 
 // hcDecEmployee0 reads [id, importance, [subordinate ids]].
 func hcDecEmployee0(raw json.RawMessage) *Employee {
-	parts := hcJSON[[]json.RawMessage](raw)
+	parts := hcRaw1(raw)
 	if len(parts) != 3 {
 		panic(hcInputError{fmt.Sprintf("an employee must be [id, importance, [subordinate ids]], got %s", raw)})
 	}
-	return &Employee{Id: hcJSON[int](parts[0]), Importance: hcJSON[int](parts[1]), Subordinates: hcJSON[[]int](parts[2])}
+	return &Employee{Id: hcDec0(parts[0], hcParseInt), Importance: hcDec0(parts[1], hcParseInt), Subordinates: hcDec1(parts[2], hcParseInt)}
 }
 
 func hcDecEmployee1(raw json.RawMessage) []*Employee {
-	parts := hcJSON[[]json.RawMessage](raw)
+	parts := hcRaw1(raw)
 	out := make([]*Employee, len(parts))
 	for i, p := range parts {
 		out[i] = hcDecEmployee0(p)

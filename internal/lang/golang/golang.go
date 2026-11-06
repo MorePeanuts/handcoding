@@ -455,7 +455,7 @@ func writeStructures(b *strings.Builder, f *problem.Function, vars map[string]st
 		if prm.Ref == "" {
 			continue
 		}
-		fmt.Fprintf(b, "\t%s := hcFind(%sN, hcJSON[int](hcArg(in, %q)), %q, %q)\n", vars[prm.Name], vars[prm.Ref], prm.Name, prm.Name, prm.Ref)
+		fmt.Fprintf(b, "\t%s := hcFind(%sN, hcDec0(hcArg(in, %q), hcParseInt), %q, %q)\n", vars[prm.Name], vars[prm.Ref], prm.Name, prm.Name, prm.Ref)
 	}
 }
 
@@ -480,8 +480,8 @@ func links(t string) string {
 
 func writeClassCall(b *strings.Builder, p *problem.Problem) error {
 	c := p.Class
-	b.WriteString("\tops := hcJSON[[]string](hcArg(in, \"ops\"))\n")
-	b.WriteString("\targs := hcJSON[[][]json.RawMessage](hcArg(in, \"args\"))\n")
+	b.WriteString("\tops := hcDec1(hcArg(in, \"ops\"), hcParseString)\n")
+	b.WriteString("\targs := hcDec2(hcArg(in, \"args\"), hcParseRaw)\n")
 	b.WriteString("\tif len(ops) == 0 || len(ops) != len(args) {\n\t\tpanic(hcInputError{\"ops and args must be non-empty and of equal length\"})\n\t}\n")
 	b.WriteString("\tout := make([]any, len(ops))\n")
 	// Each call is timed on its own, after its arguments are decoded and

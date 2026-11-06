@@ -15,7 +15,7 @@ func hcNodeLinks(n *Node) []*Node {
 // hcDecNode0 reads LeetCode's level order of [isLeaf, val] pairs, in which
 // every node has four child slots (null when absent).
 func hcDecNode0(raw json.RawMessage) *Node {
-	vals := hcJSON[[][]int](raw)
+	vals := hcDec2(raw, hcParseInt)
 	node := func(i int) *Node {
 		v := vals[i]
 		if v == nil {

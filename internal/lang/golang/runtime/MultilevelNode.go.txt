@@ -13,7 +13,7 @@ func hcNodeLinks(n *Node) []*Node { return []*Node{n.Prev, n.Next, n.Child} }
 // each ended by null, and each child level preceded by as many more nulls as
 // its parent's index in the level above.
 func hcDecNode0(raw json.RawMessage) *Node {
-	vals := hcJSON[[]*int](raw)
+	vals := hcDec1(raw, hcParseIntPtr)
 	var head *Node
 	var above []*Node
 	for i := 0; i < len(vals); {

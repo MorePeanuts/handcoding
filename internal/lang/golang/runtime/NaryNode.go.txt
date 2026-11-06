@@ -9,7 +9,7 @@ func hcNodeLinks(n *Node) []*Node { return n.Children }
 // hcDecNode0 reads LeetCode's level order: the root, null, then the
 // children of each node in level order, each group followed by null.
 func hcDecNode0(raw json.RawMessage) *Node {
-	vals := hcJSON[[]*int](raw)
+	vals := hcDec1(raw, hcParseIntPtr)
 	if len(vals) == 0 {
 		return nil
 	}

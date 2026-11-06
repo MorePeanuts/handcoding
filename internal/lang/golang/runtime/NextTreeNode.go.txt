@@ -11,7 +11,7 @@ func hcNodeLinks(n *Node) []*Node { return []*Node{n.Left, n.Right, n.Next} }
 
 // hcDecNode0 reads a binary tree in level order; next pointers stay nil.
 func hcDecNode0(raw json.RawMessage) *Node {
-	vals := hcJSON[[]*int](raw)
+	vals := hcDec1(raw, hcParseIntPtr)
 	if len(vals) == 0 || vals[0] == nil {
 		return nil
 	}
