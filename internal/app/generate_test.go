@@ -67,6 +67,7 @@ func writeFile(t *testing.T, path, content string) {
 // them afresh, and runs in both languages build them, judge them on the
 // reference's outputs and keep them in the cache.
 func TestGeneratedCases(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	p := largest(t, a)
@@ -139,6 +140,7 @@ func cachePath(a *app.App, p *problem.Problem, langID string) string {
 // cache, and build them again once what built them changed or the cache is
 // unreadable.
 func TestGeneratedCasesCache(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "python3")
 	a := newWorkspace(t)
 	p := largest(t, a)
@@ -200,6 +202,7 @@ func TestGeneratedCasesCache(t *testing.T) {
 // verdict: a broken generator, an input other than the digest's, an invalid
 // input, and a reference that fails on the input.
 func TestGeneratedCaseErrors(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "python3")
 	a := newWorkspace(t)
 	p := largest(t, a)
@@ -281,6 +284,7 @@ func TestGeneratedCaseErrors(t *testing.T) {
 // cases without running anything: generator.py both ways, digests, and the
 // size of stored cases, warnings unless strict.
 func TestValidateGeneratedCases(t *testing.T) {
+	t.Parallel()
 	a := newWorkspace(t)
 	p := addProblem(t, a, "largest", largestYAML, largestCases)
 	writeFile(t, filepath.Join(p.Dir, problem.ReferenceDir, "solution.py"), "class Solution:\n    def largest(self, nums):\n        return max(nums)\n")
@@ -331,6 +335,7 @@ func TestValidateGeneratedCases(t *testing.T) {
 // GenerateInputs builds inputs as generator.py makes them now, digests or
 // not, and computes no expected outputs.
 func TestGenerateInputs(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "python3")
 	a := newWorkspace(t)
 	p := largest(t, a)
@@ -367,6 +372,7 @@ func TestGenerateInputs(t *testing.T) {
 // extension, and a generator call that is not in cases.jsonl is built with
 // its expected output, nothing cached.
 func TestRunFile(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	p := largest(t, a)

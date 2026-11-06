@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/lang"
@@ -34,6 +35,11 @@ func newWorkspace(t *testing.T) *app.App {
 	// the network.
 	ws.Config.Python.Interpreter = "python3"
 	a := app.New(ws)
+	// Tests run in parallel, and a stall under load must not make a run
+	// that is not about time limits Time Limit Exceeded: a floor of 250ms
+	// keeps every limit at 10s or more. The tests of time limits set their
+	// own (timelimit_test.go).
+	a.SetTimeLimit(app.TimeFactor, 250*time.Millisecond)
 	t.Cleanup(func() { a.Close() })
 	return a
 }
@@ -63,6 +69,7 @@ func requireTools(t *testing.T, tools ...string) {
 // reference solutions, which exercises both drivers on every supported shape,
 // and the inputs of its generated cases must match their digests.
 func TestRegressionReferences(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	probs, err := a.WS.Problems()
@@ -73,8 +80,11 @@ func TestRegressionReferences(t *testing.T) {
 		t.Fatal("no problems in the regression set")
 	}
 	ctx := context.Background()
+	// The problems run at once in the one workspace, as hc validate --jobs
+	// runs them: each has its own files in the caches.
 	for _, p := range probs {
 		t.Run(p.Slug, func(t *testing.T) {
+			t.Parallel()
 			if err := p.Validate(); err != nil {
 				t.Fatalf("invalid problem: %v", err)
 			}
@@ -123,6 +133,7 @@ func TestRegressionReferences(t *testing.T) {
 // TestGoMinimumVersion checks every Go reference of the regression set at
 // the protocol's minimum Go version, as hc validate --run does.
 func TestGoMinimumVersion(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go")
 	a := newWorkspace(t)
 	probs, err := a.WS.Problems()
@@ -136,6 +147,7 @@ func TestGoMinimumVersion(t *testing.T) {
 			continue
 		}
 		t.Run(p.Slug, func(t *testing.T) {
+			t.Parallel()
 			if err := l.CheckMinVersion(context.Background(), p, ref); err != nil {
 				t.Error(err)
 			}
@@ -147,6 +159,7 @@ func TestGoMinimumVersion(t *testing.T) {
 // reference that passes its cases on the local toolchain but uses a
 // standard library symbol newer than the protocol's minimum Go version.
 func TestValidateGoMinimumVersion(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go")
 	a := newWorkspace(t)
 	yaml := "slug: total\ntitle: Total\nkind: function\nfunction:\n  name: total\n  params:\n    - name: nums\n      type: integer[]\n  returns: integer\njudge:\n  compare: exact\n"
@@ -175,6 +188,7 @@ func TestValidateGoMinimumVersion(t *testing.T) {
 }
 
 func TestStartSubmitWrongAnswer(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	ctx := context.Background()
@@ -221,6 +235,7 @@ func TestStartSubmitWrongAnswer(t *testing.T) {
 }
 
 func TestRuntimeErrorAndTimeout(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	a.WS.Config.Timeout = "2s"
@@ -291,6 +306,7 @@ func mustLang(t *testing.T, a *app.App, name string) lang.Language {
 // Python runs in the workspace's virtual environment unless hc.yaml names an
 // interpreter.
 func TestPythonEnvironment(t *testing.T) {
+	t.Parallel()
 	ws, err := workspace.Create(t.TempDir(), "")
 	if err != nil {
 		t.Fatal(err)

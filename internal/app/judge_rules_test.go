@@ -82,6 +82,7 @@ judge:
 // nums[:k] is judged, so whatever a correct solution leaves after k is
 // ignored, while a wrong k fails.
 func TestOutputLength(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	p := addProblem(t, a, "remove-dup", removeDupYAML, `{"input":{"nums":[1,1,2]},"expected":[1,2]}`+"\n")
@@ -122,6 +123,7 @@ func TestOutputLength(t *testing.T) {
 // TestNotReady checks a problem whose judge rule is undecided: test shows
 // the output without a verdict, and submit refuses.
 func TestNotReady(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "python3")
 	a := newWorkspace(t)
 	yaml := strings.Replace(removeDupYAML, "  compare: exact\n", "", 1)
@@ -169,6 +171,7 @@ func TestNotReady(t *testing.T) {
 // reference alone is shown without a verdict and cannot be submitted, while
 // a Python one is judged.
 func TestReadyPerLanguage(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	p := addProblem(t, a, "remove-dup", removeDupYAML, `{"input":{"nums":[1,1,2]},"expected":[1,2],"example":true}`+"\n")
@@ -218,6 +221,7 @@ func TestReadyPerLanguage(t *testing.T) {
 // TestBuildCasesAnyOf checks that hc cases build refuses to fill an any_of
 // expected output: the reference finds one answer, not all of them.
 func TestBuildCasesAnyOf(t *testing.T) {
+	t.Parallel()
 	a := newWorkspace(t)
 	p, err := a.WS.Problem("find-peak-element")
 	if err != nil {
@@ -240,6 +244,7 @@ func TestBuildCasesAnyOf(t *testing.T) {
 // judged value is the board after the call, rebinding the parameter changes
 // nothing, and outputs are compact JSON like the expected ones.
 func TestInPlaceBoard(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	p, err := a.WS.Problem("surrounded-regions")
@@ -293,6 +298,7 @@ judge:
 // TestNonASCIIOutput checks that both drivers write text outputs as UTF-8,
 // not as \u escapes, so reports show what the solution returned.
 func TestNonASCIIOutput(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	p := addProblem(t, a, "echo", echoYAML, `{"input":{"s":"你好&<>"},"expected":"你好&<>!"}`+"\n")
@@ -326,6 +332,7 @@ func TestNonASCIIOutput(t *testing.T) {
 // that belongs to another structure is a runtime error, a wrong node is a
 // wrong answer, and inputs that do not fit the structure are input errors.
 func TestStructureInputs(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	tests := []struct {
@@ -415,6 +422,7 @@ func TestStructureInputs(t *testing.T) {
 // (returns_copy), a broken prev pointer, next pointers that miss nodes, a
 // NestedInteger of the wrong shape, and inputs that do not fit their form.
 func TestJudgeDefinedTypes(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	const square = `{"node":[[2,4],[1,3],[2,4],[1,3]]}`
@@ -562,6 +570,7 @@ func writeSolution(t *testing.T, a *app.App, p *problem.Problem, langID, code st
 // languages are accepted for any valid answer, and rejected ones carry the
 // checker's message into the report and the submission history.
 func TestChecker(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	// The reference finds the first index; expected is one valid answer.
@@ -644,6 +653,7 @@ func TestChecker(t *testing.T) {
 // with an error naming checker.py, relative to the workspace, and the case,
 // rather than judging the solution.
 func TestBrokenChecker(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	a.WS.Config.Timeout = "2s"
@@ -729,6 +739,7 @@ const pickerChecker = `def check(input, output, expected):
 // TestCheckerClassProblem checks a design problem judged by a checker,
 // which sees the whole operation sequence.
 func TestCheckerClassProblem(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	ops := `["Picker"` + strings.Repeat(`,"pick"`, 50) + `]`
@@ -876,6 +887,7 @@ func (c *Codec) deserialize(data string) *TreeNode { return c.last }
 // second instance, so a codec that keeps the tree on the instance fails,
 // while with same it passes.
 func TestRoundTrip(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	const cases = `{"input":{"root":[1,2,3,null,null,4,5]},"expected":[1,2,3,null,null,4,5]}` + "\n" +
@@ -947,6 +959,7 @@ func TestRoundTrip(t *testing.T) {
 // invalid instead of judging the drivers' reading of it: [null,1] gives the
 // empty tree a child, and [1,null] is not the output form of a tree.
 func TestRunInvalidCase(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "python3")
 	a := newWorkspace(t)
 	yaml := "slug: same\ntitle: Same\nkind: function\nfunction:\n  name: same\n  params:\n    - name: root\n      type: TreeNode\n  returns: TreeNode\njudge:\n  compare: exact\n"
@@ -1000,6 +1013,7 @@ judge:
 // TestClassTiming checks that a class problem's time adds up the
 // constructor and every method call, which are timed one by one.
 func TestClassTiming(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	p := addProblem(t, a, "sleeper", sleeperYAML, `{"input":{"ops":["Sleeper","nap","nap"],"args":[[30],[30],[30]]},"expected":[null,30,30]}`+"\n")

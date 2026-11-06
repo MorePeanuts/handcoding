@@ -19,7 +19,8 @@ import (
 )
 
 // requireGit skips the test without git, and keeps the user's git
-// configuration (signing, hooks, default branch) out of it.
+// configuration (signing, hooks, default branch) out of it. It sets the
+// environment, so the tests that call it cannot run in parallel.
 func requireGit(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -153,6 +154,7 @@ func TestInstallPackGit(t *testing.T) {
 }
 
 func TestInstallPackCopy(t *testing.T) {
+	t.Parallel()
 	src := filepath.Join(t.TempDir(), "tiny")
 	writeTinyPack(t, src)
 	// Not part of the pack: left behind.
@@ -178,6 +180,7 @@ func TestInstallPackCopy(t *testing.T) {
 }
 
 func TestInstallPackRefusals(t *testing.T) {
+	t.Parallel()
 	a := practice(t)
 	ctx := context.Background()
 	newer := filepath.Join(t.TempDir(), "newer")
@@ -556,6 +559,7 @@ func TestUpdatePackRef(t *testing.T) {
 }
 
 func TestUpdateCopiedPack(t *testing.T) {
+	t.Parallel()
 	src := filepath.Join(t.TempDir(), "tiny")
 	writeTinyPack(t, src)
 	a := practice(t)
@@ -585,6 +589,7 @@ func TestUpdateCopiedPack(t *testing.T) {
 }
 
 func TestRemovePack(t *testing.T) {
+	t.Parallel()
 	src := filepath.Join(t.TempDir(), "tiny")
 	writeTinyPack(t, src)
 	a := practice(t)
@@ -646,6 +651,7 @@ func TestRemovePack(t *testing.T) {
 }
 
 func TestPackCommentsKept(t *testing.T) {
+	t.Parallel()
 	src := filepath.Join(t.TempDir(), "tiny")
 	writeTinyPack(t, src)
 	a := practice(t)
@@ -721,6 +727,7 @@ func replaceIn(t *testing.T, path, old, new string) {
 }
 
 func TestCheckPack(t *testing.T) {
+	t.Parallel()
 	requireTools(t, "go", "python3")
 	sum, findings := checkout(t, nil)
 	if !sum.OK() || sum.Problems != len(tinyProblems) {
@@ -769,6 +776,7 @@ func TestCheckPack(t *testing.T) {
 }
 
 func TestPackCommandsNeedPractice(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeTinyPack(t, dir)
 	ws, err := workspace.Open(dir)

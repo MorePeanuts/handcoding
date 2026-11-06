@@ -17,6 +17,7 @@ go run ./cmd/hc -w /tmp/hc-dev test two-sum                       # run against 
 ```
 
 - Integration tests in `internal/app` and `internal/tui` actually compile and run solutions; they need `go` and `python3` (3.10+) on PATH and skip otherwise. Their workspaces set `python.interpreter: python3`, so tests never create a virtual environment or touch the network; `python.Venv` is tested with fake `uv`/`python` scripts on PATH.
+- `internal/app`'s and `internal/tui`'s tests call `t.Parallel()` (each its own workspace; `TestRegressionReferences`'s per-problem subtests share one, as `validate --jobs` does), and new ones should, except two kinds that stay serial, which Go runs first, alone: tests that use `t.Setenv` (Go refuses it in parallel tests and their parents: `isolateConfig` for LeetCode sessions, `requireGit`), and timing-sensitive ones (`timelimit_test.go`: sleeping solutions against limits a few times the reference's time). `internal/cli`'s stay serial (`capture` swaps `os.Stdout`, tests set PATH).
 - Go ≥ 1.26 is required (`errors.AsType` is used); `go.mod` pins the toolchain version.
 - Use a throwaway workspace while developing (`hc init /tmp/hc-dev`, then `-w` or `HC_WORKSPACE`) instead of the user's `~/handcoding`. A new workspace is empty; `cp -R testdata/regression /tmp/hc-dev/packs/` installs the regression set in it as a (read-only) pack. The set is also an authoring workspace of its own (see Regression set); to try one without touching the set, copy it elsewhere and run hc in the copy.
 
