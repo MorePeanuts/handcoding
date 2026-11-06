@@ -37,8 +37,14 @@ hc.yaml, or ~/handcoding — so using the default lets you run hc anywhere.
 A pack checkout (a directory with pack.yaml) needs no init: hc opens it as a
 workspace as it is, so init refuses a directory in one.
 
---lang sets the default solution language (language in hc.yaml). With
-python, hc also creates the workspace's Python virtual environment now.`,
+--lang sets the default solution language (language in hc.yaml).
+
+init also creates the workspace's Python virtual environment, .hc/venv,
+whatever the language: Python runs Python solutions, and the generators and
+checkers that most problems have (see ` + "`hc env`" + `). It uses uv if it is on
+PATH, else the newest Python 3.12+ on PATH. With neither, the workspace is
+created all the same, but init prints how to get one and exits with an
+error; run ` + "`hc env sync`" + ` in the workspace afterwards.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := ""
@@ -63,9 +69,9 @@ python, hc also creates the workspace's Python virtual environment now.`,
 			if _, err := skill.Install(ws.Root, skill.Practice, skill.Set(skill.Practice), opts); err != nil {
 				return err
 			}
-			if l, err := app.New(ws).Lang(""); err == nil && l.ID() == "python" {
-				setupEnv(cmd.Context(), l)
-			}
+			a := app.New(ws)
+			defer a.Close()
+			envErr := a.SetUpPython(cmd.Context(), os.Stderr)
 			fmt.Printf("%s workspace at %s\n\n", ui.Green.Render("Created"), ws.Root)
 			fmt.Println("It has no problems yet. Install the official LeetCode pack:")
 			fmt.Println("  hc pack install " + app.OfficialPack)
@@ -79,6 +85,10 @@ python, hc also creates the workspace's Python virtual environment now.`,
 			fmt.Println("  hc gen <slug>            have an agent write its test cases")
 			fmt.Println("  hc new <slug>            write a problem from scratch")
 			fmt.Println("\nTip: version your progress with `git init` in the workspace.")
+			if envErr != nil {
+				fmt.Println()
+				return fmt.Errorf("the workspace at %s is created, but not its Python environment: %w", ws.Root, envErr)
+			}
 			return nil
 		},
 	}

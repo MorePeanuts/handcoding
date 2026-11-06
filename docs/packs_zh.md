@@ -38,6 +38,7 @@ CLAUDE.md                     @AGENTS.md，以及留给 Claude Code 的备注
 - **名称**取自 `--name`，否则取目录名的 kebab-case 形式（`My Pack` 变成 `my-pack`）。名称是题目包的标识：已安装的题目包、解答和历史记录都以它为键，所以要在发布前定好。名称规则见 [`pack.yaml`](protocol_zh.md#packyaml)。
 - **拒绝的情况。** `hc pack init` 拒绝已经包含 `pack.yaml` 的目录和位于某个工作区内的目录，并且从不覆盖文件：只要它要写的任何一个文件已经存在，它就把这些文件列出来，什么也不写。
 - **git。** hc 不会运行 `git init`。如果 `dir` 已经在某个 git 仓库中，它仍然属于该仓库；但 GitHub 只运行仓库根目录下的工作流，所以题目包应当就是仓库的根目录。
+- **Python。** 最后，`hc pack init` 用 Python 3.12（协议支持的最旧版本）创建 checkout 的 Python 环境 `.hc/venv`（见[工作区](how-to-use_zh.md#工作区)）。PATH 上既没有 uv 也没有 Python 时，题目包仍会写好，但 `hc pack init` 会说明如何安装并以非零状态退出；装好后在题目包中运行 `hc env sync`。刚克隆的 checkout 由第一个需要 Python 的命令创建环境。
 
 此后这个目录就是题目包的检出目录，hc 直接把它作为工作区打开（见[编写题目包](how-to-use_zh.md#编写题目包)）：在其中运行的每个 hc 命令都作用于这个题目包。
 

@@ -18,7 +18,7 @@ import (
 // workflow runs and its agent files cite against the command tree, as
 // TestSkillsLint does for the skills: CI and agents run them literally.
 func TestPackInit(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
+	fakeUV(t)
 	dir := filepath.Join(t.TempDir(), "my-pack")
 	out, err := capture(t, "pack", "init", dir, "--title", "Mine")
 	if err != nil {
@@ -55,6 +55,27 @@ func TestPackInit(t *testing.T) {
 	}
 	for _, err := range lintSkill(newRootCmd(), skill.Skill{Name: "pack init", Files: files}) {
 		t.Errorf("agent files: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".hc", "venv", "bin", "python")); err != nil {
+		t.Errorf("no virtual environment: %v", err)
+	}
+}
+
+// Without uv or a Python 3.12+, pack init writes the pack, then fails with
+// the guide.
+func TestPackInitNoPython(t *testing.T) {
+	py := noPython(t)
+	dir := filepath.Join(t.TempDir(), "my-pack")
+	out, err := capture(t, "pack", "init", dir)
+	want := "the pack at " + dir + " is created, but not its Python environment: cannot create .hc/venv: there is no uv, and no Python 3.12 or later on PATH (" + py + " is 3.9.6)"
+	if err == nil || !strings.Contains(err.Error(), want) || !strings.Contains(err.Error(), "`hc env sync`") {
+		t.Errorf("pack init: %v", err)
+	}
+	if !strings.Contains(out, "Created the pack my-pack") {
+		t.Errorf("output:\n%s", out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "pack.yaml")); err != nil {
+		t.Error(err)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
+	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/skill"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
@@ -55,30 +56,78 @@ func TestInitLang(t *testing.T) {
 	}
 }
 
-// Without uv or a Python, init still creates the workspace.
-func TestInitLangNoPython(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
-	dir := filepath.Join(t.TempDir(), "ws")
-	if err := runHC(t, "init", "-l", "python", dir); err != nil {
+// noPython puts on PATH neither uv nor a supported Python, only a python3
+// of 3.9.6, as macOS has.
+func noPython(t *testing.T) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("fake executables are shell scripts")
+	}
+	bin := t.TempDir()
+	py := filepath.Join(bin, "python3")
+	if err := os.WriteFile(py, []byte("#!/bin/sh\n[ \"$1\" = -c ] && echo 3.9.6\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	ws, err := workspace.Open(dir)
-	if err != nil {
+	t.Setenv("PATH", bin)
+	return py
+}
+
+// Without uv or a Python 3.12+, init creates the workspace, whatever its
+// language, then fails with the guide, which names what it found.
+func TestInitNoPython(t *testing.T) {
+	py := noPython(t)
+	var dir string
+	for _, langName := range []string{"go", "python"} {
+		dir = filepath.Join(t.TempDir(), "ws")
+		out, err := capture(t, "init", "-l", langName, dir)
+		if err == nil {
+			t.Fatalf("%s: init succeeded without Python", langName)
+		}
+		for _, want := range []string{
+			"the workspace at " + dir + " is created, but not its Python environment: cannot create .hc/venv: there is no uv, and no Python 3.12 or later on PATH (" + py + " is 3.9.6)",
+			python.UVInstallURL, "`hc env sync`",
+		} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("%s: error lacks %q:\n%v", langName, want, err)
+			}
+		}
+		if !strings.Contains(out, "Created workspace") {
+			t.Errorf("%s: output:\n%s", langName, out)
+		}
+		ws, err := workspace.Open(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ws.Config.Language != langName {
+			t.Errorf("language = %q, want %s", ws.Config.Language, langName)
+		}
+		if _, err := os.Stat(filepath.Join(dir, skill.ClaudeDir)); err != nil {
+			t.Errorf("%s: no skills: %v", langName, err)
+		}
+	}
+
+	// Once uv is there, hc env sync creates the environment.
+	fakeUV(t)
+	if err := runHC(t, "-w", dir, "env", "sync"); err != nil {
 		t.Fatal(err)
 	}
-	if ws.Config.Language != "python" {
-		t.Errorf("language = %q, want python", ws.Config.Language)
+	if _, err := os.Stat(filepath.Join(dir, ".hc", "venv", "bin", "python")); err != nil {
+		t.Errorf("no virtual environment after hc env sync: %v", err)
 	}
 }
 
 func TestInitDefaultsAndRejectsLang(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
+	fakeUV(t)
 	dir := filepath.Join(t.TempDir(), "ws")
 	if err := runHC(t, "init", dir); err != nil {
 		t.Fatal(err)
 	}
 	if ws, err := workspace.Open(dir); err != nil || ws.Config.Language != "go" {
 		t.Errorf("default workspace: %+v, %v", ws, err)
+	}
+	// Go solutions need Python too, for generators and checkers.
+	if _, err := os.Stat(filepath.Join(dir, ".hc", "venv", "bin", "python")); err != nil {
+		t.Errorf("no virtual environment in a Go workspace: %v", err)
 	}
 
 	bad := filepath.Join(t.TempDir(), "bad")
@@ -94,7 +143,7 @@ func TestInitDefaultsAndRejectsLang(t *testing.T) {
 // init installs the workspace's skills, and an agent command reinstalls a
 // missing one before it starts the agent.
 func TestSkillsInstalledForAgents(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
+	fakeUV(t)
 	dir := filepath.Join(t.TempDir(), "ws")
 	if err := runHC(t, "init", dir); err != nil {
 		t.Fatal(err)
@@ -127,7 +176,7 @@ func TestSkillsInstalledForAgents(t *testing.T) {
 // TestInitSuggestsOfficialPack checks that a new workspace is told how to
 // install the official LeetCode pack.
 func TestInitSuggestsOfficialPack(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
+	fakeUV(t)
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)

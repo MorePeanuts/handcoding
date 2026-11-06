@@ -13,7 +13,7 @@ import (
 // TestPackCommands runs hc pack on a copy of the regression set, a plain
 // directory (no git needed).
 func TestPackCommands(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
+	fakeUV(t)
 	src := filepath.Join(t.TempDir(), "set")
 	if err := regression.Copy(src); err != nil {
 		t.Fatal(err)

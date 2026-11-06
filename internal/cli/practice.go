@@ -42,7 +42,7 @@ func newStartCmd(root *rootOptions) *cobra.Command {
 				if created {
 					fmt.Fprintf(os.Stderr, "%s %s\n", ui.Green.Render("created"), path)
 				}
-				setupEnv(cmd.Context(), l)
+				setupEnv(cmd.Context(), l, "running Python solutions")
 				if edit {
 					return openEditor(a, path)
 				}
@@ -69,7 +69,7 @@ func newEditCmd(root *rootOptions) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				setupEnv(cmd.Context(), l)
+				setupEnv(cmd.Context(), l, "running Python solutions")
 				return openEditor(a, path)
 			})
 		},
@@ -79,10 +79,11 @@ func newEditCmd(root *rootOptions) *cobra.Command {
 }
 
 // setupEnv prepares the language's environment, such as the Python virtual
-// environment, so the editor finds it. A failure is only a warning here:
-// the solution can be edited anyway, and running it reports the error.
-func setupEnv(ctx context.Context, l lang.Language) {
-	if err := l.Setup(ctx, os.Stderr); err != nil {
+// environment, so the editor (or an agent) finds it; why says what needs
+// it (see app.SetUpEnv). A failure is only a warning here: the solution can
+// be edited anyway, and running it reports the error.
+func setupEnv(ctx context.Context, l lang.Language, why string) {
+	if err := app.SetUpEnv(ctx, l, os.Stderr, why); err != nil {
 		fmt.Fprintln(os.Stderr, ui.Yellow.Render("warning:")+" "+err.Error())
 	}
 }
@@ -456,7 +457,7 @@ server for your editor to attach to:
 						return err
 					}
 				}
-				tc, err := l.Toolchain()
+				tc, err := app.SetUp(cmd.Context(), l, os.Stderr, fmt.Sprintf("debugging %s's Python solution", p.Slug))
 				if err != nil {
 					return err
 				}

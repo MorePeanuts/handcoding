@@ -333,7 +333,7 @@ func (l Language) DebugCommand(dir, _ string, p *problem.Problem, opts lang.Debu
 		check := exec.Command(l.python(), "-c", "import debugpy")
 		if err := check.Run(); err != nil {
 			if l.Venv != nil {
-				return nil, fmt.Errorf("debugpy is not installed in %s; install it with `hc env sync`", l.Venv.Label)
+				return nil, fmt.Errorf("debugpy is not installed in %s; install it with `hc env sync` (without uv, on Debian and Ubuntu, install the python3.X-venv package of your Python first)", l.Venv.Label)
 			}
 			return nil, fmt.Errorf("debugpy is not installed for %s: run `%s -m pip install debugpy`, or remove python.interpreter from hc.yaml to let hc manage a virtual environment with debugpy", l.python(), l.python())
 		}

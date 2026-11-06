@@ -22,9 +22,13 @@ import (
 // installed without touching the user's Python (PEP 668 forbids that on
 // Homebrew and recent Debian).
 //
-// It is created on first use: with uv when it is installed, which downloads
-// a Python if there is none, otherwise with the newest Python MinVersion+ on
-// PATH (or of Version, when it is set). A virtual environment cannot be
+// It is created by hc init and hc pack init, or else on first use: with uv
+// when it is installed, which downloads a Python if there is none, otherwise
+// with the newest Python MinVersion+ on PATH (or of Version, when it is
+// set), without pip if its venv module cannot install it (Debian's
+// python3.X-venv is missing): judging needs no third-party package, only
+// headless debugging (debugpy) does. With neither, it fails with a
+// *SetupError that says how to get one. A virtual environment cannot be
 // moved, so one whose interpreter no longer runs is created again.
 type Venv struct {
 	// Dir is the environment's directory.
@@ -133,10 +137,10 @@ func (v *Venv) writer(w io.Writer) io.Writer {
 
 func (v *Venv) create(ctx context.Context, w io.Writer) error {
 	if err := os.RemoveAll(v.Dir); err != nil {
-		return err
+		return &SetupError{Env: v.Label, Cause: err}
 	}
 	if err := os.MkdirAll(filepath.Dir(v.Dir), 0o755); err != nil {
-		return err
+		return &SetupError{Env: v.Label, Cause: err}
 	}
 	var install []string
 	if uv, err := exec.LookPath("uv"); err == nil {
@@ -147,21 +151,33 @@ func (v *Venv) create(ctx context.Context, w io.Writer) error {
 		fmt.Fprintf(w, "Creating %s with uv (it downloads Python %s if none is installed)…\n", v.Label, label)
 		if err := run(ctx, uv, "venv", "--no-project", "--python", want, v.Dir); err != nil {
 			os.RemoveAll(v.Dir)
-			return fmt.Errorf("create %s with uv: %w", v.Label, err)
+			return &SetupError{Env: v.Label, Tool: "uv", Cause: err}
 		}
 		install = []string{uv, "pip", "install", "--python", v.Python(), "debugpy"}
 	} else {
-		py, ver, err := findPython(ctx, v.Version)
-		if err != nil {
-			return fmt.Errorf("cannot create %s: %w", v.Label, err)
+		py, ver, found := findPython(ctx, v.Version)
+		if py == "" {
+			return &SetupError{Env: v.Label, Found: found}
 		}
 		fmt.Fprintf(w, "Creating %s with %s (Python %s)…\n", v.Label, py, ver)
 		if v.Version != "" && !sameMinor(ver, v.Version) {
 			fmt.Fprintf(w, "warning: no Python %s on PATH, so the pack's Python is not run on the oldest version the protocol supports here, only in its CI; install uv, or Python %s\n", v.Version, v.Version)
 		}
 		if err := run(ctx, py, "-m", "venv", v.Dir); err != nil {
+			// Debian and Ubuntu (WSL included) ship ensurepip, which
+			// venv installs pip with, apart, as python3.X-venv. Judging
+			// needs no third-party package, so an environment without
+			// pip works; only debugpy is missing.
 			os.RemoveAll(v.Dir)
-			return fmt.Errorf("create %s with %s (on Debian and Ubuntu this needs the python3-venv package): %w", v.Label, py, err)
+			if err2 := run(ctx, py, "-m", "venv", "--without-pip", v.Dir); err2 != nil {
+				os.RemoveAll(v.Dir)
+				return &SetupError{Env: v.Label, Tool: py, Cause: err}
+			}
+			minor := minorOf(ver)
+			fmt.Fprintf(w, "warning: %s -m venv cannot install pip, so %s has no debugpy and headless debugging (hc debug --headless) will not work; "+
+				"to get it, install the python%s-venv package (on Debian and Ubuntu: sudo apt install python%s-venv) or uv, then run `hc env sync`\n",
+				py, v.Label, minor, minor)
+			return nil
 		}
 		install = []string{v.Python(), "-m", "pip", "install", "--disable-pip-version-check", "debugpy"}
 	}
@@ -172,6 +188,79 @@ func (v *Venv) create(ctx context.Context, w io.Writer) error {
 		fmt.Fprintf(w, "warning: debugpy not installed, so headless debugging will not work; retry with `hc env sync`: %v\n", err)
 	}
 	return nil
+}
+
+// minorOf is the minor version of version ver: 3.12 of 3.12.4.
+func minorOf(ver string) string {
+	if parts := strings.SplitN(ver, ".", 3); len(parts) >= 2 {
+		return parts[0] + "." + parts[1]
+	}
+	return ver
+}
+
+// SetupError is a failure to create the virtual environment. Every command
+// that needs Python reports it, prefixed with why it does. Its message ends
+// with what to do: without Cause, when there was neither uv nor a Python
+// MinVersion+ on PATH, how to get one; then run `hc env sync`.
+type SetupError struct {
+	// Env names the environment, e.g. ".hc/venv".
+	Env string
+	// Tool is what failed to create it: "uv", or the Python found on PATH.
+	Tool string
+	// Found are the Pythons on PATH too old to use, e.g.
+	// "/usr/bin/python3 is 3.9.6".
+	Found []string
+	// Cause is why Tool failed, nil when there was none.
+	Cause error
+}
+
+func (e *SetupError) Error() string {
+	var b strings.Builder
+	b.WriteString("cannot create " + e.Env)
+	if e.Tool != "" {
+		b.WriteString(" with " + e.Tool)
+	}
+	if e.Cause != nil {
+		fmt.Fprintf(&b, ": %v\n", e.Cause)
+		fmt.Fprintf(&b, "Fix that, then run `hc env sync`; or set python.interpreter in hc.yaml to a Python %s or later, which hc then uses as it is.", MinVersion)
+		return b.String()
+	}
+	fmt.Fprintf(&b, ": there is no uv, and no Python %s or later on PATH", MinVersion)
+	if len(e.Found) > 0 {
+		b.WriteString(" (" + strings.Join(e.Found, ", ") + ")")
+	}
+	b.WriteString(".\n\n")
+	b.WriteString(Guide(runtime.GOOS))
+	return b.String()
+}
+
+func (e *SetupError) Unwrap() error { return e.Cause }
+
+// UVInstallURL is uv's installation guide.
+const UVInstallURL = "https://docs.astral.sh/uv/getting-started/installation/"
+
+// Guide tells the user, on the operating system goos, why hc needs Python
+// and how to get it. hc prints the commands and never runs an installer.
+func Guide(goos string) string {
+	var cmds []string
+	switch goos {
+	case "darwin":
+		cmds = []string{"brew install uv", "curl -LsSf https://astral.sh/uv/install.sh | sh"}
+	case "windows":
+		cmds = []string{"winget install --id=astral-sh.uv -e", `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`}
+	default:
+		cmds = []string{"curl -LsSf https://astral.sh/uv/install.sh | sh"}
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "hc runs Python solutions, and the generators and checkers that most problems have, whatever your solution's language, in Python %s or later.\n", MinVersion)
+	b.WriteString("Install one of these, then run `hc env sync`:\n")
+	fmt.Fprintf(&b, "  - uv (recommended: it installs Python as well, see %s), with one of\n", UVInstallURL)
+	for _, c := range cmds {
+		b.WriteString("      " + c + "\n")
+	}
+	fmt.Fprintf(&b, "  - Python %s or later, on PATH\n", MinVersion)
+	fmt.Fprintf(&b, "Or set python.interpreter in hc.yaml to a Python %s or later, which hc then uses as it is.", MinVersion)
+	return b.String()
 }
 
 // run runs a command, returning its output with the error.
@@ -214,8 +303,8 @@ func (v *Venv) canGet(ctx context.Context) bool {
 	if _, err := exec.LookPath("uv"); err == nil {
 		return true
 	}
-	_, ver, err := findPython(ctx, v.Version)
-	return err == nil && sameMinor(ver, v.Version)
+	py, ver, _ := findPython(ctx, v.Version)
+	return py != "" && sameMinor(ver, v.Version)
 }
 
 // sameMinor reports whether version ver (3.12.4) is of minor version minor
@@ -226,8 +315,9 @@ func sameMinor(ver, minor string) bool {
 
 // findPython returns the newest Python MinVersion+ among python3, python and
 // python3.N on PATH: of minor version want if there is one and want is set.
-func findPython(ctx context.Context, want string) (path, ver string, err error) {
-	var older []string
+// Without one, path is empty, and older lists the Pythons on PATH too old to
+// use ("/usr/bin/python3 is 3.9.6").
+func findPython(ctx context.Context, want string) (path, ver string, older []string) {
 	var wantPath, wantVer string
 	seen := map[string]bool{}
 	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
@@ -262,14 +352,7 @@ func findPython(ctx context.Context, want string) (path, ver string, err error) 
 	if wantPath != "" {
 		return wantPath, wantVer, nil
 	}
-	if path != "" {
-		return path, ver, nil
-	}
-	msg := fmt.Sprintf("no Python %s or later on PATH", MinVersion)
-	if len(older) > 0 {
-		msg += " (" + strings.Join(older, ", ") + ")"
-	}
-	return "", "", fmt.Errorf("%s; install uv (https://docs.astral.sh/uv/), which installs Python as well, or Python %s+, or set python.interpreter in hc.yaml", msg, MinVersion)
+	return path, ver, older
 }
 
 const versionScript = "import sys; print('.'.join(map(str, sys.version_info[:3])))"

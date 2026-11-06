@@ -3,6 +3,7 @@ package python
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -245,21 +246,95 @@ func TestVenvVersionMissing(t *testing.T) {
 	}
 }
 
+// Without uv or a supported Python, the error is a *SetupError whose
+// message says what was found and how to get Python.
 func TestVenvNoPython(t *testing.T) {
 	f := newFakeEnv(t)
 	f.python(filepath.Join(f.bin, "python3"), "3.11.9")
 	v := f.venv()
 	err := v.Ensure(context.Background(), &bytes.Buffer{})
-	if err == nil {
-		t.Fatal("no error")
+	se, ok := errors.AsType[*SetupError](err)
+	if !ok {
+		t.Fatalf("Ensure = %v, want a *SetupError", err)
 	}
-	for _, want := range []string{"uv", "3.12", "is 3.11.9"} {
+	if se.Cause != nil || len(se.Found) != 1 || se.Found[0] != f.bin+"/python3 is 3.11.9" {
+		t.Errorf("SetupError %+v", se)
+	}
+	for _, want := range []string{
+		"cannot create .hc/venv: there is no uv, and no Python 3.12 or later on PATH (" + f.bin + "/python3 is 3.11.9).\n",
+		"generators and checkers", UVInstallURL, "python.interpreter", "then run `hc env sync`",
+	} {
 		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error lacks %q: %v", want, err)
+			t.Errorf("error lacks %q:\n%v", want, err)
 		}
 	}
 	if _, err := (Language{Venv: v}).Toolchain(); err == nil {
 		t.Error("toolchain without an environment")
+	}
+}
+
+// The guide gives the commands that install uv on each system.
+func TestGuide(t *testing.T) {
+	for goos, want := range map[string][]string{
+		"darwin":  {"      brew install uv\n", "      curl -LsSf https://astral.sh/uv/install.sh | sh\n"},
+		"linux":   {"      curl -LsSf https://astral.sh/uv/install.sh | sh\n"},
+		"windows": {"      winget install --id=astral-sh.uv -e\n", `irm https://astral.sh/uv/install.ps1 | iex`},
+	} {
+		g := Guide(goos)
+		for _, w := range append(want, "Python 3.12 or later", UVInstallURL, "`hc env sync`", "python.interpreter") {
+			if !strings.Contains(g, w) {
+				t.Errorf("%s: guide lacks %q:\n%s", goos, w, g)
+			}
+		}
+		if goos != "darwin" && strings.Contains(g, "brew") {
+			t.Errorf("%s: guide names brew:\n%s", goos, g)
+		}
+	}
+}
+
+// A Python whose venv cannot install pip (Debian's python3.X-venv missing)
+// creates the environment without it, and hc warns that only debugpy is
+// missing.
+func TestVenvWithoutPip(t *testing.T) {
+	f := newFakeEnv(t)
+	f.script(filepath.Join(f.bin, "python3"), `case "$1" in
+-c) echo 3.12.3 ;;
+-m) if [ "$3" = --without-pip ]; then /bin/mkdir -p "$4/bin" && /bin/cp "$0" "$4/bin/python"
+    else /bin/mkdir -p "$3/bin"; echo "ensurepip is not available" >&2; exit 1; fi ;;
+esac
+`)
+	v := f.venv()
+	var out bytes.Buffer
+	if err := v.Ensure(context.Background(), &out); err != nil {
+		t.Fatal(err)
+	}
+	f.wantLogged(
+		f.bin+"/python3 -m venv "+v.Dir,
+		f.bin+"/python3 -m venv --without-pip "+v.Dir,
+	)
+	if strings.Contains(f.logged(), "pip install") {
+		t.Errorf("installed debugpy without pip:\n%s", f.logged())
+	}
+	for _, want := range []string{"warning: " + f.bin + "/python3 -m venv cannot install pip", "headless debugging", "python3.12-venv", "uv", "`hc env sync`"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output lacks %q:\n%s", want, out.String())
+		}
+	}
+	if ver, err := version(context.Background(), v.Python()); err != nil || ver != "3.12.3" {
+		t.Errorf("environment: %q, %v", ver, err)
+	}
+
+	// A venv that fails without pip too is a *SetupError naming the Python
+	// and its output.
+	f = newFakeEnv(t)
+	f.script(filepath.Join(f.bin, "python3"), `case "$1" in
+-c) echo 3.12.3 ;;
+-m) echo "venv is broken" >&2; exit 1 ;;
+esac
+`)
+	err := f.venv().Ensure(context.Background(), &bytes.Buffer{})
+	if se, ok := errors.AsType[*SetupError](err); !ok || se.Tool != f.bin+"/python3" || !strings.Contains(err.Error(), "venv is broken") || !strings.Contains(err.Error(), "`hc env sync`") {
+		t.Errorf("Ensure = %v", err)
 	}
 }
 

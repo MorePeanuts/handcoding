@@ -36,6 +36,7 @@ Commit all of it. The skills are committed on purpose: a fresh clone describes i
 - **The name** is `--name`, or else the directory's name in kebab-case (`My Pack` becomes `my-pack`). It is the pack's identity: installed packs, solutions and history are keyed by it, so choose it before you publish. Its rules are those of [`pack.yaml`](protocol.md#packyaml).
 - **Refusals.** `hc pack init` refuses a directory that already holds `pack.yaml` or is inside a workspace, and it never overwrites a file: when any file it would write exists, it lists them and writes nothing.
 - **git.** hc does not run `git init`. If `dir` is in a git repository already it stays one, but GitHub runs only the workflows at the root of a repository, so the pack should be the repository's root.
+- **Python.** Last, `hc pack init` creates the checkout's Python environment, `.hc/venv`, on Python 3.12, the oldest the protocol supports (see [the workspace](how-to-use.md#workspace)). Without uv or a Python on PATH, the pack is still written, but `hc pack init` prints how to get one and exits with a non-zero status; install it and run `hc env sync` in the pack. A fresh clone gets its environment from the first command that needs Python.
 
 The directory is now a pack checkout, which hc opens as a workspace as it is (see [working on a pack](how-to-use.md#working-on-a-pack)): every hc command run in it works on this pack.
 
