@@ -213,15 +213,16 @@ func newSkillCmd(root *rootOptions) *cobra.Command {
 		Long: `hc ships agent skills that teach coding agents its problem protocol and
 workflows. They are installed into the workspace, for Claude Code in
 ` + skill.ClaudeDir + ` and for Codex in ` + skill.AgentsDir + `, and listed in a block of
-AGENTS.md. hc manages only the copies it installed, and never touches other
-skills or the rest of AGENTS.md.`,
+AGENTS.md; in a practice workspace, that block is also a guide for agents
+helping you practice. hc manages only the copies it installed, and never
+touches other skills or the rest of AGENTS.md.`,
 	}
 	var force bool
 	install := &cobra.Command{
 		Use:   "install [skill...]",
 		Short: "Install or update the workspace's skills",
 		Long: `Install the skills this workspace gets, or only the named ones, and update
-the skill index in AGENTS.md. A practice workspace gets ` + strings.Join(skill.Set(skill.Practice), ", ") + `; a pack
+hc's block in AGENTS.md. A practice workspace gets ` + strings.Join(skill.Set(skill.Practice), ", ") + `; a pack
 checkout gets ` + strings.Join(skill.Set(skill.Authoring), ", ") + `. Outdated skills hc installed are
 replaced; skills you edited are kept unless --force is given. Without names,
 skills hc installed that the workspace does not get are removed.`,
@@ -233,12 +234,13 @@ skills hc installed that the workspace does not get are removed.`,
 				return err
 			}
 			defer a.Close()
+			ctx := skillContext(a.WS)
 			opts := skill.Options{Version: version.String(), Force: force}
 			names := args
 			if len(names) == 0 {
-				names, opts.Exclusive = skill.Set(skillContext(a.WS)), true
+				names, opts.Exclusive = skill.Set(ctx), true
 			}
-			changes, err := skill.Install(a.WS.Root, names, opts)
+			changes, err := skill.Install(a.WS.Root, ctx, names, opts)
 			printSkillChanges(os.Stdout, changes)
 			if err == nil && len(changes) == 0 {
 				fmt.Println("skills are up to date")
@@ -310,7 +312,8 @@ func syncSkills(ws *workspace.Workspace) error {
 	// Not exclusive: a skill the user installed by name stays. Only a bare
 	// hc skill install brings the workspace to exactly its set.
 	opts := skill.Options{Version: version.String()}
-	changes, err := skill.Install(ws.Root, skill.Set(skillContext(ws)), opts)
+	ctx := skillContext(ws)
+	changes, err := skill.Install(ws.Root, ctx, skill.Set(ctx), opts)
 	printSkillChanges(os.Stderr, changes)
 	return err
 }

@@ -114,7 +114,7 @@ func InitPack(dir string, o InitPackOptions) (*InitPackResult, error) {
 		}
 	}
 	// AGENTS.md has the author's section: the installer appends its block.
-	if _, err := skill.Install(root, skills, skill.Options{Version: o.HCVersion, Exclusive: true}); err != nil {
+	if _, err := skill.Install(root, skill.Authoring, skills, skill.Options{Version: o.HCVersion, Exclusive: true}); err != nil {
 		return nil, err
 	}
 	return &InitPackResult{

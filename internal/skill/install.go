@@ -201,10 +201,10 @@ type Change struct {
 const legacyDir = ClaudeDir + "/handcoding"
 
 // Install installs the named skills into every install directory of the
-// workspace at root, then rewrites the skill index in AGENTS.md. Missing and
-// outdated managed skills are written; edited ones only with Force; skills hc
-// did not install are never touched.
-func Install(root string, names []string, opts Options) ([]Change, error) {
+// workspace at root, a directory of the context, then rewrites hc's block in
+// AGENTS.md (see Index). Missing and outdated managed skills are written;
+// edited ones only with Force; skills hc did not install are never touched.
+func Install(root string, ctx Context, names []string, opts Options) ([]Change, error) {
 	for _, name := range names {
 		if _, ok := Get(name); !ok {
 			return nil, fmt.Errorf("unknown skill %q (skills: %s)", name, strings.Join(Names(), ", "))
@@ -242,7 +242,7 @@ func Install(root string, names []string, opts Options) ([]Change, error) {
 	if removeLegacy(root) {
 		changes = append(changes, Change{Path: legacyDir, Action: Removed})
 	}
-	if changed, err := WriteIndex(root); err != nil {
+	if changed, err := WriteIndex(root, ctx); err != nil {
 		return changes, err
 	} else if changed {
 		changes = append(changes, Change{Path: AgentsFile, Action: Updated})

@@ -49,6 +49,11 @@ func TestSkillSetsByContext(t *testing.T) {
 	if !installed(practice, skill.Pack) {
 		t.Fatal("hc skill install hc-pack did not install it")
 	}
+	// The block is the workspace's, whatever skills were named.
+	agents, err := os.ReadFile(filepath.Join(practice, skill.AgentsFile))
+	if err != nil || !strings.Contains(string(agents), "# handcoding workspace\n") || !strings.Contains(string(agents), "`"+skill.Pack+"`") {
+		t.Errorf("AGENTS.md of the practice workspace: %v\n%s", err, agents)
+	}
 	// hc gen only adds the set's skills; it keeps one installed by name.
 	if err := runHC(t, "-w", practice, "new", "demo"); err != nil {
 		t.Fatal(err)
@@ -79,9 +84,10 @@ func TestSkillSetsByContext(t *testing.T) {
 			t.Errorf("gen in a pack checkout did not install %s", name)
 		}
 	}
-	agents, err := os.ReadFile(filepath.Join(checkout, skill.AgentsFile))
-	if err != nil || !strings.Contains(string(agents), "`"+skill.Pack+"`") {
-		t.Errorf("AGENTS.md does not list hc-pack: %v\n%s", err, agents)
+	// A pack checkout's block is the skill index, without the practice guide.
+	agents, err = os.ReadFile(filepath.Join(checkout, skill.AgentsFile))
+	if err != nil || !strings.Contains(string(agents), "`"+skill.Pack+"`") || strings.Contains(string(agents), "# handcoding workspace") {
+		t.Errorf("AGENTS.md of the pack checkout: %v\n%s", err, agents)
 	}
 	out, err = capture(t, "-w", checkout, "skill", "list")
 	if err != nil {
