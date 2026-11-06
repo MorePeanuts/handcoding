@@ -31,7 +31,7 @@
   .claude/  .agents/                       智能体 skill
 ```
 
-`hc init --lang python` 把默认解题语言设为 Python（即 `hc.yaml` 中的 `language`，默认为 `go`），并立即创建下文介绍的 Python 环境。如果创建失败，例如既没有 uv 也没有 Python 3.10+，`hc init` 会给出警告，但仍然创建工作区。
+`hc init --lang python` 把默认解题语言设为 Python（即 `hc.yaml` 中的 `language`，默认为 `go`），并立即创建下文介绍的 Python 环境。如果创建失败，例如既没有 uv 也没有 Python 3.12+，`hc init` 会给出警告，但仍然创建工作区。
 
 `hc` 按以下顺序查找工作区：`-w <dir>`、`$HC_WORKSPACE`、包含 `hc.yaml` 或 `pack.yaml`（题目包的检出目录，见[编写题目包](#编写题目包)）的最近一级父目录、`~/handcoding`。所以在任何目录下都可以运行它。
 
@@ -52,14 +52,14 @@ hc 无法读取的题目包（没有 `pack.yaml`、`pack.yaml` 不合法，或�
 
 Python 解答在 hc 管理的虚拟环境 `.hc/venv` 中运行。第一次有命令需要 Python 时（`hc init --lang python`、`hc start`、`test`、`submit`、`debug`、`cases build`、`validate --run`），hc 会创建它：
 
-1. 如果装了 [uv](https://docs.astral.sh/uv/)，用 `uv venv --python '>=3.10'` 创建；本机没有合适的 Python 时，uv 会自动下载一个；
-2. 否则从 PATH 上的 `python3`、`python` 和 `python3.N` 中选出最新的 Python 3.10+，用 `-m venv` 创建。在 Debian 和 Ubuntu 上这需要安装 `python3-venv` 包。
+1. 如果装了 [uv](https://docs.astral.sh/uv/)，用 `uv venv --python '>=3.12'` 创建；本机没有合适的 Python 时，uv 会自动下载一个；
+2. 否则从 PATH 上的 `python3`、`python` 和 `python3.N` 中选出最新的 Python 3.12+，用 `-m venv` 创建。在 Debian 和 Ubuntu 上这需要安装 `python3-venv` 包。
 
-在题目包的 checkout 中（见[编写题目包](packs_zh.md)），环境改用 Python 3.10，即协议支持的最旧版本，题目包的参考解、判题程序和生成器都必须能在它上面运行：用 `uv venv --python 3.10` 创建，没有 uv 时用 PATH 上最新的 `python3.10`。这样 `hc validate --run` 和 `hc pack check` 与题目包的 CI 使用同一个 Python。已有的环境版本不对时会重新创建；找不到 Python 3.10 时（没有 uv，PATH 上也没有），hc 使用最新的版本并给出警告。
+在题目包的 checkout 中（见[编写题目包](packs_zh.md)），环境改用 Python 3.12，即协议支持的最旧版本，题目包的参考解、判题程序和生成器都必须能在它上面运行：用 `uv venv --python 3.12` 创建，没有 uv 时用 PATH 上最新的 `python3.12`。这样 `hc validate --run` 和 `hc pack check` 与题目包的 CI 使用同一个 Python。已有的环境版本不对时会重新创建；找不到 Python 3.12 时（没有 uv，PATH 上也没有），hc 使用最新的版本并给出警告。
 
 环境中装有 debugpy，用于 headless 调试。下载 Python 和安装 debugpy 需要联网，但只需一次；判题始终离线。如果环境失效（工作区被移动，或者它所用的 Python 被删除），hc 会重新创建。`hc env sync` 可以随时重建它，例如在装好 uv 之后。hc 还会在工作区根目录写入 `pyrightconfig.json`（已有时不覆盖），让 pyright 和 basedpyright 用同一个解释器检查你的解答。如果想用自己的 Python（conda、自行编译的版本），在 `hc.yaml` 中设置 `python.interpreter`，hc 就不再创建虚拟环境。
 
-支持的最低版本是 Python 3.10 和 Go 1.22（见协议的[语言版本](protocol_zh.md#语言版本)）。你自己的解答可以使用工具链支持的任何特性：`hc test`、`hc submit` 和 `hc debug` 会注明所用的工具链（`[Python 3.12.9]`），版本过旧时只给出警告。题目附带的代码必须能在最低版本上运行，所以 `hc cases build` 和 `hc validate --run` 拒绝在过旧的工具链上运行参考解。更新的工具链没有问题：`hc validate --run`（因而 `hc pack check`）还会对照 Go 1.22 检查每个 Go 参考解，做法是在 go 指令为 `go 1.22` 的模块中对它运行 go vet，它会报告更新的语言特性和标准库符号。
+支持的最低版本是 Python 3.12 和 Go 1.22（见协议的[语言版本](protocol_zh.md#语言版本)）。你自己的解答可以使用工具链支持的任何特性：`hc test`、`hc submit` 和 `hc debug` 会注明所用的工具链（`[Python 3.12.9]`），版本过旧时只给出警告。题目附带的代码必须能在最低版本上运行，所以 `hc cases build` 和 `hc validate --run` 拒绝在过旧的工具链上运行参考解。更新的工具链没有问题：`hc validate --run`（因而 `hc pack check`）还会对照 Go 1.22 检查每个 Go 参考解，做法是在 go 指令为 `go 1.22` 的模块中对它运行 go vet，它会报告更新的语言特性和标准库符号。
 
 建议在工作区里执行 `git init`，记录下自己的练习过程。`hc init` 写入的 `.gitignore` 排除了 `.hc/` 和已安装的题目包，后者可以由 `hc pack install` 根据 `hc.yaml` 重新安装。
 
@@ -321,7 +321,7 @@ hc 只修改这个列表，`hc.yaml` 的其余部分保留原有的注释和顺�
 
 ### 检查题目包
 
-`hc pack check` 是题目包的 CI 在发布前运行的检查。在题目包的检出目录中运行它（见[编写题目包](#编写题目包)），或者传入它的目录：`hc pack check ./my-pack`。它检查 `pack.yaml` 合法且协议版本受支持，分组中列出的都是本包的题目，并且每道题都能加载、合法、目录名规范、slug 和 ID 唯一、已就绪（设置了 `judge.compare`）、有用例且每个用例都有期望输出（生成用例则有摘要）、没有超过 100 KB 的用例、对题目包 `languages` 中的每种语言都有参考解，并通过 `hc validate --run`：每个参考解都通过每个用例，生成用例重新构造。因此它需要 Go 和 Python 3.10+，无法运行的参考解也算错误。它为每道题输出一行，最后输出汇总，任何一项失败都以非零状态退出。
+`hc pack check` 是题目包的 CI 在发布前运行的检查。在题目包的检出目录中运行它（见[编写题目包](#编写题目包)），或者传入它的目录：`hc pack check ./my-pack`。它检查 `pack.yaml` 合法且协议版本受支持，分组中列出的都是本包的题目，并且每道题都能加载、合法、目录名规范、slug 和 ID 唯一、已就绪（设置了 `judge.compare`）、有用例且每个用例都有期望输出（生成用例则有摘要）、没有超过 100 KB 的用例、对题目包 `languages` 中的每种语言都有参考解，并通过 `hc validate --run`：每个参考解都通过每个用例，生成用例重新构造。因此它需要 Go 和 Python 3.12+，无法运行的参考解也算错误。它为每道题输出一行，最后输出汇总，任何一项失败都以非零状态退出。
 
 `hc pack check` 和 `hc validate` 会同时检查多道题：同时检查 `--jobs`（`-j`）道，默认每个 CPU 一道，最多 4 道。各行的顺序与逐道检查时相同，每道题和它之前的题都检查完后立即输出它的一行，题目的参考解运行时的输出紧接在它这一行之前。同时进行的参考解运行不用于[时间限制](#时间限制)的计时，因为它们在争用机器；`-j 1` 逐道检查，并像以前一样计时。
 
@@ -450,7 +450,7 @@ theme: auto           # 题面配色：auto | dark | light
 images: auto          # 题面图片：auto | kitty | blocks | none
 timeout: 10s          # 每次运行及其判题程序、生成器的墙钟时限（协议：运行时限）
 python:
-  interpreter: python3.12  # 代替 .hc/venv 使用的 Python 3.10+，也可以是完整路径；默认不设置
+  interpreter: python3.12  # 代替 .hc/venv 使用的 Python 3.12+，也可以是完整路径；默认不设置
 agent:
   name: claude        # claude | codex，或者设置 command（见上文）
 leetcode:
@@ -471,6 +471,6 @@ locales: [en]         # 你自己题目的题面语言，默认的排在第一
 - `hc fetch` 可以导入使用 [LeetCode 的 `Node` 类型](protocol_zh.md#leetcode-的-node-类型)、`NestedInteger`、`Employee` 的题目，签名取自 LeetCode 的 Go 初始代码。`returns_copy`（克隆图）留给 `hc gen` 设置；扁平化嵌套列表迭代器这类迭代器题目的示例只给出输入、没有给出调用序列，也留给 `hc gen` 补写。
 - 把一个值编码再解码回来的题目（297、449、535）按[编解码往返题](protocol_zh.md#编解码往返题)评测：只比较解码得到的值，所以对编码本身的要求（449 的"尽可能紧凑"）不会检查。`hc fetch` 可以导入这类题目，编码器、解码器以及二者是否共用一个实例取自 LeetCode 初始代码注释中的调用方式。回归测试集中的 297 和 535 分别展示了两种情况。
 - 限制运行时间（见[时间限制](#时间限制)），但不限制内存。
-- Python 的递归上限就是 Python 自己的，默认 1000：需要更深递归的解答用 `sys.setrecursionlimit` 自行提高，和任何 Python 程序一样。Python 3.11 之前，每次 Python 调用还会占用 C 栈，深递归会撑爆主线程的栈，无论上限设多少，进程都会崩溃。因此在 3.10 上，hc 在一个栈大小为 512 MB 的线程中运行解答、检查器和生成器，足够几十万层调用。
+- Python 的递归上限就是 Python 自己的，默认 1000：需要更深递归的解答用 `sys.setrecursionlimit` 自行提高，和任何 Python 程序一样。
 - 无法获取 LeetCode 会员题目。
-- 合法答案很多、无法全部列出的题目（"返回任意一个合法答案"）和随机题由[判题程序](protocol_zh.md#判题程序)评测，判题程序由 `hc gen` 编写，回归测试集中的 5、108、210、324、384 和 528 都带有判题程序。判题程序用 Python 编写，所以即使用 Go 作答，这些题目也需要 Python 3.10 或更新版本；hc 管理的虚拟环境会提供它。
+- 合法答案很多、无法全部列出的题目（"返回任意一个合法答案"）和随机题由[判题程序](protocol_zh.md#判题程序)评测，判题程序由 `hc gen` 编写，回归测试集中的 5、108、210、324、384 和 528 都带有判题程序。判题程序用 Python 编写，所以即使用 Go 作答，这些题目也需要 Python 3.12 或更新版本；hc 管理的虚拟环境会提供它。

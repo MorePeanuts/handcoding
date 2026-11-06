@@ -9,7 +9,7 @@
 # written to results.jsonl: {"id", "input"}, or {"id", "error"} when the
 # function is missing, raises or returns something else than a JSON object.
 # A generator.py that cannot be loaded gets a single {"id": 0, "error"} line.
-# Compatible with Python 3.10+, the minimum of the problem protocol.
+# Compatible with Python 3.12+, the minimum of the problem protocol.
 
 import importlib.util
 import json
@@ -17,7 +17,7 @@ import os
 import sys
 import traceback
 
-from hc_runtime import Rng, _with_stack
+from hc_runtime import Rng
 
 
 def _traceback(exc, path):
@@ -86,4 +86,4 @@ def main():
 
 
 if __name__ == "__main__":
-    _with_stack(main)
+    main()

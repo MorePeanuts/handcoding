@@ -16,8 +16,8 @@ func newEnvCmd(root *rootOptions) *cobra.Command {
 		Long: `hc runs Python solutions in a virtual environment it manages in the
 workspace (.hc/venv), unless python.interpreter is set in hc.yaml. It is
 created the first time a command needs Python: with uv if it is installed
-(uv downloads a Python 3.10+ if there is none), otherwise with the newest
-Python 3.10+ on PATH. It holds debugpy for headless debugging.`,
+(uv downloads a Python 3.12+ if there is none), otherwise with the newest
+Python 3.12+ on PATH. It holds debugpy for headless debugging.`,
 	}
 	cmd.AddCommand(&cobra.Command{
 		Use:   "sync",

@@ -99,7 +99,7 @@ func TestVenvWithUV(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.wantLogged(
-		f.bin+"/uv venv --no-project --python >=3.10 "+v.Dir,
+		f.bin+"/uv venv --no-project --python >=3.12 "+v.Dir,
 		f.bin+"/uv pip install --python "+v.Python()+" debugpy",
 	)
 	if !strings.Contains(out.String(), "network") {
@@ -157,9 +157,9 @@ func TestVenvRepair(t *testing.T) {
 func TestVenvWithoutUV(t *testing.T) {
 	f := newFakeEnv(t)
 	f.python(filepath.Join(f.bin, "python3"), "3.9.6")
-	f.python(filepath.Join(f.bin, "python"), "3.10.0")
-	f.python(filepath.Join(f.bin, "python3.11"), "3.11.2")
+	f.python(filepath.Join(f.bin, "python"), "3.11.9")
 	f.python(filepath.Join(f.bin, "python3.12"), "3.12.1")
+	f.python(filepath.Join(f.bin, "python3.13"), "3.13.2")
 	f.python(filepath.Join(f.bin, "python3-config"), "0")
 	v := f.venv()
 	// A pyrightconfig.json of the user's own is kept.
@@ -170,7 +170,7 @@ func TestVenvWithoutUV(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.wantLogged(
-		f.bin+"/python3.12 -m venv "+v.Dir,
+		f.bin+"/python3.13 -m venv "+v.Dir,
 		v.Python()+" -m pip install --disable-pip-version-check debugpy",
 	)
 	if strings.Contains(f.logged(), "python3-config") {
@@ -186,56 +186,56 @@ func TestVenvWithoutUV(t *testing.T) {
 // the newest of that version on PATH creates it.
 func TestVenvVersion(t *testing.T) {
 	f := newFakeEnv(t)
-	f.uv("3.12.4")
+	f.uv("3.13.4")
 	v := f.venv()
 	if err := v.Ensure(context.Background(), &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	f.uv("3.10.18")
+	f.uv("3.12.11")
 	v = f.venv()
-	v.Version = "3.10"
+	v.Version = "3.12"
 	var out bytes.Buffer
 	if err := v.Ensure(context.Background(), &out); err != nil {
 		t.Fatal(err)
 	}
-	f.wantLogged(f.bin + "/uv venv --no-project --python 3.10 " + v.Dir)
-	if !strings.Contains(out.String(), "has Python 3.12.4, not 3.10; creating it again") {
+	f.wantLogged(f.bin + "/uv venv --no-project --python 3.12 " + v.Dir)
+	if !strings.Contains(out.String(), "has Python 3.13.4, not 3.12; creating it again") {
 		t.Errorf("version change not reported:\n%s", out.String())
 	}
-	if ver, err := version(context.Background(), v.Python()); err != nil || ver != "3.10.18" {
+	if ver, err := version(context.Background(), v.Python()); err != nil || ver != "3.12.11" {
 		t.Errorf("environment: %q, %v", ver, err)
 	}
 
 	f = newFakeEnv(t)
-	f.python(filepath.Join(f.bin, "python3"), "3.12.1")
-	f.python(filepath.Join(f.bin, "python3.10"), "3.10.4")
+	f.python(filepath.Join(f.bin, "python3"), "3.13.1")
+	f.python(filepath.Join(f.bin, "python3.12"), "3.12.4")
 	f.python(filepath.Join(f.bin, "python3.11"), "3.11.2")
 	v = f.venv()
-	v.Version = "3.10"
+	v.Version = "3.12"
 	if err := v.Ensure(context.Background(), &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	f.wantLogged(f.bin + "/python3.10 -m venv " + v.Dir)
+	f.wantLogged(f.bin + "/python3.12 -m venv " + v.Dir)
 }
 
 // Without a Python of Version, the newest creates the environment, with a
 // warning, and is kept: nothing better can be had.
 func TestVenvVersionMissing(t *testing.T) {
 	f := newFakeEnv(t)
-	f.python(filepath.Join(f.bin, "python3"), "3.12.1")
+	f.python(filepath.Join(f.bin, "python3"), "3.13.1")
 	v := f.venv()
-	v.Version = "3.10"
+	v.Version = "3.12"
 	var out bytes.Buffer
 	if err := v.Ensure(context.Background(), &out); err != nil {
 		t.Fatal(err)
 	}
 	f.wantLogged(f.bin + "/python3 -m venv " + v.Dir)
-	if !strings.Contains(out.String(), "warning: no Python 3.10 on PATH") {
+	if !strings.Contains(out.String(), "warning: no Python 3.12 on PATH") {
 		t.Errorf("no warning:\n%s", out.String())
 	}
 	before := f.logged()
 	v = f.venv()
-	v.Version = "3.10"
+	v.Version = "3.12"
 	out.Reset()
 	if err := v.Ensure(context.Background(), &out); err != nil {
 		t.Fatal(err)
@@ -247,13 +247,13 @@ func TestVenvVersionMissing(t *testing.T) {
 
 func TestVenvNoPython(t *testing.T) {
 	f := newFakeEnv(t)
-	f.python(filepath.Join(f.bin, "python3"), "3.9.6")
+	f.python(filepath.Join(f.bin, "python3"), "3.11.9")
 	v := f.venv()
 	err := v.Ensure(context.Background(), &bytes.Buffer{})
 	if err == nil {
 		t.Fatal("no error")
 	}
-	for _, want := range []string{"uv", "3.10", "is 3.9.6"} {
+	for _, want := range []string{"uv", "3.12", "is 3.11.9"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error lacks %q: %v", want, err)
 		}

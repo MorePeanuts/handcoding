@@ -36,8 +36,8 @@ def down(n):
 
 // TestDeepRecursion checks that Python code that raises the recursion limit
 // recurses 10^5 calls deep in a solution, a reference, a generator and a
-// checker: before Python 3.11 that overflows the main thread's C stack, so
-// the drivers run in a thread with a larger one (#113).
+// checker. The drivers run them in the main thread, whose C stack such calls
+// do not use on the Python versions the protocol supports (#113, #132).
 func TestDeepRecursion(t *testing.T) {
 	t.Parallel()
 	requireTools(t, "go", "python3")

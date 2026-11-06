@@ -350,7 +350,7 @@ func Create(dir, language string) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	header := "# handcoding workspace configuration\n# agent.name: claude | codex   (or set agent.command for a custom agent)\n# leetcode.site: com | cn\n# locales: the languages of your own problems' statements, the default first, e.g. [en, zh-CN] (default [en])\n# theme: auto | dark | light   (set it if statements look wrong in your terminal)\n# images: auto | kitty | blocks | none   (kitty: kitty, Ghostty, herdr; blocks: any truecolor terminal)\n# python.interpreter: a Python 3.10+ to use instead of the virtual environment hc manages in .hc/venv\n"
+	header := "# handcoding workspace configuration\n# agent.name: claude | codex   (or set agent.command for a custom agent)\n# leetcode.site: com | cn\n# locales: the languages of your own problems' statements, the default first, e.g. [en, zh-CN] (default [en])\n# theme: auto | dark | light   (set it if statements look wrong in your terminal)\n# images: auto | kitty | blocks | none   (kitty: kitty, Ghostty, herdr; blocks: any truecolor terminal)\n# python.interpreter: a Python 3.12+ to use instead of the virtual environment hc manages in .hc/venv\n"
 	if err := os.WriteFile(filepath.Join(abs, ConfigFile), append([]byte(header), data...), 0o644); err != nil {
 		return nil, err
 	}

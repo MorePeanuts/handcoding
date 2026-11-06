@@ -154,7 +154,7 @@ func (t Toolchain) Err() error {
 	return fmt.Errorf("%s is older than %s, the oldest version hc supports; %s", t, t.Min, t.Upgrade)
 }
 
-// AtLeast compares dotted version numbers: AtLeast("3.9.6", "3.10") is
+// AtLeast compares dotted version numbers: AtLeast("3.9.6", "3.12") is
 // false. Each component is read up to its first non-digit, so "1.22rc1"
 // counts as 1.22.
 func AtLeast(version, min string) bool {

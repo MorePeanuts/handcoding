@@ -88,8 +88,8 @@ func TestInitPack(t *testing.T) {
 			t.Errorf("check.yml does not run %q:\n%s", want, data)
 		}
 	}
-	if python != "3.10" {
-		t.Errorf("check.yml sets up Python %q, not 3.10", python)
+	if python != "3.12" {
+		t.Errorf("check.yml sets up Python %q, not 3.12", python)
 	}
 	if strings.Contains(string(data), "@latest") || strings.Contains(string(data), "pin it") {
 		t.Errorf("a release pins hc:\n%s", data)
