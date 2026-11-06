@@ -60,7 +60,7 @@ python, hc also creates the workspace's Python virtual environment now.`,
 				return err
 			}
 			opts := skill.Options{Version: version.String(), Exclusive: true}
-			if _, err := skill.Install(ws.Root, skill.Set(skill.Practice), opts); err != nil {
+			if _, err := skill.Install(ws.Root, skill.Practice, skill.Set(skill.Practice), opts); err != nil {
 				return err
 			}
 			if l, err := app.New(ws).Lang(""); err == nil && l.ID() == "python" {

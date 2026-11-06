@@ -52,6 +52,35 @@ func TestSkillsLint(t *testing.T) {
 	}
 }
 
+// Agents read hc's block of AGENTS.md in every session, so its commands are
+// checked like the skills': in each kind of workspace, with its skills and,
+// in a practice workspace, without.
+func TestAgentsBlockLint(t *testing.T) {
+	for _, ctx := range skill.Contexts {
+		root := t.TempDir()
+		if _, err := skill.Install(root, ctx, skill.Set(ctx), skill.Options{Version: "v0.0.1"}); err != nil {
+			t.Fatal(err)
+		}
+		blocks := []string{skill.Index(root, ctx)}
+		if ctx == skill.Practice {
+			blocks = append(blocks, skill.Index(t.TempDir(), ctx))
+		}
+		for _, block := range blocks {
+			if block == "" {
+				t.Fatalf("%s: no block", ctx)
+			}
+			files := map[string][]byte{skill.AgentsFile: []byte(block)}
+			for _, err := range lintSkill(newRootCmd(), skill.Skill{Name: skill.AgentsFile, Files: files}) {
+				t.Errorf("%s: %v", ctx, err)
+			}
+		}
+		// The practice guide's commands are there to be checked.
+		if ctx == skill.Practice && strings.Count(blocks[0], "hc test <problem>") < 4 {
+			t.Errorf("%s: the guide shows no hc test commands:\n%s", ctx, blocks[0])
+		}
+	}
+}
+
 func TestSkillsLintCatchesStaleCommands(t *testing.T) {
 	md := "---\nname: hc-x\ndescription: d\n---\n" +
 		"Run `hc cases build <slug> --force` and `hc validate <slug> --run`.\n" +

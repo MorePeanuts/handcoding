@@ -105,7 +105,8 @@ func TestSkillsInstalledForAgents(t *testing.T) {
 		}
 	}
 	agents, err := os.ReadFile(filepath.Join(dir, skill.AgentsFile))
-	if err != nil || !strings.Contains(string(agents), skill.Cases) {
+	// The workspace guide, with the skills as one section of it.
+	if err != nil || !strings.Contains(string(agents), "# handcoding workspace\n") || !strings.Contains(string(agents), "## Writing problems") || !strings.Contains(string(agents), skill.Cases) {
 		t.Errorf("AGENTS.md: %q, %v", agents, err)
 	}
 

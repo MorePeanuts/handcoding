@@ -29,12 +29,12 @@ func read(t *testing.T, path string) string {
 	return string(data)
 }
 
-func install(t *testing.T, root string, opts Options, names ...string) map[string]Action {
+func install(t *testing.T, root string, ctx Context, opts Options, names ...string) map[string]Action {
 	t.Helper()
 	if opts.Version == "" {
 		opts.Version = "v0.0.1"
 	}
-	changes, err := Install(root, names, opts)
+	changes, err := Install(root, ctx, names, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestInstallManagesOnlyItsSkills(t *testing.T) {
 	claude := ClaudeDir + "/" + Cases
 	agents := AgentsDir + "/" + Cases
 
-	got := install(t, root, Options{}, Cases)
+	got := install(t, root, Practice, Options{}, Cases)
 	if got[claude] != Added || got[agents] != Added || got[AgentsFile] != Updated || got[ClaudeFile] != Added {
 		t.Fatalf("first install: %v", got)
 	}
@@ -79,7 +79,7 @@ func TestInstallManagesOnlyItsSkills(t *testing.T) {
 	if s := state(root, claude); s != Current {
 		t.Fatalf("state after install: %v", s)
 	}
-	if got := install(t, root, Options{}, Cases); len(got) != 0 {
+	if got := install(t, root, Practice, Options{}, Cases); len(got) != 0 {
 		t.Errorf("second install changed %v", got)
 	}
 
@@ -89,13 +89,13 @@ func TestInstallManagesOnlyItsSkills(t *testing.T) {
 	if s := state(root, claude); s != Modified {
 		t.Fatalf("edited skill: %v", s)
 	}
-	if got := install(t, root, Options{}, Cases); got[claude] != Skipped {
+	if got := install(t, root, Practice, Options{}, Cases); got[claude] != Skipped {
 		t.Errorf("install over an edited skill: %v", got)
 	}
 	if read(t, skillMD) != "my notes\n" {
 		t.Error("edited skill overwritten without --force")
 	}
-	if got := install(t, root, Options{Force: true}, Cases); got[claude] != Replaced {
+	if got := install(t, root, Practice, Options{Force: true}, Cases); got[claude] != Replaced {
 		t.Errorf("forced install: %v", got)
 	}
 
@@ -107,7 +107,7 @@ func TestInstallManagesOnlyItsSkills(t *testing.T) {
 	if in := inspect(root, agents); in.State != Outdated || in.Version != "v0.0.0" {
 		t.Fatalf("old copy: %+v", in)
 	}
-	if got := install(t, root, Options{}, Cases); got[agents] != Updated {
+	if got := install(t, root, Practice, Options{}, Cases); got[agents] != Updated {
 		t.Errorf("install over an outdated skill: %v", got)
 	}
 	if _, err := os.Stat(filepath.Join(root, agents, "extra.md")); err == nil {
@@ -152,7 +152,7 @@ func TestInstallLeavesUnmanagedSkills(t *testing.T) {
 	write(t, mine, "mine\n")
 	other := filepath.Join(root, AgentsDir, "my-skill", MainFile)
 	write(t, other, "mine\n")
-	got := install(t, root, Options{Force: true, Exclusive: true}, Cases)
+	got := install(t, root, Practice, Options{Force: true, Exclusive: true}, Cases)
 	if got[ClaudeDir+"/"+Cases] != Skipped {
 		t.Errorf("unmanaged skill of the same name: %v", got)
 	}
@@ -180,7 +180,7 @@ func TestInstallRemovesStaleSkills(t *testing.T) {
 	// The unmarked skill hc installed before skills were managed.
 	write(t, filepath.Join(root, legacyDir, MainFile), "---\nname: handcoding\ndescription: d\n---\n")
 
-	got := install(t, root, Options{}, Cases)
+	got := install(t, root, Practice, Options{}, Cases)
 	if got[ClaudeDir+"/hc-old"] != Removed || got[legacyDir] != Removed {
 		t.Errorf("stale skills: %v", got)
 	}
@@ -190,18 +190,108 @@ func TestInstallRemovesStaleSkills(t *testing.T) {
 		}
 	}
 
-	// Exclusive installs remove managed skills outside the names too.
-	got = install(t, root, Options{Exclusive: true})
+	// Exclusive installs remove managed skills outside the names too. A pack
+	// checkout's block is only the skill index, so it goes with them.
+	got = install(t, root, Authoring, Options{Exclusive: true})
 	if got[ClaudeDir+"/"+Cases] != Removed || got[AgentsDir+"/"+Cases] != Removed {
 		t.Errorf("exclusive install of nothing: %v", got)
 	}
 	if strings.Contains(read(t, filepath.Join(root, AgentsFile)), beginMarker) {
-		t.Error("AGENTS.md still has a block without skills")
+		t.Error("AGENTS.md of a pack checkout still has a block without skills")
+	}
+}
+
+// A practice workspace's block is a guide for agents helping the user, with
+// the installed skills as one section of it, and is written without skills
+// too.
+func TestPracticeIndex(t *testing.T) {
+	root := t.TempDir()
+	guide := []string{"# handcoding workspace", "## Layout", "## Using hc", "## Helping the user learn", "## Scratch files", ".hc/scratch/<slug>/", "hc rewrites this block"}
+	check := func(name, block string, skills bool) {
+		t.Helper()
+		if !strings.HasPrefix(block, beginMarker+"\n# handcoding workspace\n") || !strings.HasSuffix(block, "outside it.\n"+endMarker) {
+			t.Errorf("%s: block is not delimited:\n%s", name, block)
+		}
+		for _, want := range guide {
+			if !strings.Contains(block, want) {
+				t.Errorf("%s: block lacks %q:\n%s", name, want, block)
+			}
+		}
+		if strings.Contains(block, "<%") || strings.Contains(block, "\n\n\n") {
+			t.Errorf("%s: template left over:\n%s", name, block)
+		}
+		if got := strings.Contains(block, "## Writing problems"); got != skills {
+			t.Errorf("%s: skills section %v, want %v:\n%s", name, got, skills, block)
+		}
+	}
+
+	// Without skills: the guide, no skills section.
+	if changed, err := WriteIndex(root, Practice); err != nil || !changed {
+		t.Fatalf("WriteIndex without skills = %v, %v", changed, err)
+	}
+	check("no skills", strings.TrimSuffix(read(t, filepath.Join(root, AgentsFile)), "\n"), false)
+	if Index(root, Authoring) != "" {
+		t.Error("a pack checkout without skills gets a block")
+	}
+
+	// With skills, the section lists the installed ones, and only them.
+	install(t, root, Practice, Options{}, Cases)
+	block := Index(root, Practice)
+	check("skills", block, true)
+	_, section, _ := strings.Cut(block, "## Writing problems")
+	if !strings.Contains(section, "- `"+Cases+"`: ") || !strings.Contains(section, AgentsDir+"/"+Cases+"/"+MainFile) || strings.Contains(section, "`"+Problem+"`") {
+		t.Errorf("skills section:\n%s", section)
+	}
+	if read(t, filepath.Join(root, AgentsFile)) != block+"\n" {
+		t.Error("Install did not write the block")
+	}
+
+	// The block of an older hc is replaced in place, keeping the user's text.
+	old := "# Mine\n\nnotes\n\n" + beginMarker + "\n## hc skills\n\nold index\n" + endMarker + "\n\nmore notes\n"
+	write(t, filepath.Join(root, AgentsFile), old)
+	if changed, err := WriteIndex(root, Practice); err != nil || !changed {
+		t.Fatalf("WriteIndex over an old block = %v, %v", changed, err)
+	}
+	if got, want := read(t, filepath.Join(root, AgentsFile)), "# Mine\n\nnotes\n\n"+block+"\n\nmore notes\n"; got != want {
+		t.Errorf("AGENTS.md:\n%s\nwant\n%s", got, want)
+	}
+	if changed, err := WriteIndex(root, Practice); err != nil || changed {
+		t.Errorf("WriteIndex again = %v, %v", changed, err)
+	}
+}
+
+// A pack checkout's block is the skill index alone: the pack's own text for
+// agents is outside it.
+func TestAuthoringIndex(t *testing.T) {
+	root := t.TempDir()
+	install(t, root, Authoring, Options{}, Cases)
+	cases, _ := Get(Cases)
+	want := beginMarker + `
+## hc skills
+
+This is a handcoding (hc) workspace. Before you work on a task one of these
+skills covers, read its SKILL.md and follow it:
+
+- ` + "`hc-cases`: " + oneLine(cases.Description) + " Read `" + AgentsDir + "/hc-cases/SKILL.md`." + `
+
+Keep throwaway files (scripts, scratch data) in .hc/scratch/<slug>/, the
+directory of the problem you work on (.hc/scratch/ for other work): other
+agents may be working on other problems at the same time, with files of the
+same names. .hc/ is hc's own directory, never part of a pack. Delete your
+files when you are done.
+
+hc rewrites this block when it installs skills; write your own notes outside it.
+` + endMarker
+	if got := Index(root, Authoring); got != want {
+		t.Errorf("got\n%s\nwant\n%s", got, want)
+	}
+	if got := read(t, filepath.Join(root, AgentsFile)); got != want+"\n" {
+		t.Errorf("AGENTS.md:\n%s", got)
 	}
 }
 
 func TestInstallUnknownSkill(t *testing.T) {
-	if _, err := Install(t.TempDir(), []string{"hc-nope"}, Options{}); err == nil {
+	if _, err := Install(t.TempDir(), Practice, []string{"hc-nope"}, Options{}); err == nil {
 		t.Error("no error")
 	}
 }
@@ -228,7 +318,7 @@ func TestWithIndex(t *testing.T) {
 
 func TestList(t *testing.T) {
 	root := t.TempDir()
-	install(t, root, Options{}, Cases)
+	install(t, root, Practice, Options{}, Cases)
 	var dirs []string
 	for _, in := range List(root) {
 		want := Missing
@@ -270,7 +360,7 @@ func TestSets(t *testing.T) {
 // except copies the user edited.
 func TestInstallSetRemovesOtherSkills(t *testing.T) {
 	root := t.TempDir()
-	install(t, root, Options{Exclusive: true}, Set(Authoring)...)
+	install(t, root, Authoring, Options{Exclusive: true}, Set(Authoring)...)
 	for _, dir := range Dirs {
 		if s := state(root, dir+"/"+Pack); s != Current {
 			t.Fatalf("%s/%s after the authoring set: %v", dir, Pack, s)
@@ -283,7 +373,7 @@ func TestInstallSetRemovesOtherSkills(t *testing.T) {
 	// The user edited one copy.
 	edited := filepath.Join(root, ClaudeDir, Pack, MainFile)
 	write(t, edited, "my notes\n")
-	got := install(t, root, Options{Exclusive: true}, Set(Practice)...)
+	got := install(t, root, Practice, Options{Exclusive: true}, Set(Practice)...)
 	if got[AgentsDir+"/"+Pack] != Removed || got[ClaudeDir+"/"+Pack] != Skipped {
 		t.Errorf("practice set over the authoring set: %v", got)
 	}
@@ -299,7 +389,7 @@ func TestInstallSetRemovesOtherSkills(t *testing.T) {
 		}
 	}
 
-	got = install(t, root, Options{Exclusive: true, Force: true}, Set(Practice)...)
+	got = install(t, root, Practice, Options{Exclusive: true, Force: true}, Set(Practice)...)
 	if got[ClaudeDir+"/"+Pack] != Removed {
 		t.Errorf("forced practice set: %v", got)
 	}
