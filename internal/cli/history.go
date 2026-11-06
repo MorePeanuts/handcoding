@@ -114,10 +114,14 @@ func newHistoryShowCmd(root *rootOptions) *cobra.Command {
 				fmt.Fprintf(os.Stderr, "%s #%d %s [%s] %s %d/%d · %s\n\n", ui.Bold.Render("submission"), s.ID, s.Ref(), s.Lang,
 					ui.VerdictStyle(runner.Verdict(s.Verdict)).Render(s.Verdict), s.Passed, s.Total, s.CreatedAt.Format("2006-01-02 15:04:05"))
 				if rep := app.DecodeReport(s.Details); rep != nil {
-					if p, err := a.WS.Problem(s.Ref()); err == nil {
+					// The report is rendered with the problem's cases, so
+					// only with the very problem it was judged on.
+					if p, err := a.WS.ProblemOf(s.Pack, s.Slug); err == nil {
 						ui.PrintReport(os.Stderr, p, rep, ui.ReportOptions{Ref: a.WS.Ref(p)})
-						fmt.Fprintln(os.Stderr)
+					} else {
+						fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("note: %v; the judge details cannot be shown", err)))
 					}
+					fmt.Fprintln(os.Stderr)
 				}
 				fmt.Print(s.Code)
 				return nil
@@ -158,7 +162,7 @@ func newHistoryRestoreCmd(root *rootOptions) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withSubmission(root, cmd, args[0], func(a *app.App, _ *store.Store, s store.Submission) error {
-				p, err := a.WS.Problem(s.Ref())
+				p, err := a.WS.ProblemOf(s.Pack, s.Slug)
 				if err != nil {
 					return err
 				}

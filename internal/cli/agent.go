@@ -170,7 +170,7 @@ func runAgent(cmd *cobra.Command, a *app.App, ag *agent.Agent, task, prompt stri
 	}
 	fmt.Fprintln(os.Stderr)
 	// Reload: the agent may have changed problem.yaml.
-	p2, err := a.WS.Problem(p.Ref())
+	p2, err := a.WS.ProblemOf(p.Pack, p.Slug)
 	if err != nil {
 		return err
 	}

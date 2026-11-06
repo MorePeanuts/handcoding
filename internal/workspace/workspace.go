@@ -656,6 +656,7 @@ func dirMatches(base, ref string) bool {
 // prefixes, and several exact matches (in different packs) are an error that
 // lists them as pack/slug. If the reference names a directory whose
 // problem.yaml is broken, the load error is returned rather than "not found".
+// A reference hc stored (pack and slug) is resolved with ProblemOf instead.
 func (w *Workspace) Problem(ref string) (*problem.Problem, error) {
 	ref = strings.TrimSpace(ref)
 	if name, rest, ok := strings.Cut(ref, "/"); ok {
@@ -678,6 +679,43 @@ func (w *Workspace) Problem(ref string) (*problem.Problem, error) {
 		return nil, err
 	}
 	return resolve(ref, ref, probs, failed)
+}
+
+// ProblemOf finds the problem a stored reference names, such as a
+// submission's pack and slug: the problem of the pack called packName whose
+// slug is exactly slug. Problem is for what a user types; ProblemOf matches
+// no id, directory name or slug prefix, so that what hc kept of a problem
+// that is gone is never taken for another problem's. If a directory of that
+// slug fails to load, its load error is returned.
+func (w *Workspace) ProblemOf(packName, slug string) (*problem.Problem, error) {
+	ref := packName + "/" + slug
+	packs, err := w.Packs()
+	if err != nil {
+		return nil, err
+	}
+	i := slices.IndexFunc(packs, func(k *Pack) bool { return k.Name == packName })
+	if i < 0 {
+		return nil, fmt.Errorf("problem %s no longer exists (no pack %s in this workspace)", ref, packName)
+	}
+	if err := packs[i].Err; err != nil {
+		return nil, fmt.Errorf("problem %s: pack %s cannot be read: %w", ref, packName, err)
+	}
+	probs, failed, err := packs[i].Problems()
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range probs {
+		if p.Slug == slug {
+			return p, nil
+		}
+	}
+	for _, le := range failed {
+		base := filepath.Base(le.Dir)
+		if m := dirIDRE.FindStringSubmatch(base); base == slug || m != nil && m[2] == slug {
+			return nil, le
+		}
+	}
+	return nil, fmt.Errorf("problem %s no longer exists", ref)
 }
 
 // resolve finds the problem that name, the part of ref within its pack,
