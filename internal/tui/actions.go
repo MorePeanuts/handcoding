@@ -18,8 +18,8 @@ import (
 )
 
 // problemKey handles the actions available wherever a problem is in focus
-// (list, detail and result screens; runKeys only in a problem). It reports
-// whether key was handled.
+// (list, detail and result screens; runKeys only in a problem, and the
+// list handles h itself). It reports whether key was handled.
 func (m *model) problemKey(key string, p *problem.Problem) (tea.Cmd, bool) {
 	switch key {
 	case "e":

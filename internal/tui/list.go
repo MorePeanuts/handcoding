@@ -210,6 +210,10 @@ func (m *model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.openGroups()
 	case "i":
 		m.switchLocale(m.pack)
+	case "h":
+		// The list's history is the workspace's; a problem's is on its
+		// own screens.
+		m.openHistory(nil)
 	case "enter", " ", "v":
 		if p != nil {
 			m.openDetail(p, key != "v")
