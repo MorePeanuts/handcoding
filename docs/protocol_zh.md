@@ -634,7 +634,7 @@ judge:
 
 ## 判题程序
 
-`judge.compare: checker` 的题目必须在其目录中有 `checker.py`，其他比较方式（或没有比较方式）的题目不得有。不论解答用什么语言，判题程序都用 Python 编写，并且必须能在 Python 3.10 上运行。
+`judge.compare: checker` 的题目必须在其目录中有 `checker.py`，其他比较方式（或没有比较方式）的题目不得有。不论解答用什么语言，判题程序都用 Python 编写，并且必须能在 Python 3.12 上运行。
 
 ```python
 def check(input, output, expected):
@@ -672,7 +672,7 @@ def check(input, output, expected):
 
 用例可以是生成的，而不是存储的：评判该用例时，由 `generator.py` 构造它的输入，由参考解计算它的期望输出。能抓出复杂度不对的解答的大输入就这样写，于是题目包里存的是构造数据的程序，而不是数据本身。
 
-有生成用例的题目必须在目录中有 `generator.py`，没有生成用例的题目不得有。无论解答用什么语言，生成器都用 Python 编写，并且必须能在 Python 3.10 上运行。
+有生成用例的题目必须在目录中有 `generator.py`，没有生成用例的题目不得有。无论解答用什么语言，生成器都用 Python 编写，并且必须能在 Python 3.12 上运行。
 
 ```python
 def descending(rng, n):
@@ -729,7 +729,7 @@ def distinct(rng, n):
 
 | 语言 | 支持的最低版本 |
 |---|---|
-| Python | 3.10 |
+| Python | 3.12 |
 | Go | 1.22 |
 
 参考解、初始代码、判题程序和生成器必须能在这些版本上运行，包括语言和标准库：只有在受支持的工具链上，才会用参考解计算期望输出或检查参考解。用户的解答可以使用其工具链支持的任何特性。要按 Go 1.22 检查 Go 代码，在它的模块中写 `go 1.22` 并运行 `go vet`，其中的 `stdversion` 检查会报告较新的标准库符号。

@@ -25,7 +25,7 @@ jobs:
         # the oldest Python the problem protocol supports (python.MinVersion),
         # which make test takes from the uv project's .python-version, as it
         # does locally. On macOS, the latest release: setup-python's "3.x"
-        # follows it, which no uv request does (">=3.10" finds the newest
+        # follows it, which no uv request does (">=3.12" finds the newest
         # Python installed, not the newest released), so make test
         # PY=system uses the python3 it puts on PATH. The oldest Go is
         # checked by TestGoMinimumVersion with the toolchain that builds hc.

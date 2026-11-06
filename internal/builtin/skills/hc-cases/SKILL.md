@@ -84,7 +84,7 @@ is judged only in a language the problem has a reference in
 `pack.yaml`, every language when it has none, and every language for the
 workspace's own problems; `hc validate <slug>` names a missing reference.
 
-- Write `reference/solution.py` first. It must run on Python 3.10, the
+- Write `reference/solution.py` first. It must run on Python 3.12, the
   oldest version hc supports (`hc docs protocol language-versions`); import
   only the public names of `hc_runtime` and the standard library.
 - Write an idiomatic implementation of the complexity the problem accepts,

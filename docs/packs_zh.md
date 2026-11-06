@@ -59,13 +59,13 @@ hc pack check               # 像 CI 那样检查整个题目包
 
 流程与练习工作区相同（见[自己出题](how-to-use_zh.md#自己出题)、[用编码智能体生成用例](how-to-use_zh.md#用编码智能体生成用例)），只是题目写到题目包的 `problems/` 下，并且只用 slug 来指代。如果题目包有分组，再把 slug 加到 `pack.yaml` 的某个分组中。
 
-只有通过 `hc pack check` 的题目才能合入：它合法、对题目包的每种语言都[已就绪](protocol_zh.md#就绪)（判题规则 `judge.compare` 已经确定，并且每种语言都有参考解）、每个用例都有期望输出，并且每个参考解都通过每个用例。参考解必须能在协议支持的最旧工具链上运行（见[语言版本](protocol_zh.md#语言版本)），CI 用 Python 3.10 运行 Python 参考解，hc 在 checkout 中也是如此。`hc fetch` 有意不设置判题规则，因为确定它需要阅读题面：这是 `hc gen` 的工作。
+只有通过 `hc pack check` 的题目才能合入：它合法、对题目包的每种语言都[已就绪](protocol_zh.md#就绪)（判题规则 `judge.compare` 已经确定，并且每种语言都有参考解）、每个用例都有期望输出，并且每个参考解都通过每个用例。参考解必须能在协议支持的最旧工具链上运行（见[语言版本](protocol_zh.md#语言版本)），CI 用 Python 3.12 运行 Python 参考解，hc 在 checkout 中也是如此。`hc fetch` 有意不设置判题规则，因为确定它需要阅读题面：这是 `hc gen` 的工作。
 
 如果某道题无法用协议表达，不要绕过去（比如用一个判别别的东西的判题程序，或者改动题面去迁就）：去提一个 [issue](https://github.com/MorePeanuts/handcoding/issues)，说明缺少什么，并在协议支持之前先不收录这道题。`hc pack init` 写入的 `AGENTS.md` 也这样告诉智能体。
 
 ## CI 与固定的 hc 版本
 
-`.github/workflows/check.yml` 在每次 push 和 pull request 时运行。它安装 Go 和 Python 3.10（协议支持的最旧 Python），从而在用户可能使用的环境中检查参考解和判题程序，然后：
+`.github/workflows/check.yml` 在每次 push 和 pull request 时运行。它安装 Go 和 Python 3.12（协议支持的最旧 Python），从而在用户可能使用的环境中检查参考解和判题程序，然后：
 
 1. 用 `go install github.com/MorePeanuts/handcoding/cmd/hc@<version>` 安装 hc；
 2. 写入一个设置了 `python.interpreter: python3` 的 `hc.yaml`，让 hc 用这个 Python 判题，而不是创建虚拟环境（`hc.yaml` 不提交）；

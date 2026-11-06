@@ -103,9 +103,12 @@ func (l Language) Setup(ctx context.Context, w io.Writer) error {
 	return l.Venv.Ensure(ctx, w)
 }
 
-// MinVersion is the oldest Python the problem protocol supports. LeetCode's
-// templates annotate with `X | None`, which needs 3.10.
-const MinVersion = "3.10"
+// MinVersion is the oldest Python the problem protocol supports. Since 3.11,
+// Python-to-Python calls take no C stack, so code that raises the recursion
+// limit recurses deep in the main thread; 3.12 rather than 3.11 because it is
+// supported until October 2028 (raising the minimum once a protocol is final
+// takes a new one) and is the system Python of Ubuntu 24.04 LTS and RHEL 10.
+const MinVersion = "3.12"
 
 // toolchains caches detection per interpreter for the life of the process.
 var toolchains sync.Map // interpreter -> func() (lang.Toolchain, error)

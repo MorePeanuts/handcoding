@@ -36,7 +36,7 @@ type Venv struct {
 	// environment. It is written only if it does not exist.
 	Pyright string
 	// Version, when set, is the minor version of Python the environment
-	// has, such as "3.10". A pack checkout's has MinVersion, which the
+	// has, such as "3.12". A pack checkout's has MinVersion, which the
 	// pack's content must run on. An environment of another version is
 	// created again when one of Version can be had.
 	Version string
@@ -218,8 +218,8 @@ func (v *Venv) canGet(ctx context.Context) bool {
 	return err == nil && sameMinor(ver, v.Version)
 }
 
-// sameMinor reports whether version ver (3.10.4) is of minor version minor
-// (3.10).
+// sameMinor reports whether version ver (3.12.4) is of minor version minor
+// (3.12).
 func sameMinor(ver, minor string) bool {
 	return ver == minor || strings.HasPrefix(ver, minor+".")
 }

@@ -57,13 +57,13 @@ hc pack check               # the whole pack, as CI checks it
 
 The flow is that of a practice workspace ([your own problems](how-to-use.md#your-own-problems), [test cases from a coding agent](how-to-use.md#test-cases-from-a-coding-agent)), except that problems go to the pack's `problems/` and are named by their slug alone. Then add the slug to a group of `pack.yaml` if the pack has groups.
 
-A problem lands only when it passes `hc pack check`: it is valid, [ready](protocol.md#readiness) (its judge rule, `judge.compare`, is decided) for every language of the pack (it has a reference in each), every case has an expected output, and every reference solution passes every case. References must work on the oldest toolchains the protocol supports ([language versions](protocol.md#language-versions)), and CI runs the Python ones on Python 3.10, as hc does in the checkout. `hc fetch` deliberately leaves the judge rule undecided, since deciding it means reading the statement: that is part of `hc gen`.
+A problem lands only when it passes `hc pack check`: it is valid, [ready](protocol.md#readiness) (its judge rule, `judge.compare`, is decided) for every language of the pack (it has a reference in each), every case has an expected output, and every reference solution passes every case. References must work on the oldest toolchains the protocol supports ([language versions](protocol.md#language-versions)), and CI runs the Python ones on Python 3.12, as hc does in the checkout. `hc fetch` deliberately leaves the judge rule undecided, since deciding it means reading the statement: that is part of `hc gen`.
 
 If a problem cannot be expressed in the protocol, do not work around it (with a checker that judges something else, or a statement changed to fit): open an [issue](https://github.com/MorePeanuts/handcoding/issues) that says what is missing, and leave the problem out until the protocol has it. The `AGENTS.md` that `hc pack init` writes tells agents the same.
 
 ## CI and the pinned hc version
 
-`.github/workflows/check.yml` runs on every push and pull request. It sets up Go and Python 3.10, the oldest Python the protocol supports, so that references and checkers are checked where users may run them, and then:
+`.github/workflows/check.yml` runs on every push and pull request. It sets up Go and Python 3.12, the oldest Python the protocol supports, so that references and checkers are checked where users may run them, and then:
 
 1. installs hc with `go install github.com/MorePeanuts/handcoding/cmd/hc@<version>`;
 2. writes a `hc.yaml` that sets `python.interpreter: python3`, so hc judges with that Python rather than creating a virtual environment (`hc.yaml` is not committed);

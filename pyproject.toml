@@ -2,13 +2,13 @@
 name = "handcoding-dev"
 version = "0"
 description = "Not a package: only pins the Python that hc's tests and editors use (see CONTRIBUTING.md)."
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = []
 
 [tool.uv]
 package = false
 
-# Editors: hc's Python and the regression set's are checked on .venv, Python 3.10.
+# Editors: hc's Python and the regression set's are checked on .venv, Python 3.12.
 [tool.pyright]
 venvPath = "."
 venv = ".venv"

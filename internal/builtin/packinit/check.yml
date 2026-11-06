@@ -24,7 +24,7 @@ jobs:
       # checkers must run on it.
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.10"
+          python-version: "<% .Python %>"
 <%- if .Pinned %>
       # The hc the pack is checked with. Bump it on purpose: read what changed
       # with `hc docs protocol protocol-versions`, then run `hc skill install`

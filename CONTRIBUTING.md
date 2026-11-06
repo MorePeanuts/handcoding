@@ -8,16 +8,16 @@ Open an issue before starting on anything non-trivial. Use the bug report or fea
 
 ## Development
 
-You need Go (see `go.mod` for the version), git and [uv](https://docs.astral.sh/uv/getting-started/installation/). The integration tests compile and run real solutions in both languages, with the `python3` on PATH, never the virtual environment hc manages for users. Solutions, references and drivers must keep working on the oldest versions hc supports (Python 3.10, Go 1.22; see the protocol's [language versions](docs/protocol.md#language-versions)), so the repository is a minimal uv project (`pyproject.toml`, no dependencies) pinned to Python 3.10 by `.python-version`, and `make test` runs the tests with `uv run`, which puts its `.venv` first on PATH (uv downloads Python 3.10 the first time if you have none). `make test PY=3.13` tests another version, in `.venv-3.13`, and `make test PY=system` the `python3` on PATH as it is. CI runs them on Python 3.10 (Linux) and the latest release (macOS), and `TestGoMinimumVersion` builds the Go side at Go 1.22.
+You need Go (see `go.mod` for the version), git and [uv](https://docs.astral.sh/uv/getting-started/installation/). The integration tests compile and run real solutions in both languages, with the `python3` on PATH, never the virtual environment hc manages for users. Solutions, references and drivers must keep working on the oldest versions hc supports (Python 3.12, Go 1.22; see the protocol's [language versions](docs/protocol.md#language-versions)), so the repository is a minimal uv project (`pyproject.toml`, no dependencies) pinned to Python 3.12 by `.python-version`, and `make test` runs the tests with `uv run`, which puts its `.venv` first on PATH (uv downloads Python 3.12 the first time if you have none). `make test PY=3.13` tests another version, in `.venv-3.13`, and `make test PY=system` the `python3` on PATH as it is. CI runs them on Python 3.12 (Linux) and the latest release (macOS), and `TestGoMinimumVersion` builds the Go side at Go 1.22.
 
-`uv sync` creates the same `.venv`, which pyright (configured in `pyproject.toml`) and editors that detect `.venv` use for hc's Python (`internal/lang/python/*.py`) and the regression set's references, checkers and generators, so they check them against Python 3.10.
+`uv sync` creates the same `.venv`, which pyright (configured in `pyproject.toml`) and editors that detect `.venv` use for hc's Python (`internal/lang/python/*.py`) and the regression set's references, checkers and generators, so they check them against Python 3.12.
 
-`make test` and CI set `HC_TEST_REQUIRE_TOOLS=1`, which makes a test that needs a missing tool, or a `python3` older than 3.10, fail. Plain `go test` skips such tests instead, so it also works without Python; on macOS, whose `python3` is 3.9, that skips almost every integration test. A new test that needs a tool checks it with `internal/testenv`.
+`make test` and CI set `HC_TEST_REQUIRE_TOOLS=1`, which makes a test that needs a missing tool, or a `python3` older than 3.12, fail. Plain `go test` skips such tests instead, so it also works without Python; on macOS, whose `python3` is 3.9, that skips almost every integration test. A new test that needs a tool checks it with `internal/testenv`.
 
 ```sh
 make build      # bin/hc
 make install    # go install into $(go env GOBIN)
-make test       # unit and end-to-end tests (-race), on Python 3.10
+make test       # unit and end-to-end tests (-race), on Python 3.12
 make lint       # go vet + golangci-lint (the version CI uses is in .github/workflows/ci.yml)
 
 uv run go test ./internal/app -run 'TestRegressionReferences/two-sum' -v   # one subtest

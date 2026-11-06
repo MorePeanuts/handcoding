@@ -31,7 +31,7 @@ English · [简体中文](how-to-use_zh.md)
   .claude/  .agents/                       the agent skills
 ```
 
-`hc init --lang python` makes Python the default solution language (`language` in `hc.yaml`; default `go`) and creates the Python environment described below right away. If that fails, for example because neither uv nor Python 3.10+ is installed, `hc init` warns and creates the workspace anyway.
+`hc init --lang python` makes Python the default solution language (`language` in `hc.yaml`; default `go`) and creates the Python environment described below right away. If that fails, for example because neither uv nor Python 3.12+ is installed, `hc init` warns and creates the workspace anyway.
 
 `hc` finds the workspace from `-w <dir>`, then `$HC_WORKSPACE`, then the nearest parent directory containing `hc.yaml` or `pack.yaml` (a pack checkout, see [working on a pack](#working-on-a-pack)), then `~/handcoding`. You can run it from anywhere.
 
@@ -52,14 +52,14 @@ Each Go problem is a standalone module, and the driver sits next to `solution.go
 
 Python solutions run in a virtual environment that hc manages in `.hc/venv`. hc creates it the first time a command needs Python (`hc init --lang python`, `hc start`, `test`, `submit`, `debug`, `cases build`, `validate --run`):
 
-1. with [uv](https://docs.astral.sh/uv/) if it is installed: `uv venv --python '>=3.10'`, which downloads a Python if none is installed;
-2. otherwise with the newest Python 3.10+ on PATH (`python3`, `python` or `python3.N`) and `-m venv`. On Debian and Ubuntu this needs the `python3-venv` package.
+1. with [uv](https://docs.astral.sh/uv/) if it is installed: `uv venv --python '>=3.12'`, which downloads a Python if none is installed;
+2. otherwise with the newest Python 3.12+ on PATH (`python3`, `python` or `python3.N`) and `-m venv`. On Debian and Ubuntu this needs the `python3-venv` package.
 
-In a pack checkout (see [authoring a pack](packs.md)), the environment has Python 3.10 instead, the oldest the protocol supports, which the pack's references, checkers and generators must run on: `uv venv --python 3.10`, or without uv the newest `python3.10` on PATH. So `hc validate --run` and `hc pack check` run them on the same Python as the pack's CI. An environment of another version is created again; when there is no Python 3.10 to be had (no uv, none on PATH), hc uses the newest and warns.
+In a pack checkout (see [authoring a pack](packs.md)), the environment has Python 3.12 instead, the oldest the protocol supports, which the pack's references, checkers and generators must run on: `uv venv --python 3.12`, or without uv the newest `python3.12` on PATH. So `hc validate --run` and `hc pack check` run them on the same Python as the pack's CI. An environment of another version is created again; when there is no Python 3.12 to be had (no uv, none on PATH), hc uses the newest and warns.
 
 The environment holds debugpy for headless debugging. Downloading Python and installing debugpy need network access, once; judging stays offline. If the environment stops working (the workspace was moved, or its Python removed), hc creates it again. `hc env sync` recreates it on demand, for example after installing uv. hc also writes `pyrightconfig.json` at the workspace root, unless you have one, so pyright and basedpyright check your solutions with the same interpreter. To use your own Python instead (conda, a custom build), set `python.interpreter` in `hc.yaml`; hc then creates no environment.
 
-The oldest supported toolchains are Python 3.10 and Go 1.22 (the protocol's [language versions](protocol.md#language-versions)). Your own solutions may use anything your toolchain supports: `hc test`, `hc submit` and `hc debug` name the toolchain they run with (`[Python 3.12.9]`) and only warn when it is older. Code that problems ship must work on the oldest versions, so `hc cases build` and `hc validate --run` refuse to run reference solutions on an older toolchain. A newer one is fine: `hc validate --run` (and so `hc pack check`) also checks every Go reference against Go 1.22, by vetting it in a module whose go directive is `go 1.22`, which reports newer language features and standard library symbols.
+The oldest supported toolchains are Python 3.12 and Go 1.22 (the protocol's [language versions](protocol.md#language-versions)). Your own solutions may use anything your toolchain supports: `hc test`, `hc submit` and `hc debug` name the toolchain they run with (`[Python 3.12.9]`) and only warn when it is older. Code that problems ship must work on the oldest versions, so `hc cases build` and `hc validate --run` refuse to run reference solutions on an older toolchain. A newer one is fine: `hc validate --run` (and so `hc pack check`) also checks every Go reference against Go 1.22, by vetting it in a module whose go directive is `go 1.22`, which reports newer language features and standard library symbols.
 
 Consider running `git init` in the workspace to keep a record of your practice. The `.gitignore` that `hc init` writes leaves out `.hc/` and the installed packs, which `hc pack install` reinstalls from `hc.yaml`.
 
@@ -321,7 +321,7 @@ To **reproduce a workspace** elsewhere, copy its `hc.yaml` into a new workspace 
 
 ### Checking a pack
 
-`hc pack check` is what a pack's CI runs before publishing. Run it in a pack checkout ([working on a pack](#working-on-a-pack)), or pass its directory: `hc pack check ./my-pack`. It checks that `pack.yaml` is valid and of a supported protocol, that its groups name problems of the pack, and that every problem loads, is valid, has a canonical directory name and a unique slug and ID, is ready (`judge.compare` is set), has cases that all have an expected output (or, generated, a digest) and none over 100 KB, a reference solution in every language of the pack's `languages`, and passes `hc validate --run`: every reference solution passes every case, generated ones built afresh. So it needs Go and Python 3.10+, and a reference that cannot be run is an error. It prints one line per problem and a summary, and exits non-zero on any failure.
+`hc pack check` is what a pack's CI runs before publishing. Run it in a pack checkout ([working on a pack](#working-on-a-pack)), or pass its directory: `hc pack check ./my-pack`. It checks that `pack.yaml` is valid and of a supported protocol, that its groups name problems of the pack, and that every problem loads, is valid, has a canonical directory name and a unique slug and ID, is ready (`judge.compare` is set), has cases that all have an expected output (or, generated, a digest) and none over 100 KB, a reference solution in every language of the pack's `languages`, and passes `hc validate --run`: every reference solution passes every case, generated ones built afresh. So it needs Go and Python 3.12+, and a reference that cannot be run is an error. It prints one line per problem and a summary, and exits non-zero on any failure.
 
 `hc pack check` and `hc validate` check several problems at once: `--jobs` (`-j`) of them, by default one per CPU and at most 4. The lines come in the same order as one at a time, each as soon as its problem and those before it are done, and the output of a problem's reference runs comes just before its line. Reference runs made at once are not timed for [time limits](#time-limit), since they compete for the machine; `-j 1` checks one problem after another and times them as before.
 
@@ -450,7 +450,7 @@ theme: auto           # statement colors: auto | dark | light
 images: auto          # statement images: auto | kitty | blocks | none
 timeout: 10s          # wall-clock limit of a run, its checker and its generators (protocol: run-limit)
 python:
-  interpreter: python3.12  # Python 3.10+ to use instead of .hc/venv; e.g. a full path. Unset by default
+  interpreter: python3.12  # Python 3.12+ to use instead of .hc/venv; e.g. a full path. Unset by default
 agent:
   name: claude        # claude | codex, or set command (see above)
 leetcode:
@@ -471,6 +471,6 @@ locales: [en]         # the statement languages of your own problems, the defaul
 - `hc fetch` imports problems with [LeetCode's `Node` types](protocol.md#leetcodes-node-types), `NestedInteger` and `Employee`, reading their signature from LeetCode's Go template. `returns_copy` (Clone Graph) is left to `hc gen`, and so are the examples of iterator problems such as Flatten Nested List Iterator, which LeetCode gives without the calls.
 - Problems that encode a value and decode it back (297, 449, 535) are judged as [round trips](protocol.md#round-trip-problems): only the decoded value is compared, so requirements on the encoding itself (449: "as compact as possible") are not checked. `hc fetch` imports them, reading the encoder, the decoder and whether they share an instance from the harness in LeetCode's template comment. Problems 297 and 535 of the regression set show both kinds.
 - Time is limited (see [Time limit](#time-limit)), but memory is not.
-- Python's recursion limit is Python's own, 1000 by default: a recursive solution that needs more raises it with `sys.setrecursionlimit`, as in any Python program. Before Python 3.11, every Python call also uses the C stack, and a deep recursion overflows the main thread's, crashing the process whatever the limit. So on 3.10, hc runs solutions, checkers and generators in a thread with a 512 MB stack, enough for a few hundred thousand calls.
+- Python's recursion limit is Python's own, 1000 by default: a recursive solution that needs more raises it with `sys.setrecursionlimit`, as in any Python program.
 - LeetCode premium problems cannot be fetched.
-- Problems with many valid answers that cannot all be listed ("return any valid answer") and randomized problems are judged by a [checker](protocol.md#checkers), which `hc gen` writes; problems 5, 108, 210, 324, 384 and 528 of the regression set have one. Checkers are Python, so these problems need Python 3.10 or later even when you solve them in Go; the virtual environment hc manages provides it.
+- Problems with many valid answers that cannot all be listed ("return any valid answer") and randomized problems are judged by a [checker](protocol.md#checkers), which `hc gen` writes; problems 5, 108, 210, 324, 384 and 528 of the regression set have one. Checkers are Python, so these problems need Python 3.12 or later even when you solve them in Go; the virtual environment hc manages provides it.

@@ -52,7 +52,7 @@ go install github.com/MorePeanuts/handcoding/cmd/hc@latest
 
 Prebuilt binaries for Linux, macOS and Windows are on the [releases page](https://github.com/MorePeanuts/handcoding/releases).
 
-To solve problems you need the toolchain of your language: Go 1.22+, or for Python, [uv](https://docs.astral.sh/uv/) (recommended) or Python 3.10+. hc runs Python solutions in a virtual environment of its own, created in the workspace the first time it needs Python. With uv, that works even where the system Python is too old (macOS ships 3.9): uv downloads a newer one. Optional extras:
+To solve problems you need the toolchain of your language: Go 1.22+, or for Python, [uv](https://docs.astral.sh/uv/) (recommended) or Python 3.12+. hc runs Python solutions in a virtual environment of its own, created in the workspace the first time it needs Python. With uv, that works even where the system Python is too old (macOS ships 3.9): uv downloads a newer one. Optional extras:
 
 - [Delve](https://github.com/go-delve/delve) for debugging Go;
 - `claude` or `codex` for generating test cases.

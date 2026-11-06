@@ -3,7 +3,7 @@ VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev
 LDFLAGS  := -s -w -X github.com/MorePeanuts/handcoding/internal/version.Version=$(VERSION)
 
 # The tests run under uv run, which puts the uv project's environment first
-# on PATH: .venv, on .python-version's Python (3.10, the protocol's minimum).
+# on PATH: .venv, on .python-version's Python (3.12, the protocol's minimum).
 # make test PY=3.13 runs them on another Python, from .venv-3.13; make test
 # PY=system on the python3 on PATH as it is. HC_TEST_REQUIRE_TOOLS makes a
 # test that would skip for a missing or too old tool fail instead.

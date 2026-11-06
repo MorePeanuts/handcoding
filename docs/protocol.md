@@ -632,7 +632,7 @@ A broken checker is not a verdict: see [Checkers](#checkers). Neither is a gener
 
 ## Checkers
 
-A problem with `judge.compare: checker` MUST have `checker.py` in its directory, and a problem with any other mode (or none) MUST NOT. Checkers are written in Python whatever the solution's language, and MUST work on Python 3.10.
+A problem with `judge.compare: checker` MUST have `checker.py` in its directory, and a problem with any other mode (or none) MUST NOT. Checkers are written in Python whatever the solution's language, and MUST work on Python 3.12.
 
 ```python
 def check(input, output, expected):
@@ -670,7 +670,7 @@ def check(input, output, expected):
 
 A case MAY be generated rather than stored: `generator.py` builds its input when the case is judged, and a reference solution its expected output. Large inputs, which catch solutions of the wrong complexity, are written this way, so that a pack holds the programs that build them rather than the data.
 
-A problem with a generated case MUST have `generator.py` in its directory, and a problem without one MUST NOT. Generators are written in Python whatever the solution's language, and MUST work on Python 3.10.
+A problem with a generated case MUST have `generator.py` in its directory, and a problem without one MUST NOT. Generators are written in Python whatever the solution's language, and MUST work on Python 3.12.
 
 ```python
 def descending(rng, n):
@@ -727,7 +727,7 @@ The solution is `solution.go`, in `package main`.
 
 | Language | Oldest supported version |
 |---|---|
-| Python | 3.10 |
+| Python | 3.12 |
 | Go | 1.22 |
 
 Reference solutions, templates, checkers and generators MUST work on these versions, language and standard library: a reference's expected outputs are only computed, and it is only checked, on a supported toolchain. User solutions MAY use anything their toolchain supports. To check Go code against Go 1.22, give its module `go 1.22` and run `go vet`, whose `stdversion` check reports newer standard library symbols.
