@@ -108,14 +108,21 @@ type Options struct {
 	// CheckerName is how errors refer to checker.py, e.g. relative to the
 	// workspace; its absolute path if empty.
 	CheckerName string
+	// ExpectGenerated makes the output of each generated case without an
+	// expected output its expected output (CaseResult.Case.Expected), once
+	// validated, and judges the case on it: Accepted, or what the checker
+	// says. The first reference a problem is checked with so computes the
+	// generated cases' expected outputs in the run that judges it.
+	ExpectGenerated bool
 }
 
-// Run prepares, builds and runs the solution in dir against the cases.
+// Run prepares, builds and runs the solution in dir against the cases,
+// which it does not validate (see Validate).
 func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, cases []Selected, opts Options) (*Report, error) {
 	if opts.Timeout <= 0 {
 		opts.Timeout = 10 * time.Second
 	}
-	if err := checkCases(p, cases); err != nil {
+	if err := checkBuilt(cases); err != nil {
 		return nil, err
 	}
 	if err := l.Prepare(dir, p); err != nil {
@@ -191,13 +198,25 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 			cr.Error = res.Error
 		default:
 			cr.Output = res.Output
-			cr.Verdict = judgeCase(p, ready, sel.Case, res.Output, &cr)
+			self := opts.ExpectGenerated && cr.Case.Generated() && !cr.Case.HasExpected() && res.Output != nil
+			if self {
+				cr.Case.Expected = res.Output
+				if err := p.ValidateExpected(cr.Case); err != nil {
+					return nil, invalidCase(sel.Index, err)
+				}
+			}
+			if self && ready && p.Judge.Compare != problem.CompareChecker {
+				// An output is what it is compared with.
+				cr.Verdict = Accepted
+			} else {
+				cr.Verdict = judgeCase(p, ready, cr.Case, res.Output, &cr)
+			}
 			if cr.Verdict == "" {
 				input, err := json.Marshal(sel.Case.Input)
 				if err != nil {
 					return nil, err
 				}
-				toCheck = append(toCheck, judge.CheckerCase{ID: sel.Index, Input: input, Output: res.Output, Expected: sel.Case.Expected})
+				toCheck = append(toCheck, judge.CheckerCase{ID: sel.Index, Input: input, Output: res.Output, Expected: cr.Case.Expected})
 			}
 		}
 		rep.Cases = append(rep.Cases, cr)
@@ -343,10 +362,11 @@ func orDiscard(w io.Writer) io.Writer {
 	return w
 }
 
-// DebugCommand builds a debugger command for the given cases. The returned
-// cleanup removes temporary files.
+// DebugCommand builds a debugger command for the given cases, which unlike
+// Run it validates (see Validate). The returned cleanup removes temporary
+// files.
 func DebugCommand(l lang.Language, p *problem.Problem, dir string, cases []Selected, opts lang.DebugOptions) (*exec.Cmd, func(), error) {
-	if err := checkCases(p, cases); err != nil {
+	if err := Validate(p, cases); err != nil {
 		return nil, nil, err
 	}
 	if err := l.Prepare(dir, p); err != nil {
@@ -387,15 +407,38 @@ func (t *tailBuffer) Write(p []byte) (int, error) {
 
 func (t *tailBuffer) String() string { return t.buf.String() }
 
-// checkCases refuses cases the protocol calls invalid, which the drivers
-// would read in some way of their own and the judge would then judge.
-func checkCases(p *problem.Problem, cases []Selected) error {
+// Validate refuses cases the protocol calls invalid, which the drivers
+// would read in some way of their own and the judge would then judge. Run
+// does not validate its cases, since a command runs the same cases several
+// times (the reference's too), and validating a large case costs about as
+// much as running it: the caller validates them once, with Validate or
+// problem.Problem.ValidateCase. A generated case's input is validated
+// when it is built (Generate), so Validate checks only its expected output.
+func Validate(p *problem.Problem, cases []Selected) error {
+	if err := checkBuilt(cases); err != nil {
+		return err
+	}
+	for _, c := range cases {
+		validate := p.ValidateCase
+		if c.Case.Generated() {
+			validate = p.ValidateExpected
+		}
+		if err := validate(c.Case); err != nil {
+			return invalidCase(c.Index, err)
+		}
+	}
+	return nil
+}
+
+func invalidCase(index int, err error) error {
+	return fmt.Errorf("case %d is invalid: %w (hc validate checks the whole problem)", index, err)
+}
+
+// checkBuilt refuses generated cases whose inputs were not built.
+func checkBuilt(cases []Selected) error {
 	for _, c := range cases {
 		if c.Case.Generated() && c.Case.Input == nil {
 			return fmt.Errorf("case %d is generated, and its input was not built", c.Index)
-		}
-		if err := p.ValidateCase(c.Case); err != nil {
-			return fmt.Errorf("case %d is invalid: %w (hc validate checks the whole problem)", c.Index, err)
 		}
 	}
 	return nil

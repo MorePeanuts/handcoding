@@ -1,7 +1,6 @@
 package problem
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -114,10 +113,8 @@ func ValidateType(t string, allowVoid bool) error {
 // The error names the offending element, e.g. `[2]: must be integer, got
 // string "x"`.
 func CheckValue(t string, raw json.RawMessage) error {
-	var v any
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.UseNumber()
-	if err := dec.Decode(&v); err != nil {
+	v, err := decodeValue(raw)
+	if err != nil {
 		return err
 	}
 	return checkValue(t, v, "")
@@ -128,16 +125,47 @@ func CheckValue(t string, raw json.RawMessage) error {
 // (that is []), no trailing nulls in a level order, and [0,1] for a QuadNode
 // that is not a leaf. A value in any other form matches no output.
 func checkOutput(t string, raw json.RawMessage) error {
-	var v any
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.UseNumber()
-	if err := dec.Decode(&v); err != nil {
+	v, err := decodeValue(raw)
+	if err != nil {
 		return err
 	}
 	if err := checkValue(t, v, ""); err != nil {
 		return err
 	}
 	return checkOutputForm(t, v, "")
+}
+
+// scalarOK reports whether raw, a value of a JSON text known to be valid,
+// is plainly of the scalar type t, which CheckValue would accept, without
+// decoding it; false means CheckValue has to tell. An integer of up to 18
+// digits fits an int64; a longer one is left to CheckValue.
+func scalarOK(t string, raw []byte) bool {
+	if len(raw) == 0 {
+		return false
+	}
+	switch t {
+	case TypeInteger, TypeLong:
+		digits := raw
+		if digits[0] == '-' {
+			digits = digits[1:]
+		}
+		if len(digits) == 0 || len(digits) > 18 {
+			return false
+		}
+		for _, b := range digits {
+			if b < '0' || b > '9' {
+				return false
+			}
+		}
+		return true
+	case TypeDouble:
+		return raw[0] == '-' || '0' <= raw[0] && raw[0] <= '9'
+	case TypeString:
+		return raw[0] == '"'
+	case TypeBoolean:
+		return string(raw) == "true" || string(raw) == "false"
+	}
+	return false
 }
 
 // checkOutputForm checks the output form of a value checkValue accepted.

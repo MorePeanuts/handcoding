@@ -156,6 +156,19 @@ func TestValidateCaseClass(t *testing.T) {
 		{`{"input":{"ops":["Stack","top"],"args":[[3],[]]},"expected":[null]}`, `expected has 1 entries but there are 2 ops`},
 		{`{"input":{"ops":["Stack","push"],"args":[[3],[1]]},"expected":[null,1]}`, `expected[1] (push): must be null`},
 		{`{"input":{"ops":["Stack","top"],"args":[[3],[]]},"expected":[null,"1"]}`, `expected[1] (top): must be integer`},
+		{`{"input":{"ops":["Stack","top"],"args":[[3],[]]},"expected":[null,[1]]}`, `expected[1] (top): must be integer, got array [1]`},
+		{`{"input":{"ops":["Stack","top"],"args":[[3],[]]},"expected":null}`, `expected has 0 entries but there are 2 ops`},
+		{`{"input":{"ops":["Stack","top"],"args":[[3],[]]},"expected":{"a":1}}`, `expected: must be an array with one return value per op`},
+		{`{"input":{"ops":["Stack","top"],"args":[[3],[]]},"expected":1}`, `expected: must be an array with one return value per op`},
+		// args decode as json.Unmarshal into [][]T would: null is empty.
+		{`{"input":{"ops":["Stack"],"args":null}}`, `ops has 1 entries but args has 0`},
+		{`{"input":{"ops":["Stack"],"args":[null]}}`, `op 1 (Stack): takes 1 argument(s), got 0`},
+		{`{"input":{"ops":["Stack"],"args":[3]}}`, `"args" must be an array of argument arrays, one per op`},
+		{`{"input":{"ops":["Stack"],"args":{"a":[3]}}}`, `"args" must be an array of argument arrays, one per op`},
+		{`{"input":{"ops":["push"],"args":[3]}}`, `"args" must be an array of argument arrays, one per op`},
+		{`{"input":{"ops":"Stack","args":[[3]]}}`, `"ops" must be an array of method names`},
+		{`{"input":{"ops":["Stack","push"],"args":[[3],[1.5]]}}`, `op 2 (push) argument "x": must be a whole number (integer), got 1.5`},
+		{`{"input":{"ops":["Stack","push","top"],"args":[[3],[1],[]]},"expected":[null,null,null]}`, `expected[2] (top): must be integer, got null`},
 	}
 	for _, tt := range tests {
 		err := p.ValidateCase(mustParseCase(t, tt.line))
@@ -164,6 +177,50 @@ func TestValidateCaseClass(t *testing.T) {
 			t.Errorf("%s: unexpected error %v", tt.line, err)
 		case tt.err != "" && (err == nil || !strings.Contains(err.Error(), tt.err)):
 			t.Errorf("%s: error = %v, want %q", tt.line, err, tt.err)
+		}
+	}
+}
+
+// TestValidateExpected checks that ValidateExpected checks only the
+// expected output, as ValidateCase does.
+func TestValidateExpected(t *testing.T) {
+	fn := &Problem{Slug: "f", Title: "F", Kind: KindFunction, Function: &Function{
+		Name: "f", Params: []Param{{Name: "nums", Type: "integer[]"}}, Returns: TypeTreeNode,
+	}}
+	fn.Normalize()
+	class := &Problem{Slug: "s", Title: "S", Kind: KindClass, Class: &Class{
+		Name:    "Stack",
+		Methods: []Method{{Name: "push", Params: []Param{{Name: "x", Type: TypeInteger}}, Returns: TypeVoid}, {Name: "top", Returns: TypeInteger}},
+	}}
+	class.Normalize()
+	tests := []struct {
+		p         *Problem
+		line, err string
+	}{
+		{fn, `{"input":{"nums":[1]},"expected":[1,2]}`, ""},
+		{fn, `{"input":{"nums":[1]}}`, ""},
+		// The input is not checked.
+		{fn, `{"input":{"nums":"x"},"expected":[1]}`, ""},
+		{fn, `{"input":{"nums":[1]},"expected":[1,null]}`, "expected: must not end with null"},
+		{class, `{"input":{"ops":["Stack","top"],"args":[[],["x"]]},"expected":[null,1]}`, ""},
+		{class, `{"input":{"ops":["Stack","top"],"args":[[],[]]},"expected":[null,"1"]}`, `expected[1] (top): must be integer`},
+		{class, `{"input":{"ops":["Stack","push"],"args":[[],[1]]},"expected":[null,1]}`, `expected[1] (push): must be null`},
+		{class, `{"input":{"ops":["Stack"],"args":[[]]},"expected":[null,null]}`, `expected has 2 entries but there are 1 ops`},
+	}
+	for _, tt := range tests {
+		c := mustParseCase(t, tt.line)
+		err := tt.p.ValidateExpected(c)
+		switch {
+		case tt.err == "" && err != nil:
+			t.Errorf("%s: unexpected error %v", tt.line, err)
+		case tt.err != "" && (err == nil || !strings.Contains(err.Error(), tt.err)):
+			t.Errorf("%s: error = %v, want %q", tt.line, err, tt.err)
+		}
+		// On a valid input, ValidateCase finds the same.
+		if tt.err != "" {
+			if full := tt.p.ValidateCase(c); full == nil || full.Error() != err.Error() {
+				t.Errorf("%s: ValidateCase: %v, ValidateExpected: %v", tt.line, full, err)
+			}
 		}
 	}
 }
