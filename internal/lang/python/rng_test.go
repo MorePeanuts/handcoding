@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/MorePeanuts/handcoding/internal/testenv"
 )
 
 // splitmix64 is the generator Rng implements, written independently.
@@ -26,10 +28,7 @@ func splitmix64(seed uint64, n int) []uint64 {
 // cases are recorded by the digests of these numbers, so any change to Rng
 // changes every pack's generated inputs.
 func TestRng(t *testing.T) {
-	py, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("python3 not installed")
-	}
+	py := testenv.LookPath(t, "python3")
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, runtimeFile), runtimeSrc, 0o644); err != nil {
 		t.Fatal(err)
@@ -250,10 +249,7 @@ print(made)
 // speed, and a number it changes changes the generated inputs, and so the
 // digests, of every pack.
 func TestRngEquivalence(t *testing.T) {
-	py, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("python3 not installed")
-	}
+	py := testenv.LookPath(t, "python3")
 	dir := t.TempDir()
 	files := map[string]string{runtimeFile: string(runtimeSrc), "rng_oracle.py": rngOracle, "check.py": rngEquivalence}
 	for name, src := range files {

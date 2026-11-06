@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/problem"
+	"github.com/MorePeanuts/handcoding/internal/testenv"
 )
 
 // moduleDir prepares a solution module of a one-function problem.
@@ -35,9 +35,7 @@ func moduleDir(t *testing.T, body string) string {
 // A BuildCache keeps one program per content: the same files in another
 // directory reuse it, without a build, and other files get their own.
 func TestBuildCache(t *testing.T) {
-	if _, err := exec.LookPath("go"); err != nil {
-		t.Skip("go not in PATH")
-	}
+	testenv.LookPath(t, "go")
 	l := Language{BuildCache: t.TempDir()}
 	ctx := context.Background()
 	build := func(dir string) (string, time.Time) {
@@ -125,9 +123,7 @@ func TestPruneBuilds(t *testing.T) {
 // followed by a run, all find their program, and the cache is pruned to
 // KeepBuilds, the programs used long ago first.
 func TestBuildCacheParallel(t *testing.T) {
-	if _, err := exec.LookPath("go"); err != nil {
-		t.Skip("go not in PATH")
-	}
+	testenv.LookPath(t, "go")
 	cache := t.TempDir()
 	// The cache holds KeepBuilds programs used long ago, which go first.
 	long := time.Now().Add(-2 * KeepRecent)

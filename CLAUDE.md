@@ -9,14 +9,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```sh
 make build            # bin/hc (version from git describe via -ldflags)
 make install          # go install into $(go env GOBIN)
-make test             # go test -race ./...
+make test             # uv run go test -race ./... on Python 3.10, failing instead of skipping (below)
+make test PY=3.13     # on another Python (.venv-3.13); PY=system uses the python3 on PATH as it is
 make lint             # go vet + golangci-lint (CI pins v2.15.0, see .github/workflows/ci.yml)
 
-go test ./internal/app -run 'TestRegressionReferences/two-sum' -v   # one subtest
-go run ./cmd/hc -w /tmp/hc-dev test two-sum                       # run against a scratch workspace
+uv run go test ./internal/app -run 'TestRegressionReferences/two-sum' -v   # one subtest
+go run ./cmd/hc -w /tmp/hc-dev test two-sum                               # run against a scratch workspace
 ```
 
-- Integration tests in `internal/app` and `internal/tui` actually compile and run solutions; they need `go` and `python3` (3.10+) on PATH and skip otherwise. Their workspaces set `python.interpreter: python3`, so tests never create a virtual environment or touch the network; `python.Venv` is tested with fake `uv`/`python` scripts on PATH.
+- The repository root is a minimal uv project (`pyproject.toml`, `uv.lock`, no dependencies, `package = false`) whose `.python-version` is 3.10, the protocol's minimum: `uv run` (and `uv sync`, for editors) creates `.venv` on it and puts `.venv/bin` first on PATH. `make test` runs the tests through `uv run --locked`, and with `HC_TEST_REQUIRE_TOOLS=1`, as CI does: the tests that need `go`, `python3` (a supported one) or `git` then fail instead of skipping without it. Plain `go test` skips them, and on macOS the system `python3` is 3.9, so it skips nearly every integration test. Those skips go through `internal/testenv` (`LookPath`, `Skip`); a new test that needs a tool uses it. CI runs `make test` on ubuntu (3.10, through setup-uv) and `make test PY=system` on macOS with setup-python's latest `3.x`.
+- Integration tests in `internal/app` and `internal/tui` actually compile and run solutions with the `go` and `python3` on PATH. Their workspaces set `python.interpreter: python3`, so tests never create a virtual environment or touch the network; `python.Venv` is tested with fake `uv`/`python` scripts on PATH.
 - `internal/app`'s and `internal/tui`'s tests call `t.Parallel()` (each its own workspace; `TestRegressionReferences`'s per-problem subtests share one, as `validate --jobs` does), and new ones should, except two kinds that stay serial, which Go runs first, alone: tests that use `t.Setenv` (Go refuses it in parallel tests and their parents: `isolateConfig` for LeetCode sessions, `requireGit`), and timing-sensitive ones (`timelimit_test.go`: sleeping solutions against limits a few times the reference's time). `internal/cli`'s stay serial (`capture` swaps `os.Stdout`, tests set PATH).
 - Go ≥ 1.26 is required (`errors.AsType` is used); `go.mod` pins the toolchain version.
 - Use a throwaway workspace while developing (`hc init /tmp/hc-dev`, then `-w` or `HC_WORKSPACE`) instead of the user's `~/handcoding`. A new workspace is empty; `cp -R testdata/regression /tmp/hc-dev/packs/` installs the regression set in it as a (read-only) pack. The set is also an authoring workspace of its own (see Regression set); to try one without touching the set, copy it elsewhere and run hc in the copy.

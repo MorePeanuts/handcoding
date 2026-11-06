@@ -15,17 +15,17 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/regression"
 	"github.com/MorePeanuts/handcoding/internal/store"
+	"github.com/MorePeanuts/handcoding/internal/testenv"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
-// requireGit skips the test without git, and keeps the user's git
-// configuration (signing, hooks, default branch) out of it. It sets the
-// environment, so the tests that call it cannot run in parallel.
+// requireGit skips the test without git (fails it under
+// $HC_TEST_REQUIRE_TOOLS), and keeps the user's git configuration (signing,
+// hooks, default branch) out of it. It sets the environment, so the tests
+// that call it cannot run in parallel.
 func requireGit(t *testing.T) {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not installed")
-	}
+	testenv.LookPath(t, "git")
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	t.Setenv("GIT_AUTHOR_NAME", "hc")
