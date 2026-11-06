@@ -2,12 +2,12 @@ package cli
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/problem"
+	"github.com/MorePeanuts/handcoding/internal/testenv"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
@@ -15,11 +15,8 @@ import (
 // output with the reference in the solution's language: here the two
 // references disagree, and each solution agrees with its own.
 func TestTestInputReference(t *testing.T) {
-	for _, tool := range []string{"go", "python3"} {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Skip(tool + " not in PATH")
-		}
-	}
+	testenv.LookPath(t, "go")
+	testenv.LookPath(t, "python3")
 	dir := t.TempDir()
 	ws, err := workspace.Create(dir, "")
 	if err != nil {

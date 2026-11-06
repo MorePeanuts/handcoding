@@ -2,12 +2,12 @@ package golang
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/MorePeanuts/handcoding/internal/problem"
+	"github.com/MorePeanuts/handcoding/internal/testenv"
 )
 
 func TestModVersion(t *testing.T) {
@@ -26,9 +26,7 @@ func TestModVersion(t *testing.T) {
 // Prepare rewrites go.mod for the local toolchain, also when an older hc
 // wrote it with another version.
 func TestPrepareGoMod(t *testing.T) {
-	if _, err := exec.LookPath("go"); err != nil {
-		t.Skip("go not in PATH")
-	}
+	testenv.LookPath(t, "go")
 	tc, err := Language{}.Toolchain()
 	if err != nil {
 		t.Fatal(err)
@@ -157,9 +155,7 @@ func TestStarterRoundTrip(t *testing.T) {
 // A class problem times each call on its own: arguments are decoded before
 // the timed section and results encoded after it.
 func TestClassCallTiming(t *testing.T) {
-	if _, err := exec.LookPath("go"); err != nil {
-		t.Skip("go not in PATH")
-	}
+	testenv.LookPath(t, "go")
 	p := &problem.Problem{Slug: "f", Kind: problem.KindClass, Class: &problem.Class{
 		Name:        "Stack",
 		Constructor: []problem.Param{{Name: "nums", Type: "integer[]"}},

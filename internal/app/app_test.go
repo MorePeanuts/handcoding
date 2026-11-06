@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,6 +18,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/regression"
 	"github.com/MorePeanuts/handcoding/internal/runner"
+	"github.com/MorePeanuts/handcoding/internal/testenv"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
@@ -44,22 +44,22 @@ func newWorkspace(t *testing.T) *app.App {
 	return a
 }
 
+// requireTools skips the test (fails it under $HC_TEST_REQUIRE_TOOLS)
+// unless every tool is on PATH, and python3 is a supported Python.
 func requireTools(t *testing.T, tools ...string) {
 	t.Helper()
 	for _, tool := range tools {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Skipf("%s not installed", tool)
-		}
+		testenv.LookPath(t, tool)
 	}
 	// hc refuses to run references on a toolchain below the protocol's
-	// minimum; CI installs supported versions.
+	// minimum; make test and CI use supported versions.
 	if slices.Contains(tools, "python3") {
 		tc, err := python.Language{}.Toolchain()
 		if err != nil {
-			t.Skip(err)
+			testenv.Skip(t, err)
 		}
 		if err := tc.Err(); err != nil {
-			t.Skip(err)
+			testenv.Skip(t, err)
 		}
 	}
 }

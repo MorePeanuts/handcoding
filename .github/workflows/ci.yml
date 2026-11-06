@@ -21,24 +21,39 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Solutions run on the oldest Python the problem protocol supports
-        # (python.MinVersion) and on the latest. The oldest Go is checked by
-        # TestGoMinimumVersion with the toolchain that builds hc.
+        # Both ends of the supported Python range, on both OSes. On Linux,
+        # the oldest Python the problem protocol supports (python.MinVersion),
+        # which make test takes from the uv project's .python-version, as it
+        # does locally. On macOS, the latest release: setup-python's "3.x"
+        # follows it, which no uv request does (">=3.10" finds the newest
+        # Python installed, not the newest released), so make test
+        # PY=system uses the python3 it puts on PATH. The oldest Go is
+        # checked by TestGoMinimumVersion with the toolchain that builds hc.
         include:
-          - { os: ubuntu-latest, python: "3.10" }
-          - { os: ubuntu-latest, python: "3.x" }
+          - { os: ubuntu-latest, python: "" }
           - { os: macos-latest, python: "3.x" }
+    name: test (${{ matrix.os }}, Python ${{ matrix.python || '.python-version' }})
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - uses: actions/setup-python@v7
+      # setup-uv publishes no major-version tags since v8.
+      - if: matrix.python == ''
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: false
+      - if: matrix.python != ''
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       # go vet runs once, as part of golangci-lint in the lint job.
-      - run: go test -race ./...
+      - run: make test ${{ matrix.python != '' && 'PY=system' || '' }}
+        env:
+          # make test sets it too: a missing or too old tool fails the tests
+          # instead of skipping them.
+          HC_TEST_REQUIRE_TOOLS: "1"
 
   lint:
     runs-on: ubuntu-latest

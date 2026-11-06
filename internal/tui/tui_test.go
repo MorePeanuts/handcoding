@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -19,6 +18,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/regression"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/store"
+	"github.com/MorePeanuts/handcoding/internal/testenv"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
@@ -94,20 +94,21 @@ func keyMsg(s string) tea.KeyMsg {
 }
 
 func requireGo(t *testing.T) {
-	if _, err := exec.LookPath("go"); err != nil {
-		t.Skip("go not installed")
-	}
+	t.Helper()
+	testenv.LookPath(t, "go")
 }
 
-// requirePython skips unless python3 is a supported Python, which building
-// generated cases needs whatever the solution's language.
+// requirePython skips (fails under $HC_TEST_REQUIRE_TOOLS) unless python3
+// is a supported Python, which building generated cases needs whatever the
+// solution's language.
 func requirePython(t *testing.T) {
+	t.Helper()
 	tc, err := python.Language{}.Toolchain()
 	if err != nil {
-		t.Skip(err)
+		testenv.Skip(t, err)
 	}
 	if err := tc.Err(); err != nil {
-		t.Skip(err)
+		testenv.Skip(t, err)
 	}
 }
 
