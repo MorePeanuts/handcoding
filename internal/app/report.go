@@ -27,10 +27,13 @@ type storedCase struct {
 }
 
 type storedReport struct {
-	Verdict      string       `json:"verdict"`
-	Passed       int          `json:"passed"`
-	Total        int          `json:"total"`
-	ElapsedNs    int64        `json:"elapsed_ns"`
+	Verdict   string `json:"verdict"`
+	Passed    int    `json:"passed"`
+	Total     int    `json:"total"`
+	ElapsedNs int64  `json:"elapsed_ns"`
+	// Problem identifies the problem's files the submission was judged on
+	// (problemKey).
+	Problem      string       `json:"problem,omitempty"`
 	Stopped      bool         `json:"stopped,omitempty"`
 	CompileError string       `json:"compile_error,omitempty"`
 	Stderr       string       `json:"stderr,omitempty"`
@@ -40,7 +43,7 @@ type storedReport struct {
 // EncodeReport serializes a report for the submission history.
 func EncodeReport(p *problem.Problem, rep *runner.Report) string {
 	sr := storedReport{
-		Verdict: string(rep.Verdict), Passed: rep.Passed, Total: rep.Total,
+		Verdict: string(rep.Verdict), Passed: rep.Passed, Total: rep.Total, Problem: problemKey(p),
 		ElapsedNs: rep.Elapsed.Nanoseconds(), Stopped: rep.Stopped, CompileError: rep.CompileError, Stderr: clipText(rep.Stderr),
 	}
 	for _, c := range rep.Cases {

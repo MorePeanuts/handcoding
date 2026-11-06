@@ -189,11 +189,6 @@ func (m *model) viewResult() string {
 		}
 	}
 	keys := []string{"↑↓ scroll", "t test", "s submit", "d debug", "e edit", "v statement", "h history", "esc back"}
-	if r != nil && !r.running && r.ref == p.Ref() && r.report != nil {
-		if n := m.debugCase(p); n > 1 || r.report.Verdict != runner.Accepted {
-			keys[3] = fmt.Sprintf("d debug-case-%d", n)
-		}
-	}
 	if r != nil && r.running {
 		keys = []string{"esc cancel"}
 	}

@@ -95,8 +95,8 @@ A pack installed in a practice workspace (`packs/<name>/`, beside `hc.yaml`) is 
 Run `hc` (or `hc list`) to open the problem list. It works best with the terminal split in two: `hc` on one side, your editor on the other.
 
 - Press `enter` on a problem to open it. The statement is shown, the solution file is created from the template, and its absolute path is **copied to the clipboard**. In the editor, `:e <paste>` and start writing. To read a statement without starting the problem, press `v` instead: nothing is created or copied until an action such as `e`, `t` or `y` needs the solution.
-- Test, submit, debug and history are all available from the statement. Results appear in the TUI, with your program's own output listed separately below them.
-- The debugger takes over the terminal. The screen is cleared before it starts, and the TUI comes back when it exits. If the last run had a failing case, `d` debugs that case.
+- Test, submit and debug are available from the statement and the result screen, not from the list, as on LeetCode; history is available everywhere. Results appear in the TUI, with your program's own output listed separately below them.
+- The debugger takes over the terminal. The screen is cleared before it starts, and the TUI comes back when it exits. `d` debugs the first case your code fails, as [`hc debug`](#debugging) picks it. In the history, `d` restores the submission and debugs its first failure.
 - Statement images are drawn in the terminal. kitty and Ghostty show the original image. Other truecolor terminals show a block-character approximation that loses detail; press `o` to open the original in your image viewer. See [`images`](#configuration) to choose the mode.
 - Statement colors follow the terminal background. If they look wrong, set `theme` in `hc.yaml`.
 - The list shows one pack at a time. With more than one pack, a tab bar at the top names each pack with its progress (solved/total), and `tab` / `shift+tab` switch packs; on a narrow terminal the bar scrolls to keep the current pack in view. A pack without problems, such as `local` before you add one, gets no tab, unless no pack has problems yet.
@@ -109,8 +109,8 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 | Key | Action | Key | Action |
 |---|---|---|---|
 | `enter` | Open the problem (and copy the solution path) | `e` | Open the solution in your editor |
-| `t` | Test on the examples | `s` | Submit (all cases) |
-| `d` | Debug (the last failing case, if any) | `h` | Submission history: code, judge details, restore, delete |
+| `t` | Test on the examples (in a problem) | `s` | Submit, all cases (in a problem) |
+| `d` | Debug the first failing case (in a problem) | `h` | Submission history: code, judge details, restore, debug, delete |
 | `y` | Copy the solution path again | `L` | Switch language |
 | `r` | Reset to the template | `D` | Discard: delete the solution and its history, back to not started |
 | `/` | Search | `f` | Filter: all / unsolved / solved / starred |
@@ -379,9 +379,11 @@ hc marks every copy it installs, with its version and a hash of the content (`.h
 ## Debugging
 
 ```sh
-hc debug two-sum -c 2       # Go: Delve, stopped at your function
-hc debug lru -l py          # Python: pdb
+hc debug two-sum            # Go: Delve, stopped at your function, on the first failing case
+hc debug lru -l py -c 2     # Python: pdb, on case 2
 ```
+
+Without `-c` or `-i`, `hc debug` debugs the first case your code fails. While your code and the problem are as they were at your last `hc test` or `hc submit` (in the TUI too), it takes that run's first failure without running again. Otherwise, or when that run passed only some of the cases, it first runs every case, then debugs the first that fails. With no failure it debugs case 1. `hc history restore` counts as a run of the restored code, since a submission ran every case. A run that stopped early, at a time limit or a crash, fails on the case it stopped at.
 
 ### Neovim (nvim-dap)
 

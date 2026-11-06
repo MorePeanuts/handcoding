@@ -7,19 +7,19 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/muesli/termenv"
 
+	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/problem"
-	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 )
 
 // problemKey handles the actions available wherever a problem is in focus
-// (list, detail and result screens). It reports whether key was handled.
+// (list, detail and result screens; runKeys only in a problem). It reports
+// whether key was handled.
 func (m *model) problemKey(key string, p *problem.Problem) (tea.Cmd, bool) {
 	switch key {
 	case "e":
@@ -29,7 +29,7 @@ func (m *model) problemKey(key string, p *problem.Problem) (tea.Cmd, bool) {
 	case "s":
 		return m.startRun(runSubmit, p), true
 	case "d":
-		return m.debug(p), true
+		return m.debug(p, m.lang), true
 	case "h":
 		m.openHistory(p)
 		return nil, true
@@ -168,35 +168,26 @@ func (m *model) edit(p *problem.Problem) tea.Cmd {
 	return tea.ExecProcess(cmd, func(err error) tea.Msg { return execDoneMsg{err} })
 }
 
-// debug starts the debugger on the first failing case of the last run of p,
-// or on case 1.
-func (m *model) debug(p *problem.Problem) tea.Cmd {
-	if !m.app.HasSolution(p, m.lang) {
-		m.message = "no " + m.lang.Name() + " solution yet — press enter or e first"
+// runKeys are the keys of problemKey that run the solution, which the
+// problem list leaves to the problem's own screens, as LeetCode does.
+var runKeys = []string{"t", "s", "d"}
+
+// debug starts the debugger on p's solution in l, on the case hc debug
+// picks: the first that fails.
+func (m *model) debug(p *problem.Problem, l lang.Language) tea.Cmd {
+	if !m.app.HasSolution(p, l) {
+		m.message = "no " + l.Name() + " solution yet — press enter or e first"
 		return nil
 	}
-	caseNum := m.debugCase(p)
-	cmd := exec.Command(m.opts.Exe, "-w", m.app.WS.Root, "debug", p.Ref(), "-l", m.lang.ID(), "-c", strconv.Itoa(caseNum))
-	m.message = fmt.Sprintf("debugged case %d", caseNum)
+	cmd := exec.Command(m.opts.Exe, "-w", m.app.WS.Root, "debug", p.Ref(), "-l", l.ID(), "--pause")
 	return tea.Exec(&clearScreenCmd{Cmd: cmd}, func(err error) tea.Msg {
-		// The debugger's exit status is not ours to report.
+		// The debugger's exit status is not ours to report, but hc debug
+		// failing before it starts (a compile error) is.
 		if _, ok := errors.AsType[*exec.ExitError](err); ok {
 			err = nil
 		}
 		return execDoneMsg{err}
 	})
-}
-
-func (m *model) debugCase(p *problem.Problem) int {
-	if m.run == nil || m.run.report == nil || m.run.ref != p.Ref() || m.run.langID != m.lang.ID() {
-		return 1
-	}
-	for _, c := range m.run.report.Cases {
-		if c.Verdict != runner.Accepted && !c.Verdict.Unjudged() {
-			return c.Index
-		}
-	}
-	return 1
 }
 
 // clearScreenCmd clears the terminal before running an interactive program,

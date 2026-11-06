@@ -169,7 +169,7 @@ func newHistoryRestoreCmd(root *rootOptions) *cobra.Command {
 				if a.HasSolution(p, l) && !yes && !confirm(fmt.Sprintf("Overwrite your current %s solution of %s?", l.Name(), p.Slug)) {
 					return fmt.Errorf("aborted (use --yes to skip the prompt)")
 				}
-				path, err := a.Restore(p, l, s.Code)
+				path, err := a.RestoreSubmission(p, l, s)
 				if err != nil {
 					return err
 				}

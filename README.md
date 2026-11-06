@@ -78,7 +78,7 @@ Every action also has a command:
 hc start two-sum -e     # create the solution and open it in your editor
 hc test two-sum         # run the examples
 hc submit two-sum       # judge on all cases and record the submission
-hc debug two-sum -c 4   # debug case 4
+hc debug two-sum        # debug the first failing case (-c 4: case 4)
 ```
 
 ## Documentation

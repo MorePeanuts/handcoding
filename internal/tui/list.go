@@ -215,7 +215,7 @@ func (m *model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.openDetail(p, key != "v")
 		}
 	default:
-		if p != nil {
+		if p != nil && !slices.Contains(runKeys, key) {
 			if cmd, ok := m.problemKey(key, p); ok {
 				return m, cmd
 			}
@@ -415,7 +415,7 @@ func (m *model) viewList() string {
 		b.WriteString(keyHelp(m.width, "↑↓ move", "enter choose", "esc cancel"))
 		return b.String()
 	}
-	keys := []string{"↑↓ move", "enter open", "v view", "e edit", "t test", "s submit", "d debug", "h history",
+	keys := []string{"↑↓ move", "enter open", "v view", "e edit", "h history",
 		"y copy-path", "m star", "r reset", "D discard", "f filter", "/ search", "L lang", "q quit"}
 	if t := m.tab(); t != nil && len(t.groups()) > 0 {
 		keys = slices.Insert(keys, 1, "c group")

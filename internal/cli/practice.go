@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -255,7 +256,7 @@ func runTest(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.Language
 		what = o.file
 	}
 	fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Running %d case(s) of %s [%s]…", len(sel), what, toolchainLabel(l))))
-	ro := app.RunOptions{Stdout: os.Stdout, Stderr: os.Stderr}
+	ro := app.RunOptions{Stdout: os.Stdout, Stderr: os.Stderr, Custom: o.input != "" || o.generate != ""}
 	var rep *runner.Report
 	if o.file != "" {
 		rep, err = a.RunFile(ctx, p, l, o.file, sel, ro)
@@ -395,12 +396,18 @@ func newDebugCmd(root *rootOptions) *cobra.Command {
 		input    string
 		headless bool
 		addr     string
+		doPause  bool
 	)
 	cmd := &cobra.Command{
 		Use:     "debug <problem>",
 		Aliases: []string{"d"},
 		Short:   "Run a case under the debugger (Delve / pdb / DAP)",
 		Long: `Start a debugger on your solution with one or more cases as input.
+
+Without --case or --input it debugs the first case your code fails: that
+of your last test or submission while the code and the problem are
+unchanged since, else of a run of every case that it makes first (case 1
+when every case passes).
 
 Interactive mode (default) launches Delve (Go) or pdb (Python) in the
 terminal with a breakpoint at your function. Headless mode starts a debug
@@ -409,7 +416,19 @@ server for your editor to attach to:
   Go:     dlv headless server (nvim-dap: type "go", request "attach", mode "remote")
   Python: debugpy, installed in the workspace's .hc/venv (nvim-dap: request "attach", connect to the port)`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			// The TUI's terminal comes back as soon as hc exits, so an error
+			// before the debugger starts (a compile error) waits to be read.
+			started := false
+			if doPause {
+				defer func() {
+					if err != nil && !started {
+						fmt.Fprintln(os.Stderr, "hc:", err)
+						err = errSilent
+						pause()
+					}
+				}()
+			}
 			return root.withProblem(args[0], langName, func(a *app.App, p *problem.Problem, l lang.Language) error {
 				if !a.HasSolution(p, l) {
 					return fmt.Errorf("no %s solution for %s yet; run `hc start %s`", l.Name(), p.Slug, a.WS.Ref(p))
@@ -427,7 +446,11 @@ server for your editor to attach to:
 						return err
 					}
 					if len(caseNums) == 0 {
-						caseNums = []int{1}
+						d, err := firstFailure(cmd, a, p, l)
+						if err != nil {
+							return err
+						}
+						caseNums = []int{d}
 					}
 					if sel, err = app.Select(cases, caseNums, false); err != nil {
 						return err
@@ -462,16 +485,46 @@ server for your editor to attach to:
 				// The debugger handles Ctrl-C itself.
 				signal.Ignore(os.Interrupt)
 				defer signal.Reset(os.Interrupt)
+				started = true
 				return dcmd.Run()
 			})
 		},
 	}
 	langFlag(cmd, &langName)
-	cmd.Flags().IntSliceVarP(&caseNums, "case", "c", nil, "case numbers to debug (default 1)")
+	cmd.Flags().IntSliceVarP(&caseNums, "case", "c", nil, "case numbers to debug (default: the first that fails)")
 	cmd.Flags().StringVarP(&input, "input", "i", "", "custom input as a JSON object")
 	cmd.Flags().BoolVar(&headless, "headless", false, "start a debug server for an editor (nvim-dap, VS Code) instead of a terminal debugger")
 	cmd.Flags().StringVar(&addr, "addr", "127.0.0.1:38697", "listen address in headless mode")
+	cmd.Flags().BoolVar(&doPause, "pause", false, "wait for Enter after an error before the debugger starts")
+	_ = cmd.Flags().MarkHidden("pause")
 	return cmd
+}
+
+// firstFailure picks the case hc debug debugs when none is given, and says
+// why.
+func firstFailure(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.Language) (int, error) {
+	note := func(msg string) { fmt.Fprintln(os.Stderr, ui.Cyan.Render("debug")+" "+msg) }
+	if d, ok := a.LastFailure(p, l); ok {
+		if d.Verdict == "" {
+			note("every case passed your last run; debugging case 1")
+		} else {
+			note(fmt.Sprintf("case %d failed your last run (%s)", d.Index, d.Verdict))
+		}
+		return d.Index, nil
+	}
+	fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Running every case to find the first that fails [%s]…", toolchainLabel(l))))
+	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
+	defer stop()
+	d, err := a.RunFailure(ctx, p, l, app.RunOptions{Stdout: io.Discard, Stderr: io.Discard})
+	if err != nil {
+		return 0, err
+	}
+	if d.Verdict == "" {
+		note("every case passes; debugging case 1")
+	} else {
+		note(fmt.Sprintf("case %d is the first that fails (%s)", d.Index, d.Verdict))
+	}
+	return d.Index, nil
 }
 
 func newResetCmd(root *rootOptions) *cobra.Command {
