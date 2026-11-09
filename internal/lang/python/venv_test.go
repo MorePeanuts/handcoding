@@ -246,6 +246,80 @@ func TestVenvVersionMissing(t *testing.T) {
 	}
 }
 
+// existing gives f's workspace an environment whose Python reports
+// version ver, as an older hc would have left it.
+func (f *fakeEnv) existing(ver string) *Venv {
+	f.t.Helper()
+	v := f.venv()
+	if err := os.MkdirAll(filepath.Dir(v.Python()), 0o755); err != nil {
+		f.t.Fatal(err)
+	}
+	f.python(v.Python(), ver)
+	return v
+}
+
+// Without Version (a practice workspace), an environment older than
+// MinVersion, made by an older hc, is created again when a Python
+// MinVersion+ can be had: with uv, or one on PATH. Otherwise it is kept.
+func TestVenvBelowMinimum(t *testing.T) {
+	f := newFakeEnv(t)
+	f.uv("3.12.4")
+	v := f.existing("3.10.14")
+	var out bytes.Buffer
+	if err := v.Ensure(context.Background(), &out); err != nil {
+		t.Fatal(err)
+	}
+	f.wantLogged(f.bin + "/uv venv --no-project --python >=3.12 " + v.Dir)
+	if !strings.Contains(out.String(), ".hc/venv has Python 3.10.14, older than 3.12; creating it again\n") {
+		t.Errorf("recreation not reported:\n%s", out.String())
+	}
+	if ver, err := version(context.Background(), v.Python()); err != nil || ver != "3.12.4" {
+		t.Errorf("environment: %q, %v", ver, err)
+	}
+
+	// Without uv, a Python 3.12+ on PATH creates it.
+	f = newFakeEnv(t)
+	f.python(filepath.Join(f.bin, "python3"), "3.11.9")
+	f.python(filepath.Join(f.bin, "python3.13"), "3.13.2")
+	v = f.existing("3.11.2")
+	out.Reset()
+	if err := v.Ensure(context.Background(), &out); err != nil {
+		t.Fatal(err)
+	}
+	f.wantLogged(f.bin + "/python3.13 -m venv " + v.Dir)
+	if !strings.Contains(out.String(), "has Python 3.11.2, older than 3.12; creating it again") {
+		t.Errorf("recreation not reported:\n%s", out.String())
+	}
+
+	// With neither, the old environment is kept, silently: nothing better
+	// can be had.
+	f = newFakeEnv(t)
+	f.python(filepath.Join(f.bin, "python3"), "3.11.9")
+	v = f.existing("3.10.14")
+	out.Reset()
+	if err := v.Ensure(context.Background(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(f.logged(), " venv ") || out.Len() != 0 {
+		t.Errorf("environment created again:\n%s\n%s", f.logged(), out.String())
+	}
+	if ver, err := version(context.Background(), v.Python()); err != nil || ver != "3.10.14" {
+		t.Errorf("environment: %q, %v", ver, err)
+	}
+
+	// One of MinVersion or later is kept, even when uv could make another.
+	f = newFakeEnv(t)
+	f.uv("3.13.4")
+	v = f.existing("3.12.0")
+	out.Reset()
+	if err := v.Ensure(context.Background(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(f.logged(), "uv venv") || out.Len() != 0 {
+		t.Errorf("environment created again:\n%s\n%s", f.logged(), out.String())
+	}
+}
+
 // Without uv or a supported Python, the error is a *SetupError whose
 // message says what was found and how to get Python.
 func TestVenvNoPython(t *testing.T) {

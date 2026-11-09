@@ -29,7 +29,9 @@ import (
 // python3.X-venv is missing): judging needs no third-party package, only
 // headless debugging (debugpy) does. With neither, it fails with a
 // *SetupError that says how to get one. A virtual environment cannot be
-// moved, so one whose interpreter no longer runs is created again.
+// moved, so one whose interpreter no longer runs is created again, and so
+// is one older than MinVersion (made by an older hc) when a Python
+// MinVersion+ can be had.
 type Venv struct {
 	// Dir is the environment's directory.
 	Dir string
@@ -86,6 +88,11 @@ func (v *Venv) Ensure(ctx context.Context, w io.Writer) error {
 		}
 	case v.Version != "" && !sameMinor(ver, v.Version) && v.canGet(ctx):
 		fmt.Fprintf(w, "%s has Python %s, not %s; creating it again\n", v.Label, ver, v.Version)
+		recreate = true
+	case v.Version == "" && !lang.AtLeast(ver, MinVersion) && v.canGet(ctx):
+		// Made by an hc of an older minimum: it cannot run generators
+		// or checkers.
+		fmt.Fprintf(w, "%s has Python %s, older than %s; creating it again\n", v.Label, ver, MinVersion)
 		recreate = true
 	}
 	if recreate {
@@ -306,14 +313,15 @@ func (v *Venv) writePyright(w io.Writer) {
 
 var pythonNameRE = regexp.MustCompile(`^python(3(\.\d+)?)?(\.exe)?$`)
 
-// canGet reports whether an environment of Version can be created: uv
-// downloads any version, or one is on PATH.
+// canGet reports whether an environment of Version, or without Version of
+// MinVersion or later, can be created: uv downloads any version, or one is
+// on PATH.
 func (v *Venv) canGet(ctx context.Context) bool {
 	if _, err := exec.LookPath("uv"); err == nil {
 		return true
 	}
 	py, ver, _ := findPython(ctx, v.Version)
-	return py != "" && sameMinor(ver, v.Version)
+	return py != "" && (v.Version == "" || sameMinor(ver, v.Version))
 }
 
 // sameMinor reports whether version ver (3.12.4) is of minor version minor
