@@ -137,7 +137,7 @@ Problems can be referred to by slug, slug prefix, number or directory name: `hc 
 
 ```sh
 hc start two-sum -e                                 # create the solution and open the editor
-hc test two-sum                                     # run the examples (or the first 3 cases if none is marked)
+hc test two-sum                                     # run the examples (an error if no case is marked as one)
 hc test two-sum -c 4 -c 5                           # run chosen cases
 hc test two-sum --all -v                            # all cases, full output, not recorded
 hc test two-sum -i '{"nums":[1,2,3],"target":5}'    # custom input (expected output from the reference, if any)

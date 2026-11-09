@@ -94,8 +94,11 @@ func testExamples(ctx context.Context, a *app.App, p *problem.Problem, l lang.La
 	if err != nil {
 		return nil, err
 	}
-	if len(sel) == 0 {
+	if len(cases) == 0 {
 		return nil, fmt.Errorf("%s has no test cases yet (hc gen %s)", p.Slug, a.WS.Ref(p))
+	}
+	if len(sel) == 0 {
+		return nil, fmt.Errorf(`%s has no example cases: mark the statement's examples with "example": true in %s`, p.Slug, problem.CasesFile)
 	}
 	return a.Run(ctx, p, l, sel, opts)
 }

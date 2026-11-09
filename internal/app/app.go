@@ -381,8 +381,8 @@ func (a *App) Restore(p *problem.Problem, l lang.Language, code string) (string,
 	return path, os.WriteFile(path, []byte(code), 0o644)
 }
 
-// Select picks cases by 1-based index; with no indices it picks examples (or
-// the first three cases if none is marked) unless all is set.
+// Select picks cases by 1-based index; with no indices it picks every case
+// when all is set, else the examples, none when no case is marked as one.
 func Select(cases []problem.Case, indices []int, all bool) ([]runner.Selected, error) {
 	var sel []runner.Selected
 	switch {
@@ -403,16 +403,6 @@ func Select(cases []problem.Case, indices []int, all bool) ([]runner.Selected, e
 				sel = append(sel, runner.Selected{Index: i + 1, Case: c})
 			}
 		}
-		// Else the first three cases, stored ones first: generated cases
-		// are large, and slow to build.
-		for _, generated := range []bool{false, true} {
-			for i, c := range cases {
-				if len(sel) < 3 && c.Generated() == generated {
-					sel = append(sel, runner.Selected{Index: i + 1, Case: c})
-				}
-			}
-		}
-		slices.SortFunc(sel, func(a, b runner.Selected) int { return a.Index - b.Index })
 	}
 	return sel, nil
 }
