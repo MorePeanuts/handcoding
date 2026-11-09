@@ -114,7 +114,7 @@ func WriteClaudeFile(root string) (bool, error) {
 		}
 		return false, err
 	}
-	return true, os.WriteFile(filepath.Join(root, ClaudeFile), []byte(claudeImport), 0o644)
+	return true, writeFile(filepath.Join(root, ClaudeFile), []byte(claudeImport))
 }
 
 func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
@@ -124,17 +124,26 @@ func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 // appends the block, replaces it in place, or removes it when the context
 // gets none. It reports whether the file changed.
 func WriteIndex(root string, ctx Context) (bool, error) {
+	return writeIndex(root, ctx, true)
+}
+
+// writeIndex is WriteIndex, which without create only replaces or removes a
+// block that is there.
+func writeIndex(root string, ctx Context, create bool) (bool, error) {
 	file := filepath.Join(root, AgentsFile)
 	data, err := os.ReadFile(file)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return false, err
 	}
 	old := string(data)
+	if !create && !strings.Contains(old, beginMarker) {
+		return false, nil
+	}
 	updated, err := withIndex(old, Index(root, ctx))
 	if err != nil || updated == old {
 		return false, err
 	}
-	return true, os.WriteFile(file, []byte(updated), 0o644)
+	return true, writeFile(file, []byte(updated))
 }
 
 // withIndex returns content with its hc block replaced by block, or removed

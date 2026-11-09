@@ -372,17 +372,21 @@ hc 自带若干 skill，向编码智能体讲解它的题目协议和工作流�
 | `hc-cases` | 题目怎么评判：评判规则、参考解、checker 和测试用例 |
 | `hc-pack` | 维护题目包：收录题目、分组、保持 slug 不变、协议版本、CI 和发布 |
 
-工作区得到哪些 skill 取决于它的类型：练习工作区得到 `hc-problem` 和 `hc-cases`，题目包的检出目录（见[编写题目包](#编写题目包)）三个都有。它们被安装到 `.claude/skills/`（供 Claude Code）和 `.agents/skills/`（供 Codex），并在 `AGENTS.md` 的一个区块中列出，这个区块还告诉智能体把临时文件放在 `.hc/scratch/<slug>/` 中，每道题一个目录，这样同时处理不同题目的智能体（例如并行运行的几个 `hc gen`）不会互相覆盖文件：新工作区由 `hc init` 安装，任何工作区中 `hc gen`、`hc fix` 和 `hc skill install` 也会安装。在练习工作区中，这个区块是一份指南，供你在那里打开的任何智能体帮助你练习，skill 列表只是其中一节（没有 skill 时也会写入）：工作区的结构，该用哪些 hc 命令（`hc show`、`hc test`；`hc submit` 只在你要求时运行，交互式的 `hc debug` 从不运行），以及以教代做：先给提示再给解法，题目包的 `reference/` 是答案，不主动给出，只在你要求时才改你的解答文件，从不修改已安装的题目包。在题目包的检出目录中，这个区块只是 skill 索引，位于题目包自己的说明之后。Claude Code 本身不读取 `AGENTS.md`，所以工作区没有 `CLAUDE.md` 时，hc 还会创建一个导入它的 `CLAUDE.md`（`@AGENTS.md`）；你已有的 `CLAUDE.md` 归你所有，hc 从不触碰。由于它们就在工作区里，在工作区中启动的任何 Claude Code 或 Codex 会话都能使用：让它"写一道 hc 题……"、"为这道 hc 题生成用例"或"把这道题加进题目包"即可。skill 引用协议的章节（`hc docs protocol <section>`），而不是重复其内容。
+工作区得到哪些 skill 取决于它的类型：练习工作区得到 `hc-problem` 和 `hc-cases`，题目包的检出目录（见[编写题目包](#编写题目包)）三个都有。它们被安装到 `.claude/skills/`（供 Claude Code）和 `.agents/skills/`（供 Codex），并在 `AGENTS.md` 的一个区块中列出，这个区块还告诉智能体把临时文件放在 `.hc/scratch/<slug>/` 中，每道题一个目录，这样同时处理不同题目的智能体（例如并行运行的几个 `hc gen`）不会互相覆盖文件：新工作区由 `hc init` 安装，任何工作区中 `hc gen`、`hc fix` 和 `hc skill install` 也会安装；练习工作区被较新的 hc 打开时也会刷新（见下文）。在练习工作区中，这个区块是一份指南，供你在那里打开的任何智能体帮助你练习，skill 列表只是其中一节（没有 skill 时也会写入）：工作区的结构，该用哪些 hc 命令（`hc show`、`hc test`；`hc submit` 只在你要求时运行，交互式的 `hc debug` 从不运行），以及以教代做：先给提示再给解法，题目包的 `reference/` 是答案，不主动给出，只在你要求时才改你的解答文件，从不修改已安装的题目包。在题目包的检出目录中，这个区块只是 skill 索引，位于题目包自己的说明之后。Claude Code 本身不读取 `AGENTS.md`，所以工作区没有 `CLAUDE.md` 时，hc 还会创建一个导入它的 `CLAUDE.md`（`@AGENTS.md`）；你已有的 `CLAUDE.md` 归你所有，hc 从不触碰。由于它们就在工作区里，在工作区中启动的任何 Claude Code 或 Codex 会话都能使用：让它"写一道 hc 题……"、"为这道 hc 题生成用例"或"把这道题加进题目包"即可。skill 引用协议的章节（`hc docs protocol <section>`），而不是重复其内容。
 
 ```sh
 hc skill list               # 这个工作区得到的 skill；每个 skill 是否安装、是否最新、是否过期或被修改，以及由哪个 hc 版本安装
-hc skill install            # 安装或更新工作区的 skill（升级 hc 之后）
+hc skill install            # 安装或更新工作区的 skill，并重建 AGENTS.md 的区块和 CLAUDE.md
 hc skill install --force    # 连你修改过的 skill 也一并替换或删除
 hc skill install hc-pack    # 按名称安装一个 skill，不论工作区是否得到它
 hc skill show hc-cases      # 打印一个 skill
 ```
 
-hc 会给它安装的每一份副本做标记，记下版本和内容的哈希（skill 目录中的 `.hc-skill.json`），并且只替换或删除这些副本：你修改过的 skill 会保留，除非加上 `--force`；不是 hc 安装的 skill 从不触碰。在 `AGENTS.md` 中，hc 只改写 `<!-- hc:begin -->` 与 `<!-- hc:end -->` 之间的区块，文件的其余部分归你所有，你给智能体的备注请写在这个区块之外。`hc gen` 和 `hc fix` 在启动智能体前，会安装工作区 skill 集合中缺失或过期的 skill。不带名称的 `hc skill install` 则让工作区与它的集合完全一致：还会删除 hc 曾安装、但工作区不该有的 skill（包括按名称安装的）。两者对你修改过的 skill 都只给出警告，既不替换也不删除。
+hc 会给它安装的每一份副本做标记，记下版本和内容的哈希（skill 目录中的 `.hc-skill.json`），并且只替换或删除这些副本：你修改过的 skill 会保留，除非加上 `--force`；不是 hc 安装的 skill 从不触碰。在 `AGENTS.md` 中，hc 只改写 `<!-- hc:begin -->` 与 `<!-- hc:end -->` 之间的区块，文件的其余部分归你所有，你给智能体的备注请写在这个区块之外。不带名称的 `hc skill install` 让工作区与它的集合完全一致：还会删除 hc 曾安装、但工作区不该有的 skill（包括按名称安装的）；对你修改过的 skill 只给出警告，既不替换也不删除。
+
+**升级 hc 之后**，练习工作区会自动跟上：第一个打开它的命令（包括 TUI）发现 hc 安装的某个 skill，或 `AGENTS.md` 中 hc 的区块，与当前 hc 写入的不同时，就会刷新它们，并在 stderr 上用一行说明，例如 `updated the workspace for hc v0.1.0-alpha.11: hc-cases, AGENTS.md`。它会更新过期的 skill，安装集合中缺失的 skill，删除 hc 不再提供的 skill，并改写区块；但会保留按名称安装的 skill，也不会重新创建你删掉的 `AGENTS.md` 区块或 `CLAUDE.md`（`hc skill install` 会）。你修改过的 skill 会保留，并只警告一次。一切都是最新时，它什么也不写。只有 hc 的正式发布版本才会这样做，而且只更新来自更旧 hc 的 skill：开发构建，或者较旧的 hc 打开一个已被较新 hc 刷新过的工作区，都不会改动它。`hc gen` 和 `hc fix` 在启动智能体前，不论 hc 是什么版本，都会安装集合中缺失或过期的 skill。
+
+题目包的检出目录会提交它的 skill，而它的 CI 要求这些 skill 属于它所固定的 hc（[CI 与固定的 hc 版本](packs_zh.md#ci-与固定的-hc-版本)），所以 hc 从不在那里自动刷新它们：`hc gen` 和 `hc fix` 只安装缺失的 skill；当这些 skill 来自与你运行的 hc 不同的版本时，`hc validate`、`hc pack check`、`hc gen` 和 `hc fix` 会提示这一点，并说明把题目包迁移到这个 hc 是单独的一步（在 workflow 中固定它、运行 `hc skill install`、提交）。
 
 ## 调试
 

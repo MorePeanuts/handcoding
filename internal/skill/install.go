@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 )
 
 // The directories skills are installed into, relative to the workspace root:
@@ -62,6 +64,12 @@ type Installed struct {
 	Version string
 	// Shipped reports whether the registry has the skill.
 	Shipped bool
+	// Hash is the hash of the copy's content, for managed skills.
+	Hash string
+	// Superseded reports, for a managed skill, whether hc ships other
+	// content for it than the copy was installed with, or no longer ships
+	// it: what an update would change, and a Modified copy misses.
+	Superseded bool
 }
 
 // inspect reports the state of the skill directory dir (relative to root).
@@ -79,7 +87,10 @@ func inspect(root, dir string) Installed {
 		return in
 	}
 	in.Version = m.Version
-	switch hash, err := hashDir(abs); {
+	in.Superseded = !shipped || m.Hash != s.Hash
+	hash, err := hashDir(abs)
+	in.Hash = hash
+	switch {
 	case err != nil || hash != m.Hash:
 		in.State = Modified
 	case shipped && hash == s.Hash:
@@ -170,6 +181,16 @@ type Options struct {
 	// so that installing a context's set syncs the workspace to it. Without
 	// it, only managed skills hc no longer ships are removed.
 	Exclusive bool
+	// Refresh refreshes only what the workspace has of hc's instructions:
+	// it rewrites hc's block of AGENTS.md where the file has one, and never
+	// creates the block or CLAUDE.md, which the user may have removed on
+	// purpose.
+	Refresh bool
+	// MissingOnly installs only the named skills that are not installed,
+	// and leaves every installed copy as it is: none is updated, replaced
+	// or removed. It rewrites hc's block of AGENTS.md only when it
+	// installed a skill, and never creates CLAUDE.md.
+	MissingOnly bool
 }
 
 // Action is what Install did to a skill directory.
@@ -204,6 +225,12 @@ const legacyDir = ClaudeDir + "/handcoding"
 // workspace at root, a directory of the context, then rewrites hc's block in
 // AGENTS.md (see Index). Missing and outdated managed skills are written;
 // edited ones only with Force; skills hc did not install are never touched.
+//
+// Every skill directory is replaced whole, by renaming one built beside it
+// (see replaceDir), and AGENTS.md and CLAUDE.md by renaming a file written
+// beside them, so that an agent reading them never sees half of one. Two
+// processes installing at once could still undo each other's work, so
+// callers in a workspace hold its skills lock (workspace.LockSkills).
 func Install(root string, ctx Context, names []string, opts Options) ([]Change, error) {
 	for _, name := range names {
 		if _, ok := Get(name); !ok {
@@ -215,7 +242,9 @@ func Install(root string, ctx Context, names []string, opts Options) ([]Change, 
 		keep = names
 	}
 	var changes []Change
+	added := false
 	for _, dir := range Dirs {
+		removeStaging(filepath.Join(root, filepath.FromSlash(dir)))
 		for _, name := range names {
 			c, err := installOne(root, path.Join(dir, name), opts)
 			if err != nil {
@@ -223,7 +252,11 @@ func Install(root string, ctx Context, names []string, opts Options) ([]Change, 
 			}
 			if c != nil {
 				changes = append(changes, *c)
+				added = added || c.Action == Added
 			}
+		}
+		if opts.MissingOnly {
+			continue
 		}
 		for _, in := range managedIn(root, dir) {
 			if slices.Contains(keep, in.Name) {
@@ -233,19 +266,25 @@ func Install(root string, ctx Context, names []string, opts Options) ([]Change, 
 				changes = append(changes, Change{Path: in.Dir, Action: Skipped, Reason: "not a skill this workspace gets, but edited since hc installed it; `hc skill install --force` removes it"})
 				continue
 			}
-			if err := os.RemoveAll(filepath.Join(root, filepath.FromSlash(in.Dir))); err != nil {
+			if err := removeDir(filepath.Join(root, filepath.FromSlash(in.Dir))); err != nil {
 				return changes, err
 			}
 			changes = append(changes, Change{Path: in.Dir, Action: Removed})
 		}
 	}
-	if removeLegacy(root) {
+	if !opts.MissingOnly && removeLegacy(root) {
 		changes = append(changes, Change{Path: legacyDir, Action: Removed})
 	}
-	if changed, err := WriteIndex(root, ctx); err != nil {
+	if opts.MissingOnly && !added {
+		return changes, nil
+	}
+	if changed, err := writeIndex(root, ctx, !opts.Refresh); err != nil {
 		return changes, err
 	} else if changed {
 		changes = append(changes, Change{Path: AgentsFile, Action: Updated})
+	}
+	if opts.Refresh || opts.MissingOnly {
+		return changes, nil
 	}
 	if created, err := WriteClaudeFile(root); err != nil {
 		return changes, err
@@ -257,6 +296,9 @@ func Install(root string, ctx Context, names []string, opts Options) ([]Change, 
 
 func installOne(root, dir string, opts Options) (*Change, error) {
 	in := inspect(root, dir)
+	if opts.MissingOnly && in.State != Missing {
+		return nil, nil
+	}
 	action := Added
 	switch in.State {
 	case Current:
@@ -272,27 +314,112 @@ func installOne(root, dir string, opts Options) (*Change, error) {
 		action = Updated
 	}
 	s, _ := Get(in.Name)
-	abs := filepath.Join(root, filepath.FromSlash(dir))
-	if err := os.RemoveAll(abs); err != nil {
-		return nil, err
-	}
-	for name, data := range s.Files {
-		p := filepath.Join(abs, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			return nil, err
-		}
-		if err := os.WriteFile(p, data, 0o644); err != nil {
-			return nil, err
-		}
-	}
 	m, err := json.MarshalIndent(mark{Skill: s.Name, Version: opts.Version, Hash: s.Hash}, "", "  ")
 	if err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(filepath.Join(abs, MarkFile), append(m, '\n'), 0o644); err != nil {
+	files := maps.Clone(s.Files)
+	files[MarkFile] = append(m, '\n')
+	if err := replaceDir(filepath.Join(root, filepath.FromSlash(dir)), files); err != nil {
 		return nil, err
 	}
 	return &Change{Path: dir, Action: action}, nil
+}
+
+// stagingPrefix starts the names of the directories that replaceDir and
+// removeDir build and remove skill directories in, beside them. Agents do
+// not take them for skills: they have no SKILL.md of their own.
+const stagingPrefix = ".hc-staging-"
+
+// replaceDir makes dir a directory of exactly files (paths relative to it)
+// in a way no reader sees half done: it writes them into a staging
+// directory beside dir, renames the old dir into it and the new one into
+// place, then removes the staging directory with the old copy. Between the
+// two renames, dir is missing for an instant.
+func replaceDir(dir string, files map[string][]byte) error {
+	parent := filepath.Dir(dir)
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return err
+	}
+	stage, err := os.MkdirTemp(parent, stagingPrefix)
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(stage)
+	next := filepath.Join(stage, "new")
+	if err := os.Mkdir(next, 0o755); err != nil {
+		return err
+	}
+	for name, data := range files {
+		p := filepath.Join(next, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(p, data, 0o644); err != nil {
+			return err
+		}
+	}
+	if err := os.Rename(dir, filepath.Join(stage, "old")); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return os.Rename(next, dir)
+}
+
+// removeDir removes dir at once, as replaceDir replaces one: renamed into a
+// staging directory, which is then removed.
+func removeDir(dir string) error {
+	stage, err := os.MkdirTemp(filepath.Dir(dir), stagingPrefix)
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(stage)
+	if err := os.Rename(dir, filepath.Join(stage, "old")); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+// staleStaging is how old a staging directory is when Install removes it,
+// as left behind by an hc process that ended before it could.
+const staleStaging = 10 * time.Minute
+
+// removeStaging removes the stale staging directories in dir.
+func removeStaging(dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if !e.IsDir() || !strings.HasPrefix(e.Name(), stagingPrefix) {
+			continue
+		}
+		if info, err := e.Info(); err == nil && time.Since(info.ModTime()) > staleStaging {
+			_ = os.RemoveAll(filepath.Join(dir, e.Name()))
+		}
+	}
+}
+
+// writeFile writes data to the file at p in a way no reader sees half done:
+// into a temporary file beside it, then renamed into place.
+func writeFile(p string, data []byte) error {
+	f, err := os.CreateTemp(filepath.Dir(p), "."+filepath.Base(p)+".hc-*")
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(data)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Chmod(f.Name(), 0o644)
+	}
+	if err == nil {
+		err = os.Rename(f.Name(), p)
+	}
+	if err != nil {
+		_ = os.Remove(f.Name())
+	}
+	return err
 }
 
 // removeLegacy removes the skill hc installed before skills were managed, if
@@ -310,5 +437,40 @@ func removeLegacy(root string) bool {
 	if m, _, err := FrontMatter(data); err != nil || m.Name != "handcoding" {
 		return false
 	}
-	return os.RemoveAll(dir) == nil
+	return removeDir(dir) == nil
+}
+
+// Status is what Check found of the files hc manages in a workspace.
+type Status struct {
+	// Copies are the managed skill directories in the install directories,
+	// whether or not the workspace's set has them.
+	Copies []Installed
+	// IndexStale reports whether AGENTS.md has hc's block and it is not
+	// Index's.
+	IndexStale bool
+}
+
+// Check reports the state of the files hc manages in the workspace of the
+// context at root, for deciding whether to refresh them. It reads only the
+// managed skill directories and AGENTS.md, and writes nothing.
+func Check(root string, ctx Context) (Status, error) {
+	var st Status
+	for _, dir := range Dirs {
+		st.Copies = append(st.Copies, managedIn(root, dir)...)
+	}
+	data, err := os.ReadFile(filepath.Join(root, AgentsFile))
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return st, nil
+	case err != nil:
+		return st, err
+	}
+	old := string(data)
+	if strings.Contains(old, beginMarker) {
+		// A block without its end is for Install to report.
+		if updated, err := withIndex(old, Index(root, ctx)); err == nil {
+			st.IndexStale = updated != old
+		}
+	}
+	return st, nil
 }

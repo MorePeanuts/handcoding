@@ -743,6 +743,7 @@ the reference solutions on every case and require them to pass. Validates
 				return err
 			}
 			defer a.Close()
+			packSkillsHint(a)
 			opts := app.ValidateOptions{Run: run, Stderr: os.Stderr, Jobs: jobs}
 			var sum app.ValidateSummary
 			if len(args) > 0 {
