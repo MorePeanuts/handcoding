@@ -331,3 +331,27 @@ func TestPythonEnvironment(t *testing.T) {
 		t.Fatal("SyncEnv despite python.interpreter")
 	}
 }
+
+// Without indices, Select picks the examples alone, each once, and nothing
+// when no case is marked as one.
+func TestSelectExamples(t *testing.T) {
+	t.Parallel()
+	cases := []problem.Case{{Example: true}, {}, {}, {}}
+	indices := func(sel []runner.Selected) []int {
+		var got []int
+		for _, s := range sel {
+			got = append(got, s.Index)
+		}
+		return got
+	}
+	if sel, err := app.Select(cases, nil, false); err != nil || !slices.Equal(indices(sel), []int{1}) {
+		t.Errorf("one example: %v, %v; want [1]", indices(sel), err)
+	}
+	cases[0].Example = false
+	if sel, err := app.Select(cases, nil, false); err != nil || len(sel) != 0 {
+		t.Errorf("no example: %v, %v; want none", indices(sel), err)
+	}
+	if sel, err := app.Select(cases, nil, true); err != nil || len(sel) != 4 {
+		t.Errorf("all: %v, %v; want 4 cases", indices(sel), err)
+	}
+}

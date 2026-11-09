@@ -321,7 +321,11 @@ func selectForTest(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.La
 	if err != nil {
 		return nil, err
 	}
-	return app.Select(cases, o.cases, o.all)
+	sel, err := app.Select(cases, o.cases, o.all)
+	if err == nil && len(sel) == 0 && len(cases) > 0 {
+		return nil, fmt.Errorf(`%s has no example cases: mark the statement's examples with "example": true in %s, or choose cases with --case or --all`, p.Slug, problem.CasesFile)
+	}
+	return sel, err
 }
 
 func parseInput(p *problem.Problem, s string) (problem.Case, error) {

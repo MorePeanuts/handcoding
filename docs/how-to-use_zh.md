@@ -137,7 +137,7 @@ pyrightconfig.json
 
 ```sh
 hc start two-sum -e                                 # 创建解答并打开编辑器
-hc test two-sum                                     # 运行示例用例（没有标记示例时运行前 3 个用例）
+hc test two-sum                                     # 运行示例用例（没有用例标记为示例时报错）
 hc test two-sum -c 4 -c 5                           # 运行指定用例
 hc test two-sum --all -v                            # 全部用例，完整输出，不记录
 hc test two-sum -i '{"nums":[1,2,3],"target":5}'    # 自定义输入（有参考解时会算出期望输出）
