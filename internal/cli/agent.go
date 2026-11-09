@@ -62,7 +62,7 @@ computes expected outputs with ` + "`hc cases build`" + ` and verifies them with
 				if err != nil {
 					return err
 				}
-				if err := syncSkills(a.WS); err != nil {
+				if err := syncSkills(a); err != nil {
 					return err
 				}
 				rel, _ := filepath.Rel(a.WS.Root, p.Dir)
@@ -106,7 +106,7 @@ To fix a case by hand instead: hc cases edit <problem>.`,
 				if err != nil {
 					return err
 				}
-				if err := syncSkills(a.WS); err != nil {
+				if err := syncSkills(a); err != nil {
 					return err
 				}
 				solution := ""
@@ -215,7 +215,9 @@ workflows. They are installed into the workspace, for Claude Code in
 ` + skill.ClaudeDir + ` and for Codex in ` + skill.AgentsDir + `, and listed in a block of
 AGENTS.md; in a practice workspace, that block is also a guide for agents
 helping you practice. hc manages only the copies it installed, and never
-touches other skills or the rest of AGENTS.md.`,
+touches other skills or the rest of AGENTS.md. A release of hc refreshes a
+practice workspace's outdated copies and block when it opens the workspace;
+a pack checkout's change only with hc skill install.`,
 	}
 	var force bool
 	install := &cobra.Command{
@@ -234,13 +236,12 @@ skills hc installed that the workspace does not get are removed.`,
 				return err
 			}
 			defer a.Close()
-			ctx := skillContext(a.WS)
 			opts := skill.Options{Version: version.String(), Force: force}
 			names := args
 			if len(names) == 0 {
-				names, opts.Exclusive = skill.Set(ctx), true
+				names, opts.Exclusive = skill.Set(a.SkillContext()), true
 			}
-			changes, err := skill.Install(a.WS.Root, ctx, names, opts)
+			changes, err := a.InstallSkills(names, opts)
 			printSkillChanges(os.Stdout, changes)
 			if err == nil && len(changes) == 0 {
 				fmt.Println("skills are up to date")
@@ -259,7 +260,7 @@ skills hc installed that the workspace does not get are removed.`,
 				return err
 			}
 			defer a.Close()
-			ctx := skillContext(a.WS)
+			ctx := a.SkillContext()
 			set := skill.Set(ctx)
 			fmt.Printf("This is a %s; it gets %s.\n\n", ctx, strings.Join(set, ", "))
 			rows := [][]string{{"SKILL", "SET", "DIRECTORY", "STATUS", "VERSION"}}
@@ -295,27 +296,28 @@ skills hc installed that the workspace does not get are removed.`,
 	return cmd
 }
 
-// skillContext decides which skills `hc skill install` gives ws: a pack
-// checkout gets the authoring set, a practice workspace the practice set.
-func skillContext(ws *workspace.Workspace) skill.Context {
-	if ws.Kind == workspace.Authoring {
-		return skill.Authoring
-	}
-	return skill.Practice
+// syncSkills installs the skills an agent needs before it starts (see
+// app.AgentSkills): in a practice workspace, as `hc skill install` does
+// without names, but removing no skill the user installed by name; in a
+// pack checkout only the missing ones, with packSkillsHint.
+func syncSkills(a *app.App) error {
+	changes, err := a.AgentSkills(version.String())
+	printSkillChanges(os.Stderr, changes)
+	packSkillsHint(a)
+	return err
 }
 
-// syncSkills installs the workspace's skills before an agent starts, as
-// `hc skill install` does without names: missing and outdated copies are
-// written and managed copies of other skills removed, but none the user
-// edited is touched.
-func syncSkills(ws *workspace.Workspace) error {
-	// Not exclusive: a skill the user installed by name stays. Only a bare
-	// hc skill install brings the workspace to exactly its set.
-	opts := skill.Options{Version: version.String()}
-	ctx := skillContext(ws)
-	changes, err := skill.Install(ws.Root, ctx, skill.Set(ctx), opts)
-	printSkillChanges(os.Stderr, changes)
-	return err
+// packSkillsHint says, in a pack checkout whose skills another hc
+// installed, that moving the pack to this hc is a step of its own. hc
+// validate, hc pack check, hc gen and hc fix show it, once each.
+func packSkillsHint(a *app.App) {
+	v := version.String()
+	from := a.PackSkillVersions(v)
+	if len(from) == 0 {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "%s this pack's skills come from hc %s, not from this hc (%s). To move the pack to this hc, follow the %s skill's steps: pin %s in %s, run `hc skill install`, and commit the result.\n",
+		ui.Faint.Render("note:"), strings.Join(from, ", "), v, skill.Pack, v, app.WorkflowFile)
 }
 
 func printSkillChanges(w io.Writer, changes []skill.Change) {

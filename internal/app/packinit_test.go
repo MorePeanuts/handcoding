@@ -295,26 +295,3 @@ func TestPackNameFor(t *testing.T) {
 		}
 	}
 }
-
-func TestReleaseVersion(t *testing.T) {
-	t.Parallel()
-	for v, want := range map[string]bool{
-		"v0.2.0":                          true,
-		"v1.10.3":                         true,
-		"v0.2.0-alpha.1":                  true,
-		"dev":                             false,
-		"0.2.0":                           false,
-		"v0.2":                            false,
-		"v0.1.0-alpha.5-3-g28dc5a8":       false,
-		"v0.1.0-alpha.5-3-g28dc5a8-dirty": false,
-		"v0.2.0-dirty":                    false,
-		"28dc5a8":                         false,
-		"v0.1.0-alpha.5.0.20261028143410-28dc5a8f1330":       false,
-		"v0.0.0-20261028143410-28dc5a8f1330":                 false,
-		"v0.1.0-alpha.5.0.20261028143410-28dc5a8f1330+dirty": false,
-	} {
-		if got := app.ReleaseVersion(v); got != want {
-			t.Errorf("ReleaseVersion(%q) = %v, want %v", v, got, want)
-		}
-	}
-}

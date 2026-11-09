@@ -82,6 +82,8 @@ hc skill install     # replace the skills with those of this hc
 git diff             # review what changed, then commit it with the bump
 ```
 
+hc never does this on its own in a pack checkout, as it does in a practice workspace: `hc gen` and `hc fix` only install the skills the checkout lacks. When the committed skills come from another hc than the one you run, `hc validate`, `hc pack check`, `hc gen` and `hc fix` remind you of these steps.
+
 Without this, the last step of CI fails. CI runs `hc skill install --force`, so the committed copies of hc's skills must be exactly the pinned hc's: an edit to one of them fails CI too (`hc skill list` shows it as *modified*). Keep your own guidance in `CLAUDE.md`, the author section of `AGENTS.md`, or a skill of your own, which hc never touches.
 
 ## Publishing

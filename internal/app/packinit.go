@@ -18,6 +18,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/skill"
+	"github.com/MorePeanuts/handcoding/internal/version"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
@@ -122,7 +123,7 @@ func InitPack(dir string, o InitPackOptions) (*InitPackResult, error) {
 		Root:     root,
 		Manifest: m,
 		Files:    all,
-		Pinned:   ReleaseVersion(o.HCVersion),
+		Pinned:   version.IsRelease(o.HCVersion),
 		GitRoot:  gitRoot(root),
 	}, nil
 }
@@ -149,7 +150,7 @@ func packFiles(m *pack.Manifest, hcVersion string) ([]packFile, error) {
 		Name, Title, Version, Python string
 		Pinned                       bool
 	}{m.Name, m.DisplayTitle(), "latest", python.MinVersion, false}
-	if ReleaseVersion(hcVersion) {
+	if version.IsRelease(hcVersion) {
 		data.Version, data.Pinned = hcVersion, true
 	}
 	files := []packFile{
@@ -189,27 +190,14 @@ func renderPackTemplate(name string, data any) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-var (
-	nonAlnumRE = regexp.MustCompile(`[^a-z0-9]+`)
-	// releaseRE matches the tag of an hc release, vX.Y.Z or vX.Y.Z-pre.
-	releaseRE = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
-	// buildRE matches versions that look like releases but are not: git
-	// describe's (v0.1.0-3-gabc1234, -dirty) and Go's pseudo-versions
-	// (v0.0.0-20261028123456-abcdef123456).
-	buildRE = regexp.MustCompile(`-\d+-g[0-9a-f]+(-dirty)?$|-dirty$|\d{14}-[0-9a-f]{12}$`)
-)
+// nonAlnumRE matches the runs of characters a pack's name cannot have.
+var nonAlnumRE = regexp.MustCompile(`[^a-z0-9]+`)
 
 // PackNameFor derives a pack's name from the name of its directory: lower
 // case, with every run of other characters than letters and digits a hyphen.
 // The result may still not be a valid name (it is empty, say, or local).
 func PackNameFor(dir string) string {
 	return strings.Trim(nonAlnumRE.ReplaceAllString(strings.ToLower(filepath.Base(dir)), "-"), "-")
-}
-
-// ReleaseVersion reports whether v is the version of an hc release, which
-// `go install …@v` can install: not dev, nor a build between releases.
-func ReleaseVersion(v string) bool {
-	return releaseRE.MatchString(v) && !buildRE.MatchString(v)
 }
 
 // gitRoot returns the top of the git work tree dir is in, or "".

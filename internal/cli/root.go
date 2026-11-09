@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
+	"slices"
 	"strings"
 
 	"github.com/mattn/go-isatty"
@@ -16,6 +18,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/problem"
+	"github.com/MorePeanuts/handcoding/internal/skill"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 	"github.com/MorePeanuts/handcoding/internal/version"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
@@ -104,13 +107,65 @@ list right away, and --group a group of a pack.`,
 	return root
 }
 
-// openApp opens the workspace and the application.
+// openApp opens the workspace and the application, and brings what hc
+// manages in a practice workspace in step with this hc (see
+// app.SyncWorkspace), before any command, the TUI included, uses it.
 func (o *rootOptions) openApp() (*app.App, error) {
 	ws, err := workspace.Find(o.workspace)
 	if err != nil {
 		return nil, err
 	}
-	return app.New(ws), nil
+	a := app.New(ws)
+	syncWorkspace(a)
+	return a, nil
+}
+
+// syncWorkspace runs app.SyncWorkspace and says on stderr, which keeps
+// stdout clean for --json, what it did. Its failure does not stop the
+// command: the workspace works with outdated skills too.
+func syncWorkspace(a *app.App) {
+	v := version.String()
+	res, err := a.SyncWorkspace(context.Background(), v)
+	if res != nil && len(res.Changes) > 0 {
+		fmt.Fprintf(os.Stderr, "%s\n", ui.Faint.Render(fmt.Sprintf("updated the workspace for hc %s: %s", v, strings.Join(syncedNames(res.Changes), ", "))))
+	}
+	if res != nil && len(res.Kept) > 0 {
+		dirs := make([]string, len(res.Kept))
+		for i, in := range res.Kept {
+			dirs[i] = in.Dir
+		}
+		verb, it := "misses", "it"
+		if len(dirs) > 1 {
+			verb, it = "miss", "them"
+		}
+		fmt.Fprintf(os.Stderr, "%s kept your edited %s, which %s what hc %s changed in %s; `hc skill install --force` replaces %s (shown once)\n",
+			ui.Yellow.Render("warning"), strings.Join(dirs, ", "), verb, v, it, it)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s cannot update the workspace's skills for hc %s: %v\n", ui.Yellow.Render("warning"), v, err)
+	}
+}
+
+// syncedNames names what changes changed, once each: a skill by its name,
+// marked when it is new or removed, and a file by its path.
+func syncedNames(changes []skill.Change) []string {
+	var names []string
+	for _, c := range changes {
+		name := c.Path
+		if dir := path.Dir(c.Path); slices.Contains(skill.Dirs, dir) {
+			name = path.Base(c.Path)
+			switch c.Action {
+			case skill.Added:
+				name += " (new)"
+			case skill.Removed:
+				name += " (removed)"
+			}
+		}
+		if !slices.Contains(names, name) {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 // withProblem opens the app and resolves the problem and language.

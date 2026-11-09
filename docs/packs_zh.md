@@ -84,6 +84,8 @@ hc skill install     # 换成这个 hc 的技能
 git diff             # 检查改动，然后和升级一起提交
 ```
 
+在题目包的检出目录中，hc 不会像在练习工作区中那样自动这样做：`hc gen` 和 `hc fix` 只安装检出目录缺少的技能。当提交的技能来自与你运行的 hc 不同的版本时，`hc validate`、`hc pack check`、`hc gen` 和 `hc fix` 会提醒你这些步骤。
+
 不这样做，CI 的最后一步就会失败。CI 运行的是 `hc skill install --force`，所以仓库中 hc 技能的副本必须与固定的 hc 完全一致：编辑过其中任何一个（`hc skill list` 显示为 *modified*），CI 同样会失败。你自己的说明请写在 `CLAUDE.md`、`AGENTS.md` 的作者部分，或你自己的技能中，hc 从不触碰它们。
 
 ## 发布

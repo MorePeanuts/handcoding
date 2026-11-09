@@ -489,6 +489,7 @@ and a summary, and fails if anything is wrong.`,
 				}
 			}
 			defer a.Close()
+			packSkillsHint(a)
 			opts := app.ValidateOptions{Stderr: os.Stderr, Jobs: jobs}
 			sum, err := a.CheckPack(cmd.Context(), opts, func(f app.Finding) { printFinding(f) })
 			if err != nil {

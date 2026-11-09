@@ -119,6 +119,10 @@ Versions are [SemVer](https://semver.org/) tags with a `v` prefix. Pushing a tag
 
 Patch releases contain only fixes, never new features or problem protocol changes. Features accumulate on `main` and ship as pre-releases when there is something worth trying. There are no `-rc` releases.
 
+### Release notes
+
+The release workflow writes the changelog from the commits. Before publishing a release, add to its notes what upgrading to it changes in a user's workspace, if anything, and that it happens on its own: new or changed skills, or a new guide in `AGENTS.md`, which a practice workspace gets the first time the new hc opens it (a pack checkout's skills move only with the hc its CI pins, through `hc skill install`), caches rebuilt, or what hc now refuses and how to get past it. When an upgrade changes nothing in a workspace, say that too.
+
 ### Protocol versions
 
 A [protocol version](docs/protocol.md#protocol-versions) is a draft until the first stable release that implements it, and final from then on. Protocol changes made during a milestone go into its draft version without a bump: protocol 1 is final with `v0.1.0`, and the changes after it go into protocol 2, which `v0.2.0` makes final. A change to a final version, an added feature included, needs a new version. Whether a version is final is `problem.FinalProtocol` (`internal/problem/protocol.go`), and `TestFinalProtocol` (`internal/regression`) fails when the features of a final version change: the types, kinds, compare modes, fields and languages that `TestProtocolCoverage` derives from the code. It cannot see a feature whose meaning changes; review must.
