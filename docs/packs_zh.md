@@ -25,7 +25,7 @@ git init                                  # 如果它还不是仓库
 ```
 pack.yaml                     清单：protocol、name、title 和一个空的 groups 列表
 problems/                     题目，每题一个目录（初始为空，带一个 .gitkeep）
-.gitignore                    hc 在检出目录中添加的内容：.hc/、solutions/、hc.yaml、pyrightconfig.json
+.gitignore                    hc 在检出目录中添加的内容：.hc/、solutions/、hc.yaml、pyrightconfig.json、ty.toml
 .github/workflows/check.yml   CI：每次 push 和 pull request 时运行 hc pack check
 AGENTS.md                     给编码智能体的说明，以及 hc 的技能索引
 CLAUDE.md                     @AGENTS.md，以及留给 Claude Code 的备注

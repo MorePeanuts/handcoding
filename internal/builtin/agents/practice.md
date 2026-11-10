@@ -14,7 +14,7 @@ comes second. Answer in the user's language.
 - `packs/local/problems/`: the user's own problems.
 - `solutions/<pack>/<lang>/<dir>/solution.py` (or `.go`): the user's code. hc
   rewrites the other files there on every run (`_hc_runner.py`,
-  `hc_runtime.py`, `zz_hc_driver.go`, `go.mod`): never edit them.
+  `zz_hc_driver.go`, `go.mod`): never edit them.
 - `.hc/`: hc's state (history, caches, the Python environment). Never edit
   it; only `.hc/scratch/` is yours (see Scratch files).
 

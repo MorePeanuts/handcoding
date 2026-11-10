@@ -61,7 +61,7 @@ decide; do not do it on your own.
 5. Land one problem per commit (or pull request), whose message names the
    problem, with its group changes in the same commit. Commit only the pack's
    files: `pack.yaml` and `problems/<dir>/`, never `solutions/`, `.hc/`,
-   `hc.yaml` or `pyrightconfig.json`.
+   `hc.yaml`, `pyrightconfig.json` or `ty.toml`.
 
 To fix a problem that has landed, use `hc-problem` or `hc-cases` the same
 way, then `hc pack check`. Fixing cases, a reference or a statement is not

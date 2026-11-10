@@ -1175,9 +1175,7 @@ def _call_round_trip(solution, meta, inp, clock):
 
 
 def main(meta):
-    here = os.path.dirname(os.path.abspath(__file__))
-    if here not in sys.path:
-        sys.path.insert(0, here)
+    # The runner put the solution's directory on sys.path.
     import solution  # noqa: E402
 
     # hc reads and writes UTF-8 whatever the locale. Outputs keep non-ASCII

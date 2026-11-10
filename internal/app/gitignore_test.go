@@ -17,7 +17,8 @@ import (
 // workspace.GeneratedFiles, which a practice workspace's .gitignore leaves
 // out, are what the drivers write next to a solution: every file Prepare
 // writes for any problem of the regression set is listed, and every file
-// listed is written (but __pycache__/, which Python writes when it runs).
+// listed is written (but __pycache__/, which Python writes when it runs,
+// and the LegacyFiles of older hc versions).
 // With git on PATH, git itself ignores them, and not the solutions.
 func TestGitignoreCoversGenerated(t *testing.T) {
 	t.Parallel()
@@ -61,7 +62,7 @@ func TestGitignoreCoversGenerated(t *testing.T) {
 		}
 	}
 	for _, name := range workspace.GeneratedFiles {
-		if !written[name] && name != "__pycache__/" {
+		if !written[name] && name != "__pycache__/" && !slices.Contains(workspace.LegacyFiles, name) {
 			t.Errorf("no driver writes %s, which .gitignore leaves out", name)
 		}
 	}

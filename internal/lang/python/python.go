@@ -1,8 +1,10 @@
 // Package python implements the Python 3 language for handcoding.
 //
-// A problem directory holds solution.py (the user's code), hc_runtime.py
-// (ListNode/TreeNode, the judge-defined types, codecs, driver loop) and _hc_runner.py, a tiny entry
-// point embedding the problem signature.
+// A problem directory holds solution.py (the user's code) and _hc_runner.py,
+// a tiny entry point embedding the problem signature. hc_runtime.py
+// (ListNode/TreeNode, the judge-defined types, codecs, driver loop) is
+// shared: written once per hc version into a directory of the workspace
+// (Language.Runtime), which the runner puts on sys.path.
 //
 // Python also runs the checkers of problems judged by one (judge.compare:
 // checker), for solutions in every language: hc_checker.py calls check from
@@ -20,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -73,6 +76,10 @@ type Language struct {
 	Interpreter string
 	// Venv, when set, provides the interpreter instead.
 	Venv *Venv
+	// Runtime is the directory of the shared runtime: hc_runtime.py for
+	// editors, and a directory per hc version (runtimeDir) for runs. Empty
+	// means one in the system's temporary directory.
+	Runtime string
 }
 
 var (
@@ -223,8 +230,17 @@ type meta struct {
 	RoundTrip *problem.RoundTrip `json:"round_trip,omitempty"`
 }
 
-// Prepare writes hc_runtime.py and _hc_runner.py.
-func (Language) Prepare(dir string, p *problem.Problem) error {
+// Prepare writes _hc_runner.py, which imports hc_runtime from the shared
+// runtime directory, and removes the copy of hc_runtime.py an older hc wrote
+// into dir, which would shadow it for code run otherwise.
+func (l Language) Prepare(dir string, p *problem.Problem) error {
+	rt, err := l.runtimeDir()
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(filepath.Join(dir, runtimeFile)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
 	m, err := json.Marshal(meta{Kind: p.Kind, Function: p.Function, Class: p.Class, Output: p.Judge.Output, OutputLength: p.Judge.OutputLength, RoundTrip: p.Judge.RoundTrip})
 	if err != nil {
 		return err
@@ -235,6 +251,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, %s)
 
 import hc_runtime  # noqa: E402
 
@@ -242,8 +259,8 @@ META = json.loads(%q)
 
 if __name__ == "__main__":
     hc_runtime.main(META)
-`, string(m))
-	return writeFiles(dir, map[string][]byte{runtimeFile: runtimeSrc, runnerFile: []byte(runner)})
+`, pyString(rt), string(m))
+	return writeFiles(dir, map[string][]byte{runnerFile: []byte(runner)})
 }
 
 // writeFiles writes generated files into dir, leaving unchanged ones alone.
@@ -260,13 +277,15 @@ func writeFiles(dir string, files map[string][]byte) error {
 	return nil
 }
 
-// CheckCommand runs a problem's checker.py with hc_checker.py, next to
-// hc_runtime.py so that checkers can import its types and codecs.
+// CheckCommand runs a problem's checker.py with hc_checker.py of the shared
+// runtime, next to hc_runtime.py so that checkers can import its types and
+// codecs.
 func (l Language) CheckCommand(ctx context.Context, dir, checker, items, out string) (*exec.Cmd, error) {
-	if err := writeFiles(dir, map[string][]byte{runtimeFile: runtimeSrc, checkerFile: checkerSrc}); err != nil {
+	rt, err := l.runtimeDir()
+	if err != nil {
 		return nil, err
 	}
-	cmd := exec.CommandContext(ctx, l.python(), checkerFile, checker, items, out)
+	cmd := exec.CommandContext(ctx, l.python(), filepath.Join(rt, checkerFile), checker, items, out)
 	cmd.Dir = dir
 	// Unbuffered, so that what a crashing checker printed is reported.
 	cmd.Env = append(os.Environ(), "PYTHONDONTWRITEBYTECODE=1", "PYTHONUNBUFFERED=1")
@@ -282,13 +301,15 @@ except SyntaxError:
     sys.exit(1)
 `
 
-// GenerateCommand runs a problem's generator.py with hc_generator.py, next
-// to hc_runtime.py, which provides the Rng generators get.
+// GenerateCommand runs a problem's generator.py with hc_generator.py of the
+// shared runtime, next to hc_runtime.py, which provides the Rng generators
+// get.
 func (l Language) GenerateCommand(ctx context.Context, dir, generator, items, out string) (*exec.Cmd, error) {
-	if err := writeFiles(dir, map[string][]byte{runtimeFile: runtimeSrc, genFile: generatorSrc}); err != nil {
+	rt, err := l.runtimeDir()
+	if err != nil {
 		return nil, err
 	}
-	cmd := exec.CommandContext(ctx, l.python(), genFile, generator, items, out)
+	cmd := exec.CommandContext(ctx, l.python(), filepath.Join(rt, genFile), generator, items, out)
 	cmd.Dir = dir
 	// A fixed hash seed keeps the order of sets of strings from changing
 	// between runs; generators must not depend on it, and digests catch
@@ -390,4 +411,10 @@ func entryLine(path string, p *problem.Problem) (int, error) {
 		return 0, err
 	}
 	return 0, errors.New("entry point not found")
+}
+
+// pyString is s as a Python string literal: JSON's escapes are Python's.
+func pyString(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
 }

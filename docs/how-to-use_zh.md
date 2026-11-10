@@ -22,11 +22,12 @@
   packs/local/problems/0001-two-sum/       你自己的题目（见题目协议）
   packs/<name>/                            已安装的题目包（只读）
   solutions/local/go/0001-two-sum/         你的代码：solution.go，以及自动生成的 go.mod 和 zz_hc_driver.go
-  solutions/local/python/0001-two-sum/     你的代码：solution.py，以及自动生成的 hc_runtime.py 和 _hc_runner.py
+  solutions/local/python/0001-two-sum/     你的代码：solution.py，以及自动生成的 _hc_runner.py
   .hc/hc.db                                提交历史（SQLite）
   .hc/venv/                                hc 管理的 Python 虚拟环境
+  .hc/runtime/python/                      hc_runtime.py，所有 Python 解答共用
   .hc/cache/                               供编码智能体使用的 Go 和 uv 缓存，以及生成用例（cases/）、Go 程序（build/）和参考解用时（baseline/）
-  pyrightconfig.json                       让 pyright 使用 .hc/venv
+  pyrightconfig.json  ty.toml              让 pyright 和 ty 使用 .hc/venv
   AGENTS.md  CLAUDE.md                     给帮助你练习的编码智能体的指南（见智能体 skill）
   .claude/  .agents/                       智能体 skill
 ```
@@ -60,11 +61,11 @@ Python 在 hc 管理的虚拟环境 `.hc/venv` 中运行：包括 Python 解答�
 
 在题目包的 checkout 中（见[编写题目包](packs_zh.md)），环境改用 Python 3.12，即协议支持的最旧版本，题目包的参考解、判题程序和生成器都必须能在它上面运行：用 `uv venv --python 3.12` 创建，没有 uv 时用 PATH 上最新的 `python3.12`。这样 `hc validate --run` 和 `hc pack check` 与题目包的 CI 使用同一个 Python。已有的环境版本不对时会重新创建；找不到 Python 3.12 时（没有 uv，PATH 上也没有），hc 使用最新的版本并给出警告。
 
-环境中装有 debugpy，用于 headless 调试。下载 Python 和安装 debugpy 需要联网，但只需一次；判题始终离线。如果环境失效（工作区被移动，或者它所用的 Python 被删除），hc 会重新创建。环境的 Python 低于 3.12 时（由最低版本更低的旧版 hc 创建），只要 uv 或 PATH 上的 Python 3.12+ 能建出新环境，hc 也会重新创建；否则保留它，`hc test`、`submit` 和 `debug` 会警告版本过旧。`hc env sync` 可以随时重建它：hc 无法创建环境时，在装好 uv 或 Python 之后运行它；或者用它补装 debugpy。hc 还会在工作区根目录写入 `pyrightconfig.json`（已有时不覆盖），让 pyright 和 basedpyright 用同一个解释器检查你的解答。如果想用自己的 Python（conda、自行编译的版本），在 `hc.yaml` 中设置 `python.interpreter`，hc 就原样使用它，不再创建虚拟环境，也不显示指引。
+环境中装有 debugpy，用于 headless 调试。下载 Python 和安装 debugpy 需要联网，但只需一次；判题始终离线。如果环境失效（工作区被移动，或者它所用的 Python 被删除），hc 会重新创建。环境的 Python 低于 3.12 时（由最低版本更低的旧版 hc 创建），只要 uv 或 PATH 上的 Python 3.12+ 能建出新环境，hc 也会重新创建；否则保留它，`hc test`、`submit` 和 `debug` 会警告版本过旧。`hc env sync` 可以随时重建它：hc 无法创建环境时，在装好 uv 或 Python 之后运行它；或者用它补装 debugpy。Python 解答从 `hc_runtime` 导入 `ListNode`、`TreeNode` 等类型，hc 把它在每个工作区中只保存一份，放在 `.hc/runtime/python/`，而不是放在每个解答旁边。虚拟环境通过 `hc_runtime.pth` 把这个目录加入 `sys.path`；hc 还会在工作区根目录写入 `pyrightconfig.json` 和 `ty.toml`（已有时不覆盖），让 pyright、basedpyright 和 ty 用同一个解释器检查你的解答，并能解析 `hc_runtime`。其他编辑器或语言服务器只要指向 `.hc/venv` 中的 Python，也能找到它。如果想用自己的 Python（conda、自行编译的版本），在 `hc.yaml` 中设置 `python.interpreter`，hc 就原样使用它，不再创建虚拟环境，不显示指引，也不写编辑器配置：要让编辑器解析 `hc_runtime`，把 `.hc/runtime/python` 加入它的搜索路径（pyright 的 `extraPaths`，ty 的 `environment.extra-paths`）。
 
 支持的最低版本是 Python 3.12 和 Go 1.22（见协议的[语言版本](protocol_zh.md#语言版本)）。你自己的解答可以使用工具链支持的任何特性：`hc test`、`hc submit` 和 `hc debug` 会注明所用的工具链（`[Python 3.12.9]`），版本过旧时只给出警告。题目附带的代码必须能在最低版本上运行，所以 `hc cases build` 和 `hc validate --run` 拒绝在过旧的工具链上运行参考解。更新的工具链没有问题：`hc validate --run`（因而 `hc pack check`）还会对照 Go 1.22 检查每个 Go 参考解，做法是在 go 指令为 `go 1.22` 的模块中对它运行 go vet，它会报告更新的语言特性和标准库符号。
 
-建议在工作区里执行 `git init`，记录下自己的练习过程。`hc init` 写入的 `.gitignore` 排除了 `.hc/`、已安装的题目包（可以由 `hc pack install` 根据 `hc.yaml` 重新安装），以及 hc 每次运行前在解答旁生成的文件（`zz_hc_driver.go`、`go.mod`、`_hc_runner.py`、`hc_runtime.py`、`__pycache__/`），这样仓库里只有你自己的代码。这些规则位于 `# hc:begin` 和 `# hc:end` 之间的区块中，更新的 hc 打开工作区时会刷新它；你自己的规则请写在区块之外。没有这个区块的 `.gitignore`（例如 v0.1.0-alpha.12 之前的 hc 写入的）归你所有，hc 不会改动它：要使用这个区块，从新工作区中复制一份（在临时目录中运行 `hc init`），并用 `git rm -r --cached solutions` 再 `git add solutions` 把已提交的生成文件移出仓库。
+建议在工作区里执行 `git init`，记录下自己的练习过程。`hc init` 写入的 `.gitignore` 排除了 `.hc/`、已安装的题目包（可以由 `hc pack install` 根据 `hc.yaml` 重新安装），以及 hc 每次运行前在解答旁生成的文件（`zz_hc_driver.go`、`go.mod`、`_hc_runner.py`、`__pycache__/`，以及 v0.1.0-alpha.12 之前的版本写在那里的 `hc_runtime.py`），这样仓库里只有你自己的代码。这些规则位于 `# hc:begin` 和 `# hc:end` 之间的区块中，更新的 hc 打开工作区时会刷新它；你自己的规则请写在区块之外。没有这个区块的 `.gitignore`（例如 v0.1.0-alpha.12 之前的 hc 写入的）归你所有，hc 不会改动它：要使用这个区块，从新工作区中复制一份（在临时目录中运行 `hc init`），并用 `git rm -r --cached solutions` 再 `git add solutions` 把已提交的生成文件移出仓库。
 
 ### 编写题目包
 
@@ -77,7 +78,7 @@ my-pack/
   pack.yaml  problems/                     题目包本身（见题目协议）
   hc.yaml                                  可选：你的个人设置（language、editor、agent、timeout、python）
   solutions/<pack>/<lang>/<dir>/           你的解答，与练习工作区相同
-  .hc/  pyrightconfig.json                 hc 的状态，与练习工作区相同
+  .hc/  pyrightconfig.json  ty.toml        hc 的状态，与练习工作区相同
   .claude/  .agents/  AGENTS.md  CLAUDE.md   智能体技能与说明，在某个命令安装之后出现
 ```
 
@@ -89,6 +90,7 @@ my-pack/
 solutions/
 hc.yaml
 pyrightconfig.json
+ty.toml
 ```
 
 `hc pack init` 写入的就是这个 `.gitignore`，并且把 `.claude/`、`.agents/` 和 `AGENTS.md` 留在仓库中，让新克隆的仓库能向智能体说明自己。用其他方式创建的题目包，可以把它们也加入忽略列表，或者提交它们（hc 只修改它自己安装的技能和 `AGENTS.md` 中它自己的那一段）。

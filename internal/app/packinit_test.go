@@ -108,7 +108,7 @@ func TestInitPack(t *testing.T) {
 		t.Errorf("CLAUDE.md:\n%s", data)
 	}
 	data, _ = os.ReadFile(filepath.Join(dir, ".gitignore"))
-	for _, want := range []string{"/.hc/", "/solutions/", "/hc.yaml", "/pyrightconfig.json"} {
+	for _, want := range []string{"/.hc/", "/solutions/", "/hc.yaml", "/pyrightconfig.json", "/ty.toml"} {
 		if !strings.Contains(string(data), want+"\n") {
 			t.Errorf(".gitignore lacks %s:\n%s", want, data)
 		}

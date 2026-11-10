@@ -26,7 +26,7 @@
 //	  solutions/<pack>/<lang>/<dir>/  as in a practice workspace
 //	  .hc/                            as in a practice workspace
 //
-// What hc adds to a checkout (hc.yaml, solutions/, .hc/, pyrightconfig.json,
+// What hc adds to a checkout (hc.yaml, solutions/, .hc/, pyrightconfig.json, ty.toml,
 // the agent skills) is the author's, not the pack's, and belongs in its
 // .gitignore.
 package workspace
@@ -57,6 +57,8 @@ const (
 	VenvDir = "venv"
 	// PyrightConfig points pyright at the virtual environment.
 	PyrightConfig = "pyrightconfig.json"
+	// TyConfig points ty at the virtual environment.
+	TyConfig = "ty.toml"
 	// EnvWorkspace overrides workspace discovery.
 	EnvWorkspace = "HC_WORKSPACE"
 )
@@ -401,6 +403,12 @@ func (w *Workspace) StatePath() string { return filepath.Join(w.Root, StateDir) 
 
 // VenvPath is the directory of the Python virtual environment.
 func (w *Workspace) VenvPath() string { return filepath.Join(w.Root, StateDir, VenvDir) }
+
+// RuntimePath is the directory of a language driver's runtime shared by the
+// workspace's solutions, such as Python's hc_runtime.py.
+func (w *Workspace) RuntimePath(langID string) string {
+	return filepath.Join(w.Root, StateDir, "runtime", langID)
+}
 
 // SolutionDir is where the user's code for p in language langID lives:
 // solutions/<pack>/<lang>/<dir>.

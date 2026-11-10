@@ -1,6 +1,7 @@
 package python
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -41,6 +42,10 @@ type Venv struct {
 	// Pyright, when set, is a pyrightconfig.json pointing pyright at the
 	// environment. It is written only if it does not exist.
 	Pyright string
+	// Ty, when set, is a ty.toml pointing ty at the environment, which ty
+	// does not find by itself (it looks for .venv). It is written only if
+	// it does not exist.
+	Ty string
 	// Version, when set, is the minor version of Python the environment
 	// has, such as "3.12". A pack checkout's has MinVersion, which the
 	// pack's content must run on. An environment of another version is
@@ -49,6 +54,11 @@ type Venv struct {
 	// Log receives progress messages when Ensure is given no writer; nil
 	// means os.Stderr.
 	Log io.Writer
+	// Runtime, when set, is the shared runtime's directory (see
+	// Language.Runtime), which the environment puts on sys.path with a
+	// PthFile, and the pyrightconfig.json it writes lists in extraPaths, so
+	// that editors resolve `from hc_runtime import …` in solutions.
+	Runtime string
 
 	mu    sync.Mutex
 	ready bool
@@ -101,7 +111,7 @@ func (v *Venv) Ensure(ctx context.Context, w io.Writer) error {
 			return err
 		}
 	}
-	v.writePyright(w)
+	v.writeEditorConfigs(w)
 	v.ready = true
 	return nil
 }
@@ -116,7 +126,7 @@ func (v *Venv) Rebuild(ctx context.Context, w io.Writer) error {
 		v.failed = err
 		return err
 	}
-	v.writePyright(w)
+	v.writeEditorConfigs(w)
 	v.ready = true
 	return nil
 }
@@ -302,10 +312,14 @@ func (v *Venv) writePyright(w io.Writer) {
 	if err != nil {
 		return
 	}
-	data, _ := json.MarshalIndent(map[string]string{
+	config := map[string]any{
 		"venvPath": filepath.ToSlash(rel),
 		"venv":     filepath.Base(v.Dir),
-	}, "", "  ")
+	}
+	if rt, err := filepath.Rel(filepath.Dir(v.Pyright), v.Runtime); v.Runtime != "" && err == nil {
+		config["extraPaths"] = []string{filepath.ToSlash(rt)}
+	}
+	data, _ := json.MarshalIndent(config, "", "  ")
 	if err := os.WriteFile(v.Pyright, append(data, '\n'), 0o644); err != nil {
 		fmt.Fprintf(w, "warning: %v\n", err)
 	}
@@ -381,4 +395,65 @@ func version(ctx context.Context, py string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// writeEditorConfigs points editors at the environment and the shared
+// runtime: pyright's and ty's configuration, unless they exist, and the
+// PthFile.
+func (v *Venv) writeEditorConfigs(w io.Writer) {
+	v.writePyright(w)
+	v.writeTy(w)
+	v.writePth(w)
+}
+
+// writeTy writes Ty, unless it exists.
+func (v *Venv) writeTy(w io.Writer) {
+	if v.Ty == "" {
+		return
+	}
+	if _, err := os.Stat(v.Ty); !errors.Is(err, os.ErrNotExist) {
+		return
+	}
+	base := filepath.Dir(v.Ty)
+	py, err := filepath.Rel(base, v.Dir)
+	if err != nil {
+		return
+	}
+	var b strings.Builder
+	b.WriteString("# Written by hc: ty, the type checker, uses the Python environment hc manages.\n")
+	fmt.Fprintf(&b, "[environment]\npython = %s\n", pyString(filepath.ToSlash(py)))
+	if rt, err := filepath.Rel(base, v.Runtime); v.Runtime != "" && err == nil {
+		fmt.Fprintf(&b, "extra-paths = [%s]\n", pyString(filepath.ToSlash(rt)))
+	}
+	if err := os.WriteFile(v.Ty, []byte(b.String()), 0o644); err != nil {
+		fmt.Fprintf(w, "warning: %v\n", err)
+	}
+}
+
+// writePth writes the PthFile that puts Runtime on sys.path into the
+// environment's site-packages, unless it is there.
+func (v *Venv) writePth(w io.Writer) {
+	if v.Runtime == "" {
+		return
+	}
+	data := []byte(v.Runtime + "\n")
+	for _, dir := range v.sitePackages() {
+		p := filepath.Join(dir, PthFile)
+		if old, err := os.ReadFile(p); err == nil && bytes.Equal(old, data) {
+			continue
+		}
+		if err := os.WriteFile(p, data, 0o644); err != nil {
+			fmt.Fprintf(w, "warning: %v\n", err)
+		}
+	}
+}
+
+// sitePackages returns the environment's site-packages directories.
+func (v *Venv) sitePackages() []string {
+	pattern := filepath.Join(v.Dir, "lib", "python3*", "site-packages")
+	if runtime.GOOS == "windows" {
+		pattern = filepath.Join(v.Dir, "Lib", "site-packages")
+	}
+	dirs, _ := filepath.Glob(pattern)
+	return dirs
 }

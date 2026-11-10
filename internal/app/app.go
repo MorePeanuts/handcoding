@@ -81,18 +81,24 @@ func LanguageID(name string) (string, error) {
 // oldest Python the protocol supports in a pack checkout, whose content
 // must run on it, as its CI checks; of the newest otherwise.
 func pythonLanguage(ws *workspace.Workspace) python.Language {
+	rt := ""
+	if ws.Root != "" {
+		rt = ws.RuntimePath("python")
+	}
 	if ws.Config.Python.Interpreter != "" {
-		return python.Language{Interpreter: ws.Config.Python.Interpreter}
+		return python.Language{Interpreter: ws.Config.Python.Interpreter, Runtime: rt}
 	}
 	v := &python.Venv{
 		Dir:     ws.VenvPath(),
 		Label:   filepath.Join(workspace.StateDir, workspace.VenvDir),
 		Pyright: filepath.Join(ws.Root, workspace.PyrightConfig),
+		Ty:      filepath.Join(ws.Root, workspace.TyConfig),
+		Runtime: rt,
 	}
 	if ws.Kind == workspace.Authoring {
 		v.Version = python.MinVersion
 	}
-	return python.Language{Venv: v}
+	return python.Language{Venv: v, Runtime: rt}
 }
 
 // SetUpPython creates the workspace's Python virtual environment unless it
