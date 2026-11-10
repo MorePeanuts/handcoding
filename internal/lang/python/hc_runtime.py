@@ -1209,8 +1209,12 @@ def _run_deep(fn, *args):
     except (ValueError, RuntimeError):
         return fn(*args)
     result, raised = [], []
+    started = threading.Event()
 
     def run():
+        # Threads fn starts (the time limit's watchdog) get the default
+        # stack: wait for the main thread to restore it.
+        started.wait()
         try:
             result.append(fn(*args))
         except BaseException as e:  # noqa: BLE001
@@ -1221,6 +1225,7 @@ def _run_deep(fn, *args):
         t.start()
     finally:
         threading.stack_size(0)
+        started.set()
     t.join()
     if raised:
         raise raised[0]
