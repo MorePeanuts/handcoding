@@ -61,14 +61,15 @@ type WorkspaceSync struct {
 	Kept []skill.Installed
 }
 
-// SyncWorkspace keeps what hc manages in a practice workspace, its skills
-// and its block of AGENTS.md, in step with the running hc, hcVersion. Every
-// command that opens a practice workspace calls it, so it writes nothing
-// unless something is stale: a managed skill copy is outdated, or
-// AGENTS.md's block is not the one hc writes now. Then it syncs as
-// AgentSkills does, but creates neither a block of AGENTS.md nor a
-// CLAUDE.md that the workspace lacks, which the user may have removed on
-// purpose (`hc skill install` creates them).
+// SyncWorkspace keeps what hc manages in a practice workspace, its skills,
+// its block of AGENTS.md and its block of .gitignore, in step with the
+// running hc, hcVersion. Every command that opens a practice workspace calls
+// it, so it writes nothing unless something is stale: a managed skill copy
+// is outdated, or a block is not the one hc writes now. Then it syncs the
+// skills as AgentSkills does, but creates neither a block of AGENTS.md nor
+// a CLAUDE.md that the workspace lacks, which the user may have removed on
+// purpose (`hc skill install` creates them), and rewrites the block of
+// .gitignore only where the file has one (workspace.RefreshIgnore).
 //
 // It only ever upgrades: it does nothing unless hcVersion is a release
 // (version.IsRelease), so that a development build and an installed hc do
@@ -88,8 +89,12 @@ func (a *App) SyncWorkspace(ctx context.Context, hcVersion string) (*WorkspaceSy
 	if err != nil || !upgradable(st, hcVersion) {
 		return nil, err
 	}
+	ignore, err := a.WS.IgnoreStale()
+	if err != nil {
+		return nil, err
+	}
 	kept := keptCopies(st)
-	if !stale(st) && len(kept) == 0 {
+	if !stale(st) && !ignore && len(kept) == 0 {
 		return nil, nil
 	}
 	unlock, held, err := a.WS.LockSkills(false)
@@ -115,6 +120,11 @@ func (a *App) SyncWorkspace(ctx context.Context, hcVersion string) (*WorkspaceSy
 		if err != nil {
 			return res, err
 		}
+	}
+	if changed, err := a.WS.RefreshIgnore(); err != nil {
+		return res, err
+	} else if changed {
+		res.Changes = append(res.Changes, skill.Change{Path: workspace.IgnoreFile, Action: skill.Updated})
 	}
 	res.Kept = a.newlyKept(ctx, keptCopies(st))
 	if len(res.Changes) == 0 && len(res.Kept) == 0 {
