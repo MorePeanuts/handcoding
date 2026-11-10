@@ -356,8 +356,7 @@ func Create(dir, language string) (*Workspace, error) {
 	}
 	// Installed packs are git checkouts of their own, reproduced from the
 	// packs list in hc.yaml.
-	gitignore := "# handcoding local state\n.hc/\n# installed packs (hc pack install reinstalls them from hc.yaml)\n/packs/*\n!/packs/local/\n"
-	if err := os.WriteFile(filepath.Join(abs, ".gitignore"), []byte(gitignore), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(abs, IgnoreFile), []byte(IgnoreBlock()), 0o644); err != nil {
 		return nil, err
 	}
 	return &Workspace{Root: abs, Kind: Practice, Config: cfg}, nil

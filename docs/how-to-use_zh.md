@@ -64,7 +64,7 @@ Python 在 hc 管理的虚拟环境 `.hc/venv` 中运行：包括 Python 解答�
 
 支持的最低版本是 Python 3.12 和 Go 1.22（见协议的[语言版本](protocol_zh.md#语言版本)）。你自己的解答可以使用工具链支持的任何特性：`hc test`、`hc submit` 和 `hc debug` 会注明所用的工具链（`[Python 3.12.9]`），版本过旧时只给出警告。题目附带的代码必须能在最低版本上运行，所以 `hc cases build` 和 `hc validate --run` 拒绝在过旧的工具链上运行参考解。更新的工具链没有问题：`hc validate --run`（因而 `hc pack check`）还会对照 Go 1.22 检查每个 Go 参考解，做法是在 go 指令为 `go 1.22` 的模块中对它运行 go vet，它会报告更新的语言特性和标准库符号。
 
-建议在工作区里执行 `git init`，记录下自己的练习过程。`hc init` 写入的 `.gitignore` 排除了 `.hc/` 和已安装的题目包，后者可以由 `hc pack install` 根据 `hc.yaml` 重新安装。
+建议在工作区里执行 `git init`，记录下自己的练习过程。`hc init` 写入的 `.gitignore` 排除了 `.hc/`、已安装的题目包（可以由 `hc pack install` 根据 `hc.yaml` 重新安装），以及 hc 每次运行前在解答旁生成的文件（`zz_hc_driver.go`、`go.mod`、`_hc_runner.py`、`hc_runtime.py`、`__pycache__/`），这样仓库里只有你自己的代码。这些规则位于 `# hc:begin` 和 `# hc:end` 之间的区块中，更新的 hc 打开工作区时会刷新它；你自己的规则请写在区块之外。没有这个区块的 `.gitignore`（例如 v0.1.0-alpha.12 之前的 hc 写入的）归你所有，hc 不会改动它：要使用这个区块，从新工作区中复制一份（在临时目录中运行 `hc init`），并用 `git rm -r --cached solutions` 再 `git add solutions` 把已提交的生成文件移出仓库。
 
 ### 编写题目包
 
@@ -384,7 +384,7 @@ hc skill show hc-cases      # 打印一个 skill
 
 hc 会给它安装的每一份副本做标记，记下版本和内容的哈希（skill 目录中的 `.hc-skill.json`），并且只替换或删除这些副本：你修改过的 skill 会保留，除非加上 `--force`；不是 hc 安装的 skill 从不触碰。在 `AGENTS.md` 中，hc 只改写 `<!-- hc:begin -->` 与 `<!-- hc:end -->` 之间的区块，文件的其余部分归你所有，你给智能体的备注请写在这个区块之外。不带名称的 `hc skill install` 让工作区与它的集合完全一致：还会删除 hc 曾安装、但工作区不该有的 skill（包括按名称安装的）；对你修改过的 skill 只给出警告，既不替换也不删除。
 
-**升级 hc 之后**，练习工作区会自动跟上：第一个打开它的命令（包括 TUI）发现 hc 安装的某个 skill，或 `AGENTS.md` 中 hc 的区块，与当前 hc 写入的不同时，就会刷新它们，并在 stderr 上用一行说明，例如 `updated the workspace for hc v0.1.0-alpha.11: hc-cases, AGENTS.md`。它会更新过期的 skill，安装集合中缺失的 skill，删除 hc 不再提供的 skill，并改写区块；但会保留按名称安装的 skill，也不会重新创建你删掉的 `AGENTS.md` 区块或 `CLAUDE.md`（`hc skill install` 会）。你修改过的 skill 会保留，并只警告一次。一切都是最新时，它什么也不写。只有 hc 的正式发布版本才会这样做，而且只更新来自更旧 hc 的 skill：开发构建，或者较旧的 hc 打开一个已被较新 hc 刷新过的工作区，都不会改动它。`hc gen` 和 `hc fix` 在启动智能体前，不论 hc 是什么版本，都会安装集合中缺失或过期的 skill。
+**升级 hc 之后**，练习工作区会自动跟上：第一个打开它的命令（包括 TUI）发现 hc 安装的某个 skill，或 `AGENTS.md`、`.gitignore` 中 hc 的区块，与当前 hc 写入的不同时，就会刷新它们，并在 stderr 上用一行说明，例如 `updated the workspace for hc v0.1.0-alpha.11: hc-cases, AGENTS.md`。它会更新过期的 skill，安装集合中缺失的 skill，删除 hc 不再提供的 skill，并改写区块；但会保留按名称安装的 skill，也不会重新创建你删掉的 `AGENTS.md` 区块或 `CLAUDE.md`（`hc skill install` 会）。你修改过的 skill 会保留，并只警告一次。一切都是最新时，它什么也不写。只有 hc 的正式发布版本才会这样做，而且只更新来自更旧 hc 的 skill：开发构建，或者较旧的 hc 打开一个已被较新 hc 刷新过的工作区，都不会改动它。`hc gen` 和 `hc fix` 在启动智能体前，不论 hc 是什么版本，都会安装集合中缺失或过期的 skill。
 
 题目包的检出目录会提交它的 skill，而它的 CI 要求这些 skill 属于它所固定的 hc（[CI 与固定的 hc 版本](packs_zh.md#ci-与固定的-hc-版本)），所以 hc 从不在那里自动刷新它们：`hc gen` 和 `hc fix` 只安装缺失的 skill；当这些 skill 来自与你运行的 hc 不同的版本时，`hc validate`、`hc pack check`、`hc gen` 和 `hc fix` 会提示这一点，并说明把题目包迁移到这个 hc 是单独的一步（在 workflow 中固定它、运行 `hc skill install`、提交）。
 
