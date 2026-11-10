@@ -21,9 +21,13 @@ const (
 
 // GeneratedFiles are the files the language drivers write next to a
 // solution before every run (lang.Language's Prepare), which a workspace
-// kept in git leaves out. TestGitignoreCoversGenerated (internal/app) keeps
-// the list equal to what the drivers write.
-var GeneratedFiles = []string{"go.mod", "zz_hc_driver.go", "_hc_runner.py", "hc_runtime.py", "__pycache__/"}
+// kept in git leaves out, and LegacyFiles those older hc versions wrote
+// there, still in solutions not run since. TestGitignoreCoversGenerated
+// (internal/app) keeps the list equal to what the drivers write.
+var GeneratedFiles = []string{"go.mod", "zz_hc_driver.go", "_hc_runner.py", "__pycache__/", "hc_runtime.py"}
+
+// LegacyFiles are the GeneratedFiles no driver writes any longer.
+var LegacyFiles = []string{"hc_runtime.py"}
 
 // IgnoreBlock is hc's block of a practice workspace's IgnoreFile: hc's state
 // directory, the installed packs and what hc generates next to solutions.

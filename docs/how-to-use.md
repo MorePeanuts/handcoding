@@ -22,11 +22,12 @@ English · [简体中文](how-to-use_zh.md)
   packs/local/problems/0001-two-sum/       your own problems (see the problem protocol)
   packs/<name>/                            installed packs (read-only)
   solutions/local/go/0001-two-sum/         your code: solution.go, plus generated go.mod and zz_hc_driver.go
-  solutions/local/python/0001-two-sum/     your code: solution.py, plus generated hc_runtime.py and _hc_runner.py
+  solutions/local/python/0001-two-sum/     your code: solution.py, plus a generated _hc_runner.py
   .hc/hc.db                                submission history (SQLite)
   .hc/venv/                                Python virtual environment managed by hc
+  .hc/runtime/python/                      hc_runtime.py, shared by every Python solution
   .hc/cache/                               Go and uv caches for coding agents, generated cases (cases/), Go programs (build/), reference times (baseline/)
-  pyrightconfig.json                       points pyright at .hc/venv
+  pyrightconfig.json  ty.toml              point pyright and ty at .hc/venv
   AGENTS.md  CLAUDE.md                     a guide for coding agents helping you practice (see Agent skills)
   .claude/  .agents/                       the agent skills
 ```
@@ -60,11 +61,11 @@ Every command that needs Python reports this the same way, saying first what nee
 
 In a pack checkout (see [authoring a pack](packs.md)), the environment has Python 3.12 instead, the oldest the protocol supports, which the pack's references, checkers and generators must run on: `uv venv --python 3.12`, or without uv the newest `python3.12` on PATH. So `hc validate --run` and `hc pack check` run them on the same Python as the pack's CI. An environment of another version is created again; when there is no Python 3.12 to be had (no uv, none on PATH), hc uses the newest and warns.
 
-The environment holds debugpy for headless debugging. Downloading Python and installing debugpy need network access, once; judging stays offline. If the environment stops working (the workspace was moved, or its Python removed), hc creates it again. So it does when its Python is older than 3.12 (made by an earlier hc, whose minimum was lower) and uv or a Python 3.12+ on PATH can make a new one; otherwise hc keeps it, and `hc test`, `submit` and `debug` warn that it is too old. `hc env sync` recreates it on demand: after installing uv or Python when hc could not create it, or to get debugpy. hc also writes `pyrightconfig.json` at the workspace root, unless you have one, so pyright and basedpyright check your solutions with the same interpreter. To use your own Python instead (conda, a custom build), set `python.interpreter` in `hc.yaml`; hc then uses it as it is, creates no environment and shows no guide.
+The environment holds debugpy for headless debugging. Downloading Python and installing debugpy need network access, once; judging stays offline. If the environment stops working (the workspace was moved, or its Python removed), hc creates it again. So it does when its Python is older than 3.12 (made by an earlier hc, whose minimum was lower) and uv or a Python 3.12+ on PATH can make a new one; otherwise hc keeps it, and `hc test`, `submit` and `debug` warn that it is too old. `hc env sync` recreates it on demand: after installing uv or Python when hc could not create it, or to get debugpy. Python solutions import `hc_runtime` (`ListNode`, `TreeNode` and the other types), which hc keeps once per workspace in `.hc/runtime/python/`, not next to each solution. The environment puts that directory on its `sys.path` (`hc_runtime.pth`), and hc writes `pyrightconfig.json` and `ty.toml` at the workspace root, unless you have them, so that pyright, basedpyright and ty check your solutions with the same interpreter and resolve `hc_runtime`. Another editor or language server finds it once you point it at `.hc/venv`'s Python. To use your own Python instead (conda, a custom build), set `python.interpreter` in `hc.yaml`; hc then uses it as it is, creates no environment and shows no guide, and writes no editor configuration: to have your editor resolve `hc_runtime`, add `.hc/runtime/python` to its search paths (`extraPaths` for pyright, `environment.extra-paths` for ty).
 
 The oldest supported toolchains are Python 3.12 and Go 1.22 (the protocol's [language versions](protocol.md#language-versions)). Your own solutions may use anything your toolchain supports: `hc test`, `hc submit` and `hc debug` name the toolchain they run with (`[Python 3.12.9]`) and only warn when it is older. Code that problems ship must work on the oldest versions, so `hc cases build` and `hc validate --run` refuse to run reference solutions on an older toolchain. A newer one is fine: `hc validate --run` (and so `hc pack check`) also checks every Go reference against Go 1.22, by vetting it in a module whose go directive is `go 1.22`, which reports newer language features and standard library symbols.
 
-Consider running `git init` in the workspace to keep a record of your practice. The `.gitignore` that `hc init` writes leaves out `.hc/`, the installed packs, which `hc pack install` reinstalls from `hc.yaml`, and the files hc writes next to your solutions before every run (`zz_hc_driver.go`, `go.mod`, `_hc_runner.py`, `hc_runtime.py`, `__pycache__/`), so the repository holds only your own code. These rules are a block between `# hc:begin` and `# hc:end`, which a newer hc refreshes when it opens the workspace; add your own rules outside it. A `.gitignore` without the block, such as one written by an hc before v0.1.0-alpha.12, is yours and hc leaves it alone: to get the block, copy it from a new workspace (`hc init` in a temporary directory), and remove the generated files already committed with `git rm -r --cached solutions` followed by `git add solutions`.
+Consider running `git init` in the workspace to keep a record of your practice. The `.gitignore` that `hc init` writes leaves out `.hc/`, the installed packs, which `hc pack install` reinstalls from `hc.yaml`, and the files hc writes next to your solutions before every run (`zz_hc_driver.go`, `go.mod`, `_hc_runner.py`, `__pycache__/`, and the `hc_runtime.py` that versions before v0.1.0-alpha.12 wrote there), so the repository holds only your own code. These rules are a block between `# hc:begin` and `# hc:end`, which a newer hc refreshes when it opens the workspace; add your own rules outside it. A `.gitignore` without the block, such as one written by an hc before v0.1.0-alpha.12, is yours and hc leaves it alone: to get the block, copy it from a new workspace (`hc init` in a temporary directory), and remove the generated files already committed with `git rm -r --cached solutions` followed by `git add solutions`.
 
 ### Working on a pack
 
@@ -77,7 +78,7 @@ my-pack/
   pack.yaml  problems/                     the pack (see the problem protocol)
   hc.yaml                                  optional: your settings (language, editor, agent, timeout, python)
   solutions/<pack>/<lang>/<dir>/           your solutions, as in a practice workspace
-  .hc/  pyrightconfig.json                 hc's state, as in a practice workspace
+  .hc/  pyrightconfig.json  ty.toml        hc's state, as in a practice workspace
   .claude/  .agents/  AGENTS.md  CLAUDE.md   the agent skills and instructions, once a command installs them
 ```
 
@@ -89,6 +90,7 @@ Without `hc.yaml` hc uses the defaults, and it never creates one in a checkout. 
 solutions/
 hc.yaml
 pyrightconfig.json
+ty.toml
 ```
 
 `hc pack init` writes this `.gitignore`, and commits to keeping `.claude/`, `.agents/` and `AGENTS.md` in the repository, so that a fresh clone describes itself to agents. In a pack created otherwise, ignore them too, or commit them (hc changes only its own skills and its block of `AGENTS.md`).

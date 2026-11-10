@@ -23,7 +23,7 @@ git init                                  # unless it already is a repository
 ```
 pack.yaml                     the manifest: protocol, name, title and an empty groups list
 problems/                     the problems, one directory each (empty, with a .gitkeep)
-.gitignore                    what hc adds to a checkout: .hc/, solutions/, hc.yaml, pyrightconfig.json
+.gitignore                    what hc adds to a checkout: .hc/, solutions/, hc.yaml, pyrightconfig.json, ty.toml
 .github/workflows/check.yml   CI: hc pack check on every push and pull request
 AGENTS.md                     instructions for coding agents, and hc's skill index
 CLAUDE.md                     @AGENTS.md, and room for notes for Claude Code
