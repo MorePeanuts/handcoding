@@ -709,6 +709,7 @@ def distinct(rng, n):
 - 题目的 `Node` 类型以 `Node` 这个名字导入：`from hc_runtime import GraphNode as Node`。其他类型保留原名：`from hc_runtime import ListNode, TreeNode`、`from hc_runtime import NestedInteger`。
 - `decode(type, value)` 把一个 JSON 值转成协议类型 `type`（规范名称，如 `"TreeNode"` 或 `"integer[]"`）对应的 Python 值，`encode(type, value)` 做相反的转换。
 - 参考解必须导入它用到的名称。初始代码可以省略导入：不包含 `hc_runtime` 的初始代码前面会加上标准的导入块（`typing` 中的名称、`ListNode`、`TreeNode`，以及题目的 `Node`、`NestedInteger` 和 `Employee`）。
+- 判题器运行解答、参考解、判题程序和生成器时，递归上限（`sys.getrecursionlimit()`）至少为 100000，使普通递归能深入题目包的输入；代码可以调低或调高它。经过 C 代码的递归，例如对 `functools.cache` 函数的调用，或 `sorted` 和 `max` 进行的比较，还受 Python 版本限制：无论上限是多少，Python 3.12 都把这类调用限制在约 3000 层。参考解、判题程序和生成器经过 C 代码的递归不得超过这个深度。
 
 ### Go
 

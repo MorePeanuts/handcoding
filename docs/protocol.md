@@ -707,6 +707,7 @@ The solution is `solution.py`.
 - The problem's `Node` type is imported under that name: `from hc_runtime import GraphNode as Node`. The others keep their names: `from hc_runtime import ListNode, TreeNode`, `from hc_runtime import NestedInteger`.
 - `decode(type, value)` turns a JSON value into the Python value for the protocol type `type` (a canonical name such as `"TreeNode"` or `"integer[]"`), and `encode(type, value)` does the reverse.
 - A reference MUST import the names it uses. A template MAY omit the imports: a template that does not mention `hc_runtime` gets the standard import block (`typing` names, `ListNode`, `TreeNode`, and the problem's `Node`, `NestedInteger` and `Employee`) put in front of it.
+- A judge runs solutions, references, checkers and generators with a recursion limit (`sys.getrecursionlimit()`) of at least 100000, so that plain recursion goes as deep as a pack's inputs; code MAY lower or raise it. Recursion through C code, such as calls of a `functools.cache` function or comparisons that `sorted` and `max` make, is also bounded by the Python version: Python 3.12 caps it at about 3000 such calls whatever the limit. References, checkers and generators MUST NOT recurse deeper than that through C code.
 
 ### Go
 

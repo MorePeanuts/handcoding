@@ -4,3 +4,5 @@
 {"input":{"root":[0]},"expected":1}
 {"input":{"root":[1,2,null,3,null,4,null,5]},"expected":5,"note":"left skewed"}
 {"input":{"root":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]},"expected":4,"note":"perfect tree"}
+{"generate":{"name":"skewed","args":{"n":10000,"side":"right"}},"digest":"sha256:c4ce745c697689717cdc34e7b3c3d2cb5f05e72d0fab5878876853424f31c6f1","note":"a right path of 10^4 nodes, the most the constraints allow: plain recursion goes that deep"}
+{"generate":{"name":"skewed","args":{"n":10000,"side":"left"}},"digest":"sha256:c2e542bd0a2da759bce68522836b1e6d36dfc974a7310a2d5f7d31f3385a9c0d","note":"a left path of 10^4 nodes"}
