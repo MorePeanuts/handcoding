@@ -656,7 +656,6 @@ func TestBrokenChecker(t *testing.T) {
 	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
-	a.WS.Config.Timeout = "2s"
 	p := addProblem(t, a, "any-index", anyIndexYAML,
 		`{"input":{"nums":[1,2],"target":1},"expected":0}`+"\n"+`{"input":{"nums":[1,2],"target":2},"expected":1}`+"\n")
 	placeholderReferences(t, p)
@@ -680,7 +679,16 @@ func TestBrokenChecker(t *testing.T) {
 			"go":     "package main\n\nfunc anyIndex(nums []int, target int) int { return target - 1 }\n",
 			"python": "class Solution:\n    def anyIndex(self, nums, target):\n        return target - 1\n",
 		}[langID])
-		for _, tt := range tests {
+		for i, tt := range tests {
+			// The run timeout limits the checker and the solution's run
+			// alike. Only the looping checker, the last test, gets a short
+			// one: by then the solution has run, so a loaded machine does
+			// not stretch its start (macOS checks every new executable)
+			// over it.
+			a.WS.Config.Timeout = "30s"
+			if i == len(tests)-1 {
+				a.WS.Config.Timeout = "2s"
+			}
 			addChecker(t, p, tt.checker)
 			_, err := a.Run(context.Background(), p, l, sel, app.RunOptions{})
 			if err == nil {
