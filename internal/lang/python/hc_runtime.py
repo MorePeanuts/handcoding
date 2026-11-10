@@ -1174,7 +1174,69 @@ def _call_round_trip(solution, meta, inp, clock):
     return encode(dec["returns"], ret)
 
 
+# The recursion limit hc runs Python code with: solutions, references,
+# checkers and generators (the protocol's python section guarantees at least
+# 10^5, so that plain recursion reaches the deepest inputs a pack has).
+# Since Python 3.11, Python-to-Python calls take no C stack, so this costs
+# nothing until it is used. Recursion through C code (functools.cache,
+# comparisons called by sorted or max) still does: Python 3.12 caps it at a
+# fixed depth (about 3300 memoized calls), and later versions at what the
+# thread's stack holds, so _run_deep gives the code a thread with a large
+# stack (virtual memory, used only as deep as the code goes).
+RECURSION_LIMIT = 10**6
+_STACK_SIZE = 512 << 20
+
+
+def _debugged():
+    """Report whether a debugger traces this thread (pdb, debugpy)."""
+    if sys.gettrace() is not None:
+        return True
+    monitoring = getattr(sys, "monitoring", None)
+    return monitoring is not None and monitoring.get_tool(monitoring.DEBUGGER_ID) is not None
+
+
+def _run_deep(fn, *args):
+    """Call fn with RECURSION_LIMIT, in a thread with a large stack.
+
+    Under a debugger, which may trace only the thread it starts in, fn runs
+    in place, with the limit but the main thread's stack.
+    """
+    sys.setrecursionlimit(RECURSION_LIMIT)
+    if _debugged():
+        return fn(*args)
+    try:
+        threading.stack_size(_STACK_SIZE)
+    except (ValueError, RuntimeError):
+        return fn(*args)
+    result, raised = [], []
+    started = threading.Event()
+
+    def run():
+        # Threads fn starts (the time limit's watchdog) get the default
+        # stack: wait for the main thread to restore it.
+        started.wait()
+        try:
+            result.append(fn(*args))
+        except BaseException as e:  # noqa: BLE001
+            raised.append(e)
+
+    try:
+        t = threading.Thread(target=run, name="hc", daemon=True)
+        t.start()
+    finally:
+        threading.stack_size(0)
+        started.set()
+    t.join()
+    if raised:
+        raise raised[0]
+    return result[0]
+
+
 def main(meta):
+    _run_deep(_main, meta)
+
+
+def _main(meta):
     # The runner put the solution's directory on sys.path.
     import solution  # noqa: E402
 

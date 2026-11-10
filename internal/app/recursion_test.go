@@ -25,19 +25,14 @@ judge:
   compare: checker
 `
 
-const depthPython = `import sys
-
-sys.setrecursionlimit(10**6)
-
-
-def down(n):
+const depthPython = `def down(n):
     return 0 if n == 0 else down(n - 1) + 1
 `
 
-// TestDeepRecursion checks that Python code that raises the recursion limit
-// recurses 10^5 calls deep in a solution, a reference, a generator and a
-// checker. The drivers run them in the main thread, whose C stack such calls
-// do not use on the Python versions the protocol supports (#113, #132).
+// TestDeepRecursion checks that Python code recurses 10^5 calls deep in a
+// solution, a reference, a generator and a checker without raising the
+// recursion limit itself: the drivers run them with a limit of 10^6, which
+// the protocol guarantees to be at least 10^5 (#147).
 func TestDeepRecursion(t *testing.T) {
 	t.Parallel()
 	requireTools(t, "go", "python3")

@@ -17,6 +17,8 @@ import os
 import sys
 import traceback
 
+from hc_runtime import _run_deep
+
 
 def _traceback(exc, path):
     frames = [
@@ -79,4 +81,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    _run_deep(main)
