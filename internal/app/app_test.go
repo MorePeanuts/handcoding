@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -238,24 +239,31 @@ func TestRuntimeErrorAndTimeout(t *testing.T) {
 	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
-	a.WS.Config.Timeout = "2s"
 	ctx := context.Background()
 	p, _ := a.WS.Problem("reverse-linked-list")
 	cases, _ := p.LoadCases()
 	sel, _ := app.Select(cases, nil, false)
 
+	// Only the infinite loop gets a short run timeout, a backstop for the
+	// time limit. The run timeout includes starting the program, which for a
+	// freshly built Go executable on a machine loaded by the other packages'
+	// tests (macOS checks every new executable) can take seconds, so the
+	// others get a generous one rather than turning a crash into a timeout.
+	const loop, generous = "2s", "30s"
 	tests := []struct {
 		lang, code string
+		timeout    string
 		want       runner.Verdict
 		errSub     string
 	}{
-		{"go", "package main\n\nfunc reverseList(head *ListNode) *ListNode { var p *ListNode; return p.Next }\n", runner.RuntimeError, "solution.go"},
-		{"go", "package main\n\nfunc reverseList(head *ListNode) *ListNode { for {} }\n", runner.TimeLimit, ""},
-		{"go", "package main\n\nfunc reverseList(head *ListNode) *ListNode { return x }\n", runner.CompileError, ""},
-		{"python", "class Solution:\n    def reverseList(self, head):\n        return None.next\n", runner.RuntimeError, "AttributeError"},
-		{"python", "class Solution:\n    def reverseList(self, head)\n        return head\n", runner.CompileError, ""},
+		{"go", "package main\n\nfunc reverseList(head *ListNode) *ListNode { var p *ListNode; return p.Next }\n", generous, runner.RuntimeError, "solution.go"},
+		{"go", "package main\n\nfunc reverseList(head *ListNode) *ListNode { for {} }\n", loop, runner.TimeLimit, ""},
+		{"go", "package main\n\nfunc reverseList(head *ListNode) *ListNode { return x }\n", generous, runner.CompileError, ""},
+		{"python", "class Solution:\n    def reverseList(self, head):\n        return None.next\n", generous, runner.RuntimeError, "AttributeError"},
+		{"python", "class Solution:\n    def reverseList(self, head)\n        return head\n", generous, runner.CompileError, ""},
 	}
 	for _, tt := range tests {
+		a.WS.Config.Timeout = tt.timeout
 		l, _ := a.Lang(tt.lang)
 		path, _, err := a.Start(p, l)
 		if err != nil {
@@ -269,7 +277,11 @@ func TestRuntimeErrorAndTimeout(t *testing.T) {
 			t.Fatal(err)
 		}
 		if rep.Verdict != tt.want {
-			t.Errorf("%s %q: verdict %s, want %s", tt.lang, tt.code, rep.Verdict, tt.want)
+			var got []string
+			for _, c := range rep.Cases {
+				got = append(got, fmt.Sprintf("%d: %s in %v %q", c.Index, c.Verdict, c.Elapsed, c.Error))
+			}
+			t.Errorf("%s %q: verdict %s, want %s; cases %v", tt.lang, tt.code, rep.Verdict, tt.want, got)
 			continue
 		}
 		if tt.errSub != "" {
