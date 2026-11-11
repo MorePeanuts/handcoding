@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -49,8 +50,8 @@ func (s Style) Render(strs ...string) string {
 var plain = lipgloss.NewStyle()
 
 // Colors reports whether hc styles its output: when stdout is a terminal,
-// or CLICOLOR_FORCE is set, and the environment allows colors (not NO_COLOR,
-// nor TERM=dumb). Output on stderr follows stdout, so that the two streams
+// or CLICOLOR_FORCE is set, and the environment allows colors (NO_COLOR is
+// unset or empty, and TERM is not dumb unless CLICOLOR_FORCE is set). Output on stderr follows stdout, so that the two streams
 // look alike. It is decided once, from the environment and whether stdout is
 // a terminal; the terminal is never queried.
 //
@@ -61,9 +62,14 @@ func Colors() bool { return colors() }
 var colors = sync.OnceValue(func() bool { return detectColors(os.Stdout, os.Environ()) })
 
 // detectColors decides Colors for an output and an environment: a color
-// profile above ASCII, which keeps text attributes but no colors (NO_COLOR),
-// for an output that is a terminal or with colors forced.
+// profile above ASCII, which keeps text attributes but no colors, for an
+// output that is a terminal or with colors forced. NO_COLOR with any value
+// but the empty one turns them off (no-color.org), where colorprofile only
+// heeds the values strconv.ParseBool reads as true.
 func detectColors(out *os.File, env []string) bool {
+	if v, _ := lookupEnv(env, "NO_COLOR"); v != "" {
+		return false
+	}
 	tty := isatty.IsTerminal(out.Fd()) || isatty.IsCygwinTerminal(out.Fd())
 	if !tty && !forcedColors(env) {
 		return false
@@ -75,12 +81,19 @@ func detectColors(out *os.File, env []string) bool {
 // forcedColors reports whether CLICOLOR_FORCE asks for colors when output is
 // not a terminal.
 func forcedColors(env []string) bool {
-	for _, e := range env {
-		if v, ok := strings.CutPrefix(e, "CLICOLOR_FORCE="); ok {
-			return v != "" && v != "0"
+	v, _ := lookupEnv(env, "CLICOLOR_FORCE")
+	return v != "" && v != "0"
+}
+
+// lookupEnv finds a variable in env, the last value winning, as for
+// exec.Cmd.Env.
+func lookupEnv(env []string, name string) (string, bool) {
+	for _, e := range slices.Backward(env) {
+		if v, ok := strings.CutPrefix(e, name+"="); ok {
+			return v, true
 		}
 	}
-	return false
+	return "", false
 }
 
 // Difficulty renders a colored difficulty label.

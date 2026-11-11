@@ -76,6 +76,8 @@ func TestDetectColors(t *testing.T) {
 		{[]string{"TERM=xterm-256color", "CLICOLOR_FORCE=1"}, true},
 		{[]string{"TERM=xterm-256color", "CLICOLOR_FORCE=0"}, false},
 		{[]string{"TERM=xterm-256color", "CLICOLOR_FORCE=1", "NO_COLOR=1"}, false},
+		{[]string{"TERM=xterm-256color", "CLICOLOR_FORCE=1", "NO_COLOR=yes"}, false},
+		{[]string{"TERM=xterm-256color", "CLICOLOR_FORCE=1", "NO_COLOR="}, true},
 		{[]string{"TERM=dumb", "CLICOLOR_FORCE=1"}, true},
 	} {
 		if got := detectColors(w, c.env); got != c.want {
