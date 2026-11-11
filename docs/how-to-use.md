@@ -494,10 +494,17 @@ leetcode:
 locales: [en]         # the statement languages of your own problems, the default first
 ```
 
-`images: auto` picks `kitty` in kitty, Ghostty and [herdr](https://herdr.dev), `blocks` in other truecolor terminals, and `none` otherwise.
+`images: auto` picks `kitty` in kitty, Ghostty and [herdr](https://herdr.dev), and in tmux around kitty or Ghostty (below), `blocks` in other truecolor terminals, and `none` otherwise.
 
 - **herdr** draws kitty graphics itself, so images show whenever the terminal around herdr supports kitty graphics: kitty, Ghostty, or WezTerm with `enable_kitty_graphics = true`. In other terminals the image area stays blank; set `images: blocks`, and press `o` to see the original.
-- **tmux**: auto never picks kitty. If the outer terminal supports Unicode placeholders (kitty, Ghostty), set `images: kitty` and enable tmux's `allow-passthrough`.
+- **tmux** passes the images through to the terminal it is attached to, which must support Unicode placeholders (kitty, Ghostty). auto picks kitty when tmux reports such a terminal with true color and `allow-passthrough` is on; add to `~/.tmux.conf`:
+
+  ```tmux
+  set -g allow-passthrough on
+  set -g focus-events on    # draw the images again after you reattach, maybe from another terminal
+  ```
+
+  Through WezTerm or iTerm2, tmux keeps `blocks`, as those terminals do on their own.
 - **WezTerm** supports kitty graphics but not Unicode placeholders, so `images: kitty` shows garbled characters there. Keep `blocks` when running WezTerm directly.
 
 ## Current limitations

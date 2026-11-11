@@ -6,13 +6,14 @@
 //
 //   - kitty: the image is uploaded once with the kitty graphics protocol as
 //     a virtual placement, then drawn with Unicode placeholder cells
-//     (kitty, Ghostty). Full resolution.
+//     (kitty, Ghostty, also through herdr and tmux). Full resolution.
 //   - blocks: the image is approximated with colored block characters.
 //     Works in any truecolor terminal.
 package termimg
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -23,8 +24,11 @@ import (
 	"io"
 	"math"
 	"os"
+	"os/exec"
+	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
@@ -44,7 +48,8 @@ const (
 )
 
 // Detect resolves a configured protocol. "auto" (or empty) picks kitty in
-// terminals known to support Unicode placeholders and inside herdr, blocks in
+// terminals known to support Unicode placeholders, inside herdr, and inside
+// tmux when it passes kitty graphics through to such a terminal; blocks in
 // other truecolor terminals, and none otherwise or when output is not a
 // terminal.
 //
@@ -53,6 +58,11 @@ const (
 // graphics, even without Unicode placeholders. herdr answers graphics
 // queries on its own behalf, so the outer terminal cannot be probed; in
 // terminals without kitty graphics the images stay blank.
+//
+// tmux keeps placeholder cells as text and passes the uploads through
+// unchanged, so the outer terminal must support placeholders itself. Its
+// environment is the tmux server's, possibly from another terminal, so
+// Detect asks tmux about the client instead (see tmuxKitty).
 func Detect(configured string, tty bool) Protocol {
 	switch p := Protocol(configured); p {
 	case Kitty, Blocks, None:
@@ -62,10 +72,12 @@ func Detect(configured string, tty bool) Protocol {
 		return None
 	}
 	term, program := os.Getenv("TERM"), os.Getenv("TERM_PROGRAM")
-	// Inside tmux the outer terminal is unknown and passthrough may be off;
-	// kitty must be chosen explicitly there.
-	if os.Getenv("TMUX") == "" && (os.Getenv("KITTY_WINDOW_ID") != "" || term == "xterm-kitty" ||
-		program == "ghostty" || term == "xterm-ghostty" || program == "herdr") {
+	if os.Getenv("TMUX") != "" {
+		if out, err := tmuxQuery(); err == nil && tmuxKitty(out) {
+			return Kitty
+		}
+	} else if os.Getenv("KITTY_WINDOW_ID") != "" || term == "xterm-kitty" ||
+		program == "ghostty" || term == "xterm-ghostty" || program == "herdr" {
 		return Kitty
 	}
 	switch os.Getenv("COLORTERM") {
@@ -73,6 +85,41 @@ func Detect(configured string, tty bool) Protocol {
 		return Blocks
 	}
 	return None
+}
+
+// tmuxFormat asks tmux whether the pane may pass escape sequences through,
+// and the name, features and type (its reply to XTVERSION) of the terminal
+// attached. tmux prints tabs as underscores, hence the bars; the type, which
+// is free text, comes last.
+const tmuxFormat = "#{allow-passthrough}|#{client_termname}|#{client_termfeatures}|#{client_termtype}"
+
+// tmuxQuery runs tmuxFormat for the current pane; tests replace it.
+var tmuxQuery = func() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	args := []string{"display-message", "-p"}
+	if pane := os.Getenv("TMUX_PANE"); pane != "" {
+		args = append(args, "-t", pane)
+	}
+	out, err := exec.CommandContext(ctx, "tmux", append(args, tmuxFormat)...).Output()
+	return string(out), err
+}
+
+// tmuxKitty reports whether tmux's answer to tmuxFormat allows kitty
+// images: passthrough on, an outer terminal with Unicode placeholders
+// (kitty, Ghostty), and 24-bit colors, which carry the image ID (tmux
+// lowers them to 256 colors otherwise).
+func tmuxKitty(out string) bool {
+	f := strings.SplitN(strings.TrimRight(out, "\n"), "|", 4)
+	if len(f) != 4 || (f[0] != "on" && f[0] != "all") {
+		return false
+	}
+	name, typ := f[1], strings.ToLower(f[3])
+	if !strings.HasPrefix(typ, "kitty") && !strings.HasPrefix(typ, "ghostty") &&
+		name != "xterm-kitty" && name != "xterm-ghostty" {
+		return false
+	}
+	return slices.Contains(strings.Split(f[2], ","), "RGB")
 }
 
 // Image is an image rendered for the terminal.
@@ -225,6 +272,15 @@ func (r *Renderer) Show(imgs ...Image) error {
 	// terminal, and writes to one file are serialized.
 	_, err := r.out.Write(buf.Bytes())
 	return err
+}
+
+// Detachable reports whether the terminal holding the uploads may change
+// while the program runs: inside tmux, a client can detach and another
+// attach, whose terminal has none of the images. tmux reports focus to the
+// pane when a client attaches (with focus-events on), so a program can
+// Forget the images on focus and draw them again.
+func (r *Renderer) Detachable() bool {
+	return r != nil && r.proto == Kitty && os.Getenv("TMUX") != ""
 }
 
 // Forget marks every image as not uploaded, for when the terminal may have

@@ -2,6 +2,7 @@ package termimg
 
 import (
 	"bytes"
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
@@ -137,11 +138,63 @@ func TestDetect(t *testing.T) {
 	if p := Detect("auto", false); p != None {
 		t.Errorf("not a terminal: %s", p)
 	}
+	// Inside tmux, the server's environment does not count: tmux's answer
+	// about the client does.
 	t.Setenv("TMUX", "/tmp/tmux-1/default,1,0")
+	query := tmuxQuery
+	t.Cleanup(func() { tmuxQuery = query })
+	tmuxQuery = func() (string, error) { return "off|xterm-256color|RGB|WezTerm 20240203\n", nil }
 	if p := Detect("auto", true); p != Blocks {
+		t.Errorf("wezterm in tmux, ghostty environment: %s", p)
+	}
+	tmuxQuery = func() (string, error) { return "on|xterm-ghostty|256,focus,RGB|ghostty 1.2.3\n", nil }
+	if p := Detect("auto", true); p != Kitty {
 		t.Errorf("ghostty in tmux: %s", p)
+	}
+	tmuxQuery = func() (string, error) { return "", errors.New("no server") }
+	if p := Detect("auto", true); p != Blocks {
+		t.Errorf("tmux failing: %s", p)
 	}
 	if p := Detect("kitty", true); p != Kitty {
 		t.Errorf("configured: %s", p)
+	}
+}
+
+func TestTmuxKitty(t *testing.T) {
+	for _, c := range []struct {
+		out  string
+		want bool
+	}{
+		{"on|xterm-ghostty|256,RGB|ghostty 1.2.3\n", true},
+		{"all|xterm-kitty|RGB,focus|kitty(0.39.1)", true},
+		// No type (an older tmux), but the terminal's name.
+		{"on|xterm-ghostty|RGB|", true},
+		{"off|xterm-ghostty|RGB|ghostty 1.2.3", false},
+		{"on|xterm-256color|256,RGB,sixel|WezTerm 20240203", false},
+		// Without RGB, tmux would lower the colors carrying the image ID.
+		{"on|xterm-ghostty|256,focus|ghostty 1.2.3", false},
+		// The type is free text, bars included.
+		{"on|xterm-256color|RGB|ghostty 1.2|3", true},
+		// tmux older than allow-passthrough prints the unknown name empty.
+		{"|xterm-ghostty|RGB|ghostty 1.2.3", false},
+		{"", false},
+	} {
+		if got := tmuxKitty(c.out); got != c.want {
+			t.Errorf("tmuxKitty(%q) = %v, want %v", c.out, got, c.want)
+		}
+	}
+}
+
+func TestDetachable(t *testing.T) {
+	t.Setenv("TMUX", "")
+	if (&Renderer{proto: Kitty}).Detachable() {
+		t.Error("kitty outside tmux is detachable")
+	}
+	t.Setenv("TMUX", "/tmp/tmux-1/default,1,0")
+	if !(&Renderer{proto: Kitty}).Detachable() {
+		t.Error("kitty in tmux is not detachable")
+	}
+	if (&Renderer{proto: Blocks}).Detachable() || (*Renderer)(nil).Detachable() {
+		t.Error("blocks, or no renderer, is detachable")
 	}
 }

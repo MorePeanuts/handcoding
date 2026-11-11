@@ -471,6 +471,16 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// The program had the mode off, and the theme may have switched
 		// meanwhile.
 		return m, m.themeReports()
+	case tea.FocusMsg:
+		// Another tmux client may have attached, without the images (see
+		// termimg.Renderer.Detachable).
+		if m.opts.Images.Detachable() {
+			m.opts.Images.Forget()
+			if m.top() == screenDetail {
+				m.renderDetail()
+			}
+		}
+		return m, nil
 	case uv.DarkColorSchemeEvent:
 		m.setTheme(ui.ThemeDark)
 		return m, nil
@@ -650,6 +660,7 @@ func (m *model) viewHelp() string {
 func (m *model) View() tea.View {
 	v := tea.NewView(m.content())
 	v.AltScreen = true
+	v.ReportFocus = m.opts.Images.Detachable()
 	return v
 }
 
