@@ -34,6 +34,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/colorprofile"
+	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/lang"
@@ -55,6 +57,10 @@ type Options struct {
 	Lang lang.Language
 	// Theme is "dark" or "light"; empty means detect from the terminal.
 	Theme string
+	// FollowTheme switches Theme when the terminal reports a switch
+	// between light and dark (see themeReports). Run sets it when it
+	// detects the theme.
+	FollowTheme bool
 	// Images draws statement images; nil means configure from hc.yaml.
 	Images *termimg.Renderer
 	// Pack and Group choose the pack, or the group of a pack, that the list
@@ -159,6 +165,7 @@ func Run(ctx context.Context, a *app.App, opts Options) error {
 	if opts.Theme == "" {
 		// Must happen before bubbletea owns the terminal (see ui.DetectTheme).
 		opts.Theme = ui.DetectTheme(a.WS.Config.Theme)
+		opts.FollowTheme = ui.AutoTheme(a.WS.Config.Theme)
 	}
 	if opts.Images == nil {
 		opts.Images = termimg.New(termimg.Detect(a.WS.Config.Images, true), os.Stdout)
@@ -168,6 +175,10 @@ func Run(ctx context.Context, a *app.App, opts Options) error {
 		return err
 	}
 	_, err = tea.NewProgram(m, programOptions(ctx)...).Run()
+	if opts.FollowTheme {
+		// bubbletea restores only the modes it knows.
+		fmt.Fprint(os.Stdout, ansi.ResetModeLightDark)
+	}
 	if m.run != nil && m.run.cancel != nil {
 		m.run.cancel()
 	}
@@ -382,7 +393,32 @@ func loadFailed(err error) bool {
 	return pe || le
 }
 
-func (m *model) Init() tea.Cmd { return nil }
+func (m *model) Init() tea.Cmd { return m.themeReports() }
+
+// themeReports asks the terminal to report its switches between light and
+// dark (DEC mode 2031: CSI ? 997 ; 1 n for dark, 2 for light), and the
+// current one, so that the screens follow it with FollowTheme. The terminal
+// sends the reports on its own; bubbletea's input reader decodes them into
+// uv.DarkColorSchemeEvent and uv.LightColorSchemeEvent. Terminals without
+// the mode ignore both sequences. handOff turns the mode off while another
+// program has the terminal, and Run when the TUI exits.
+func (m *model) themeReports() tea.Cmd {
+	if !m.opts.FollowTheme {
+		return nil
+	}
+	return tea.Raw(ansi.SetModeLightDark + ansi.RequestLightDarkReport)
+}
+
+// setTheme renders Markdown in theme from now on, and the screen shown
+// again, keeping its scroll position.
+func (m *model) setTheme(theme string) {
+	if !m.opts.FollowTheme || theme == m.opts.Theme {
+		return
+	}
+	m.opts.Theme = theme
+	m.md = ui.NewMarkdown(theme, m.opts.Images)
+	m.layout()
+}
 
 type execDoneMsg struct{ err error }
 
@@ -410,6 +446,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.opts.Images.Forget()
 		m.refresh()
 		m.layout()
+		// The program had the mode off, and the theme may have switched
+		// meanwhile.
+		return m, m.themeReports()
+	case uv.DarkColorSchemeEvent:
+		m.setTheme(ui.ThemeDark)
+		return m, nil
+	case uv.LightColorSchemeEvent:
+		m.setTheme(ui.ThemeLight)
 		return m, nil
 	case tea.PasteMsg:
 		// Pasted text goes to the search field; elsewhere, as when it

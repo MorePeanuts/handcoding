@@ -17,6 +17,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/ansi/kitty"
 
@@ -239,4 +240,41 @@ func sgrForeground(params, fg string) string {
 		}
 	}
 	return fg
+}
+
+// schemeRecorder records the light/dark reports a program receives.
+type schemeRecorder struct{ got []string }
+
+func (r *schemeRecorder) Init() tea.Cmd { return nil }
+
+func (r *schemeRecorder) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg.(type) {
+	case uv.DarkColorSchemeEvent:
+		r.got = append(r.got, "dark")
+	case uv.LightColorSchemeEvent:
+		r.got = append(r.got, "light")
+	}
+	if len(r.got) == 2 {
+		return r, tea.Quit
+	}
+	return r, nil
+}
+
+func (r *schemeRecorder) View() tea.View { return tea.NewView("") }
+
+// TestThemeReports checks that bubbletea hands the model the terminal's
+// light/dark reports (DEC mode 2031) as the events setTheme follows.
+func TestThemeReports(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	r := &schemeRecorder{}
+	p := tea.NewProgram(r, tea.WithContext(ctx), tea.WithInput(strings.NewReader("\x1b[?997;1n\x1b[?997;2n")),
+		tea.WithOutput(io.Discard), tea.WithWindowSize(80, 24), tea.WithoutSignals())
+	if _, err := p.Run(); err != nil {
+		t.Fatalf("%v; got %q", err, r.got)
+	}
+	if !slices.Equal(r.got, []string{"dark", "light"}) {
+		t.Errorf("reports %q, want dark, light", r.got)
+	}
 }

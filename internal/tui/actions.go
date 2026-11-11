@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/muesli/termenv"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
@@ -165,7 +166,7 @@ func (m *model) edit(p *problem.Problem) tea.Cmd {
 		return nil
 	}
 	cmd.Dir = filepath.Dir(path)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg { return execDoneMsg{err} })
+	return tea.Exec(m.handOff(cmd, false), func(err error) tea.Msg { return execDoneMsg{err} })
 }
 
 // runKeys are the keys of problemKey that run the solution, which the
@@ -180,7 +181,7 @@ func (m *model) debug(p *problem.Problem, l lang.Language) tea.Cmd {
 		return nil
 	}
 	cmd := exec.Command(m.opts.Exe, "-w", m.app.WS.Root, "debug", p.Ref(), "-l", l.ID(), "--pause")
-	return tea.Exec(&clearScreenCmd{Cmd: cmd}, func(err error) tea.Msg {
+	return tea.Exec(m.handOff(cmd, true), func(err error) tea.Msg {
 		// The debugger's exit status is not ours to report, but hc debug
 		// failing before it starts (a compile error) is.
 		if _, ok := errors.AsType[*exec.ExitError](err); ok {
@@ -190,20 +191,55 @@ func (m *model) debug(p *problem.Problem, l lang.Language) tea.Cmd {
 	})
 }
 
-// clearScreenCmd clears the terminal before running an interactive program,
-// so its session does not scroll below the output of earlier ones.
-type clearScreenCmd struct{ *exec.Cmd }
+// handOff runs cmd, an interactive program, in the terminal: the editor or
+// the debugger.
+func (m *model) handOff(cmd *exec.Cmd, clear bool) *handOffCmd {
+	return &handOffCmd{Cmd: cmd, clear: clear, themeReports: m.opts.FollowTheme}
+}
 
-func (c *clearScreenCmd) Run() error {
+// handOffCmd prepares the terminal for an interactive program. It turns off
+// the theme reports (see themeReports), which the program would read as
+// input, and with clear, clears the terminal, so that a session does not
+// scroll below the output of earlier ones.
+type handOffCmd struct {
+	*exec.Cmd
+	clear, themeReports bool
+}
+
+func (c *handOffCmd) Run() error {
 	if c.Stdout != nil {
-		fmt.Fprint(c.Stdout, "\x1b[H\x1b[2J\x1b[3J")
+		var seq string
+		if c.themeReports {
+			seq += ansi.ResetModeLightDark
+		}
+		if c.clear {
+			seq += "\x1b[H\x1b[2J\x1b[3J"
+		}
+		fmt.Fprint(c.Stdout, seq)
 	}
 	return c.Cmd.Run()
 }
 
-func (c *clearScreenCmd) SetStdin(r io.Reader)  { c.Stdin = r }
-func (c *clearScreenCmd) SetStdout(w io.Writer) { c.Stdout = w }
-func (c *clearScreenCmd) SetStderr(w io.Writer) { c.Stderr = w }
+// The setters give the program the TUI's terminal, as tea.ExecProcess
+// does: only the streams cmd leaves unset.
+
+func (c *handOffCmd) SetStdin(r io.Reader) {
+	if c.Stdin == nil {
+		c.Stdin = r
+	}
+}
+
+func (c *handOffCmd) SetStdout(w io.Writer) {
+	if c.Stdout == nil {
+		c.Stdout = w
+	}
+}
+
+func (c *handOffCmd) SetStderr(w io.Writer) {
+	if c.Stderr == nil {
+		c.Stderr = w
+	}
+}
 
 // displayPath shortens the home directory to ~.
 func displayPath(path string) string {

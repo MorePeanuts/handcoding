@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"bytes"
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -11,6 +13,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/lang/python"
@@ -19,6 +23,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/store"
 	"github.com/MorePeanuts/handcoding/internal/testenv"
+	"github.com/MorePeanuts/handcoding/internal/ui"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
@@ -941,5 +946,53 @@ func TestHistoryOfEmptyWorkspace(t *testing.T) {
 	h.press("esc")
 	if m.top() != screenList {
 		t.Errorf("esc: screen %v", m.top())
+	}
+}
+
+// With FollowTheme, the TUI asks for the terminal's light/dark reports and
+// renders the statement again in the theme a report names, where it was;
+// it turns them off while the editor or the debugger has the terminal, and
+// asks again once the TUI has it back.
+func TestFollowTheme(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	if cmd := h.m.Init(); cmd != nil {
+		t.Fatalf("theme reports without FollowTheme: %v", cmd())
+	}
+	h.m.Update(uv.LightColorSchemeEvent{})
+	if h.m.opts.Theme != ui.ThemeDark {
+		t.Fatalf("theme %s without FollowTheme", h.m.opts.Theme)
+	}
+
+	h.m.opts.FollowTheme = true
+	if raw, ok := h.m.Init()().(tea.RawMsg); !ok || raw.Msg != ansi.SetModeLightDark+ansi.RequestLightDarkReport {
+		t.Fatalf("Init sends %v", h.m.Init()())
+	}
+	h.press("v", "j", "j")
+	offset, dark := h.m.detail.YOffset(), h.view()
+	if offset == 0 {
+		t.Fatal("the statement did not scroll")
+	}
+	h.m.Update(uv.LightColorSchemeEvent{})
+	if h.m.opts.Theme != ui.ThemeLight || h.view() == dark || h.m.detail.YOffset() != offset {
+		t.Errorf("after a light report: theme %s, offset %d (was %d), view changed %v",
+			h.m.opts.Theme, h.m.detail.YOffset(), offset, h.view() != dark)
+	}
+	h.m.Update(uv.DarkColorSchemeEvent{})
+	if h.m.opts.Theme != ui.ThemeDark || h.view() != dark {
+		t.Errorf("after a dark report: theme %s, view back %v", h.m.opts.Theme, h.view() == dark)
+	}
+
+	if _, cmd := h.m.Update(execDoneMsg{}); cmd == nil {
+		t.Error("no theme reports asked for after the editor")
+	}
+	var out bytes.Buffer
+	c := h.m.handOff(exec.Command("true"), true)
+	c.SetStdout(&out)
+	if err := c.Run(); err != nil {
+		t.Fatal(err)
+	}
+	if want := ansi.ResetModeLightDark + "\x1b[H\x1b[2J\x1b[3J"; out.String() != want {
+		t.Errorf("hand-off wrote %q, want %q", out.String(), want)
 	}
 }

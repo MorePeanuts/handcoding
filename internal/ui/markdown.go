@@ -11,6 +11,8 @@ import (
 	"sync"
 
 	"charm.land/glamour/v2"
+	gansi "charm.land/glamour/v2/ansi"
+	"charm.land/glamour/v2/styles"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
@@ -43,6 +45,26 @@ func DetectTheme(configured string) string {
 		return ThemeDark
 	}
 	return ThemeLight
+}
+
+// AutoTheme reports whether a configured theme follows the terminal's.
+func AutoTheme(configured string) bool {
+	return configured != ThemeDark && configured != ThemeLight
+}
+
+// markdownStyle is glamour's standard style for a theme with the body text
+// in the terminal's default foreground. glamour colors it from the 256-color
+// cube (234 in the light style, 252 in the dark one), which terminals keep
+// when they switch between light and dark, so the text would stay in the
+// colors of the old background while the rest of the screen follows the new
+// one. Headings, code and links keep their colors, readable on both.
+func markdownStyle(theme string) gansi.StyleConfig {
+	s := styles.DarkStyleConfig
+	if theme == ThemeLight {
+		s = styles.LightStyleConfig
+	}
+	s.Document.Color = nil
+	return s
 }
 
 // Markdown renders Markdown for the terminal, caching renderers per width
@@ -98,7 +120,7 @@ func (m *Markdown) render(src, dir string, width int) (rendered, error) {
 	gr, ok := m.renderers[width]
 	if !ok {
 		var err error
-		gr, err = glamour.NewTermRenderer(glamour.WithStandardStyle(m.theme), glamour.WithWordWrap(width))
+		gr, err = glamour.NewTermRenderer(glamour.WithStyles(markdownStyle(m.theme)), glamour.WithWordWrap(width))
 		if err != nil {
 			return rendered{}, err
 		}
