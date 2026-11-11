@@ -69,9 +69,6 @@ type Venv struct {
 
 // Python is the environment's interpreter.
 func (v *Venv) Python() string {
-	if runtime.GOOS == "windows" {
-		return filepath.Join(v.Dir, "Scripts", "python.exe")
-	}
 	return filepath.Join(v.Dir, "bin", "python")
 }
 
@@ -272,8 +269,6 @@ func Guide(goos string) string {
 	switch goos {
 	case "darwin":
 		cmds = []string{"brew install uv", "curl -LsSf https://astral.sh/uv/install.sh | sh"}
-	case "windows":
-		cmds = []string{"winget install --id=astral-sh.uv -e", `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`}
 	default:
 		cmds = []string{"curl -LsSf https://astral.sh/uv/install.sh | sh"}
 	}
@@ -325,7 +320,7 @@ func (v *Venv) writePyright(w io.Writer) {
 	}
 }
 
-var pythonNameRE = regexp.MustCompile(`^python(3(\.\d+)?)?(\.exe)?$`)
+var pythonNameRE = regexp.MustCompile(`^python(3(\.\d+)?)?$`)
 
 // canGet reports whether an environment of Version, or without Version of
 // MinVersion or later, can be created: uv downloads any version, or one is
@@ -450,10 +445,6 @@ func (v *Venv) writePth(w io.Writer) {
 
 // sitePackages returns the environment's site-packages directories.
 func (v *Venv) sitePackages() []string {
-	pattern := filepath.Join(v.Dir, "lib", "python3*", "site-packages")
-	if runtime.GOOS == "windows" {
-		pattern = filepath.Join(v.Dir, "Lib", "site-packages")
-	}
-	dirs, _ := filepath.Glob(pattern)
+	dirs, _ := filepath.Glob(filepath.Join(v.Dir, "lib", "python3*", "site-packages"))
 	return dirs
 }

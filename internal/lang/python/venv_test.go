@@ -6,7 +6,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -25,9 +24,6 @@ type fakeEnv struct {
 
 func newFakeEnv(t *testing.T) *fakeEnv {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("fake executables are shell scripts")
-	}
 	dir := t.TempDir()
 	f := &fakeEnv{t: t, bin: filepath.Join(dir, "bin"), lib: filepath.Join(dir, "lib"), log: filepath.Join(dir, "log"), root: filepath.Join(dir, "ws")}
 	for _, d := range []string{f.bin, f.lib, f.root} {
@@ -354,9 +350,8 @@ func TestVenvNoPython(t *testing.T) {
 // The guide gives the commands that install uv on each system.
 func TestGuide(t *testing.T) {
 	for goos, want := range map[string][]string{
-		"darwin":  {"      brew install uv\n", "      curl -LsSf https://astral.sh/uv/install.sh | sh\n"},
-		"linux":   {"      curl -LsSf https://astral.sh/uv/install.sh | sh\n"},
-		"windows": {"      winget install --id=astral-sh.uv -e\n", `irm https://astral.sh/uv/install.ps1 | iex`},
+		"darwin": {"      brew install uv\n", "      curl -LsSf https://astral.sh/uv/install.sh | sh\n"},
+		"linux":  {"      curl -LsSf https://astral.sh/uv/install.sh | sh\n"},
 	} {
 		g := Guide(goos)
 		for _, w := range append(want, "Python 3.12 or later", UVInstallURL, "`hc env sync`", "python.interpreter") {

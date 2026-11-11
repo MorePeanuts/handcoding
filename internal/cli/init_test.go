@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -26,9 +25,6 @@ func runHC(t *testing.T, args ...string) error {
 // standing in for Python 3.12, so no real environment is created.
 func fakeUV(t *testing.T) {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("fake executables are shell scripts")
-	}
 	bin := t.TempDir()
 	py := "#!/bin/sh\n[ \"$1\" = -c ] && echo 3.12.4\nexit 0\n"
 	uv := "#!/bin/sh\nif [ \"$1\" = venv ]; then\n  for a; do dir=$a; done\n  /bin/mkdir -p \"$dir/bin\" && printf '%s' '" + py + "' > \"$dir/bin/python\" && /bin/chmod +x \"$dir/bin/python\"\nfi\n"
@@ -60,9 +56,6 @@ func TestInitLang(t *testing.T) {
 // of 3.9.6, as macOS has.
 func noPython(t *testing.T) string {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("fake executables are shell scripts")
-	}
 	bin := t.TempDir()
 	py := filepath.Join(bin, "python3")
 	if err := os.WriteFile(py, []byte("#!/bin/sh\n[ \"$1\" = -c ] && echo 3.9.6\nexit 0\n"), 0o755); err != nil {

@@ -175,8 +175,6 @@ func openURL(url string) error {
 	switch runtime.GOOS {
 	case "darwin":
 		c = exec.Command("open", url)
-	case "windows":
-		c = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
 	default:
 		if os.Getenv("DISPLAY") == "" && os.Getenv("WAYLAND_DISPLAY") == "" {
 			return errors.New("no display")

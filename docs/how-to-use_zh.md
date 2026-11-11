@@ -56,7 +56,7 @@ Python 在 hc 管理的虚拟环境 `.hc/venv` 中运行：包括 Python 解答�
 
 1. 如果 PATH 上有 [uv](https://docs.astral.sh/uv/)，用 `uv venv --python '>=3.12'` 创建（本机没有合适的 Python 时，uv 会自动下载一个），再用 `uv pip` 安装 debugpy；
 2. 否则从 PATH 上的 `python3`、`python` 和 `python3.N` 中选出最新的 Python 3.12+，用 `-m venv` 创建。Debian 和 Ubuntu（包括 WSL）把 `venv` 中安装 pip 的部分单独打包为 `python3.X-venv`；没有它时，hc 改用 `-m venv --without-pip` 创建环境。判题不需要任何第三方包，所以这个环境可以正常使用，只是缺少用于 headless 调试的 debugpy；hc 会给出警告，指明要安装的包（或者安装 uv），然后运行 `hc env sync`；
-3. 否则 hc 停下并给出指引：需要 Python 3.12+ 及其原因；在你的系统上安装 uv 的命令（macOS 上为 `brew install uv` 或安装脚本，Linux 上为安装脚本，Windows 上为 `winget install --id=astral-sh.uv -e` 或 PowerShell 安装程序）和 [uv 安装页面](https://docs.astral.sh/uv/getting-started/installation/)；或者安装 Python 3.12+；或者设置 `python.interpreter`；然后运行 `hc env sync`。指引中会说明找到了什么（`/usr/bin/python3 is 3.9.6`）。hc 只打印命令，从不运行安装程序。
+3. 否则 hc 停下并给出指引：需要 Python 3.12+ 及其原因；在你的系统上安装 uv 的命令（macOS 上为 `brew install uv` 或安装脚本，Linux 上为安装脚本）和 [uv 安装页面](https://docs.astral.sh/uv/getting-started/installation/)；或者安装 Python 3.12+；或者设置 `python.interpreter`；然后运行 `hc env sync`。指引中会说明找到了什么（`/usr/bin/python3 is 3.9.6`）。hc 只打印命令，从不运行安装程序。
 
 每个需要 Python 的命令都以同样的方式报告这一错误，并在前面说明是什么需要 Python（`judging two-sum with checker.py needs Python 3.12 or later: …`）；TUI 在运行输出中显示同样的内容。`hc validate` 和 `hc pack check` 在受影响的每条检查结果中只给出它的第一行，并在所有检查结果之后只打印一次指引。
 
