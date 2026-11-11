@@ -109,7 +109,8 @@ func TestMarkdownTextFollowsTerminal(t *testing.T) {
 
 // TestMarkdownCodeInEachTheme checks that code is highlighted in the colors
 // of each renderer's theme, also after a renderer for the other theme has
-// highlighted code in the same process.
+// highlighted code in the same process (glamour registers its chroma style
+// once per process, so that the first theme's colors would stay).
 func TestMarkdownCodeInEachTheme(t *testing.T) {
 	src := "```go\nfunc f() int { return 42 // answer\n}\n```\n"
 	dark := NewMarkdown(ThemeDark, nil).Render(src, "", 80)
@@ -117,7 +118,10 @@ func TestMarkdownCodeInEachTheme(t *testing.T) {
 	if dark == light {
 		t.Fatalf("code looks the same in both themes:\n%q", dark)
 	}
-	if again := NewMarkdown(ThemeDark, nil).Render(src, "", 80); again != dark {
-		t.Errorf("dark code changed after light code:\n%q\nwas\n%q", again, dark)
+	// Not again == dark: chroma maps a 24-bit color halfway between two of
+	// the 256 to either, in the order of a map, so the same code may come
+	// out in slightly different colors from one render to the next.
+	if again := NewMarkdown(ThemeDark, nil).Render(src, "", 80); again == light {
+		t.Errorf("dark code in the light theme's colors after light code:\n%q", again)
 	}
 }
