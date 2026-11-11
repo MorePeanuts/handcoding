@@ -66,7 +66,7 @@ var packKeys = []string{"↑↓ move", "enter open", "q quit"}
 func (m *model) viewPacks() string {
 	var b strings.Builder
 	header := m.badge() + "  " + ui.Bold.Render(strconv.Itoa(len(m.tabs))) + ui.Faint.Render(" packs")
-	b.WriteString(padBetween(header, ui.Faint.Render("choose a pack"), m.width) + "\n")
+	b.WriteString(padBetween(header, ui.Faint.Render("choose a pack"), m.width) + "\n\n")
 
 	nameW, titleW := len("PACK"), 0
 	for _, t := range m.tabs {
@@ -86,9 +86,9 @@ func (m *model) viewPacks() string {
 	b.WriteString(m.rule() + "\n")
 	descW := max(m.width-2-nameW-2-len(title(""))-9-2, 0)
 
-	// the header, the column names and a rule; a rule, the status line and
-	// the keys
-	h := max(m.height-6, 3)
+	// the header, a blank, the column names and a rule; a rule, the
+	// status line and the keys
+	h := max(m.height-7, 3)
 	first := max(m.packCursor-h+1, 0)
 	n := 0
 	for i := first; i < min(first+h, len(m.tabs)); i++ {
