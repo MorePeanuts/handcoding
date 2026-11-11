@@ -108,14 +108,35 @@ func madeUpReport(p *problem.Problem) *runner.Report {
 	return rep
 }
 
-// tempPath matches what a screen shows of the workspace's path.
-var tempPath = regexp.MustCompile(`…[^ ]*?/solutions/`)
+// tempPath matches what a screen shows of the workspace's path, whole or
+// clipped to "…" on the left.
+var tempPath = regexp.MustCompile(`\S*/solutions/`)
+
+// maskPath replaces the workspace's path with "…", and shrinks the gap
+// after it on its line to two spaces: a line that puts something at its end
+// leaves a gap as much wider as the path is shorter, so that the line stays
+// the same on every machine.
+func maskPath(screen string) string {
+	const mask = "…/solutions/"
+	lines := strings.Split(screen, "\n")
+	for i, l := range lines {
+		loc := tempPath.FindStringIndex(l)
+		if loc == nil {
+			continue
+		}
+		rest := gaps.ReplaceAllString(l[loc[1]:], "  ")
+		lines[i] = l[:loc[0]] + mask + rest
+	}
+	return strings.Join(lines, "\n")
+}
+
+var gaps = regexp.MustCompile(` {2,}`)
 
 // golden compares a screen with testdata/screens/<name>.golden, or rewrites
 // the file with -update. Trailing spaces are not compared.
 func golden(t *testing.T, name, screen string) {
 	t.Helper()
-	lines := strings.Split(tempPath.ReplaceAllString(screen, "…/solutions/"), "\n")
+	lines := strings.Split(maskPath(screen), "\n")
 	for i, l := range lines {
 		lines[i] = strings.TrimRight(l, " ")
 	}
