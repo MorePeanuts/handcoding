@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -9,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/glamour/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -25,15 +26,20 @@ const (
 )
 
 // DetectTheme resolves a configured theme. "auto" (or empty) asks the
-// terminal for its background color, which must happen before a TUI takes
-// over stdin: inside bubbletea the terminal's reply is swallowed and every
-// query waits for its timeout.
+// terminal for its background color, dark when it does not say. Only the
+// commands that render Markdown call it, and the TUI before it starts: once
+// bubbletea reads stdin, the terminal's reply would reach the program as
+// input instead.
 func DetectTheme(configured string) string {
 	switch configured {
 	case ThemeDark, ThemeLight:
 		return configured
 	}
-	if lipgloss.HasDarkBackground() {
+	// A dumb terminal answers no query: asking would only wait.
+	if strings.HasPrefix(os.Getenv("TERM"), "dumb") {
+		return ThemeDark
+	}
+	if lipgloss.HasDarkBackground(os.Stdin, os.Stdout) {
 		return ThemeDark
 	}
 	return ThemeLight

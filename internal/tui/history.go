@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -130,7 +130,7 @@ func (m *model) selectedSub() *store.Submission {
 	return &m.subs[m.subCursor]
 }
 
-func (m *model) updateHistory(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *model) updateHistory(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.message = ""
 	last := max(len(m.subs)-1, 0)
 	s := m.selectedSub()
@@ -145,7 +145,7 @@ func (m *model) updateHistory(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.subCursor = 0
 	case "end", "G":
 		m.subCursor = last
-	case "enter", "v", " ":
+	case "enter", "v", "space":
 		if s != nil {
 			m.subProblem(*s)
 			m.sub = s
@@ -369,7 +369,7 @@ func (m *model) renderSubmission() {
 	m.subView.SetContent(wrap(b.String(), m.width) + "\n" + code)
 }
 
-func (m *model) updateSubmission(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *model) updateSubmission(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.message = ""
 	switch msg.String() {
 	case "esc", "q":

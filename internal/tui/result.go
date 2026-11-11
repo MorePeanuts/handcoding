@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/lang"
@@ -148,7 +148,7 @@ func (m *model) renderResult() {
 	m.result.SetContent(wrap(b.String(), m.width))
 }
 
-func (m *model) updateResult(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *model) updateResult(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.message = ""
 	switch key := msg.String(); key {
 	case "esc", "q":

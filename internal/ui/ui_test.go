@@ -3,6 +3,7 @@ package ui
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -55,5 +56,43 @@ func TestPrintReportStopped(t *testing.T) {
 		if got := strings.Contains(summary, "78.00ms"); got == stopped {
 			t.Errorf("stopped %v: summary %q", stopped, summary)
 		}
+	}
+}
+
+// TestDetectColors checks when hc's styles color its output: on a terminal
+// that allows colors, or when they are forced, never with NO_COLOR.
+func TestDetectColors(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	defer w.Close()
+	for _, c := range []struct {
+		env  []string
+		want bool
+	}{
+		{[]string{"TERM=xterm-256color"}, false},
+		{[]string{"TERM=xterm-256color", "CLICOLOR_FORCE=1"}, true},
+		{[]string{"TERM=xterm-256color", "CLICOLOR_FORCE=0"}, false},
+		{[]string{"TERM=xterm-256color", "CLICOLOR_FORCE=1", "NO_COLOR=1"}, false},
+		{[]string{"TERM=xterm-256color", "CLICOLOR_FORCE=1", "NO_COLOR=yes"}, false},
+		{[]string{"TERM=xterm-256color", "CLICOLOR_FORCE=1", "NO_COLOR="}, true},
+		{[]string{"TERM=dumb", "CLICOLOR_FORCE=1"}, true},
+	} {
+		if got := detectColors(w, c.env); got != c.want {
+			t.Errorf("a pipe with %q: colors %v, want %v", c.env, got, c.want)
+		}
+	}
+}
+
+// TestStyleWithoutColors checks that a style renders plain text when output
+// has no colors, as under go test.
+func TestStyleWithoutColors(t *testing.T) {
+	if Colors() {
+		t.Skip("stdout is a terminal")
+	}
+	if got := VerdictStyle(runner.WrongAnswer).Render("Wrong Answer"); got != "Wrong Answer" {
+		t.Errorf("rendered %q", got)
 	}
 }

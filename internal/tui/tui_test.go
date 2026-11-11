@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/lang/python"
@@ -77,20 +77,26 @@ func (h *harness) exec(cmd tea.Cmd) {
 	}
 }
 
-func (h *harness) view() string { return h.m.View() }
+func (h *harness) view() string { return h.m.content() }
 
-func keyMsg(s string) tea.KeyMsg {
+// keyMsg is the key press whose String is s, as a terminal reports it.
+func keyMsg(s string) tea.KeyPressMsg {
 	switch s {
 	case "down":
-		return tea.KeyMsg{Type: tea.KeyDown}
+		return tea.KeyPressMsg{Code: tea.KeyDown}
 	case "enter":
-		return tea.KeyMsg{Type: tea.KeyEnter}
+		return tea.KeyPressMsg{Code: tea.KeyEnter}
 	case "esc":
-		return tea.KeyMsg{Type: tea.KeyEsc}
+		return tea.KeyPressMsg{Code: tea.KeyEscape}
 	case "tab":
-		return tea.KeyMsg{Type: tea.KeyTab}
+		return tea.KeyPressMsg{Code: tea.KeyTab}
+	case "shift+tab":
+		return tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
+	case "space":
+		return tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
 	}
-	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
+	r := []rune(s)
+	return tea.KeyPressMsg{Code: r[0], Text: s}
 }
 
 func requireGo(t *testing.T) {
@@ -141,6 +147,14 @@ func TestListSearchAndFilter(t *testing.T) {
 	if len(h.m.visible) != len(h.m.probs) {
 		t.Fatalf("clearing search: %d of %d visible", len(h.m.visible), len(h.m.probs))
 	}
+	// Pasted text goes into the search field.
+	h.press("/")
+	h.m.Update(tea.PasteMsg{Content: "maxi"})
+	h.press("enter")
+	if h.m.search.Value() != "maxi" || len(h.m.visible) != 1 {
+		t.Fatalf("pasted search %q: %d visible", h.m.search.Value(), len(h.m.visible))
+	}
+	h.press("esc")
 	h.press("f", "f") // solved
 	if len(h.m.visible) != 0 {
 		t.Fatalf("solved filter shows %d", len(h.m.visible))
@@ -162,7 +176,7 @@ func TestListEmptyWorkspace(t *testing.T) {
 		t.Fatal(err)
 	}
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
-	if view := m.View(); !strings.Contains(view, "no problems yet") {
+	if view := m.content(); !strings.Contains(view, "no problems yet") {
 		t.Errorf("empty list:\n%s", view)
 	}
 }
@@ -246,7 +260,7 @@ func TestListPackTabs(t *testing.T) {
 	if m := h.openModel(Options{}); m.pack != "local" {
 		t.Errorf("reopened on %s, want local", m.pack)
 	}
-	h.m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	h.m.Update(keyMsg("shift+tab"))
 	if h.m.pack != regression.Name {
 		t.Fatalf("after shift+tab: pack %s", h.m.pack)
 	}
@@ -349,8 +363,8 @@ func TestListHidesEmptyPacks(t *testing.T) {
 		t.Errorf("remembered empty local: pack %s, %d tabs, screen %v", m.pack, len(m.tabs), m.top())
 	}
 	m := h.openModel(Options{Pack: "local"})
-	if m.pack != "local" || len(m.tabs) != 2 || !strings.Contains(m.View(), "no problems yet") {
-		t.Errorf("--pack local: pack %s, %d tabs:\n%s", m.pack, len(m.tabs), m.View())
+	if m.pack != "local" || len(m.tabs) != 2 || !strings.Contains(m.content(), "no problems yet") {
+		t.Errorf("--pack local: pack %s, %d tabs:\n%s", m.pack, len(m.tabs), m.content())
 	}
 }
 

@@ -5,8 +5,8 @@ import (
 	"slices"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/mattn/go-runewidth"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
@@ -163,7 +163,7 @@ func (m *model) selected() *problem.Problem {
 	return m.probs[m.visible[m.cursor]]
 }
 
-func (m *model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *model) updateList(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.searching {
 		return m.updateSearch(msg)
 	}
@@ -214,7 +214,7 @@ func (m *model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// The list's history is the workspace's; a problem's is on its
 		// own screens.
 		m.openHistory(nil)
-	case "enter", " ", "v":
+	case "enter", "space", "v":
 		if p != nil {
 			m.openDetail(p, key != "v")
 		}
@@ -228,8 +228,10 @@ func (m *model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *model) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+// updateSearch handles a key or a paste while the search field has focus.
+func (m *model) updateSearch(msg tea.Msg) (tea.Model, tea.Cmd) {
+	key, _ := msg.(tea.KeyPressMsg)
+	switch key.String() {
 	case "esc":
 		m.search.SetValue("")
 		fallthrough
@@ -257,7 +259,7 @@ func (m *model) openGroups() {
 	m.groupCursor = slices.IndexFunc(t.groups(), func(g pack.Group) bool { return g.Name == m.groups[m.pack] }) + 1
 }
 
-func (m *model) updateGroups(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *model) updateGroups(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	groups := m.tab().groups()
 	switch msg.String() {
 	case "esc", "q", "c":
@@ -270,7 +272,7 @@ func (m *model) updateGroups(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.groupCursor = 0
 	case "end", "G":
 		m.groupCursor = len(groups)
-	case "enter", " ":
+	case "enter", "space":
 		m.picking = false
 		m.groups[m.pack] = ""
 		if m.groupCursor > 0 {

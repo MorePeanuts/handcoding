@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/mattn/go-runewidth"
 
 	"github.com/MorePeanuts/handcoding/internal/pack"
@@ -29,7 +29,7 @@ func (m *model) pickPack() {
 // fromPicker reports whether the list was opened from the pack picker.
 func (m *model) fromPicker() bool { return m.stack[0] == screenPacks }
 
-func (m *model) updatePacks(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *model) updatePacks(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.message = ""
 	last := max(len(m.tabs)-1, 0)
 	switch msg.String() {
@@ -43,7 +43,7 @@ func (m *model) updatePacks(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.packCursor = 0
 	case "end", "G":
 		m.packCursor = last
-	case "enter", " ":
+	case "enter", "space":
 		if len(m.tabs) > 0 {
 			m.pack = m.tabs[min(m.packCursor, last)].pack.Name
 			m.show()

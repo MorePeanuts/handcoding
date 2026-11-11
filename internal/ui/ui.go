@@ -4,10 +4,15 @@ package ui
 import (
 	"fmt"
 	"io"
+	"os"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/mattn/go-isatty"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -16,13 +21,80 @@ import (
 
 // Styles shared by the CLI and the TUI.
 var (
-	Green  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	Red    = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	Yellow = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-	Cyan   = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
-	Faint  = lipgloss.NewStyle().Faint(true)
-	Bold   = lipgloss.NewStyle().Bold(true)
+	Green  = NewStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("2")))
+	Red    = NewStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("1")))
+	Yellow = NewStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("3")))
+	Cyan   = NewStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("6")))
+	Faint  = NewStyle(lipgloss.NewStyle().Faint(true))
+	Bold   = NewStyle(lipgloss.NewStyle().Bold(true))
 )
+
+// Style is a text style (colors and attributes such as bold, no layout)
+// that renders plain text when hc's output has no colors (see Colors).
+type Style struct{ s lipgloss.Style }
+
+// NewStyle makes a Style of s, which must set text attributes only.
+func NewStyle(s lipgloss.Style) Style { return Style{s} }
+
+// Bold returns the style, bold or not.
+func (s Style) Bold(v bool) Style { return Style{s.s.Bold(v)} }
+
+// Render applies the style to strs joined by spaces, as lipgloss does.
+func (s Style) Render(strs ...string) string {
+	if !Colors() {
+		return plain.Render(strs...)
+	}
+	return s.s.Render(strs...)
+}
+
+var plain = lipgloss.NewStyle()
+
+// Colors reports whether hc styles its output: when stdout is a terminal,
+// or CLICOLOR_FORCE is set, and the environment allows colors (NO_COLOR is
+// unset or empty, and TERM is not dumb unless CLICOLOR_FORCE is set). Output on stderr follows stdout, so that the two streams
+// look alike. It is decided once, from the environment and whether stdout is
+// a terminal; the terminal is never queried.
+//
+// The TUI follows it too. Glamour's Markdown and statement images are drawn
+// in color whatever it says.
+func Colors() bool { return colors() }
+
+var colors = sync.OnceValue(func() bool { return detectColors(os.Stdout, os.Environ()) })
+
+// detectColors decides Colors for an output and an environment: a color
+// profile above ASCII, which keeps text attributes but no colors, for an
+// output that is a terminal or with colors forced. NO_COLOR with any value
+// but the empty one turns them off (no-color.org), where colorprofile only
+// heeds the values strconv.ParseBool reads as true.
+func detectColors(out *os.File, env []string) bool {
+	if v, _ := lookupEnv(env, "NO_COLOR"); v != "" {
+		return false
+	}
+	tty := isatty.IsTerminal(out.Fd()) || isatty.IsCygwinTerminal(out.Fd())
+	if !tty && !forcedColors(env) {
+		return false
+	}
+	// Env decides from the environment alone, as for a terminal.
+	return colorprofile.Env(env) > colorprofile.ASCII
+}
+
+// forcedColors reports whether CLICOLOR_FORCE asks for colors when output is
+// not a terminal.
+func forcedColors(env []string) bool {
+	v, _ := lookupEnv(env, "CLICOLOR_FORCE")
+	return v != "" && v != "0"
+}
+
+// lookupEnv finds a variable in env, the last value winning, as for
+// exec.Cmd.Env.
+func lookupEnv(env []string, name string) (string, bool) {
+	for _, e := range slices.Backward(env) {
+		if v, ok := strings.CutPrefix(e, name+"="); ok {
+			return v, true
+		}
+	}
+	return "", false
+}
 
 // Difficulty renders a colored difficulty label.
 func Difficulty(d string) string {
@@ -38,7 +110,7 @@ func Difficulty(d string) string {
 }
 
 // VerdictStyle colors a verdict.
-func VerdictStyle(v runner.Verdict) lipgloss.Style {
+func VerdictStyle(v runner.Verdict) Style {
 	switch v {
 	case runner.Accepted:
 		return Green.Bold(true)
