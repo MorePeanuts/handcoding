@@ -285,9 +285,9 @@ func (m *model) updateGroups(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) listHeight() int {
-	// the tabs, a blank, the stats, a blank, the column names and a rule;
-	// a rule, the status line and the keys
-	return max(m.height-9, 3)
+	// the tabs, the stats, the column names and a rule; a rule, the status
+	// line and the keys
+	return max(m.height-7, 3)
 }
 
 // tabBar names every pack with its progress, the one shown highlighted, in
@@ -406,7 +406,7 @@ func (m *model) viewList() string {
 	right += ui.Faint.Render("   filter ") + m.filter.String()
 	left := m.badge() + "  "
 	left += m.tabBar(m.width - lipgloss.Width(left) - lipgloss.Width(right) - 2)
-	b.WriteString(padBetween(left, right, m.width) + "\n\n")
+	b.WriteString(padBetween(left, right, m.width) + "\n")
 
 	stats := ""
 	if g := m.group(); g != nil {
@@ -422,7 +422,7 @@ func (m *model) viewList() string {
 	if starred > 0 {
 		stats += "    " + ui.Yellow.Render(fmt.Sprintf("★ %d starred", starred))
 	}
-	b.WriteString(padBetween(stats, progressBar(solved, len(m.probs)), m.width) + "\n\n")
+	b.WriteString(padBetween(stats, progressBar(solved, len(m.probs)), m.width) + "\n")
 
 	h := m.listHeight()
 	if m.picking {
