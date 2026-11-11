@@ -76,7 +76,7 @@ func detectColors(out *os.File, env []string) bool {
 	if v, _ := lookupEnv(env, "NO_COLOR"); v != "" {
 		return false
 	}
-	tty := isatty.IsTerminal(out.Fd()) || isatty.IsCygwinTerminal(out.Fd())
+	tty := isatty.IsTerminal(out.Fd())
 	if !tty && !forcedColors(env) {
 		return false
 	}

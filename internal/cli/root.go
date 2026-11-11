@@ -215,7 +215,7 @@ func withWritableProblem(root *rootOptions, ref string, fn func(a *app.App, p *p
 }
 
 func isTerminal(f *os.File) bool {
-	return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
+	return isatty.IsTerminal(f.Fd())
 }
 
 // editorCommand builds the command that opens path in the user's editor.

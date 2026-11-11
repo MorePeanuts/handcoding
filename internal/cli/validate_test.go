@@ -18,9 +18,6 @@ import (
 // needs one the error's summary, and the guide to getting Python once,
 // after the findings, one problem at a time or several at once.
 func TestValidateWithoutPython(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("links go into a directory of its own")
-	}
 	goPath, err := filepath.EvalSymlinks(testenv.LookPath(t, "go"))
 	if err != nil {
 		t.Fatal(err)

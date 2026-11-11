@@ -241,10 +241,6 @@ func openFiles(paths []string) error {
 	switch runtime.GOOS {
 	case "darwin":
 		cmds = append(cmds, exec.Command("open", paths...))
-	case "windows":
-		for _, p := range paths {
-			cmds = append(cmds, exec.Command("cmd", "/c", "start", "", p))
-		}
 	default:
 		for _, p := range paths {
 			cmds = append(cmds, exec.Command("xdg-open", p))

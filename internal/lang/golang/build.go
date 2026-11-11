@@ -70,11 +70,7 @@ func (l Language) Build(ctx context.Context, dir, binDir string) error {
 		return err
 	}
 	if err := os.Rename(tmp.Name(), bin); err != nil {
-		// Windows does not replace a file that is in use: another hc has
-		// just built the same program.
-		if _, statErr := os.Stat(bin); statErr != nil {
-			return err
-		}
+		return err
 	}
 	if l.BuildCache != "" {
 		cacheMu.Lock()

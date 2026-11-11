@@ -50,7 +50,9 @@ Command-line clients bring your editor back, but they still send your code to th
 go install github.com/MorePeanuts/handcoding/cmd/hc@latest
 ```
 
-Prebuilt binaries for Linux, macOS and Windows are on the [releases page](https://github.com/MorePeanuts/handcoding/releases).
+Prebuilt binaries for Linux and macOS are on the [releases page](https://github.com/MorePeanuts/handcoding/releases).
+
+hc runs on Linux and macOS. Windows is not supported: on Windows, install and use hc inside [WSL](https://learn.microsoft.com/windows/wsl/install), where it works as on Linux.
 
 You need Go 1.22+ to solve in Go, and Python 3.12+ in any language: besides Python solutions, Python runs the generators and checkers that most problems have. The easiest way to get it is [uv](https://docs.astral.sh/uv/getting-started/installation/) (recommended; `brew install uv`, or `curl -LsSf https://astral.sh/uv/install.sh | sh`), which downloads a Python even where the system one is too old (macOS ships 3.9); a Python 3.12+ on PATH works too. `hc init` sets up a virtual environment for it in the workspace, and says how to get uv or Python if it finds neither. Optional extras:
 

@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -83,11 +82,9 @@ func TestLeetCodeSessions(t *testing.T) {
 	if _, _, err := app.LeetCodeLogin(ctx, leetcode.NewClient(cn, ""), leetcode.Session{Token: "good"}); err != nil {
 		t.Fatal(err)
 	}
-	if runtime.GOOS != "windows" {
-		for p, want := range map[string]os.FileMode{path: 0o600, filepath.Dir(path): 0o700} {
-			if st, err := os.Stat(p); err != nil || st.Mode().Perm() != want {
-				t.Errorf("%s: mode %v, %v; want %v", p, st.Mode().Perm(), err, want)
-			}
+	for p, want := range map[string]os.FileMode{path: 0o600, filepath.Dir(path): 0o700} {
+		if st, err := os.Stat(p); err != nil || st.Mode().Perm() != want {
+			t.Errorf("%s: mode %v, %v; want %v", p, st.Mode().Perm(), err, want)
 		}
 	}
 	s, err := app.LeetCodeSession(com)

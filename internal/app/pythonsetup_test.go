@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -19,9 +18,6 @@ import (
 // neither uv nor a Python on PATH, the run fails with the *python.SetupError
 // and its guide, prefixed with why it needs Python. Serial: it sets PATH.
 func TestCheckerWithoutPython(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("links go into a directory of its own")
-	}
 	goPath, err := filepath.EvalSymlinks(testenv.LookPath(t, "go"))
 	if err != nil {
 		t.Fatal(err)
