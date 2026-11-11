@@ -191,8 +191,9 @@ func newTestCmd(root *rootOptions) *cobra.Command {
 		Use:     "test <problem>",
 		Aliases: []string{"t", "run"},
 		Short:   "Run the solution on example cases (or chosen cases)",
-		Long: `Run your solution locally. By default only the example cases are run;
-use --case to pick cases, --all for every case, or --input to try your own input.
+		Long: `Run your solution locally. By default the example cases are run, and your own
+cases of a problem of an installed pack (see hc cases --help); use --case to
+pick cases, --all for every case, or --input to try an input once.
 
   hc test two-sum
   hc test two-sum -c 4 -c 5
@@ -317,12 +318,15 @@ func selectForTest(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.La
 		}
 		return sel, nil
 	}
-	cases, err := p.LoadCases()
+	cases, err := a.Cases(p)
 	if err != nil {
 		return nil, err
 	}
 	sel, err := app.Select(cases, o.cases, o.all)
 	if err == nil && len(sel) == 0 && len(cases) > 0 {
+		if a.KeepsUserCases(p) {
+			return nil, fmt.Errorf("%s has no example cases: choose cases with --case or --all, or add your own with hc cases add %s", p.Slug, a.WS.Ref(p))
+		}
 		return nil, fmt.Errorf(`%s has no example cases: mark the statement's examples with "example": true in %s, or choose cases with --case or --all`, p.Slug, problem.CasesFile)
 	}
 	return sel, err
@@ -446,7 +450,7 @@ server for your editor to attach to:
 					}
 					sel = []runner.Selected{{Index: 1, Case: c}}
 				} else {
-					cases, err := p.LoadCases()
+					cases, err := a.Cases(p)
 					if err != nil {
 						return err
 					}

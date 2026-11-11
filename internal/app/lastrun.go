@@ -52,7 +52,13 @@ func problemKey(p *problem.Problem) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// runKey identifies code run on p (see problemKey).
+// runKey identifies code run on p's cases and the user's own (see Cases):
+// with problemKey, those.
+func (a *App) runKey(p *problem.Problem, code []byte) string {
+	return runKey(code, problemKey(p)+a.userCasesKey(p))
+}
+
+// runKey identifies code run on a problem (see problemKey).
 func runKey(code []byte, problemKey string) string {
 	h := sha256.New()
 	part(h, code)
@@ -81,11 +87,11 @@ func (a *App) recordRun(p *problem.Problem, l lang.Language, code []byte, sel []
 	if rep == nil || rep.Verdict == runner.CompileError {
 		return
 	}
-	cases, err := p.LoadCases()
+	cases, err := a.Cases(p)
 	if err != nil {
 		return
 	}
-	r := lastRun{Key: runKey(code, problemKey(p)), All: len(sel) == len(cases)}
+	r := lastRun{Key: a.runKey(p, code), All: len(sel) == len(cases)}
 	if c := firstFailure(rep); c != nil {
 		r.Failed, r.Verdict = c.Index, c.Verdict
 	}
@@ -110,16 +116,17 @@ func (a *App) LastFailure(p *problem.Problem, l lang.Language) (d DebugCase, ok 
 	}
 	var r lastRun
 	data, err := os.ReadFile(a.lastRunPath(p, l))
-	if err != nil || json.Unmarshal(data, &r) != nil || r.Key != runKey(code, problemKey(p)) || r.Failed == 0 && !r.All {
+	if err != nil || json.Unmarshal(data, &r) != nil || r.Key != a.runKey(p, code) || r.Failed == 0 && !r.All {
 		return d, false
 	}
 	return DebugCase{Index: max(r.Failed, 1), Verdict: r.Verdict}, true
 }
 
-// RunFailure runs the solution on every case and returns its first
-// failure, case 1 when none fails. The run is remembered like any other.
+// RunFailure runs the solution on every case, the user's own included, and
+// returns its first failure, case 1 when none fails. The run is remembered
+// like any other.
 func (a *App) RunFailure(ctx context.Context, p *problem.Problem, l lang.Language, o RunOptions) (DebugCase, error) {
-	cases, err := p.LoadCases()
+	cases, err := a.Cases(p)
 	if err != nil {
 		return DebugCase{}, err
 	}
@@ -145,27 +152,29 @@ func (a *App) RunFailure(ctx context.Context, p *problem.Problem, l lang.Languag
 }
 
 // RestoreSubmission makes s's code the solution of p in l, like Restore.
-// A submission ran every case, so while the problem is unchanged since, it
-// is remembered as the latest run of that code (see LastFailure).
+// A submission ran every case of the problem, so while the problem is
+// unchanged since, it is remembered as the latest run of that code (see
+// LastFailure).
 func (a *App) RestoreSubmission(p *problem.Problem, l lang.Language, s store.Submission) (string, error) {
 	path, err := a.Restore(p, l, s.Code)
 	if err != nil {
 		return "", err
 	}
-	if r, ok := submissionRun(p, s); ok {
+	if r, ok := a.submissionRun(p, s); ok {
 		writeCacheFile(a.lastRunPath(p, l), r)
 	}
 	return path, nil
 }
 
-// submissionRun is s as a run, if the problem has not changed since.
-func submissionRun(p *problem.Problem, s store.Submission) (lastRun, bool) {
+// submissionRun is s as a run, if the problem has not changed since. It did
+// not run the user's own cases: with some, it covered only some cases.
+func (a *App) submissionRun(p *problem.Problem, s store.Submission) (lastRun, bool) {
 	var sr storedReport
 	key := problemKey(p)
 	if s.Details == "" || json.Unmarshal([]byte(s.Details), &sr) != nil || sr.Problem != key || sr.Verdict == string(runner.CompileError) {
 		return lastRun{}, false
 	}
-	r := lastRun{Key: runKey([]byte(s.Code), key), All: true}
+	r := lastRun{Key: runKey([]byte(s.Code), key+a.userCasesKey(p)), All: a.userCasesKey(p) == ""}
 	for _, c := range sr.Cases {
 		if v := runner.Verdict(c.Verdict); failed(v) {
 			r.Failed, r.Verdict = c.Index, v

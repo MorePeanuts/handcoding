@@ -52,6 +52,22 @@ func TestScreens(t *testing.T) {
 
 	h.press("enter")
 	shot("statement")
+	// The cases tab, on one of the user's own cases, and the form that
+	// adds one, starting from it.
+	p0 := h.m.current
+	userCases := h.m.app.WS.UserCasesPath(p0)
+	if err := os.MkdirAll(filepath.Dir(userCases), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(userCases, []byte(`{"input":{"nums":[3,3,1,3],"target":6},"note":"duplicates at both ends"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.m.loadCases(p0)
+	h.press("tab", "G")
+	shot("cases")
+	h.press("a")
+	shot("case-form")
+	h.press("esc", "tab")
 
 	p := h.m.current
 	rep := madeUpReport(p)

@@ -401,6 +401,9 @@ func printUpdate(a *app.App, u *app.PackUpdate) {
 		if o.Submissions > 0 {
 			kept = append(kept, fmt.Sprintf("%d submission(s)", o.Submissions))
 		}
+		if o.Cases != "" {
+			kept = append(kept, "your cases ("+o.Cases+")")
+		}
 		what := "was removed"
 		if !slices.Contains(u.Removed, o.Slug) {
 			what = "moved to another directory"
@@ -420,9 +423,9 @@ func newPackRemoveCmd(root *rootOptions) *cobra.Command {
 		Aliases: []string{"rm"},
 		Short:   "Remove an installed pack",
 		Long: `Delete packs/<name>/ and its entry in hc.yaml. Your solutions
-(solutions/<name>/) and the history of its problems are kept, so installing
-the pack again brings them back; --purge deletes them too. local, the
-workspace's own problems, cannot be removed.`,
+(solutions/<name>/), your own cases (cases/<name>/) and the history of its
+problems are kept, so installing the pack again brings them back; --purge
+deletes them too. local, the workspace's own problems, cannot be removed.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, err := root.openApp()
@@ -431,7 +434,7 @@ workspace's own problems, cannot be removed.`,
 			}
 			defer a.Close()
 			name := args[0]
-			if purge && !yes && !confirm(fmt.Sprintf("Remove %s, and delete your solutions and submission history of its problems?", name)) {
+			if purge && !yes && !confirm(fmt.Sprintf("Remove %s, and delete your solutions, cases and submission history of its problems?", name)) {
 				return errors.New("aborted (use --yes to skip the prompt)")
 			}
 			res, err := a.RemovePack(cmd.Context(), name, purge)
@@ -447,14 +450,18 @@ workspace's own problems, cannot be removed.`,
 			}
 			fmt.Printf("%s %s: %s\n", ui.Red.Render("removed"), name, strings.Join(done, " and "))
 			if purge {
-				fmt.Printf("     deleted %s and %d submission(s)\n", workspace.SolutionsDir+"/"+name, res.Submissions)
+				dirs := workspace.SolutionsDir + "/" + name
+				if res.Cases {
+					dirs += ", " + workspace.CasesDir + "/" + name
+				}
+				fmt.Printf("     deleted %s and %d submission(s)\n", dirs, res.Submissions)
 			} else {
-				fmt.Println(ui.Faint.Render("     your solutions and history are kept (--purge deletes them)"))
+				fmt.Println(ui.Faint.Render("     your solutions, cases and history are kept (--purge deletes them)"))
 			}
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&purge, "purge", false, "also delete your solutions and submission history of the pack")
+	cmd.Flags().BoolVar(&purge, "purge", false, "also delete your solutions, cases and submission history of the pack")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
 	return cmd
 }

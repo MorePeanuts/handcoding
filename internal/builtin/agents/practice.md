@@ -12,6 +12,9 @@ comes second. Answer in the user's language.
   and `reference/` (the pack's model solutions). Installed packs, every pack
   but `local`, are read-only: never edit them.
 - `packs/local/problems/`: the user's own problems.
+- `cases/<pack>/<slug>.jsonl`: the user's own cases of a problem of an
+  installed pack, which `hc test` runs and `hc submit` does not. Change them
+  with `hc cases add` and `hc cases rm`.
 - `solutions/<pack>/<lang>/<dir>/solution.py` (or `.go`): the user's code. hc
   rewrites the other files there on every run (`_hc_runner.py`,
   `zz_hc_driver.go`, `go.mod`): never edit them.
@@ -28,11 +31,12 @@ hc show <problem>                  # the statement
 hc show <problem> --locale zh-CN   # the statement in another language
 hc list                            # every problem and its status
 hc history <problem>               # the user's past submissions
-hc test <problem>                  # run the user's solution on the examples
+hc test <problem>                  # run the user's solution on the examples and the user's own cases
 hc test <problem> -c N             # on case N
 hc test <problem> --all            # on every case
 hc test <problem> --input '{"nums": [3, 2, 4], "target": 6}'   # on your input (the parameters)
 hc test <problem> --all --file .hc/scratch/<slug>/draft.py     # run a draft of yours instead
+hc cases add <problem> --input '{"nums": [3, 2, 4], "target": 6}'  # keep an input as a case: only when the user asks
 ```
 
 `hc test` shows the first failing case in full (`hc test <problem> -v`:

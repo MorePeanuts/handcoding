@@ -3,6 +3,7 @@ package tui
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -77,7 +78,7 @@ func (h *harness) exec(cmd tea.Cmd) {
 		for _, c := range msg {
 			h.exec(c)
 		}
-	case runDoneMsg:
+	case runDoneMsg, caseAddedMsg:
 		h.m.Update(msg)
 	}
 }
@@ -1004,5 +1005,60 @@ func TestFollowTheme(t *testing.T) {
 	}
 	if want := ansi.ResetModeLightDark + "\x1b[H\x1b[2J\x1b[3J"; out.String() != want {
 		t.Errorf("hand-off wrote %q, want %q", out.String(), want)
+	}
+}
+
+// TestAddCase adds one of the user's own cases to a problem of an
+// installed pack with the form of the detail screen, which then shows it in
+// its cases tab, and removes it.
+func TestAddCase(t *testing.T) {
+	t.Parallel()
+	requireGo(t)
+	requirePython(t)
+	h := newHarness(t)
+	h.press("enter", "a")
+	if h.m.top() != screenCaseForm {
+		t.Fatalf("a opened screen %d, not the form", h.m.top())
+	}
+	typeText := func(s string) {
+		for _, r := range s {
+			h.press(string(r))
+		}
+	}
+	// Not JSON: the form says so, and stays.
+	typeText("[1,5")
+	h.press("tab")
+	typeText("8")
+	h.press("enter")
+	if h.m.top() != screenCaseForm || !strings.Contains(h.view(), "nums is not valid JSON") {
+		t.Fatalf("an invalid value was taken:\n%s", h.view())
+	}
+	// Pasted text goes to the field focused, nums again.
+	h.m.Update(tea.PasteMsg{Content: ",3]"})
+	h.press("enter")
+	if h.m.top() != screenDetail || h.m.detailTab != tabProblemCases {
+		t.Fatalf("after adding, screen %d tab %d:\n%s", h.m.top(), h.m.detailTab, h.view())
+	}
+	p := h.m.current
+	pack, _ := p.LoadCases()
+	n := len(pack) + 1
+	if want := fmt.Sprintf("added your case %d, expecting [1,2]", n); !strings.Contains(h.m.message, want) {
+		t.Errorf("message %q, want %q", h.m.message, want)
+	}
+	if c, index := h.m.selectedCase(); c == nil || index != n || !c.User {
+		t.Fatalf("selected case %d %+v, want your case %d", index, c, n)
+	}
+	data, err := os.ReadFile(h.m.app.WS.UserCasesPath(p))
+	if err != nil || string(data) != `{"input":{"nums":[1,5,3],"target":8}}`+"\n" {
+		t.Fatalf("your cases: %q %v", data, err)
+	}
+	// The pack's cases cannot be removed; yours can.
+	h.press("g", "x")
+	if h.m.confirm != nil || !strings.Contains(h.m.message, "read-only") {
+		t.Fatalf("x on the pack's case: %q", h.m.message)
+	}
+	h.press("G", "x", "y")
+	if cases, _ := h.m.app.Cases(p); len(cases) != n-1 {
+		t.Fatalf("%d cases after removing yours, want %d", len(cases), n-1)
 	}
 }

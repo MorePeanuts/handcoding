@@ -45,6 +45,10 @@ type Case struct {
 	// Digest is InputDigest of the generated input, as the author's
 	// generator built it; hc cases build writes it.
 	Digest string `json:"digest,omitempty"`
+	// User marks a case the user keeps apart from the problem's cases, for
+	// a problem whose pack is read-only. It is not part of the protocol:
+	// hc sets it on the cases it reads from the user's file.
+	User bool `json:"-"`
 }
 
 // Generate is a call of a function of generator.py: name(rng, **args), with

@@ -23,6 +23,7 @@ English · [简体中文](how-to-use_zh.md)
   packs/<name>/                            installed packs (read-only)
   solutions/local/go/0001-two-sum/         your code: solution.go, plus generated go.mod and zz_hc_driver.go
   solutions/local/python/0001-two-sum/     your code: solution.py, plus a generated _hc_runner.py
+  cases/<pack>/<slug>.jsonl                your own cases of an installed pack's problem (see Your own cases)
   .hc/hc.db                                submission history (SQLite)
   .hc/venv/                                Python virtual environment managed by hc
   .hc/runtime/python/                      hc_runtime.py, shared by every Python solution
@@ -41,7 +42,7 @@ English · [简体中文](how-to-use_zh.md)
 The problems of a workspace come in [packs](protocol.md#packs), each a directory of `packs/`:
 
 - `packs/local/` holds your own problems: what `hc fetch`, `hc new` and `hc import` add. It has no `pack.yaml` (`local` is a reserved name), and is solved in every language. Its statements are in the [locales](#statements-in-several-languages) that `locales` in `hc.yaml` sets, English (`[en]`) by default.
-- Every other directory is an installed pack: a `pack.yaml` whose `name` is the directory's name, and its `problems/`. Installed packs are **read-only**: `hc gen`, `hc fix` and `hc cases add|rm|edit|build` refuse to change them, since updating the pack would replace the change. A pack whose `pack.yaml` lists `languages` can only be solved in those: `hc start -l` refuses the others, and if your default language is not among them, hc uses the pack's first language and says so. `hc pack install` installs them (see [Packs](#packs)); a pack copied into `packs/` by hand works too, and `hc pack list` shows it as unmanaged.
+- Every other directory is an installed pack: a `pack.yaml` whose `name` is the directory's name, and its `problems/`. Installed packs are **read-only**: `hc gen`, `hc fix` and `hc cases build` refuse to change them, since updating the pack would replace the change, and `hc cases add|rm|edit` work on [your own cases](#your-own-cases) of the problem instead. A pack whose `pack.yaml` lists `languages` can only be solved in those: `hc start -l` refuses the others, and if your default language is not among them, hc uses the pack's first language and says so. `hc pack install` installs them (see [Packs](#packs)); a pack copied into `packs/` by hand works too, and `hc pack list` shows it as unmanaged.
 
 A pack that hc cannot read (no `pack.yaml`, an invalid one, or one written for a newer protocol, which says to upgrade hc) is reported by `hc validate` and the list, and its problems are left out; the rest of the workspace works.
 
@@ -104,6 +105,7 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 - Press `enter` on a problem to open it. The statement is shown, the solution file is created from the template, and its absolute path is **copied to the clipboard**. In the editor, `:e <paste>` and start writing. To read a statement without starting the problem, press `v` instead: nothing is created or copied until an action such as `e`, `t` or `y` needs the solution.
 - Test, submit and debug are available from the statement and the result screen, not from the list, as on LeetCode. The result screen lists the cases, the first failure selected and its input, output and expected output shown under it; move to any other case, passed ones included, to see its own. `tab` shows what your program printed. A submission in the history shows the same; a passed case of it shows its input and expected output only while the problem's cases are the ones it ran on, since its output is not kept.
 - `h` on the list shows every submission of the workspace, newest first, with its problem; `o` there opens the submission's problem, and `esc` comes back. `h` in a problem (the statement or the result screen) shows only that problem's submissions.
+- A problem's screen has two tabs, switched with `tab`: the statement, and its cases. The cases tab lists every case of the problem, your own cases after the pack's; the selected one's input and expected output show under it. `a`, on either tab, opens a form that adds a case: a field per input, as JSON, then the expected output and a note, both optional; on the cases tab it starts from the selected case's input. In an installed pack the case is [one of your own](#your-own-cases); in your own problems it goes into `cases.jsonl`, as `hc cases add` does. `x` removes the selected case (in an installed pack, only yours), and `d` debugs it.
 - The debugger takes over the terminal. The screen is cleared before it starts, and the TUI comes back when it exits. `d` debugs the first case your code fails, as [`hc debug`](#debugging) picks it. In the history, `d` restores the submission and debugs its first failure.
 - Statement images are drawn in the terminal. kitty and Ghostty show the original image. Other truecolor terminals show a block-character approximation that loses detail; press `o` to open the original in your image viewer. See [`images`](#configuration) to choose the mode.
 - Statement colors follow the terminal background. When the terminal switches between light and dark while the TUI runs, the statement follows it in terminals that report the switch (Ghostty, kitty 0.38 and later, among others); elsewhere its text still follows, its headings and code keep their colors until you reopen hc. If they look wrong, set `theme` in `hc.yaml`.
@@ -117,7 +119,7 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 | Key | Action | Key | Action |
 |---|---|---|---|
 | `enter` | Open the problem (and copy the solution path) | `e` | Open the solution in your editor |
-| `t` | Test on the examples (in a problem) | `s` | Submit, all cases (in a problem) |
+| `t` | Test on the examples and your own cases (in a problem) | `s` | Submit, all cases (in a problem) |
 | `d` | Debug the first failing case (in a problem) | `h` | Submission history (the workspace's on the list, the problem's in a problem): code, judge details, restore, debug, delete |
 | `y` | Copy the solution path again | `L` | Switch language |
 | `r` | Reset to the template | `D` | Discard: delete the solution and its history, back to not started |
@@ -128,6 +130,8 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 | `m` | Star or unstar the problem (`★` in the list) | `ctrl+c` | Quit |
 | `?` | Every key of the screen (the bottom line shows the common ones) | `tab` | Result and submission: switch between the cases and the program's output (result) or the code (submission) |
 | `↑↓` / `j` `k` | Result and submission, cases tab: select a case, whose input, output and expected output show under it | `d` | Result and submission, cases tab: debug the selected case |
+| `tab` | Problem: switch between the statement and the cases | `a` | Problem: add a case (one of your own in an installed pack) |
+| `↑↓` / `j` `k` | Problem, cases tab: select a case | `x` / `d` | Problem, cases tab: remove the selected case (in an installed pack, only yours) / debug it |
 
 ## Commands
 
@@ -141,7 +145,7 @@ Problems can be referred to by slug, slug prefix, number or directory name: `hc 
 
 ```sh
 hc start two-sum -e                                 # create the solution and open the editor
-hc test two-sum                                     # run the examples (an error if no case is marked as one)
+hc test two-sum                                     # run the examples and your own cases (an error if there are neither)
 hc test two-sum -c 4 -c 5                           # run chosen cases
 hc test two-sum --all -v                            # all cases, full output, not recorded
 hc test two-sum -i '{"nums":[1,2,3],"target":5}'    # custom input (expected output from the reference, if any)
@@ -165,6 +169,27 @@ Run `hc <command> --help` for every flag.
 The report shows how long each case took in your code: the call of the function, or for a design problem the constructor and every method call, without decoding their arguments and encoding their results. The total at the bottom is the sum of these times, so it leaves out starting the program and reading the cases.
 
 `--file` runs a solution file kept anywhere instead of the one in `solutions/`, so you can compare drafts or check that a slow solution exceeds the [time limit](#time-limit) (`--file` with the reference's own file shows its times). Its language comes from its extension, unless `-l` says otherwise. The file is run alone, copied into a directory of its own.
+
+### Your own cases
+
+An installed pack is read-only, but a case you find worth keeping for one of its problems need not be lost: add it as one of your own cases. hc keeps them in the workspace, in `cases/<pack>/<slug>.jsonl`, apart from the pack, so `hc pack update` never touches them.
+
+```sh
+hc cases add two-sum -i '{"nums":[3,3,1,3],"target":6}' --note "duplicates at both ends"
+hc cases add two-sum -i '{"nums":[1,2],"target":3}' -e '[0,1]'   # with its expected output
+hc cases list two-sum               # the pack's cases, then yours, marked "yours"
+hc cases rm two-sum 10              # remove one of yours
+hc cases edit two-sum               # edit the file of your cases in your editor
+```
+
+- Your cases are numbered after the pack's: with 9 cases in the pack, yours are 10, 11, and so on. `-c` of `hc test` and `hc debug` takes these numbers, and `hc cases rm` only those of yours.
+- `hc test` runs the examples and your cases by default, `--all` every case; `hc debug` without `-c` looks for the first failure among them all. **`hc submit` never runs them**: a submission's verdict means the pack's cases, the same for everyone.
+- Without `-e`, the expected output comes from the problem's reference solution: `hc cases add` runs it on the input at once, to show the expected output and to refuse an input it fails on (one outside the problem's constraints, usually; give `-e` to keep it anyway). The file keeps only your input, and the expected output is computed again, and cached, when the case runs, so it follows the pack's updates. A problem without a reference solution shows your output unjudged; one judged with `any_of` needs `-e`.
+- Your cases have an input, and optionally an expected output and a note: not `--generate` or `--example`. To try a generated input once, use `hc test --generate`.
+- In the TUI, `a` on a problem adds one, and its cases tab lists them (see [the interactive list](#the-interactive-list)).
+- `hc pack remove` keeps them, like your solutions, and `--purge` deletes them. When an update removes a problem, hc says that your cases of it are kept.
+
+Your own problems (`packs/local/`) have no such separate file: their `cases.jsonl` is yours already, so `hc cases add` writes to it.
 
 ### Time limit
 
@@ -304,8 +329,8 @@ hc pack remove leetcode --purge             # ... and delete them too
 
 - **`hc pack install <source>`** takes a git URL, or a directory. A git URL is cloned partially (`--filter=blob:none`): hc downloads every commit, but only the files of the commits it checks out, so a pack's history costs little however large its files once were. A directory that is a git repository is cloned whole; any other directory holding `pack.yaml` is copied (its `pack.yaml` and `problems/` only). `--ref` installs a tag or branch of a git source instead of its default branch. The pack goes into `packs/<name>/`, named after its `pack.yaml`. hc refuses a `pack.yaml` that is invalid or written for a protocol it does not read (and says whether to upgrade hc or the pack), and a name that another pack in `packs/` has. Problems that fail to load are reported, but do not keep the pack from being installed.
 - **`hc pack list`** shows each pack's name, version, number of problems, progress (problems with an accepted submission), installed commit and source. A directory of `packs/` that `hc.yaml` does not list, such as one copied by hand, is *unmanaged*; a pack that `hc.yaml` lists but `packs/` lacks is *missing*.
-- **`hc pack update [name]...`** fetches each pack and checks out the latest commit of its ref: a branch moves on, a tag stays put unless it was moved upstream, and `--ref` switches to another one. A pack installed without `--ref` follows the source's default branch, also when the source renames it. A copied pack is copied again. Installed packs are read-only, so a pack with local changes is refused; `--force` discards them. An update whose `pack.yaml` hc cannot read, or that renames the pack, is undone. Afterwards hc lists the problems added and removed. Your solutions and history are keyed by the problem's directory and slug, so those of a removed problem, or of one whose directory was renamed, are kept but no problem uses them: hc says so, and deletes nothing.
-- **`hc pack remove <name>`** deletes `packs/<name>/` and its entry in `hc.yaml`. Your solutions (`solutions/<name>/`) and its history stay, so installing the pack again brings them back; `--purge` deletes them too, after asking (`--yes` skips the question). `local` cannot be removed.
+- **`hc pack update [name]...`** fetches each pack and checks out the latest commit of its ref: a branch moves on, a tag stays put unless it was moved upstream, and `--ref` switches to another one. A pack installed without `--ref` follows the source's default branch, also when the source renames it. A copied pack is copied again. Installed packs are read-only, so a pack with local changes is refused; `--force` discards them. An update whose `pack.yaml` hc cannot read, or that renames the pack, is undone. Afterwards hc lists the problems added and removed. Your solutions and history are keyed by the problem's directory and slug, so those of a removed problem, or of one whose directory was renamed, are kept but no problem uses them: hc says so, and deletes nothing. The same goes for your own cases of a removed problem.
+- **`hc pack remove <name>`** deletes `packs/<name>/` and its entry in `hc.yaml`. Your solutions (`solutions/<name>/`), your own cases (`cases/<name>/`) and its history stay, so installing the pack again brings them back; `--purge` deletes them too, after asking (`--yes` skips the question). `local` cannot be removed.
 - `hc pack install`, `update` and `remove` run one at a time in a workspace: while one runs, another refuses to start and says so, rather than undo its changes to `packs/` and `hc.yaml`.
 
 ### The packs list
@@ -448,7 +473,7 @@ Either way, hc checks the session with LeetCode and saves it, readable by you on
 
 **Code.** hc sends the solution `hc test` would run (`-l` as there), turned into LeetCode's code: Python drops its imports from `hc_runtime` (LeetCode defines `ListNode`, `TreeNode` and `Node` itself), and Go its `package main`. A Python function problem must be a method of `class Solution` there; hc also accepts a module-level function, LeetCode does not.
 
-**Results.** `test` shows each example's output next to LeetCode's expected answer and what it printed. `submit` shows the verdict, the testcases passed, and the runtime and memory with their percentiles. When a submission fails, it shows the case it failed on, your output and the expected one; when the problem's inputs are LeetCode's as they are (a function problem without [structure inputs](protocol.md#structure-inputs) or LeetCode's own types), it also prints the `hc cases add` command that adds the case, so that a case LeetCode has and the problem lacks can join its tests. LeetCode results are not recorded in hc's history.
+**Results.** `test` shows each example's output next to LeetCode's expected answer and what it printed. `submit` shows the verdict, the testcases passed, and the runtime and memory with their percentiles. When a submission fails, it shows the case it failed on, your output and the expected one; when the problem's inputs are LeetCode's as they are (a function problem without [structure inputs](protocol.md#structure-inputs) or LeetCode's own types), it also prints the `hc cases add` command that adds the case, so that a case LeetCode has and the problem lacks can join its tests: as one of [your own cases](#your-own-cases) for a problem of an installed pack. LeetCode results are not recorded in hc's history.
 
 ## Configuration
 

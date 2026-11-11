@@ -1,6 +1,7 @@
  hc   regression / 1. Two Sum  two-sum   Easy   array · hash-table                                en
  Go   …/solutions/regression/go/0001-two-sum/solution.go  ● attempted
 ────────────────────────────────────────────────────────────────────────────────────────────────────
+ Statement  Cases 9
                                                                                                    ┃
    1. Two Sum                                                                                      ┃
                                                                                                    ┃
@@ -10,7 +11,7 @@
   You may assume that each input would have exactly one solution, and you may not use the same     ┃
   element twice.                                                                                   ┃
                                                                                                    ┃
-  You can return the answer in any order.                                                          ┃
+  You can return the answer in any order.                                                          │
                                                                                                    │
   Example 1:                                                                                       │
                                                                                                    │
@@ -24,7 +25,6 @@
   indices  [0, 1]  are returned.                                                                   │
                                                                                                    │
   Example 2:                                                                                       │
-                                                                                                   │
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 copied: …/solutions/regression/go/0001-two-sum/solution.go
  t test    s submit    d debug    e edit    h history    y copy-path    ? help        top · 54 lines

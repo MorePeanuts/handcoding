@@ -52,7 +52,10 @@ const (
 	// PacksDir holds the workspace's packs, one directory each.
 	PacksDir     = "packs"
 	SolutionsDir = "solutions"
-	StateDir     = ".hc"
+	// CasesDir holds the user's own cases of installed packs' problems,
+	// which are read-only: cases/<pack>/<slug>.jsonl.
+	CasesDir = "cases"
+	StateDir = ".hc"
 	// VenvDir is the Python virtual environment, inside StateDir.
 	VenvDir = "venv"
 	// PyrightConfig points pyright at the virtual environment.
@@ -414,6 +417,13 @@ func (w *Workspace) RuntimePath(langID string) string {
 // solutions/<pack>/<lang>/<dir>.
 func (w *Workspace) SolutionDir(p *problem.Problem, langID string) string {
 	return filepath.Join(w.Root, SolutionsDir, p.Pack, langID, filepath.Base(p.Dir))
+}
+
+// UserCasesPath is the file of the user's own cases of p:
+// cases/<pack>/<slug>.jsonl. Only problems of installed packs have one (see
+// CheckWritable).
+func (w *Workspace) UserCasesPath(p *problem.Problem) string {
+	return filepath.Join(w.Root, CasesDir, p.Pack, p.Slug+".jsonl")
 }
 
 // Pack is a pack of the workspace.

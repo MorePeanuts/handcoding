@@ -28,13 +28,22 @@ func (m *model) openDetail(p *problem.Problem, start bool) {
 			m.copyPath(path)
 		}
 	}
+	m.detailTab = tabStatement
+	m.caseList = caseList{}
+	m.loadCases(p)
 	m.push(screenDetail)
 	m.detail.GotoTop()
 }
 
+// renderDetail draws the detail screen's tab: the statement, or the
+// problem's cases.
 func (m *model) renderDetail() {
 	p := m.current
 	if p == nil {
+		return
+	}
+	if m.detailTab == tabProblemCases {
+		m.renderCaseList()
 		return
 	}
 	desc, err := m.statement(p)
@@ -55,6 +64,17 @@ func (m *model) updateDetail(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc", "q":
 		m.pop()
 		return m, nil
+	case "tab", "shift+tab":
+		m.detailTab = 1 - m.detailTab
+		m.renderDetail()
+		return m, nil
+	case "a":
+		var from *problem.Case
+		if m.detailTab == tabProblemCases {
+			from, _ = m.selectedCase()
+		}
+		m.openCaseForm(m.current, from)
+		return m, nil
 	case "o":
 		m.openImages()
 		return m, nil
@@ -65,11 +85,20 @@ func (m *model) updateDetail(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	default:
+		if m.detailTab == tabProblemCases {
+			if cmd, ok := m.updateCaseList(key); ok {
+				return m, cmd
+			}
+		}
 		if cmd, ok := m.problemKey(key, m.current); ok {
 			return m, cmd
 		}
 	}
 	var cmd tea.Cmd
+	if m.detailTab == tabProblemCases {
+		m.casesView, cmd = m.casesView.Update(msg)
+		return m, cmd
+	}
 	m.detail, cmd = m.detail.Update(msg)
 	return m, cmd
 }
@@ -137,9 +166,19 @@ func clipLeft(s string, width int) string {
 	return "…" + string(r)
 }
 
-// detailKeys are the keys of the statement, the common ones first.
+// detailKeys are the keys of the detail screen's tab, the common ones
+// first.
 func (m *model) detailKeys() []string {
 	p := m.current
+	if m.detailTab == tabProblemCases {
+		keys := []string{"↑↓ case", "tab statement", "a add"}
+		if c, _ := m.selectedCase(); m.removable(c) {
+			keys = append(keys, "x remove")
+		}
+		keys = append(keys, "d debug-case", "t test", "s submit", "e edit", "h history", "esc back",
+			"g/G first/last", "pgup/pgdn page", "y copy-path", "L lang", "m star")
+		return keys
+	}
 	var keys []string
 	if len(m.detailImages) > 0 {
 		keys = append(keys, "o open-images")
@@ -148,7 +187,7 @@ func (m *model) detailKeys() []string {
 		keys = append(keys, "enter last-result")
 	}
 	keys = append(keys, "t test", "s submit", "d debug", "e edit", "h history", "y copy-path", "L lang", "esc back",
-		"↑↓ scroll", "m star", "r reset", "D discard")
+		"tab cases", "a add-case", "↑↓ scroll", "m star", "r reset", "D discard")
 	if m.localeLabel(p.Pack) != "" {
 		keys = append(keys, "i locale")
 	}
@@ -157,8 +196,14 @@ func (m *model) detailKeys() []string {
 
 func (m *model) viewDetail() string {
 	p := m.current
-	return m.frame(m.problemTitle(p), m.solutionLine(p), withScrollbar(m.detail, m.st.accent),
-		scrollPosition(m.detail), m.detailKeys()...)
+	body, pos := withScrollbar(m.detail, m.st.accent), scrollPosition(m.detail)
+	if m.detailTab == tabProblemCases {
+		body, pos = withScrollbar(m.casesView, m.st.accent), ""
+		if _, index := m.selectedCase(); index > 0 {
+			pos = fmt.Sprintf("case %d of %d", index, len(m.caseList.cases))
+		}
+	}
+	return m.frame(m.problemTitle(p), m.solutionLine(p), m.detailTabs()+"\n"+body, pos, m.detailKeys()...)
 }
 
 // localImages lists the image files a statement in dir refers to.

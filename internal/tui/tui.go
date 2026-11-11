@@ -2,9 +2,9 @@
 //
 // It is a small stack of screens:
 //
-//	list ─enter─▶ detail (statement + solution path) ─t/s─▶ result
-//	  │             │                                         │
-//	  │             └────h────┬───────────────────────────────┘
+//	list ─enter─▶ detail (statement | cases) ─t/s─▶ result
+//	  │             │ └─a─▶ add a case                │
+//	  │             └────h────┬───────────────────────┘
 //	  │                       ▼
 //	  │             history of the problem ─enter─▶ submission
 //	  │
@@ -81,6 +81,7 @@ const (
 	screenResult
 	screenHistory
 	screenSubmission
+	screenCaseForm
 )
 
 type confirmation struct {
@@ -150,6 +151,13 @@ type model struct {
 	viewing      bool
 	detail       viewport.Model
 	detailImages []string // local images of the current statement
+	// detailTab is the tab the detail screen shows, the statement or the
+	// problem's cases (caseList, in casesView).
+	detailTab int
+	caseList  caseList
+	casesView viewport.Model
+	// form is the form that adds a case, on screenCaseForm.
+	form *caseForm
 
 	// result screen
 	run     *runState
@@ -221,6 +229,7 @@ func newModel(ctx context.Context, a *app.App, opts Options) (*model, error) {
 	m.search.SetStyles(searchStyles())
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Dot))
 	m.detail = viewport.New()
+	m.casesView = viewport.New()
 	m.result = viewport.New()
 	m.subView = viewport.New()
 	if err := m.start(); err != nil {
@@ -448,6 +457,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case runDoneMsg:
 		m.finishRun(msg)
 		return m, nil
+	case caseAddedMsg:
+		m.caseAdded(msg)
+		return m, nil
 	case execDoneMsg:
 		if msg.err != nil {
 			m.message = ui.Red.Render(msg.err.Error())
@@ -466,10 +478,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setTheme(ui.ThemeLight)
 		return m, nil
 	case tea.PasteMsg:
-		// Pasted text goes to the search field; elsewhere, as when it
-		// arrived as keys, it does nothing.
+		// Pasted text goes to the search field and the form's fields;
+		// elsewhere, as when it arrived as keys, it does nothing.
 		if m.top() == screenList && m.searching && m.confirm == nil {
 			return m.updateSearch(msg)
+		}
+		if m.top() == screenCaseForm {
+			return m.updateCaseForm(msg)
 		}
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
@@ -481,6 +496,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.help {
 			m.help = false
 			return m, nil
+		}
+		if m.top() == screenCaseForm {
+			// Every other key is text.
+			return m.updateCaseForm(msg)
 		}
 		if msg.String() == "?" && (m.top() != screenList || !m.searching) {
 			m.help = true
@@ -532,13 +551,11 @@ func (m *model) ask(prompt string, yes func() tea.Cmd) {
 // layout sizes the viewports of the visible screen.
 func (m *model) layout() {
 	h := max(m.height-headerLines-footerLines, 3)
-	for _, vp := range []*viewport.Model{&m.detail, &m.result, &m.subView} {
+	for _, vp := range []*viewport.Model{&m.detail, &m.casesView, &m.result, &m.subView} {
 		vp.SetWidth(max(m.width-1, 1)) // the scrollbar's column aside
-		vp.SetHeight(h)
+		// Their tabs above.
+		vp.SetHeight(max(h-1, 1))
 	}
-	// The result and the submission have their tabs above.
-	m.result.SetHeight(max(h-1, 1))
-	m.subView.SetHeight(max(h-1, 1))
 	// The search field fills its line, the prompt and the cursor aside:
 	// without a width, the field shows only the placeholder's first letter.
 	m.search.SetWidth(max(m.width-2, 1))
@@ -584,7 +601,12 @@ func (m *model) screenKeys() (string, []string) {
 	case screenPacks:
 		return "packs", packKeys
 	case screenDetail:
+		if m.detailTab == tabProblemCases {
+			return "cases", m.detailKeys()
+		}
 		return "statement", m.detailKeys()
+	case screenCaseForm:
+		return "add a case", formKeys
 	case screenResult:
 		return "result", m.resultKeys()
 	case screenHistory:
@@ -647,6 +669,8 @@ func (m *model) content() string {
 		return m.viewSubmission()
 	case screenPacks:
 		return m.viewPacks()
+	case screenCaseForm:
+		return m.viewCaseForm()
 	}
 	return m.viewList()
 }
