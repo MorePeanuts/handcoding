@@ -27,12 +27,13 @@ import (
 	"os/exec"
 	"strings"
 
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/atotto/clipboard"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/colorprofile"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/lang"
@@ -166,11 +167,21 @@ func Run(ctx context.Context, a *app.App, opts Options) error {
 	if err != nil {
 		return err
 	}
-	_, err = tea.NewProgram(m, tea.WithAltScreen(), tea.WithContext(ctx)).Run()
+	_, err = tea.NewProgram(m, programOptions(ctx)...).Run()
 	if m.run != nil && m.run.cancel != nil {
 		m.run.cancel()
 	}
 	return err
+}
+
+// programOptions configure the program that runs the TUI.
+//
+// The renderer keeps every color of the view as it is (true color): the
+// styles of package ui already leave colors out where hc's output has none
+// (see ui.Colors), and statement images need theirs intact, since a kitty
+// placeholder cell names its image by its 24-bit foreground color.
+func programOptions(ctx context.Context) []tea.ProgramOption {
+	return []tea.ProgramOption{tea.WithContext(ctx), tea.WithColorProfile(colorprofile.TrueColor)}
 }
 
 func newModel(ctx context.Context, a *app.App, opts Options) (*model, error) {
@@ -187,10 +198,11 @@ func newModel(ctx context.Context, a *app.App, opts Options) (*model, error) {
 	m.search = textinput.New()
 	m.search.Prompt = "/"
 	m.search.Placeholder = "search title, slug, id or tag"
+	m.search.SetStyles(searchStyles())
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Dot))
-	m.detail = viewport.New(0, 0)
-	m.result = viewport.New(0, 0)
-	m.subView = viewport.New(0, 0)
+	m.detail = viewport.New()
+	m.result = viewport.New()
+	m.subView = viewport.New()
 	if err := m.start(); err != nil {
 		return nil, err
 	}
@@ -399,7 +411,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refresh()
 		m.layout()
 		return m, nil
-	case tea.KeyMsg:
+	case tea.PasteMsg:
+		// Pasted text goes to the search field; elsewhere, as when it
+		// arrived as keys, it does nothing.
+		if m.top() == screenList && m.searching && m.confirm == nil {
+			return m.updateSearch(msg)
+		}
+	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
@@ -435,7 +453,7 @@ func (m *model) refresh() {
 	}
 }
 
-func (m *model) updateConfirm(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *model) updateConfirm(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	c := m.confirm
 	m.confirm = nil
 	if msg.String() != "y" && msg.String() != "Y" {
@@ -453,8 +471,12 @@ func (m *model) ask(prompt string, yes func() tea.Cmd) {
 func (m *model) layout() {
 	h := max(m.height-headerLines-footerLines, 3)
 	for _, vp := range []*viewport.Model{&m.detail, &m.result, &m.subView} {
-		vp.Width, vp.Height = m.width, h
+		vp.SetWidth(m.width)
+		vp.SetHeight(h)
 	}
+	// The search field fills its line, the prompt and the cursor aside:
+	// without a width, the field shows only the placeholder's first letter.
+	m.search.SetWidth(max(m.width-2, 1))
 	switch m.top() {
 	case screenDetail:
 		m.renderDetail()
@@ -489,7 +511,15 @@ func (m *model) frame(title, subtitle, body string, keys ...string) string {
 	return b.String()
 }
 
-func (m *model) View() string {
+// View draws the screen on top of the stack, in the alternate screen.
+func (m *model) View() tea.View {
+	v := tea.NewView(m.content())
+	v.AltScreen = true
+	return v
+}
+
+// content draws the screen on top of the stack.
+func (m *model) content() string {
 	switch m.top() {
 	case screenDetail:
 		return m.viewDetail()
@@ -506,10 +536,25 @@ func (m *model) View() string {
 }
 
 var (
-	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5"))
-	cursorStyle = lipgloss.NewStyle().Bold(true).Reverse(true)
-	keyStyle    = lipgloss.NewStyle().Bold(true)
+	titleStyle  = ui.NewStyle(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5")))
+	cursorStyle = ui.NewStyle(lipgloss.NewStyle().Bold(true).Reverse(true))
+	keyStyle    = ui.Bold
 )
+
+// searchStyles are the search field's styles, those of bubbles v1: unstyled
+// text and prompt, a gray placeholder (unstyled without colors, see
+// ui.Colors) and a reverse-video cursor in the text's color.
+func searchStyles() textinput.Styles {
+	s := textinput.DefaultDarkStyles()
+	for _, st := range []*textinput.StyleState{&s.Focused, &s.Blurred} {
+		st.Text, st.Prompt = lipgloss.NewStyle(), lipgloss.NewStyle()
+		if !ui.Colors() {
+			st.Placeholder, st.Suggestion = lipgloss.NewStyle(), lipgloss.NewStyle()
+		}
+	}
+	s.Cursor.Color = nil
+	return s
+}
 
 // keyHelp renders "k action · k action", dropping entries that do not fit.
 func keyHelp(width int, keys ...string) string {

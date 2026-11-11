@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/muesli/termenv"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"

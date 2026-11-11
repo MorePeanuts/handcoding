@@ -8,8 +8,8 @@ import (
 	"runtime"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/mattn/go-runewidth"
 
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -48,7 +48,7 @@ func (m *model) renderDetail() {
 	m.detail.SetContent(m.md.Render(desc, p.Dir, width))
 }
 
-func (m *model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *model) updateDetail(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.message = ""
 	switch key := msg.String(); key {
 	case "esc", "q":
