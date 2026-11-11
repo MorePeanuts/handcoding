@@ -494,10 +494,17 @@ leetcode:
 locales: [en]         # 你自己题目的题面语言，默认的排在第一
 ```
 
-`images: auto` 在 kitty、Ghostty 和 [herdr](https://herdr.dev) 中选择 `kitty`，在其他真彩色终端中选择 `blocks`，其余情况为 `none`。
+`images: auto` 在 kitty、Ghostty 和 [herdr](https://herdr.dev) 中，以及外层是 kitty 或 Ghostty 的 tmux 中（见下文）选择 `kitty`，在其他真彩色终端中选择 `blocks`，其余情况为 `none`。
 
 - **herdr** 会自己绘制 kitty 图片，所以只要 herdr 外层的终端支持 kitty 图片协议，图片就能显示：kitty、Ghostty，或开启了 `enable_kitty_graphics = true` 的 WezTerm。在其他终端中图片区域是空白的，请设置 `images: blocks`，并按 `o` 查看原图。
-- **tmux**：auto 模式从不选择 kitty。如果外层终端支持 Unicode 占位符（kitty、Ghostty），设置 `images: kitty` 并开启 tmux 的 `allow-passthrough`。
+- **tmux** 把图片原样转给它所连接的终端，该终端需要支持 Unicode 占位符（kitty、Ghostty）。当 tmux 报告的终端是这类终端、支持真彩色，并且开启了 `allow-passthrough` 时，auto 会选择 kitty。在 `~/.tmux.conf` 中加入：
+
+  ```tmux
+  set -g allow-passthrough on
+  set -g focus-events on    # 重新 attach（也许换了一个终端）之后重新绘制图片
+  ```
+
+  外层是 WezTerm 或 iTerm2 时，tmux 中仍为 `blocks`，与直接运行这些终端时一样。
 - **WezTerm** 支持 kitty 图片协议，但不支持 Unicode 占位符，所以 `images: kitty` 在其中会显示乱码。直接运行 WezTerm 时请保持 `blocks`。
 
 ## 目前的限制
