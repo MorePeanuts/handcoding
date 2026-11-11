@@ -126,6 +126,7 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 | `v` | View the statement only | `o` | Open the statement's images (statement view); the submission's problem (workspace history) |
 | `i` | Switch the statement language | `esc` / `q` | Back (`esc` on the list: to the pack picker); `q` on the list quits |
 | `m` | Star or unstar the problem (`★` in the list) | `ctrl+c` | Quit |
+| `?` | Every key of the screen (the bottom line shows the common ones) | | |
 
 ## Commands
 

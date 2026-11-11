@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
@@ -36,6 +37,7 @@ import (
 	"github.com/charmbracelet/colorprofile"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/mattn/go-runewidth"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/lang"
@@ -91,6 +93,7 @@ type model struct {
 	opts Options
 	lang lang.Language
 	md   *ui.Markdown
+	st   styles
 
 	// copy writes to the clipboard and open shows files in the desktop's
 	// viewer; replaced in tests.
@@ -101,6 +104,7 @@ type model struct {
 	stack         []screen
 	message       string
 	confirm       *confirmation
+	help          bool // the key help of the screen shown, in full
 
 	// list screen
 	tabs []packTab
@@ -202,6 +206,7 @@ func newModel(ctx context.Context, a *app.App, opts Options) (*model, error) {
 		opts:  opts,
 		lang:  opts.Lang,
 		md:    ui.NewMarkdown(opts.Theme, opts.Images),
+		st:    newStyles(opts.Theme),
 		stack: []screen{screenList},
 		copy:  clipboard.WriteAll,
 		open:  openFiles,
@@ -417,6 +422,7 @@ func (m *model) setTheme(theme string) {
 	}
 	m.opts.Theme = theme
 	m.md = ui.NewMarkdown(theme, m.opts.Images)
+	m.st = newStyles(theme)
 	m.layout()
 }
 
@@ -468,6 +474,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.confirm != nil {
 			return m.updateConfirm(msg)
 		}
+		if m.help {
+			m.help = false
+			return m, nil
+		}
+		if msg.String() == "?" && (m.top() != screenList || !m.searching) {
+			m.help = true
+			return m, nil
+		}
 		switch m.top() {
 		case screenList:
 			return m.updateList(msg)
@@ -515,7 +529,7 @@ func (m *model) ask(prompt string, yes func() tea.Cmd) {
 func (m *model) layout() {
 	h := max(m.height-headerLines-footerLines, 3)
 	for _, vp := range []*viewport.Model{&m.detail, &m.result, &m.subView} {
-		vp.SetWidth(m.width)
+		vp.SetWidth(max(m.width-1, 1)) // the scrollbar's column aside
 		vp.SetHeight(h)
 	}
 	// The search field fills its line, the prompt and the cursor aside:
@@ -537,9 +551,8 @@ const (
 )
 
 // frame lays out a screen: a two-line header, the body and a footer with the
-// status line and key help.
-func (m *model) frame(title, subtitle, body string, keys ...string) string {
-	rule := ui.Faint.Render(strings.Repeat("─", max(m.width, 1)))
+// status line and the key help, with right (a position) at its end.
+func (m *model) frame(title, subtitle, body, right string, keys ...string) string {
 	status := m.message
 	if m.confirm != nil {
 		status = ui.Yellow.Render(m.confirm.prompt + " [y/N]")
@@ -547,11 +560,60 @@ func (m *model) frame(title, subtitle, body string, keys ...string) string {
 	var b strings.Builder
 	b.WriteString(clip(title, m.width) + "\n")
 	b.WriteString(clip(subtitle, m.width) + "\n")
-	b.WriteString(rule + "\n")
+	b.WriteString(m.rule() + "\n")
 	b.WriteString(body)
-	b.WriteString("\n" + rule + "\n")
+	b.WriteString("\n" + m.rule() + "\n")
 	b.WriteString(clip(status, m.width) + "\n")
-	b.WriteString(keyHelp(m.width, keys...))
+	b.WriteString(m.keyHelp(right, keys...))
+	return b.String()
+}
+
+// badge is hc's badge, which starts every screen's first line.
+func (m *model) badge() string { return m.st.badge.Render(" hc ") }
+
+// screenKeys are the keys of the screen shown, for its full key help.
+func (m *model) screenKeys() (string, []string) {
+	switch m.top() {
+	case screenPacks:
+		return "packs", packKeys
+	case screenDetail:
+		return "statement", m.detailKeys()
+	case screenResult:
+		return "result", m.resultKeys()
+	case screenHistory:
+		return "history", m.historyKeys()
+	case screenSubmission:
+		return "submission", m.submissionKeys()
+	}
+	if m.picking {
+		return "groups", groupKeys
+	}
+	return "problems", m.listKeys()
+}
+
+// viewHelp shows every key of the screen shown, with the global ones.
+func (m *model) viewHelp() string {
+	name, keys := m.screenKeys()
+	keys = append(slices.Clone(keys), "? help", "ctrl+c quit")
+	keyW := 0
+	for _, k := range keys {
+		key, _, _ := strings.Cut(k, " ")
+		keyW = max(keyW, runewidth.StringWidth(key))
+	}
+	var b strings.Builder
+	b.WriteString(m.badge() + "  " + ui.Bold.Render("Keys") + ui.Faint.Render(" · "+name) + "\n")
+	b.WriteString(m.rule() + "\n")
+	lines := 2
+	for _, k := range keys {
+		key, label, _ := strings.Cut(k, " ")
+		b.WriteString("  " + m.st.key.Render(" "+runewidth.FillRight(key, keyW)+" ") + "  " + label + "\n")
+		lines++
+	}
+	for ; lines < m.height-2; lines++ {
+		b.WriteString("\n")
+	}
+	b.WriteString(m.rule() + "\n")
+	b.WriteString(ui.Faint.Render("press any key to close"))
 	return b.String()
 }
 
@@ -564,6 +626,9 @@ func (m *model) View() tea.View {
 
 // content draws the screen on top of the stack.
 func (m *model) content() string {
+	if m.help {
+		return m.viewHelp()
+	}
 	switch m.top() {
 	case screenDetail:
 		return m.viewDetail()
@@ -579,12 +644,6 @@ func (m *model) content() string {
 	return m.viewList()
 }
 
-var (
-	titleStyle  = ui.NewStyle(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5")))
-	cursorStyle = ui.NewStyle(lipgloss.NewStyle().Bold(true).Reverse(true))
-	keyStyle    = ui.Bold
-)
-
 // searchStyles are the search field's styles, those of bubbles v1: unstyled
 // text and prompt, a gray placeholder (unstyled without colors, see
 // ui.Colors) and a reverse-video cursor in the text's color.
@@ -598,23 +657,6 @@ func searchStyles() textinput.Styles {
 	}
 	s.Cursor.Color = nil
 	return s
-}
-
-// keyHelp renders "k action · k action", dropping entries that do not fit.
-func keyHelp(width int, keys ...string) string {
-	var parts []string
-	used := 0
-	for _, k := range keys {
-		key, rest, _ := strings.Cut(k, " ")
-		part := keyStyle.Render(key) + ui.Faint.Render(" "+rest)
-		w := lipgloss.Width(part) + 3
-		if width > 0 && used+w > width {
-			break
-		}
-		used += w
-		parts = append(parts, part)
-	}
-	return strings.Join(parts, ui.Faint.Render(" · "))
 }
 
 func clip(s string, width int) string {

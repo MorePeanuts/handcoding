@@ -126,26 +126,24 @@ func (m *model) renderResult() {
 		m.result.SetContent("")
 		return
 	}
+	width := m.result.Width()
 	var b strings.Builder
 	switch {
 	case r.running:
-		b.WriteString(ui.Faint.Render("Building and running…"))
+		b.WriteString(ui.Faint.Render("Building and running…") + "\n")
 	case r.err != nil:
-		b.WriteString(ui.Red.Render(r.err.Error()))
+		b.WriteString(ui.Red.Render(r.err.Error()) + "\n")
 	case r.report != nil:
 		ro := ui.ReportOptions{Ref: m.app.WS.Ref(m.current)}
 		if l, err := m.app.Lang(r.langID); err == nil {
 			ro.Lang = l
 		}
-		ui.PrintReport(&b, m.current, r.report, ro)
-		if r.subID > 0 {
-			b.WriteString(ui.Faint.Render(fmt.Sprintf("Recorded as submission #%d (h to browse history)", r.subID)) + "\n")
-		}
+		m.report(&b, m.current, r.report, ro, width)
 	}
 	if out := strings.TrimRight(r.output, "\n"); out != "" && !r.running {
-		b.WriteString("\n" + ui.Faint.Render("── program output ──") + "\n" + out + "\n")
+		b.WriteString("\n" + titledRule("program output", width) + "\n" + out + "\n")
 	}
-	m.result.SetContent(wrap(b.String(), m.width))
+	m.result.SetContent(wrap(b.String(), width))
 }
 
 func (m *model) updateResult(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -176,26 +174,31 @@ func (m *model) updateResult(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// resultKeys are the keys of the result.
+func (m *model) resultKeys() []string {
+	if m.run != nil && m.run.running {
+		return []string{"esc cancel"}
+	}
+	return []string{"t test", "s submit", "d debug", "e edit", "v statement", "h history", "esc back", "↑↓ scroll", "y copy-path", "L lang", "m star"}
+}
+
 func (m *model) viewResult() string {
 	r := m.run
-	p := m.current
-	title := m.problemTitle(p)
 	sub := ""
 	if r != nil {
 		label := r.langID
 		if r.report != nil && r.report.Toolchain.Version != "" {
 			label = r.report.Toolchain.String()
 		}
-		sub = ui.Cyan.Render(string(r.kind)) + "  " + ui.Faint.Render(label)
+		sub = m.chip(m.st.accent.Bold(true), string(r.kind)) + "  " + ui.Faint.Render(label)
 		if r.running {
 			sub += "  " + m.spinner.View() + " running…"
 		}
+		if r.subID > 0 {
+			sub = padBetween(sub, ui.Faint.Render(fmt.Sprintf("recorded as submission #%d", r.subID)), m.width)
+		}
 	}
-	keys := []string{"↑↓ scroll", "t test", "s submit", "d debug", "e edit", "v statement", "h history", "esc back"}
-	if r != nil && r.running {
-		keys = []string{"esc cancel"}
-	}
-	return m.frame(title, sub, m.result.View(), keys...)
+	return m.frame(m.problemTitle(m.current), sub, withScrollbar(m.result, m.st.accent), scrollPosition(m.result), m.resultKeys()...)
 }
 
 // wrap soft-wraps long lines so nothing is cut off at the right edge.

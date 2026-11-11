@@ -280,6 +280,15 @@ func (m *model) qualifySubs() bool {
 	return packs > 1 || slices.ContainsFunc(m.subs, func(s store.Submission) bool { return s.Pack != m.subs[0].Pack })
 }
 
+// historyKeys are the keys of a history.
+func (m *model) historyKeys() []string {
+	keys := []string{"↑↓ move", "enter view", "r restore", "d debug", "x delete", "esc back"}
+	if m.historyAll() {
+		keys = slices.Insert(keys, 2, "o problem")
+	}
+	return keys
+}
+
 func (m *model) viewHistory() string {
 	all := m.historyAll()
 	// The problem column of the history of the workspace fits the longest
@@ -313,16 +322,17 @@ func (m *model) viewHistory() string {
 	rows := 0
 	for i := m.subOffset; i < min(m.subOffset+h, len(m.subs)); i++ {
 		s := m.subs[i]
-		elapsed := ui.SubmissionTime(s.ElapsedMs)
-		row := fmt.Sprintf("%-6s %s%s %-8s %-8s %-8s %s", fmt.Sprintf("#%d", s.ID), probCol(subName(s, qualify)),
-			padRight(ui.VerdictStyle(runner.Verdict(s.Verdict)).Render(s.Verdict), 20), s.Lang,
-			fmt.Sprintf("%d/%d", s.Passed, s.Total), elapsed, s.CreatedAt.Format("2006-01-02 15:04"))
-		if i == m.subCursor {
-			row = cursorStyle.Render("▸") + " " + row
-		} else {
-			row = "  " + row
+		cur := i == m.subCursor
+		r := newRow(nil)
+		if cur {
+			r = newRow(m.st.sel)
 		}
-		b.WriteString(row + "\n")
+		m.cursorBar(r, cur)
+		r.add(ui.Faint, fmt.Sprintf("%-6s ", fmt.Sprintf("#%d", s.ID))).plain(probCol(subName(s, qualify)))
+		r.add(ui.VerdictStyle(runner.Verdict(s.Verdict)), fit(s.Verdict, 20)+" ")
+		r.plain(fmt.Sprintf("%-8s %-8s %-8s ", s.Lang, fmt.Sprintf("%d/%d", s.Passed, s.Total), ui.SubmissionTime(s.ElapsedMs)))
+		r.add(ui.Faint, s.CreatedAt.Format("2006-01-02 15:04"))
+		b.WriteString(r.fill(m.width) + "\n")
 		rows++
 	}
 	if len(m.subs) == 0 {
@@ -338,13 +348,15 @@ func (m *model) viewHistory() string {
 	}
 	body := strings.TrimSuffix(b.String(), "\n")
 	count := ui.Faint.Render(plural(len(m.subs), "submission"))
-	if all {
-		title := titleStyle.Render("handcoding") + "  " + ui.Faint.Render(displayPath(m.app.WS.Root))
-		return m.frame(title, ui.Cyan.Render("All submissions")+ui.Faint.Render(" · ")+count, body,
-			"↑↓ move", "enter view", "o problem", "r restore", "d debug", "x delete", "esc back")
+	pos := ""
+	if len(m.subs) > h {
+		pos = fmt.Sprintf("%d–%d of %d", m.subOffset+1, min(m.subOffset+h, len(m.subs)), len(m.subs))
 	}
-	return m.frame(m.problemTitle(m.historyProblem()), ui.Cyan.Render("History")+"  "+count, body,
-		"↑↓ move", "enter view", "r restore", "d debug", "x delete", "esc back")
+	if all {
+		title := m.badge() + "  " + ui.Faint.Render(displayPath(m.app.WS.Root))
+		return m.frame(title, m.chip(m.st.accent.Bold(true), "All submissions")+"  "+count, body, pos, m.historyKeys()...)
+	}
+	return m.frame(m.problemTitle(m.historyProblem()), m.chip(m.st.accent.Bold(true), "History")+"  "+count, body, pos, m.historyKeys()...)
 }
 
 func (m *model) renderSubmission() {
@@ -352,21 +364,21 @@ func (m *model) renderSubmission() {
 	if s == nil {
 		return
 	}
-	width := min(max(m.width-2, 20), 120)
+	width := m.subView.Width()
 	var b strings.Builder
 	rep := app.DecodeReport(s.Details)
 	if rep != nil && m.current != nil {
-		ui.PrintReport(&b, m.current, rep, ui.ReportOptions{Ref: m.app.WS.Ref(m.current)})
+		m.report(&b, m.current, rep, ui.ReportOptions{Ref: m.app.WS.Ref(m.current)}, width)
 	} else {
 		note := "(per-case details were not recorded for this submission)"
 		if m.current == nil {
 			note = "(problem " + s.Ref() + " no longer exists, so its per-case details cannot be shown)"
 		}
-		b.WriteString(ui.VerdictStyle(runner.Verdict(s.Verdict)).Render(s.Verdict) +
-			fmt.Sprintf(" · %d/%d passed", s.Passed, s.Total) + "\n" + ui.Faint.Render(note) + "\n")
+		b.WriteString(verdictBadge(runner.Verdict(s.Verdict)) + "   " + ui.Bold.Render(fmt.Sprintf("%d/%d", s.Passed, s.Total)) +
+			ui.Faint.Render(" passed") + "\n" + ui.Faint.Render(note) + "\n")
 	}
-	code := m.md.Render("```"+s.Lang+"\n"+strings.TrimRight(s.Code, "\n")+"\n```\n", "", width)
-	m.subView.SetContent(wrap(b.String(), m.width) + "\n" + code)
+	code := m.md.Render("```"+s.Lang+"\n"+strings.TrimRight(s.Code, "\n")+"\n```\n", "", min(max(width-1, 20), 120))
+	m.subView.SetContent(wrap(b.String(), width) + "\n" + titledRule("code", width) + "\n" + code)
 }
 
 func (m *model) updateSubmission(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -395,18 +407,23 @@ func (m *model) updateSubmission(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *model) viewSubmission() string {
-	s := m.sub
-	sub := fmt.Sprintf("%s  %s  %s  %s", ui.Cyan.Render(fmt.Sprintf("Submission #%d", s.ID)),
-		ui.VerdictStyle(runner.Verdict(s.Verdict)).Render(s.Verdict), ui.Faint.Render(s.Lang),
-		ui.Faint.Render(s.CreatedAt.Format("2006-01-02 15:04:05")))
-	title := titleStyle.Render(s.Ref()) + "  " + ui.Faint.Render("(no longer exists)")
-	if m.current != nil {
-		title = m.problemTitle(m.current)
-	}
-	keys := []string{"↑↓ scroll", "r restore", "d debug", "x delete", "esc back"}
+// submissionKeys are the keys of a submission.
+func (m *model) submissionKeys() []string {
+	keys := []string{"r restore", "d debug", "x delete", "esc back", "↑↓ scroll"}
 	if m.historyAll() {
 		keys = slices.Insert(keys, 1, "o problem")
 	}
-	return m.frame(title, sub, m.subView.View(), keys...)
+	return keys
+}
+
+func (m *model) viewSubmission() string {
+	s := m.sub
+	sub := m.chip(m.st.accent.Bold(true), fmt.Sprintf("Submission #%d", s.ID)) + "  " +
+		ui.VerdictStyle(runner.Verdict(s.Verdict)).Render(s.Verdict) + "  " + ui.Faint.Render(s.Lang) + "  " +
+		ui.Faint.Render(s.CreatedAt.Format("2006-01-02 15:04:05"))
+	title := m.badge() + "  " + m.st.title.Render(s.Ref()) + "  " + ui.Faint.Render("(no longer exists)")
+	if m.current != nil {
+		title = m.problemTitle(m.current)
+	}
+	return m.frame(title, sub, withScrollbar(m.subView, m.st.accent), scrollPosition(m.subView), m.submissionKeys()...)
 }
