@@ -127,7 +127,7 @@ func TestListRendersAndNavigates(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	view := h.view()
-	for _, want := range []string{"handcoding", "Two Sum", "LRU Cache", "enter open"} {
+	for _, want := range []string{" hc ", "Two Sum", "LRU Cache", "enter open"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("view missing %q", want)
 		}
@@ -209,12 +209,13 @@ func (h *harness) openModel(opts Options) *model {
 	return m
 }
 
-// With a single pack, there is no tab bar (the empty local pack has no tab).
+// With a single pack, the tab bar has one tab and no key (the empty local
+// pack has no tab).
 func TestListSinglePack(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	view := h.view()
-	if first, _, _ := strings.Cut(view, "\n"); !strings.HasPrefix(first, "handcoding") {
+	if first, _, _ := strings.Cut(view, "\n"); !strings.HasPrefix(first, " hc ") {
 		t.Errorf("first line %q, want the header", first)
 	}
 	if strings.Contains(view, "tab pack") || len(h.m.tabs) != 1 || h.m.pack != regression.Name {
@@ -280,15 +281,15 @@ func TestListTabBarScrolls(t *testing.T) {
 	h := newHarness(t)
 	addLocal(t, h.m, "0001-two-sum")
 	h.m.Update(tea.WindowSizeMsg{Width: 20, Height: 30})
-	if bar := h.m.tabBar(); strings.Contains(bar, "local") || !strings.Contains(bar, "regression") || !strings.HasPrefix(bar, "‹") {
+	if bar := h.m.tabBar(h.m.width); strings.Contains(bar, "local") || !strings.Contains(bar, "regression") || !strings.HasPrefix(bar, "‹") {
 		t.Errorf("tab bar on regression: %q", bar)
 	}
 	h.press("tab")
-	if bar := h.m.tabBar(); !strings.Contains(bar, "local") || strings.Contains(bar, "regression") || !strings.HasSuffix(bar, "›") {
+	if bar := h.m.tabBar(h.m.width); !strings.Contains(bar, "local") || strings.Contains(bar, "regression") || !strings.HasSuffix(bar, "›") {
 		t.Errorf("tab bar on local: %q", bar)
 	}
 	h.m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
-	if bar, want := h.m.tabBar(), " local 0/1 │ regression 0/"+strconv.Itoa(len(h.m.tabs[1].probs))+" "; bar != want {
+	if bar, want := h.m.tabBar(h.m.width), " local 0/1  regression 0/"+strconv.Itoa(len(h.m.tabs[1].probs))+" "; bar != want {
 		t.Errorf("wide tab bar: %q", bar)
 	}
 }
@@ -313,7 +314,7 @@ func TestListGroups(t *testing.T) {
 	if len(h.m.probs) != 5 || h.m.probs[0].Slug != "lru-cache" {
 		t.Fatalf("design lists %d problems, the first %s", len(h.m.probs), h.m.probs[0].Slug)
 	}
-	if !strings.Contains(h.view(), "Design problems  5 problems") {
+	if !strings.Contains(h.view(), "Design problems · 5 problems") {
 		t.Errorf("header does not name the group:\n%s", h.view())
 	}
 	// Filters apply to the group.
@@ -471,7 +472,7 @@ func TestEnterOpensDetailAndCopiesPath(t *testing.T) {
 		t.Fatalf("copied %v, want %s", h.copied, path)
 	}
 	view := h.view()
-	if title, _, _ := strings.Cut(view, "\n"); !strings.Contains(title, "1. Two Sum  two-sum  Easy") {
+	if title, _, _ := strings.Cut(view, "\n"); !strings.Contains(title, "1. Two Sum  two-sum   Easy ") {
 		t.Errorf("title line lacks the title or the slug: %q", title)
 	}
 	for _, want := range []string{"You may assume", "solution.go", "t test", "esc back"} {
@@ -528,7 +529,7 @@ func TestStars(t *testing.T) {
 	if !h.m.stars[p.Ref()] || !strings.Contains(h.view(), "★ 1 starred") {
 		t.Fatalf("m did not star %s:\n%s", p.Ref(), h.view())
 	}
-	if _, row, _ := strings.Cut(h.view(), "▸"); !strings.HasPrefix(strings.TrimSpace(row), "· ★ 1 ") {
+	if _, row, _ := strings.Cut(h.view(), "▌"); !strings.HasPrefix(strings.TrimSpace(row), "· ★ 1 ") {
 		t.Errorf("starred row %q", strings.SplitN(row, "\n", 2)[0])
 	}
 	h.press("j", "v", "m")
@@ -748,16 +749,16 @@ func TestNotReadyProblem(t *testing.T) {
 func TestSwitchLocale(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	if view := h.view(); !strings.Contains(view, "Two Sum") || !strings.Contains(view, "locale: en") {
+	if view := h.view(); !strings.Contains(view, "Two Sum") || !strings.Contains(view, "locale en") {
 		t.Errorf("list in en:\n%s", view)
 	}
 	h.press("i")
-	if view := h.view(); !strings.Contains(view, "两数之和") || !strings.Contains(view, "locale: zh-CN") {
+	if view := h.view(); !strings.Contains(view, "两数之和") || !strings.Contains(view, "locale zh-CN") {
 		t.Errorf("list in zh-CN:\n%s", view)
 	}
 	h.press("enter")
 	view := h.view()
-	if title, _, _ := strings.Cut(view, "\n"); !strings.Contains(title, "1. 两数之和") || !strings.Contains(title, "[zh-CN]") {
+	if title, _, _ := strings.Cut(view, "\n"); !strings.Contains(title, "1. 两数之和") || !strings.HasSuffix(title, "zh-CN") {
 		t.Errorf("title line: %q", title)
 	}
 	if !strings.Contains(view, "给定一个整数数组") {

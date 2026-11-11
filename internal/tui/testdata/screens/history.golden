@@ -1,0 +1,30 @@
+ hc   regression / 1. Two Sum  two-sum   Easy   array · hash-table                                en
+ History   3 submissions
+────────────────────────────────────────────────────────────────────────────────────────────────────
+  ID     VERDICT              LANG     PASSED   TIME     SUBMITTED
+▌ #4     Wrong Answer         go       7/9      1ms      2026-11-11 11:26
+  #3     Accepted             python   9/9      1ms      2026-11-11 10:26
+  #2     Time Limit Exceeded  go       8/9      —        2026-11-10 11:26
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+copied: …/solutions/regression/go/0001-two-sum/solution.go
+ ↑↓ move    enter view    r restore    d debug    x delete    esc back    ? help

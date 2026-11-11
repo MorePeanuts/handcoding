@@ -1,0 +1,30 @@
+ hc   regression / 1. Two Sum  two-sum   Easy   array · hash-table                                en
+ Go   …/solutions/regression/go/0001-two-sum/solution.go  ● attempted
+────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                   ┃
+  [38;5;228;48;5;63;1m [m[38;5;228;48;5;63;1m1. Two[m[38;5;228;48;5;63;1m Sum[m[38;5;228;48;5;63;1m [m                                                                                     ┃
+                                                                                                   ┃
+  You are given an array of integers [38;5;203;48;5;236m nums [m and an integer [38;5;203;48;5;236m target [m, return [3mindices of the two[m     ┃
+  [3mnumbers such that they add up to [m[38;5;203;48;5;236m target [m .                                                      ┃
+                                                                                                   ┃
+  You may assume that each input would have [1;3mexactly[m[1m one solution[m, and you may not use the [3msame[m     ┃
+  element twice.                                                                                   ┃
+                                                                                                   ┃
+  You can return the answer in any order.                                                          ┃
+                                                                                                   │
+  [1mExample 1[m:                                                                                       │
+                                                                                                   │
+  [1mInput[m: [38;5;203;48;5;236m nums = [2,7,11,15], target = 9 [m                                                          │
+                                                                                                   │
+  [1mOutput[m: [38;5;203;48;5;236m [0,1] [m                                                                                  │
+                                                                                                   │
+  [1mExplanation[m:                                                                                     │
+                                                                                                   │
+  The sum of [38;5;203;48;5;236m nums[0] [m and [38;5;203;48;5;236m nums[1] [m is [38;5;203;48;5;236m 2 + 7 = 9 [m, which equals the target. Therefore, the       │
+  indices [38;5;203;48;5;236m [0, 1] [m are returned.                                                                   │
+                                                                                                   │
+  [1mExample 2[m:                                                                                       │
+                                                                                                   │
+────────────────────────────────────────────────────────────────────────────────────────────────────
+copied: …/solutions/regression/go/0001-two-sum/solution.go
+ t test    s submit    d debug    e edit    h history    y copy-path    ? help        top · 54 lines

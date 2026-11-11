@@ -12,6 +12,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/mattn/go-runewidth"
 
+	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 )
@@ -73,35 +74,55 @@ func (m *model) updateDetail(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// problemTitle is the first line of a problem's screens: hc's badge, the
+// problem's pack, number, title and slug (the name commands take, and the
+// only one easy to type for a problem without an ID or with one such as
+// "LCR 001"), its difficulty and tags; its star and locale at the end.
 func (m *model) problemTitle(p *problem.Problem) string {
-	title := titleStyle.Render(fmt.Sprintf("%s. %s", p.ID, m.title(p)))
-	if p.ID == "" {
-		title = titleStyle.Render(m.title(p))
+	name := m.title(p)
+	if p.ID != "" {
+		name = p.ID + ". " + name
 	}
-	if m.multiPack {
-		title = ui.Faint.Render(p.Pack+" ·") + " " + title
+	left := m.badge() + ui.Faint.Render("  "+p.Pack+" / ") + m.st.title.Render(name) + "  " + ui.Faint.Render(p.Slug)
+	if p.Difficulty != "" {
+		left += "  " + m.chip(difficultyStyle(p.Difficulty), difficultyLabel(p.Difficulty))
 	}
+	var right []string
 	if m.stars[p.Ref()] {
-		title += " " + ui.Yellow.Render("★")
+		right = append(right, ui.Yellow.Render("★"))
 	}
-	// The slug is what commands take, and the only name a problem without
-	// an ID, or with an ID such as "LCR 001", is easy to type by.
-	line := fmt.Sprintf("%s  %s  %s  %s", title, ui.Faint.Render(p.Slug), ui.Difficulty(p.Difficulty), ui.Faint.Render(strings.Join(p.Tags, ", ")))
 	if l := m.localeLabel(p.Pack); l != "" {
-		line += "  " + ui.Faint.Render("["+l+"]")
+		right = append(right, ui.Faint.Render(l))
 	}
-	return line
+	end := strings.Join(right, "  ")
+	// The tags give way to the star and the locale.
+	if room := m.width - lipgloss.Width(left) - lipgloss.Width(end) - 4; len(p.Tags) > 0 && room > 3 {
+		left += "  " + ui.Faint.Render(runewidth.Truncate(strings.Join(p.Tags, " · "), room, "…"))
+	}
+	return padBetween(left, end, m.width)
 }
 
+// solutionLine is the second line of the statement: the language and the
+// solution's path; the problem's status at the end.
 func (m *model) solutionLine(p *problem.Problem) string {
-	path := m.app.SolutionPath(p, m.lang)
-	status := ""
-	if !m.app.HasSolution(p, m.lang) {
-		status = ui.Faint.Render("  (not created)")
+	var status string
+	switch s := m.statuses[p.Ref()]; {
+	case !m.ready(p):
+		status = ui.Cyan.Render("? not ready")
+	case s == app.StatusSolved:
+		status = ui.Green.Render("✔ solved")
+	case s == app.StatusAttempted:
+		status = ui.Yellow.Render("● attempted")
 	}
-	label := ui.Cyan.Render(m.lang.Name()) + "  "
-	room := m.width - lipgloss.Width(label) - lipgloss.Width(status)
-	return label + clipLeft(displayPath(path), room) + status
+	label := m.chip(m.st.accent.Bold(true), m.lang.Name()) + "  "
+	missing := ""
+	if !m.app.HasSolution(p, m.lang) {
+		missing = ui.Faint.Render("  (not created)")
+	}
+	room := m.width - lipgloss.Width(label) - lipgloss.Width(missing) - lipgloss.Width(status) - 2
+	path := clipLeft(displayPath(m.app.SolutionPath(p, m.lang)), room)
+	dir, file := filepath.Split(path)
+	return padBetween(label+ui.Faint.Render(dir)+file+missing, status, m.width)
 }
 
 // clipLeft keeps the end of s (the file name matters most in a path).
@@ -116,19 +137,28 @@ func clipLeft(s string, width int) string {
 	return "…" + string(r)
 }
 
-func (m *model) viewDetail() string {
+// detailKeys are the keys of the statement, the common ones first.
+func (m *model) detailKeys() []string {
 	p := m.current
-	keys := []string{"↑↓ scroll", "esc back", "t test", "s submit", "d debug", "e edit", "h history", "y copy-path", "m star", "L lang", "r reset", "D discard"}
+	var keys []string
+	if len(m.detailImages) > 0 {
+		keys = append(keys, "o open-images")
+	}
+	if m.run != nil && m.run.ref == p.Ref() {
+		keys = append(keys, "enter last-result")
+	}
+	keys = append(keys, "t test", "s submit", "d debug", "e edit", "h history", "y copy-path", "L lang", "esc back",
+		"↑↓ scroll", "m star", "r reset", "D discard")
 	if m.localeLabel(p.Pack) != "" {
 		keys = append(keys, "i locale")
 	}
-	if len(m.detailImages) > 0 {
-		keys = append([]string{"o open-images"}, keys...)
-	}
-	if m.run != nil && m.run.ref == p.Ref() {
-		keys = append([]string{"enter last-result"}, keys...)
-	}
-	return m.frame(m.problemTitle(p), m.solutionLine(p), m.detail.View(), keys...)
+	return keys
+}
+
+func (m *model) viewDetail() string {
+	p := m.current
+	return m.frame(m.problemTitle(p), m.solutionLine(p), withScrollbar(m.detail, m.st.accent),
+		scrollPosition(m.detail), m.detailKeys()...)
 }
 
 // localImages lists the image files a statement in dir refers to.

@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -60,12 +61,14 @@ func (m *model) backToPicker() {
 	m.pop()
 }
 
+var packKeys = []string{"↑↓ move", "enter open", "q quit"}
+
 func (m *model) viewPacks() string {
 	var b strings.Builder
-	header := titleStyle.Render("handcoding") + fmt.Sprintf("  %d packs", len(m.tabs))
+	header := m.badge() + "  " + ui.Bold.Render(strconv.Itoa(len(m.tabs))) + ui.Faint.Render(" packs")
 	b.WriteString(padBetween(header, ui.Faint.Render("choose a pack"), m.width) + "\n\n")
 
-	nameW, titleW := len("Pack"), 0
+	nameW, titleW := len("PACK"), 0
 	for _, t := range m.tabs {
 		nameW = max(nameW, runewidth.StringWidth(t.pack.Name))
 		if title := m.packTitle(t); title != t.pack.Name {
@@ -79,11 +82,13 @@ func (m *model) viewPacks() string {
 		}
 		return fit(s, titleW) + "  "
 	}
-	cols := fmt.Sprintf("  %s  %s%9s  %s", fit("Pack", nameW), title("Title"), "Solved", "Description")
-	b.WriteString(ui.Faint.Render(cols) + "\n")
+	b.WriteString(ui.Faint.Render(fmt.Sprintf("  %s  %s%9s  %s", fit("PACK", nameW), title("TITLE"), "SOLVED", "DESCRIPTION")) + "\n")
+	b.WriteString(m.rule() + "\n")
 	descW := max(m.width-2-nameW-2-len(title(""))-9-2, 0)
 
-	h := max(m.height-5, 3)
+	// the header, a blank, the column names and a rule; a rule, the
+	// status line and the keys
+	h := max(m.height-7, 3)
 	first := max(m.packCursor-h+1, 0)
 	n := 0
 	for i := first; i < min(first+h, len(m.tabs)); i++ {
@@ -96,24 +101,25 @@ func (m *model) viewPacks() string {
 		if desc == "" && t.pack.Name == pack.LocalName {
 			desc = "your own problems"
 		}
-		row := fmt.Sprintf("%s  %s%9s  %s", fit(t.pack.Name, nameW), title(packTitle), m.progress(t.probs),
-			ui.Faint.Render(fit(desc, descW)))
-		if i == m.packCursor {
-			row = cursorStyle.Render("▸") + " " + row
-		} else {
-			row = "  " + row
+		cur := i == m.packCursor
+		r, name := newRow(nil), ui.Plain
+		if cur {
+			r, name = newRow(m.st.sel), m.st.title
 		}
-		b.WriteString(row + "\n")
+		m.cursorBar(r, cur)
+		r.add(name, fit(t.pack.Name, nameW)+"  ").plain(title(packTitle)+fmt.Sprintf("%9s  ", m.progress(t.probs))).add(ui.Faint, fit(desc, descW))
+		b.WriteString(r.fill(m.width) + "\n")
 		n++
 	}
 	for ; n < h; n++ {
 		b.WriteString("\n")
 	}
+	b.WriteString(m.rule() + "\n")
 	if m.message != "" {
 		b.WriteString(clip(m.message, m.width))
 	}
 	b.WriteString("\n")
-	b.WriteString(keyHelp(m.width, "↑↓ move", "enter open", "q quit"))
+	b.WriteString(m.keyHelp("", packKeys...))
 	return b.String()
 }
 

@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -284,31 +285,29 @@ func (m *model) updateGroups(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) listHeight() int {
-	// [tab bar], title, blank, column header + status, keys
-	h := m.height - 5
-	if m.multiPack {
-		h--
-	}
-	return max(h, 3)
+	// the tabs, a blank, the stats, a blank, the column names and a rule;
+	// a rule, the status line and the keys
+	return max(m.height-9, 3)
 }
 
-// tabBar names every pack with its progress, the one shown highlighted.
+// tabBar names every pack with its progress, the one shown highlighted, in
+// width columns.
 // When the tabs do not fit, it shows those around the current one.
-func (m *model) tabBar() string {
+func (m *model) tabBar(width int) string {
 	cur := slices.IndexFunc(m.tabs, func(t packTab) bool { return t.pack.Name == m.pack })
 	labels := make([]string, len(m.tabs))
 	for i, t := range m.tabs {
 		label := " " + t.pack.Name + " " + m.progress(t.probs) + " "
 		if i == cur {
-			labels[i] = cursorStyle.Render(label)
+			labels[i] = m.st.tabOn.Render(label)
 		} else {
-			labels[i] = ui.Faint.Render(label)
+			labels[i] = m.st.tab.Render(label)
 		}
 	}
-	// The width of the tabs first to last: a separator between two, and an
-	// arrow on each side that has more.
-	width := func(first, last int) int {
-		w := last - first
+	// The width of the tabs first to last, with an arrow on each side that
+	// has more.
+	tabsWidth := func(first, last int) int {
+		w := 0
 		for _, l := range labels[first : last+1] {
 			w += lipgloss.Width(l)
 		}
@@ -321,28 +320,28 @@ func (m *model) tabBar() string {
 		return w
 	}
 	first, last := 0, len(labels)-1
-	if m.width > 0 {
+	if width > 0 && cur >= 0 {
 		first, last = cur, cur
 		for grown := true; grown; {
 			grown = false
-			if last < len(labels)-1 && width(first, last+1) <= m.width {
+			if last < len(labels)-1 && tabsWidth(first, last+1) <= width {
 				last++
 				grown = true
 			}
-			if first > 0 && width(first-1, last) <= m.width {
+			if first > 0 && tabsWidth(first-1, last) <= width {
 				first--
 				grown = true
 			}
 		}
 	}
-	bar := strings.Join(labels[first:last+1], ui.Faint.Render("│"))
+	bar := strings.Join(labels[first:last+1], "")
 	if first > 0 {
 		bar = ui.Faint.Render("‹ ") + bar
 	}
 	if last < len(labels)-1 {
 		bar += ui.Faint.Render(" ›")
 	}
-	return clip(bar, m.width)
+	return clip(bar, width)
 }
 
 // ready reports whether p is ready for the language solutions are written
@@ -360,11 +359,30 @@ func (m *model) ready(p *problem.Problem) bool {
 	return ok
 }
 
+// listKeys are the keys of the problem list, the common ones first.
+func (m *model) listKeys() []string {
+	keys := []string{"↑↓ move", "enter open"}
+	if m.multiPack {
+		keys = append(keys, "tab pack")
+	}
+	if m.fromPicker() {
+		keys = append(keys, "esc packs")
+	}
+	keys = append(keys, "v view", "e edit", "h history", "m star", "/ search", "f filter")
+	if t := m.tab(); t != nil && len(t.groups()) > 0 {
+		keys = append(keys, "c group")
+	}
+	keys = append(keys, "L lang")
+	if m.localeLabel(m.pack) != "" {
+		keys = append(keys, "i locale")
+	}
+	return append(keys, "y copy-path", "r reset", "D discard", "pgup/pgdn page", "g/G first/last", "q quit")
+}
+
+var groupKeys = []string{"↑↓ move", "enter choose", "esc cancel"}
+
 func (m *model) viewList() string {
 	var b strings.Builder
-	if m.multiPack {
-		b.WriteString(m.tabBar() + "\n")
-	}
 	solved, attempted, notReady, starred := 0, 0, 0, 0
 	for _, p := range m.probs {
 		if m.stars[p.Ref()] {
@@ -380,24 +398,31 @@ func (m *model) viewList() string {
 			notReady++
 		}
 	}
-	header := titleStyle.Render("handcoding")
+
+	right := ui.Faint.Render("lang ") + ui.Bold.Render(m.lang.Name())
+	if l := m.localeLabel(m.pack); l != "" {
+		right += ui.Faint.Render("   locale ") + l
+	}
+	right += ui.Faint.Render("   filter ") + m.filter.String()
+	left := m.badge() + "  "
+	left += m.tabBar(m.width - lipgloss.Width(left) - lipgloss.Width(right) - 2)
+	b.WriteString(padBetween(left, right, m.width) + "\n\n")
+
+	stats := ""
 	if g := m.group(); g != nil {
 		cur, _ := m.locale(m.pack)
-		header += "  " + keyStyle.Render(g.TitleIn(cur))
+		stats = ui.Bold.Render(g.TitleIn(cur)) + ui.Faint.Render(" · ")
 	}
-	header += fmt.Sprintf("  %d problems  %s  %s", len(m.probs),
-		ui.Green.Render(fmt.Sprintf("✔ %d solved", solved)), ui.Yellow.Render(fmt.Sprintf("● %d attempted", attempted)))
+	stats += ui.Bold.Render(strconv.Itoa(len(m.probs))) + ui.Faint.Render(" problems") +
+		"    " + ui.Green.Render(fmt.Sprintf("✔ %d solved", solved)) +
+		"    " + ui.Yellow.Render(fmt.Sprintf("● %d attempted", attempted))
 	if notReady > 0 {
-		header += "  " + ui.Cyan.Render(fmt.Sprintf("? %d not ready", notReady))
+		stats += "    " + ui.Cyan.Render(fmt.Sprintf("? %d not ready", notReady))
 	}
 	if starred > 0 {
-		header += "  " + ui.Yellow.Render(fmt.Sprintf("★ %d starred", starred))
+		stats += "    " + ui.Yellow.Render(fmt.Sprintf("★ %d starred", starred))
 	}
-	right := ui.Faint.Render(fmt.Sprintf("lang: %s  filter: %s", m.lang.Name(), m.filter))
-	if l := m.localeLabel(m.pack); l != "" {
-		right = ui.Faint.Render("locale: "+l+"  ") + right
-	}
-	b.WriteString(padBetween(header, right, m.width) + "\n\n")
+	b.WriteString(padBetween(stats, progressBar(solved, len(m.probs)), m.width) + "\n\n")
 
 	h := m.listHeight()
 	if m.picking {
@@ -405,6 +430,7 @@ func (m *model) viewList() string {
 	} else {
 		m.viewProblems(&b, h)
 	}
+	b.WriteString(m.rule() + "\n")
 
 	switch {
 	case m.searching:
@@ -418,34 +444,35 @@ func (m *model) viewList() string {
 	}
 	b.WriteString("\n")
 	if m.picking {
-		b.WriteString(keyHelp(m.width, "↑↓ move", "enter choose", "esc cancel"))
+		b.WriteString(m.keyHelp("", groupKeys...))
 		return b.String()
 	}
-	keys := []string{"↑↓ move", "enter open", "v view", "e edit", "h history",
-		"y copy-path", "m star", "r reset", "D discard", "f filter", "/ search", "L lang", "q quit"}
-	if t := m.tab(); t != nil && len(t.groups()) > 0 {
-		keys = slices.Insert(keys, 1, "c group")
+	pos := ""
+	if len(m.visible) > h {
+		pos = fmt.Sprintf("%d–%d of %d", m.offset+1, min(m.offset+h, len(m.visible)), len(m.visible))
 	}
-	if m.localeLabel(m.pack) != "" {
-		keys = slices.Insert(keys, len(keys)-1, "i locale")
-	}
-	if m.fromPicker() {
-		keys = slices.Insert(keys, 1, "esc packs")
-	}
-	if m.multiPack {
-		keys = slices.Insert(keys, 1, "tab pack")
-	}
-	b.WriteString(keyHelp(m.width, keys...))
+	b.WriteString(m.keyHelp(pos, m.listKeys()...))
 	return b.String()
 }
 
-// viewProblems writes the column header and h rows of problems.
+// progressBar shows solved of total problems as a bar and a percentage.
+func progressBar(solved, total int) string {
+	const width = 24
+	if total == 0 {
+		return ""
+	}
+	done := solved * width / total
+	return ui.Green.Render(strings.Repeat("━", done)) + ui.Faint.Render(strings.Repeat("━", width-done)) +
+		ui.Faint.Render(fmt.Sprintf("  %d%%", solved*100/total))
+}
+
+// viewProblems writes the column names, a rule and h rows of problems.
 func (m *model) viewProblems(b *strings.Builder, h int) {
-	// marker(2) + status(2) + star(2) + id(7) + title + level(9) + tags
+	// cursor(2) + status(2) + star(2) + id(7) + title + level(9) + tags
 	titleW := min(max(m.width-62, 20), 48)
 	tagsW := max(m.width-2-2-2-7-titleW-1-9, 0)
-	cols := fmt.Sprintf("  %s %s %-6s %s %-8s %s", " ", " ", "#", fit("Title", titleW), "Level", "Tags")
-	b.WriteString(ui.Faint.Render(cols) + "\n")
+	b.WriteString(ui.Faint.Render(fmt.Sprintf("      %-6s %s %-8s %s", "#", fit("TITLE", titleW), "LEVEL", "TAGS")) + "\n")
+	b.WriteString(m.rule() + "\n")
 
 	if m.cursor < m.offset {
 		m.offset = m.cursor
@@ -455,29 +482,39 @@ func (m *model) viewProblems(b *strings.Builder, h int) {
 	}
 	for i := m.offset; i < min(m.offset+h, len(m.visible)); i++ {
 		p := m.probs[m.visible[i]]
+		cur := i == m.cursor
+		var r *row
+		if cur {
+			r = newRow(m.st.sel)
+		} else {
+			r = newRow(nil)
+		}
+		m.cursorBar(r, cur)
 		// A problem that cannot be submitted shows that rather than its
 		// attempts, which could not be judged.
-		mark := ui.Faint.Render("·")
 		switch status := m.statuses[p.Ref()]; {
 		case status == app.StatusSolved:
-			mark = ui.Green.Render("✔")
+			r.add(ui.Green, "✔ ")
 		case !m.ready(p):
-			mark = ui.Cyan.Render("?")
+			r.add(ui.Cyan, "? ")
 		case status == app.StatusAttempted:
-			mark = ui.Yellow.Render("●")
+			r.add(ui.Yellow, "● ")
+		default:
+			r.add(ui.Faint, "· ")
 		}
-		tags := ui.Faint.Render(fit(strings.Join(p.Tags, ", "), tagsW))
-		star := " "
 		if m.stars[p.Ref()] {
-			star = ui.Yellow.Render("★")
-		}
-		row := fmt.Sprintf("%s %s %-6s %s %s %s", mark, star, p.ID, fit(m.title(p), titleW), padRight(ui.Difficulty(p.Difficulty), 8), tags)
-		if i == m.cursor {
-			row = cursorStyle.Render("▸") + " " + row
+			r.add(ui.Yellow, "★ ")
 		} else {
-			row = "  " + row
+			r.plain("  ")
 		}
-		b.WriteString(row + "\n")
+		title := ui.Plain
+		if cur {
+			title = m.st.title
+		}
+		r.add(ui.Faint, fit(p.ID, 6)+" ").add(title, fit(m.title(p), titleW)+" ")
+		r.add(difficultyStyle(p.Difficulty), fit(difficultyLabel(p.Difficulty), 8)+" ")
+		r.add(ui.Faint, fit(strings.Join(p.Tags, " · "), tagsW))
+		b.WriteString(r.fill(m.width) + "\n")
 	}
 	used := max(len(m.visible)-m.offset, 1)
 	switch {
@@ -494,13 +531,40 @@ func (m *model) viewProblems(b *strings.Builder, h int) {
 	}
 }
 
-// viewGroups writes the group picker under a column header, in h rows:
+// difficultyStyle colors a difficulty.
+func difficultyStyle(d string) ui.Style {
+	switch d {
+	case problem.Easy:
+		return ui.Green
+	case problem.Medium:
+		return ui.Yellow
+	case problem.Hard:
+		return ui.Red
+	}
+	return ui.Faint
+}
+
+// difficultyLabel names a difficulty, a dash when unknown.
+func difficultyLabel(d string) string {
+	switch d {
+	case problem.Easy:
+		return "Easy"
+	case problem.Medium:
+		return "Medium"
+	case problem.Hard:
+		return "Hard"
+	}
+	return "-"
+}
+
+// viewGroups writes the group picker under its column names, in h rows:
 // every problem of the pack, then each group, with its progress.
 func (m *model) viewGroups(b *strings.Builder, h int) {
 	t := m.tab()
 	groups := t.groups()
 	titleW := min(max(m.width-30, 20), 48)
-	b.WriteString(ui.Faint.Render(fmt.Sprintf("  %s %7s  %s", fit("Group", titleW), "Solved", "Name")) + "\n")
+	b.WriteString(ui.Faint.Render(fmt.Sprintf("  %s %7s  %s", fit("GROUP", titleW), "SOLVED", "NAME")) + "\n")
+	b.WriteString(m.rule() + "\n")
 	first := max(m.groupCursor-h+1, 0)
 	n := 0
 	for i := first; i < min(first+h, len(groups)+1); i++ {
@@ -510,13 +574,15 @@ func (m *model) viewGroups(b *strings.Builder, h int) {
 			cur, _ := m.locale(m.pack)
 			title, probs, name = g.TitleIn(cur), groupProblems(t.probs, g), g.Name
 		}
-		row := fmt.Sprintf("%s %7s  %s", fit(title, titleW), m.progress(probs), ui.Faint.Render(name))
-		if i == m.groupCursor {
-			row = cursorStyle.Render("▸") + " " + row
-		} else {
-			row = "  " + row
+		cur := i == m.groupCursor
+		r := newRow(nil)
+		titleStyle := ui.Plain
+		if cur {
+			r, titleStyle = newRow(m.st.sel), m.st.title
 		}
-		b.WriteString(row + "\n")
+		m.cursorBar(r, cur)
+		r.add(titleStyle, fit(title, titleW)+" ").plain(fmt.Sprintf("%7s  ", m.progress(probs))).add(ui.Faint, name)
+		b.WriteString(r.fill(m.width) + "\n")
 		n++
 	}
 	for ; n < h; n++ {
@@ -534,17 +600,12 @@ func fit(s string, w int) string {
 	return runewidth.FillRight(s, w)
 }
 
-func padRight(s string, w int) string {
-	if pad := w - lipgloss.Width(s); pad > 0 {
-		return s + strings.Repeat(" ", pad)
-	}
-	return s
-}
-
+// padBetween puts left at the start of a line width columns wide and right
+// at its end, leaving right out when the two do not fit.
 func padBetween(left, right string, width int) string {
 	gap := width - lipgloss.Width(left) - lipgloss.Width(right)
-	if gap < 2 {
-		return left + "  " + right
+	if width > 0 && gap < 2 {
+		return clip(left, width)
 	}
-	return left + strings.Repeat(" ", gap) + right
+	return left + strings.Repeat(" ", max(gap, 2)) + right
 }

@@ -3,6 +3,7 @@ package ui
 
 import (
 	"fmt"
+	"image/color"
 	"io"
 	"os"
 	"slices"
@@ -27,6 +28,7 @@ var (
 	Cyan   = NewStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("6")))
 	Faint  = NewStyle(lipgloss.NewStyle().Faint(true))
 	Bold   = NewStyle(lipgloss.NewStyle().Bold(true))
+	Plain  = NewStyle(lipgloss.NewStyle())
 )
 
 // Style is a text style (colors and attributes such as bold, no layout)
@@ -38,6 +40,9 @@ func NewStyle(s lipgloss.Style) Style { return Style{s} }
 
 // Bold returns the style, bold or not.
 func (s Style) Bold(v bool) Style { return Style{s.s.Bold(v)} }
+
+// Background returns the style on a background color.
+func (s Style) Background(c color.Color) Style { return Style{s.s.Background(c)} }
 
 // Render applies the style to strs joined by spaces, as lipgloss does.
 func (s Style) Render(strs ...string) string {
@@ -142,8 +147,8 @@ func (o ReportOptions) ref(p *problem.Problem) string {
 	return p.Slug
 }
 
-// notReadyHint tells how to make p judgeable for the report's language.
-func (o ReportOptions) notReadyHint(p *problem.Problem) string {
+// NotReadyHint tells how to make p judgeable for the report's language.
+func (o ReportOptions) NotReadyHint(p *problem.Problem) string {
 	if o.Lang == nil {
 		return p.NotReadyHint(o.ref(p), "", "")
 	}
@@ -251,7 +256,7 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 	if rep.Verdict == runner.NotJudged {
 		summary := fmt.Sprintf("%s · %d case(s) ran", VerdictStyle(rep.Verdict).Render(string(rep.Verdict)), rep.Total) + totalTime(rep)
 		fmt.Fprintln(w, "\n"+summary)
-		fmt.Fprintln(w, Faint.Render("Compare your output with the expected one yourself; "+o.notReadyHint(p)+"."))
+		fmt.Fprintln(w, Faint.Render("Compare your output with the expected one yourself; "+o.NotReadyHint(p)+"."))
 		return
 	}
 	summary := fmt.Sprintf("%s · %d/%d passed", VerdictStyle(rep.Verdict).Render(string(rep.Verdict)), rep.Passed, rep.Total) + totalTime(rep)
