@@ -91,17 +91,33 @@ func TestMarkdownImages(t *testing.T) {
 	}
 }
 
-// TestMarkdownTextFollowsTerminal checks that body text carries no
-// foreground color in either theme, so that it follows the terminal's
+// TestMarkdownTextFollowsTerminal checks that body text, and a code block
+// without a language (LeetCode's examples), carry no foreground color in
+// either theme, so that it follows the terminal's
 // default foreground when the terminal switches between light and dark.
 func TestMarkdownTextFollowsTerminal(t *testing.T) {
 	for _, theme := range []string{ThemeLight, ThemeDark} {
-		out := NewMarkdown(theme, nil).Render("Plain words, **strong** and _emphasis_.\n\n- an item\n", "", 80)
+		out := NewMarkdown(theme, nil).Render("Plain words, **strong** and _emphasis_.\n\n- an item\n\n```\nInput: nums = [2,7]\n```\n", "", 80)
 		if !strings.Contains(ansi.Strip(out), "Plain words") {
 			t.Fatalf("%s: text not rendered:\n%q", theme, out)
 		}
 		if strings.Contains(out, "38;") {
 			t.Errorf("%s: body text has a foreground color:\n%q", theme, out)
 		}
+	}
+}
+
+// TestMarkdownCodeInEachTheme checks that code is highlighted in the colors
+// of each renderer's theme, also after a renderer for the other theme has
+// highlighted code in the same process.
+func TestMarkdownCodeInEachTheme(t *testing.T) {
+	src := "```go\nfunc f() int { return 42 // answer\n}\n```\n"
+	dark := NewMarkdown(ThemeDark, nil).Render(src, "", 80)
+	light := NewMarkdown(ThemeLight, nil).Render(src, "", 80)
+	if dark == light {
+		t.Fatalf("code looks the same in both themes:\n%q", dark)
+	}
+	if again := NewMarkdown(ThemeDark, nil).Render(src, "", 80); again != dark {
+		t.Errorf("dark code changed after light code:\n%q\nwas\n%q", again, dark)
 	}
 }

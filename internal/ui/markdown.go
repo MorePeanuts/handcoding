@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	gansi "charm.land/glamour/v2/ansi"
 	"charm.land/glamour/v2/styles"
 	"charm.land/lipgloss/v2"
+	"github.com/alecthomas/chroma/v2"
+	chromastyles "github.com/alecthomas/chroma/v2/styles"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -52,19 +55,81 @@ func AutoTheme(configured string) bool {
 	return configured != ThemeDark && configured != ThemeLight
 }
 
-// markdownStyle is glamour's standard style for a theme with the body text
-// in the terminal's default foreground. glamour colors it from the 256-color
-// cube (234 in the light style, 252 in the dark one), which terminals keep
-// when they switch between light and dark, so the text would stay in the
-// colors of the old background while the rest of the screen follows the new
-// one. Headings, code and links keep their colors, readable on both.
+// markdownStyle is glamour's standard style for a theme with text, in
+// paragraphs and in code blocks, in the terminal's default foreground.
+// glamour colors it from the 256-color cube or in 24-bit colors (body text
+// 234 in the light style and 252 in the dark one, code #2A2A2A and #C4C4C4),
+// which terminals keep when they switch between light and dark, so the text
+// would stay in the colors of the old background while the rest of the
+// screen follows the new one. Headings, inline code, links and highlighted
+// code keep their colors.
 func markdownStyle(theme string) gansi.StyleConfig {
 	s := styles.DarkStyleConfig
 	if theme == ThemeLight {
 		s = styles.LightStyleConfig
 	}
 	s.Document.Color = nil
+	s.CodeBlock.Color = nil
+	registerCodeStyles()
+	s.CodeBlock.Chroma, s.CodeBlock.Theme = nil, codeStyle(theme)
 	return s
+}
+
+// codeStyle names the chroma style that highlights code blocks in a theme.
+//
+// glamour registers the chroma style of its rules under one name, once per
+// process, so that a renderer for the other theme would still highlight code
+// in the colors of the first one: hc registers a style per theme instead, and
+// glamour uses the one a renderer names.
+func codeStyle(theme string) string { return "hc-" + theme }
+
+// registerCodeStyles registers codeStyle's styles: glamour's for each theme,
+// with plain text in the terminal's default foreground.
+var registerCodeStyles = sync.OnceFunc(func() {
+	for theme, c := range map[string]*gansi.Chroma{
+		ThemeDark:  styles.DarkStyleConfig.CodeBlock.Chroma,
+		ThemeLight: styles.LightStyleConfig.CodeBlock.Chroma,
+	} {
+		rules := *c
+		rules.Text = gansi.StylePrimitive{}
+		chromastyles.Register(chroma.MustNewStyle(codeStyle(theme), chromaEntries(rules)))
+	}
+})
+
+// chromaEntries converts glamour's chroma rules, whose fields are named
+// after chroma's token types, as glamour does.
+func chromaEntries(rules gansi.Chroma) chroma.StyleEntries {
+	entries := chroma.StyleEntries{}
+	v := reflect.ValueOf(rules)
+	for i := range v.NumField() {
+		p, ok := v.Field(i).Interface().(gansi.StylePrimitive)
+		if !ok {
+			continue
+		}
+		tt, err := chroma.TokenTypeString(v.Type().Field(i).Name)
+		if err != nil {
+			panic(fmt.Sprintf("glamour's chroma rule %s names no chroma token type", v.Type().Field(i).Name))
+		}
+		var parts []string
+		if p.Color != nil {
+			parts = append(parts, *p.Color)
+		}
+		if p.BackgroundColor != nil {
+			parts = append(parts, "bg:"+*p.BackgroundColor)
+		}
+		for _, attr := range []struct {
+			on   *bool
+			name string
+		}{{p.Italic, "italic"}, {p.Bold, "bold"}, {p.Underline, "underline"}} {
+			if attr.on != nil && *attr.on {
+				parts = append(parts, attr.name)
+			}
+		}
+		if len(parts) > 0 {
+			entries[tt] = strings.Join(parts, " ")
+		}
+	}
+	return entries
 }
 
 // Markdown renders Markdown for the terminal, caching renderers per width
