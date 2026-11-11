@@ -1,0 +1,30 @@
+ hc   regression / 1. Two Sum  two-sum   Easy   array · hash-table                                en
+ Submit   go                                                               recorded as submission #4
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ Cases 7/9  Output
+ ✘ Wrong Answer    7/9 passed · 1.20ms
+
+  ✔ Case 1   1.3µs
+  ✔ Case 2   2.6µs
+  ✘ Case 3   3.9µs     Wrong Answer
+  ✔ Case 4   5.2µs                   negative numbers
+▌ ✔ Case 5   6.5µs                   zeros
+╭─ Case 5 ─ Accepted · zeros ─────────────────────────────────────────────────────────────────────╮
+│  Input     nums = [3,3], target = 6                                                             │
+│  Output    [0,1]                                                                                │
+│  Expected  [0,1]                                                                                │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ✔ Case 6   7.8µs
+  ✔ Case 7   9.1µs
+  ✔ Case 8   10.4µs                  10^4 distinct numbers
+  ✘ Case 9   11.7µs    Wrong Answer
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ ↑↓ case    tab output    d debug-case    t test    s submit    e edit    ? help         case 5 of 9

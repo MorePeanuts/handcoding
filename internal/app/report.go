@@ -1,7 +1,11 @@
 package app
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -33,7 +37,11 @@ type storedReport struct {
 	ElapsedNs int64  `json:"elapsed_ns"`
 	// Problem identifies the problem's files the submission was judged on
 	// (problemKey).
-	Problem      string       `json:"problem,omitempty"`
+	Problem string `json:"problem,omitempty"`
+	// CasesKey identifies the problem's cases file (casesKey): passed
+	// cases, whose details are not kept, show them from that file while it
+	// is unchanged (SubmissionCases).
+	CasesKey     string       `json:"cases_key,omitempty"`
 	Stopped      bool         `json:"stopped,omitempty"`
 	CompileError string       `json:"compile_error,omitempty"`
 	Stderr       string       `json:"stderr,omitempty"`
@@ -43,7 +51,7 @@ type storedReport struct {
 // EncodeReport serializes a report for the submission history.
 func EncodeReport(p *problem.Problem, rep *runner.Report) string {
 	sr := storedReport{
-		Verdict: string(rep.Verdict), Passed: rep.Passed, Total: rep.Total, Problem: problemKey(p),
+		Verdict: string(rep.Verdict), Passed: rep.Passed, Total: rep.Total, Problem: problemKey(p), CasesKey: casesKey(p),
 		ElapsedNs: rep.Elapsed.Nanoseconds(), Stopped: rep.Stopped, CompileError: rep.CompileError, Stderr: clipText(rep.Stderr),
 	}
 	for _, c := range rep.Cases {
@@ -91,6 +99,33 @@ func DecodeReport(s string) *runner.Report {
 		rep.Cases = append(rep.Cases, cr)
 	}
 	return rep
+}
+
+// SubmissionCases returns p's cases as they were when a submission's
+// report (details) was recorded, which a passed case of it, whose details
+// are not kept, shows; nil when its cases file changed since, or when the
+// report predates the record of it.
+func SubmissionCases(p *problem.Problem, details string) []problem.Case {
+	var sr storedReport
+	if json.Unmarshal([]byte(details), &sr) != nil || sr.CasesKey == "" || sr.CasesKey != casesKey(p) {
+		return nil
+	}
+	cases, err := p.LoadCases()
+	if err != nil {
+		return nil
+	}
+	return cases
+}
+
+// casesKey identifies the content of p's cases file: case i of a report
+// recorded under the same key is the file's case i.
+func casesKey(p *problem.Problem) string {
+	data, err := os.ReadFile(filepath.Join(p.Dir, problem.CasesFile))
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
 func clipText(s string) string {

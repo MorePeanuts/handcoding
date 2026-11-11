@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -30,7 +31,7 @@ func (m *model) problemKey(key string, p *problem.Problem) (tea.Cmd, bool) {
 	case "s":
 		return m.startRun(runSubmit, p), true
 	case "d":
-		return m.debug(p, m.lang), true
+		return m.debug(p, m.lang, 0), true
 	case "h":
 		m.openHistory(p)
 		return nil, true
@@ -173,14 +174,18 @@ func (m *model) edit(p *problem.Problem) tea.Cmd {
 // problem list leaves to the problem's own screens, as LeetCode does.
 var runKeys = []string{"t", "s", "d"}
 
-// debug starts the debugger on p's solution in l, on the case hc debug
-// picks: the first that fails.
-func (m *model) debug(p *problem.Problem, l lang.Language) tea.Cmd {
+// debug starts the debugger on p's solution in l, on case index, or with 0
+// on the case hc debug picks: the first that fails.
+func (m *model) debug(p *problem.Problem, l lang.Language, index int) tea.Cmd {
 	if !m.app.HasSolution(p, l) {
 		m.message = "no " + l.Name() + " solution yet — press enter or e first"
 		return nil
 	}
-	cmd := exec.Command(m.opts.Exe, "-w", m.app.WS.Root, "debug", p.Ref(), "-l", l.ID(), "--pause")
+	args := []string{"-w", m.app.WS.Root, "debug", p.Ref(), "-l", l.ID(), "--pause"}
+	if index > 0 {
+		args = append(args, "-c", strconv.Itoa(index))
+	}
+	cmd := exec.Command(m.opts.Exe, args...)
 	return tea.Exec(m.handOff(cmd, true), func(err error) tea.Msg {
 		// The debugger's exit status is not ours to report, but hc debug
 		// failing before it starts (a compile error) is.

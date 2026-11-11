@@ -1,0 +1,30 @@
+ hc   regression / 1. Two Sum  two-sum   Easy   array · hash-table                                en
+ Submission #4   Wrong Answer  go  2026-11-11 11:26:00
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ Cases 7/9  Code
+ ✘ Wrong Answer    7/9 passed · 1.20ms
+
+  ✔ Case 1   1.3µs
+▌ ✔ Case 2   2.6µs
+╭─ Case 2 ─ Accepted ─────────────────────────────────────────────────────────────────────────────╮
+│  Input     nums = [3,2,4], target = 6                                                           │
+│  Output    not kept: it passed                                                                  │
+│  Expected  [1,2]                                                                                │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ✘ Case 3   3.9µs     Wrong Answer
+  ✔ Case 4   5.2µs                   negative numbers
+  ✔ Case 5   6.5µs                   zeros
+  ✔ Case 6   7.8µs
+  ✔ Case 7   9.1µs
+  ✔ Case 8   10.4µs                  10^4 distinct numbers
+  ✘ Case 9   11.7µs    Wrong Answer
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ ↑↓ case    tab code    d debug-case    r restore    x delete    esc back    ? help      case 2 of 9
