@@ -87,8 +87,9 @@ func (m *model) startRun(kind runKind, p *problem.Problem) tea.Cmd {
 	return tea.Batch(m.spinner.Tick, exec)
 }
 
+// testExamples tests p's examples and the user's own cases, as hc test does.
 func testExamples(ctx context.Context, a *app.App, p *problem.Problem, l lang.Language, opts app.RunOptions) (*runner.Report, error) {
-	cases, err := p.LoadCases()
+	cases, err := a.Cases(p)
 	if err != nil {
 		return nil, err
 	}
@@ -98,6 +99,9 @@ func testExamples(ctx context.Context, a *app.App, p *problem.Problem, l lang.La
 	}
 	if len(cases) == 0 {
 		return nil, fmt.Errorf("%s has no test cases yet (hc gen %s)", p.Slug, a.WS.Ref(p))
+	}
+	if len(sel) == 0 && a.KeepsUserCases(p) {
+		return nil, fmt.Errorf("%s has no example cases: add your own with a", p.Slug)
 	}
 	if len(sel) == 0 {
 		return nil, fmt.Errorf(`%s has no example cases: mark the statement's examples with "example": true in %s`, p.Slug, problem.CasesFile)

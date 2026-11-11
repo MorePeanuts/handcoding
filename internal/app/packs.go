@@ -403,9 +403,11 @@ type Orphan struct {
 	// Solutions are the solution directories, relative to the workspace
 	// root.
 	Solutions []string
-	// Submissions is the number of submissions in the history (for a
-	// removed problem).
+	// Submissions is the number of submissions in the history, and Cases
+	// the file of the user's own cases, relative to the workspace root (for
+	// a removed problem).
 	Submissions int
+	Cases       string
 }
 
 // UpdatePack updates the installed pack called name from its source: a git
@@ -594,8 +596,11 @@ func (a *App) diff(ctx context.Context, u *PackUpdate, before, after []*problem.
 				}
 			}
 			o.Submissions = statuses[p.Ref()]
+			if path := a.WS.UserCasesPath(p); exists(path) {
+				o.Cases = a.WS.Rel(path)
+			}
 		}
-		if len(o.Solutions) > 0 || o.Submissions > 0 {
+		if len(o.Solutions) > 0 || o.Submissions > 0 || o.Cases != "" {
 			u.Orphans = append(u.Orphans, o)
 		}
 	}
@@ -607,15 +612,17 @@ type RemoveResult struct {
 	// Deleted reports whether packs/<name> was deleted, and Unlisted
 	// whether its entry left hc.yaml.
 	Deleted, Unlisted bool
-	// Solutions reports whether solutions/<name> was deleted, and
-	// Submissions how many submissions were (with purge).
-	Solutions   bool
-	Submissions int64
+	// Solutions and Cases report whether solutions/<name> and
+	// cases/<name> were deleted, and Submissions how many submissions were
+	// (with purge).
+	Solutions, Cases bool
+	Submissions      int64
 }
 
 // RemovePack deletes the installed pack called name, packs/<name>/, and its
-// entry in hc.yaml. The user's solutions and history of its problems stay,
-// unless purge, which deletes solutions/<name>/ and the pack's submissions.
+// entry in hc.yaml. The user's solutions, own cases and history of its
+// problems stay, unless purge, which deletes solutions/<name>/,
+// cases/<name>/ and the pack's submissions.
 func (a *App) RemovePack(ctx context.Context, name string, purge bool) (*RemoveResult, error) {
 	unlock, err := a.lockPacks()
 	if err != nil {
@@ -656,6 +663,12 @@ func (a *App) RemovePack(ctx context.Context, name string, purge bool) (*RemoveR
 			return res, err
 		}
 		res.Solutions = true
+	}
+	if cases := filepath.Join(a.WS.Root, workspace.CasesDir, name); exists(cases) {
+		if err := os.RemoveAll(cases); err != nil {
+			return res, err
+		}
+		res.Cases = true
 	}
 	st, err := a.Store()
 	if err != nil {

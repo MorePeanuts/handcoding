@@ -1,0 +1,30 @@
+ hc   regression / 1. Two Sum  two-sum   Easy   array · hash-table                                en
+ Go   …/solutions/regression/go/0001-two-sum/solution.go  ● attempted
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ Statement  Cases 10
+9 of the pack, 1 of yours · t runs the examples and yours, s only the pack's
+
+  Case 1   example
+  Case 2   example
+  Case 3   example
+  Case 4   negative numbers
+  Case 5   zeros
+  Case 6   extreme values
+  Case 7
+  Case 8   generated 10^4 distinct numbers, the answer at random places
+  Case 9   generated the answer is the last two numbers: the worst case for checking pairs in order
+▌ Case 10  yours duplicates at both ends
+╭─ Case 10 · yours ───────────────────────────────────────────────────────────────────────────────╮
+│  Input     nums = [3,3,1,3], target = 6                                                         │
+│  Expected  computed by the reference solution when the case runs                                │
+│  Note      duplicates at both ends                                                              │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ ↑↓ case    tab statement    a add    x remove    d debug-case    t test    ? help     case 10 of 10

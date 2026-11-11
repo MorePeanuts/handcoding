@@ -55,11 +55,10 @@ func packWorkspace(t *testing.T) string {
 
 func TestInstalledPackIsReadOnly(t *testing.T) {
 	dir := packWorkspace(t)
+	// hc cases add, rm and edit work on the user's own cases there
+	// (TestUserCasesCommands).
 	for _, args := range [][]string{
-		{"cases", "add", "regression/two-sum", "--input", `{"nums":[1,2],"target":3}`},
-		{"cases", "rm", "regression/two-sum", "1"},
 		{"cases", "build", "regression/two-sum"},
-		{"cases", "edit", "regression/two-sum"},
 		{"gen", "regression/two-sum", "--dry-run"},
 		{"fix", "regression/two-sum", "-m", "x", "--dry-run"},
 	} {

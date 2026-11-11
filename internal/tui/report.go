@@ -182,7 +182,11 @@ func (m *model) renderCases(p *problem.Problem, rep *runner.Report, o ui.ReportO
 		if c.Verdict != runner.Accepted {
 			verdict = string(c.Verdict)
 		}
-		r.add(style, fmt.Sprintf("%-*s", verdictW, verdict)).add(ui.Faint, c.Case.Note)
+		r.add(style, fmt.Sprintf("%-*s", verdictW, verdict))
+		if c.Case.User {
+			r.add(m.st.accent, "yours ")
+		}
+		r.add(ui.Faint, c.Case.Note)
 		l.add(clip(r.fill(width), width))
 		if cur {
 			l.add(m.caseBox(p, c, b, cases, width))
@@ -221,6 +225,9 @@ func (m *model) caseBox(p *problem.Problem, c runner.CaseResult, b *browser, cas
 	var s strings.Builder
 	style := ui.VerdictStyle(c.Verdict)
 	head := fmt.Sprintf("Case %d", c.Index)
+	if c.Case.User {
+		head = fmt.Sprintf("Your case %d", c.Index)
+	}
 	top := ui.Faint.Render("╭─ ") + style.Render(head) + ui.Faint.Render(" ─ ") + style.Render(string(c.Verdict))
 	used := 3 + len(head) + 3 + runewidth.StringWidth(string(c.Verdict))
 	if c.Case.Note != "" {

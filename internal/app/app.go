@@ -388,7 +388,8 @@ func (a *App) Restore(p *problem.Problem, l lang.Language, code string) (string,
 }
 
 // Select picks cases by 1-based index; with no indices it picks every case
-// when all is set, else the examples, none when no case is marked as one.
+// when all is set, else the examples and the user's own cases (see Cases),
+// none when there are neither.
 func Select(cases []problem.Case, indices []int, all bool) ([]runner.Selected, error) {
 	var sel []runner.Selected
 	switch {
@@ -405,7 +406,7 @@ func Select(cases []problem.Case, indices []int, all bool) ([]runner.Selected, e
 		}
 	default:
 		for i, c := range cases {
-			if c.Example {
+			if c.Example || c.User {
 				sel = append(sel, runner.Selected{Index: i + 1, Case: c})
 			}
 		}
@@ -500,6 +501,12 @@ func (a *App) run(ctx context.Context, p *problem.Problem, l lang.Language, dir 
 	if err := a.Materialize(ctx, p, l, sel, o); err != nil {
 		return nil, err
 	}
+	if _, f, err := a.expectUser(ctx, p, l, sel, o.Stderr); err != nil {
+		return nil, err
+	} else if f != nil {
+		return nil, fmt.Errorf("your case %d of %s cannot be judged: the reference solution %s fails on it (%s); change or remove it: hc cases edit %s",
+			f.Index, p.Slug, f.Path, f, a.WS.Ref(p))
+	}
 	// The cases are validated once, here: neither this run nor the
 	// reference's runs that time it validate them.
 	if err := runner.Validate(p, sel); err != nil {
@@ -571,7 +578,8 @@ func (a *App) SubmitError(p *problem.Problem, l lang.Language) error {
 	return errors.New("cannot submit: " + a.NotReadyHint(p, l) + "; `hc test` shows your output meanwhile")
 }
 
-// Submit runs all cases and records the submission.
+// Submit runs all of p's cases, not the user's own, and records the
+// submission.
 func (a *App) Submit(ctx context.Context, p *problem.Problem, l lang.Language, o RunOptions) (*runner.Report, *store.Submission, error) {
 	if err := a.SubmitError(p, l); err != nil {
 		return nil, nil, err

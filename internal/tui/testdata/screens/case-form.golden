@@ -1,0 +1,30 @@
+ hc   regression / 1. Two Sum  two-sum   Easy   array · hash-table                                en
+ Add a case   one of your own, in cases/regression/two-sum.jsonl: t runs it, s does not
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+▌ nums      [3,3,1,3]
+  target    6
+  expected  optional: the reference solution computes it
+  note      optional
+
+  Values are JSON, as in hc cases list: [1,2,3], "text", 42.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ enter add    tab next    shift+tab previous    esc cancel

@@ -138,13 +138,17 @@ func titledRule(title string, width int) string {
 }
 
 // keyHelp renders keys ("k action") as chips, dropping those that do not fit
-// before "? help", which is always last, and right at the end of the line.
+// before "? help", which is always last but in the form, and right at the
+// end of the line.
 func (m *model) keyHelp(right string, keys ...string) string {
 	part := func(k string) string {
 		key, label, _ := strings.Cut(k, " ")
 		return m.st.key.Render(" "+key+" ") + ui.Faint.Render(label+"   ")
 	}
 	help := part("? help")
+	if m.top() == screenCaseForm {
+		help = "" // ? is text there
+	}
 	used := lipgloss.Width(help)
 	if right != "" {
 		used += lipgloss.Width(right) + 2

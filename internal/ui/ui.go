@@ -22,13 +22,14 @@ import (
 
 // Styles shared by the CLI and the TUI.
 var (
-	Green  = NewStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("2")))
-	Red    = NewStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("1")))
-	Yellow = NewStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("3")))
-	Cyan   = NewStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("6")))
-	Faint  = NewStyle(lipgloss.NewStyle().Faint(true))
-	Bold   = NewStyle(lipgloss.NewStyle().Bold(true))
-	Plain  = NewStyle(lipgloss.NewStyle())
+	Green   = NewStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("2")))
+	Red     = NewStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("1")))
+	Yellow  = NewStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("3")))
+	Cyan    = NewStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("6")))
+	Magenta = NewStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("5")))
+	Faint   = NewStyle(lipgloss.NewStyle().Faint(true))
+	Bold    = NewStyle(lipgloss.NewStyle().Bold(true))
+	Plain   = NewStyle(lipgloss.NewStyle())
 )
 
 // Style is a text style (colors and attributes such as bold, no layout)
@@ -206,6 +207,9 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 		}
 		if c.Elapsed > 0 {
 			line += "  " + Faint.Render(FormatDuration(c.Elapsed))
+		}
+		if c.Case.User {
+			line += "  " + Magenta.Render("yours")
 		}
 		if c.Case.Note != "" {
 			line += "  " + Faint.Render("("+c.Case.Note+")")

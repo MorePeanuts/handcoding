@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -373,6 +374,12 @@ func newCasesCmd(root *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cases",
 		Short: "Inspect and edit test cases",
+		Long: `Inspect and edit a problem's test cases.
+
+The problems of an installed pack are read-only: on them, hc cases add, rm and
+edit work on your own cases instead, kept in cases/<pack>/<slug>.jsonl of the
+workspace, which pack updates never touch. They are numbered after the pack's
+cases; hc test runs them by default, hc submit never does.`,
 	}
 	cmd.AddCommand(
 		newCasesListCmd(root),
@@ -395,7 +402,8 @@ func newCasesListCmd(root *rootOptions) *cobra.Command {
 		Use:     "list <problem>",
 		Aliases: []string{"ls"},
 		Short:   "List test cases",
-		Long: `List the test cases of a problem. A generated case shows as its call to
+		Long: `List the test cases of a problem, followed by your own cases of a problem of
+an installed pack (marked "yours"). A generated case shows as its call to
 generator.py; with --expand, hc runs generator.py and shows the input it
 builds now, clipped unless --verbose, and with --json prints the case as the
 line it would be stored as (its expected output is computed only when
@@ -404,7 +412,7 @@ run hc cases build after changing generator.py.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
-				cases, err := p.LoadCases()
+				cases, err := a.Cases(p)
 				if err != nil {
 					return err
 				}
@@ -440,6 +448,9 @@ run hc cases build after changing generator.py.`,
 					if s.Case.Example {
 						tags += ui.Cyan.Render(" example")
 					}
+					if s.Case.User {
+						tags += ui.Magenta.Render(" yours")
+					}
 					if s.Case.Note != "" {
 						tags += ui.Faint.Render(" (" + s.Case.Note + ")")
 					}
@@ -469,8 +480,13 @@ run hc cases build after changing generator.py.`,
 					}
 					fmt.Printf("  %s %s\n", ui.Faint.Render("Input   "), clip(p.FormatInput(s.Case), maxLen))
 					exp := ui.Yellow.Render("(missing — run hc cases build)")
-					if s.Case.HasExpected() {
+					switch {
+					case s.Case.HasExpected():
 						exp = clip(string(s.Case.Expected), maxLen)
+					case s.Case.User && len(a.ReferenceLangs(p)) > 0:
+						exp = ui.Faint.Render("(computed by the reference solution when it runs)")
+					case s.Case.User:
+						exp = ui.Faint.Render("(none: without a reference solution, the case shows your output)")
 					}
 					fmt.Printf("  %s %s\n", ui.Faint.Render(fmt.Sprintf("%-8s", ui.ExpectedLabel(p))), exp)
 				}
@@ -479,7 +495,11 @@ run hc cases build after changing generator.py.`,
 				if !p.Ready() {
 					mode = "not decided yet (hc gen " + a.WS.Ref(p) + ")"
 				}
-				fmt.Println(ui.Faint.Render(fmt.Sprintf("%d case(s), compare mode %s", len(cases), mode)))
+				count := fmt.Sprintf("%d case(s)", len(cases))
+				if user := countUser(cases); user > 0 {
+					count = fmt.Sprintf("%d case(s) of the pack and %d of yours", len(cases)-user, user)
+				}
+				fmt.Println(ui.Faint.Render(fmt.Sprintf("%s, compare mode %s", count, mode)))
 				return nil
 			})
 		},
@@ -573,6 +593,13 @@ there is one.
 
   hc cases add two-sum --input '{"nums":[1,4],"target":5}' --expected '[0,1]'
 
+To a problem of an installed pack, which is read-only, it adds one of your own
+cases (see hc cases --help), which takes --input, --expected and --note only.
+Without --expected, the reference solution runs on it now, to check that it can
+judge the input, and computes its expected output whenever the case runs, so
+that it follows the pack's updates; one that fails on it is refused. Without a
+reference solution, the case shows your output unjudged.
+
 With --generate, append a generated case instead: generator.py builds its input
 with the function NAME, called as NAME(rng, **args), and a reference solution
 computes its expected output when it is judged. The case's digest is written
@@ -581,7 +608,7 @@ when there is a reference solution.
   hc cases add two-sum --generate distinct --args '{"n":100000}' --seed 7`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, cmdArgs []string) error {
-			return withWritableProblem(root, cmdArgs[0], func(a *app.App, p *problem.Problem) error {
+			return withProblemOnly(root, cmdArgs[0], func(a *app.App, p *problem.Problem) error {
 				var c problem.Case
 				switch {
 				case (input == "") == (generate == ""):
@@ -611,30 +638,27 @@ when there is a reference solution.
 					}
 				}
 				c.Note, c.Example = note, example
-				if err := p.ValidateCase(c); err != nil {
-					return err
-				}
-				cases, err := p.LoadCases()
+				added, err := a.AddCase(cmd.Context(), p, c, os.Stderr)
 				if err != nil {
-					return err
-				}
-				cases = append(cases, c)
-				if err := p.SaveCases(cases); err != nil {
-					return err
-				}
-				fmt.Printf("%s case %d\n", ui.Green.Render("added"), len(cases))
-				if c.Expected == nil {
-					if _, _, err := a.ReferenceLang(p, ""); err == nil {
-						res, err := a.BuildCases(cmd.Context(), p, "", false)
-						printBuild(res)
-						if err != nil {
-							return err
-						}
-					} else if c.Generated() {
-						fmt.Println(ui.Yellow.Render("no digest and no expected output (no reference solution); add one, then run hc cases build"))
-					} else {
-						fmt.Println(ui.Yellow.Render("no expected output (no reference solution); the case only shows your output"))
+					if added != nil {
+						fmt.Printf("%s case %d\n", ui.Green.Render("added"), added.Index)
+						printBuild(added.Build)
 					}
+					return err
+				}
+				if added.User {
+					printAddedUserCase(a, p, c, added)
+					return nil
+				}
+				fmt.Printf("%s case %d\n", ui.Green.Render("added"), added.Index)
+				switch {
+				case c.Expected != nil:
+				case added.Build != nil:
+					printBuild(added.Build)
+				case c.Generated():
+					fmt.Println(ui.Yellow.Render("no digest and no expected output (no reference solution); add one, then run hc cases build"))
+				default:
+					fmt.Println(ui.Yellow.Render("no expected output (no reference solution); the case only shows your output"))
 				}
 				return nil
 			})
@@ -648,6 +672,60 @@ when there is a reference solution.
 	cmd.Flags().StringVar(&note, "note", "", "remark")
 	cmd.Flags().BoolVar(&example, "example", false, "mark as example (run by hc test)")
 	return cmd
+}
+
+// printAddedUserCase reports one of the user's own cases that hc cases add
+// added.
+func printAddedUserCase(a *app.App, p *problem.Problem, c problem.Case, added *app.Added) {
+	fmt.Printf("%s your case %d %s\n", ui.Green.Render("added"), added.Index, ui.Faint.Render("("+a.WS.Rel(a.WS.UserCasesPath(p))+")"))
+	switch {
+	case c.HasExpected():
+	case added.Expected != nil:
+		fmt.Printf("  %s %s %s\n", ui.Faint.Render(ui.ExpectedLabel(p)), clip(string(added.Expected), 200),
+			ui.Faint.Render("(from the "+added.Ref.Name()+" reference solution)"))
+	case !p.Ready():
+		fmt.Println(ui.Yellow.Render("  no expected output yet: the problem has no judge rule, so the case shows your output"))
+	default:
+		fmt.Println(ui.Yellow.Render("  no expected output: without a reference solution, the case shows your output; give --expected to judge it"))
+	}
+	fmt.Println(ui.Faint.Render(fmt.Sprintf("  hc test %s runs it; hc submit does not", a.WS.Ref(p))))
+}
+
+// editUserCases opens the file of the user's own cases of p in the editor,
+// then checks them.
+func editUserCases(a *app.App, p *problem.Problem) error {
+	path := a.WS.UserCasesPath(p)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	ed, err := editorCommand(a.WS.Config, path)
+	if err != nil {
+		return err
+	}
+	if err := ed.Run(); err != nil {
+		return err
+	}
+	// An editor may leave the file empty, or never write it.
+	if info, err := os.Stat(path); err == nil && info.Size() == 0 {
+		_ = os.Remove(path)
+	}
+	if err := a.CheckUserCases(p); err != nil {
+		return fmt.Errorf("%s: %w", a.WS.Rel(path), err)
+	}
+	user, _ := a.UserCases(p)
+	fmt.Printf("%s %s %s\n", ui.Green.Render("ok  "), a.WS.Ref(p), ui.Faint.Render(fmt.Sprintf("(%d case(s) of yours)", len(user))))
+	return nil
+}
+
+// countUser counts the user's own cases among cases.
+func countUser(cases []problem.Case) int {
+	n := 0
+	for _, c := range cases {
+		if c.User {
+			n++
+		}
+	}
+	return n
 }
 
 // parseGenerate builds the generate field of a case from the flags of
@@ -674,31 +752,28 @@ func newCasesRmCmd(root *rootOptions) *cobra.Command {
 	return &cobra.Command{
 		Use:   "rm <problem> <case>...",
 		Short: "Remove test cases by number",
-		Args:  cobra.MinimumNArgs(2),
+		Long: `Remove cases by the numbers hc cases list shows. Of a problem of an installed
+pack, only your own cases can be removed.`,
+		Args: cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withWritableProblem(root, args[0], func(_ *app.App, p *problem.Problem) error {
-				cases, err := p.LoadCases()
+			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
+				var nums []int
+				for _, arg := range args[1:] {
+					n, err := strconv.Atoi(arg)
+					if err != nil {
+						return fmt.Errorf("invalid case number %q", arg)
+					}
+					nums = append(nums, n)
+				}
+				r, err := a.RemoveCases(p, nums)
 				if err != nil {
 					return err
 				}
-				drop := map[int]bool{}
-				for _, arg := range args[1:] {
-					var n int
-					if _, err := fmt.Sscanf(arg, "%d", &n); err != nil || n < 1 || n > len(cases) {
-						return fmt.Errorf("invalid case number %q", arg)
-					}
-					drop[n] = true
+				left := fmt.Sprintf("%d left", r.Left)
+				if r.User {
+					left = fmt.Sprintf("%d of yours left", r.Left)
 				}
-				var kept []problem.Case
-				for i, c := range cases {
-					if !drop[i+1] {
-						kept = append(kept, c)
-					}
-				}
-				if err := p.SaveCases(kept); err != nil {
-					return err
-				}
-				fmt.Printf("%s %d case(s); %d left (later cases were renumbered)\n", ui.Red.Render("removed"), len(drop), len(kept))
+				fmt.Printf("%s %d case(s); %s (later cases were renumbered)\n", ui.Red.Render("removed"), r.Removed, left)
 				return nil
 			})
 		},
@@ -709,9 +784,16 @@ func newCasesEditCmd(root *rootOptions) *cobra.Command {
 	return &cobra.Command{
 		Use:   "edit <problem>",
 		Short: "Open cases.jsonl in your editor",
-		Args:  cobra.ExactArgs(1),
+		Long: `Open the problem's cases.jsonl in your editor, then validate the problem. Of a
+problem of an installed pack, open the file of your own cases instead
+(cases/<pack>/<slug>.jsonl), whose lines are those of cases.jsonl with only
+"input", "expected" and "note".`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return withWritableProblem(root, args[0], func(a *app.App, p *problem.Problem) error {
+			return withProblemOnly(root, args[0], func(a *app.App, p *problem.Problem) error {
+				if a.KeepsUserCases(p) {
+					return editUserCases(a, p)
+				}
 				path := filepath.Join(p.Dir, problem.CasesFile)
 				ed, err := editorCommand(a.WS.Config, path)
 				if err != nil {

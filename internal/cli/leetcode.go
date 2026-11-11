@@ -410,7 +410,8 @@ func newLeetCodeSubmitCmd(root *rootOptions) *cobra.Command {
 		Long: `Submit your solution to LeetCode, like Submit on the problem's page, and show
 LeetCode's verdict. When it fails, the case it failed on is shown with your
 output and the expected one; for a function problem whose input LeetCode gives
-as it is, also the hc cases add command that adds it to the problem's cases.
+as it is, also the hc cases add command that adds it to the problem's cases
+(to your own cases of the problem, for a problem of an installed pack).
 
   hc leetcode submit two-sum -l python`,
 		Args: cobra.ExactArgs(1),
@@ -585,7 +586,11 @@ func printCaseSuggestion(a *app.App, p *problem.Problem, c problem.Case, status 
 		fmt.Printf("\n%s run with -v for the hc cases add command that adds this case\n", ui.Faint.Render("note:"))
 		return
 	}
-	fmt.Printf("\n%s\n  %s\n", ui.Faint.Render("Add it to the problem's cases:"), cmd)
+	label := "Add it to the problem's cases:"
+	if a.KeepsUserCases(p) {
+		label = "Add it to your own cases of the problem:"
+	}
+	fmt.Printf("\n%s\n  %s\n", ui.Faint.Render(label), cmd)
 }
 
 func compactJSON(v any) (string, error) {
