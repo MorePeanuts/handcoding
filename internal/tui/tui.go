@@ -43,6 +43,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
+	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/store"
 	"github.com/MorePeanuts/handcoding/internal/termimg"
 	"github.com/MorePeanuts/handcoding/internal/ui"
@@ -105,6 +106,7 @@ type model struct {
 	message       string
 	confirm       *confirmation
 	help          bool // the key help of the screen shown, in full
+	resBr, subBr  browser
 
 	// list screen
 	tabs []packTab
@@ -161,6 +163,8 @@ type model struct {
 	subCursor int
 	subOffset int
 	sub       *store.Submission
+	subRep    *runner.Report // sub's report, nil without one
+	subCases  stored         // the cases sub ran on, when known
 	subView   viewport.Model
 }
 
@@ -532,6 +536,9 @@ func (m *model) layout() {
 		vp.SetWidth(max(m.width-1, 1)) // the scrollbar's column aside
 		vp.SetHeight(h)
 	}
+	// The result and the submission have their tabs above.
+	m.result.SetHeight(max(h-1, 1))
+	m.subView.SetHeight(max(h-1, 1))
 	// The search field fills its line, the prompt and the cursor aside:
 	// without a width, the field shows only the placeholder's first letter.
 	m.search.SetWidth(max(m.width-2, 1))

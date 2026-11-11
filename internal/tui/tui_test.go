@@ -623,10 +623,15 @@ func TestRunSubmitHistoryAndDiscard(t *testing.T) {
 		t.Fatalf("test run: screen %v, run %+v", h.m.top(), h.m.run)
 	}
 	view := h.view()
-	for _, want := range []string{"Accepted", "program output", "hello from solution"} {
+	for _, want := range []string{"Accepted", "Cases 3/3", "Output"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("result view missing %q:\n%s", want, view)
 		}
+	}
+	// tab shows what the program printed.
+	h.press("tab")
+	if view := h.view(); !strings.Contains(view, "hello from solution") || !strings.Contains(view, "tab cases") {
+		t.Errorf("output tab:\n%s", view)
 	}
 
 	h.press("s")
@@ -656,10 +661,10 @@ func TestRunSubmitHistoryAndDiscard(t *testing.T) {
 	if d, ok := h.m.app.LastFailure(h.m.current, l); !ok || d.Index != 1 {
 		t.Fatalf("the restored submission's run: %+v %v", d, ok)
 	}
-	h.press("enter")
+	h.press("enter", "tab")
 	view = h.view()
-	if h.m.top() != screenSubmission || !strings.Contains(view, "twoSum") || !strings.Contains(view, "9/9") {
-		t.Fatalf("submission view:\n%s", view)
+	if h.m.top() != screenSubmission || !strings.Contains(view, "twoSum") || !strings.Contains(view, "Cases 9/9") {
+		t.Fatalf("submission's code:\n%s", view)
 	}
 
 	// Delete the submission from its detail view.
@@ -846,6 +851,7 @@ func TestHistoryOfEveryProblem(t *testing.T) {
 	if h.m.top() != screenSubmission || h.m.current.Ref() != "local/two-sum" {
 		t.Fatalf("enter: screen %v, problem %v", h.m.top(), h.m.current)
 	}
+	h.press("tab")
 	if view := h.view(); !strings.Contains(view, "// local/two-sum") || !strings.Contains(view, "o problem") {
 		t.Errorf("submission:\n%s", view)
 	}
@@ -908,10 +914,13 @@ func TestHistoryOfRemovedProblem(t *testing.T) {
 	if h.m.top() != screenSubmission || h.m.current != nil {
 		t.Fatalf("enter: screen %v, problem %v", h.m.top(), h.m.current)
 	}
-	for _, want := range []string{"regression/gone", "no longer exists", "1/2 passed", "// regression/gone"} {
+	for _, want := range []string{"regression/gone", "no longer exists", "1/2 passed"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("submission lacks %q:\n%s", want, view)
 		}
+	}
+	if h.press("tab"); !strings.Contains(h.view(), "// regression/gone") {
+		t.Errorf("submission's code:\n%s", h.view())
 	}
 	h.press("r")
 	if h.m.confirm != nil || !strings.Contains(h.view(), "problem regression/gone no longer exists") {

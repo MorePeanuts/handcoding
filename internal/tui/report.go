@@ -3,7 +3,9 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
+	"charm.land/bubbles/v2/viewport"
 	"github.com/mattn/go-runewidth"
 
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -14,35 +16,140 @@ import (
 // maxValue is how much of a case's input or output the result shows.
 const maxValue = 400
 
-// report draws a run's report, width columns wide: the verdict as a badge
-// with the cases passed and the time, a line per case, then a box for each
-// case worth a look, as hc test prints them: the first failure, and the
-// cases it could not judge. hc test prints with ui.PrintReport.
-func (m *model) report(b *strings.Builder, p *problem.Problem, rep *runner.Report, o ui.ReportOptions, width int) {
+// The tabs of the result and submission screens: the run's cases, and the
+// result's program output or the submission's code.
+const (
+	tabCases = iota
+	tabOther
+)
+
+// browser is what the result or the submission screen shows of a report:
+// its tab, and in the cases tab the selected case, whose details open
+// under it.
+type browser struct {
+	tab    int
+	cursor int            // the selected case's position in the report
+	inputs map[int]string // the cases' inputs as shown, by position
+}
+
+// reset shows rep's cases, the first failure selected, or the first case
+// when none failed: the screen opens on what it showed before it had a
+// cursor.
+func (b *browser) reset(rep *runner.Report) {
+	*b = browser{}
+	if rep == nil {
+		return
+	}
+	for i, c := range rep.Cases {
+		if failed(c.Verdict) {
+			b.cursor = i
+			return
+		}
+	}
+}
+
+// failed reports whether a case's verdict is a failure.
+func failed(v runner.Verdict) bool {
+	return v != runner.Accepted && v != runner.NotRun && !v.Unjudged()
+}
+
+// move moves the cursor by delta cases, within rep's.
+func (b *browser) move(rep *runner.Report, delta int) {
+	if rep == nil || len(rep.Cases) == 0 {
+		return
+	}
+	b.cursor = min(max(b.cursor+delta, 0), len(rep.Cases)-1)
+}
+
+// browseKey handles the keys of the cases tab that move the cursor,
+// reporting whether key was one; page is how many cases a page moves.
+func (b *browser) browseKey(key string, rep *runner.Report, page int) bool {
+	switch key {
+	case "down", "j":
+		b.move(rep, 1)
+	case "up", "k":
+		b.move(rep, -1)
+	case "pgdown", "ctrl+d":
+		b.move(rep, page)
+	case "pgup", "ctrl+u":
+		b.move(rep, -page)
+	case "end", "G":
+		b.move(rep, 1<<30)
+	case "home", "g":
+		b.move(rep, -(1 << 30))
+	default:
+		return false
+	}
+	return true
+}
+
+// caseTabs draws the tabs of a browser: the cases with the run's tally, and
+// other.
+func (m *model) caseTabs(b browser, rep *runner.Report, other string) string {
+	cases := "Cases"
+	if rep != nil && rep.Total > 0 {
+		cases = fmt.Sprintf("Cases %d/%d", rep.Passed, rep.Total)
+	}
+	var s strings.Builder
+	for i, name := range []string{cases, other} {
+		if i == b.tab {
+			s.WriteString(m.st.tabOn.Render(" " + name + " "))
+		} else {
+			s.WriteString(m.st.tab.Render(" " + name + " "))
+		}
+	}
+	return s.String()
+}
+
+// stored gives what a submission's report does not keep of a passed case:
+// the problem's case it ran on (app.SubmissionCases), nil when unknown.
+type stored []problem.Case
+
+// lines collects the content of a viewport, counting its lines.
+type lines struct {
+	b strings.Builder
+	n int
+}
+
+func (l *lines) add(s string) {
+	l.b.WriteString(s + "\n")
+	l.n += strings.Count(s, "\n") + 1
+}
+
+// renderCases draws the cases tab, width columns wide: the verdict as a
+// badge with the cases passed and the time, a line per case, the selected
+// case's details in a box under it, and with stderr the tail of the
+// program's stderr. It returns the content and the first and last lines of
+// the selected case.
+func (m *model) renderCases(p *problem.Problem, rep *runner.Report, o ui.ReportOptions, b *browser, cases stored, stderr bool, width int) (string, int, int) {
+	var l lines
 	// An old toolchain explains compile and runtime errors that would
 	// otherwise look like bugs in the solution or in hc.
 	if rep.Toolchain.Version != "" {
 		if err := rep.Toolchain.Err(); err != nil {
-			b.WriteString(ui.Yellow.Render("warning: ") + err.Error() + "\n\n")
+			l.add(ui.Yellow.Render("warning: ") + err.Error())
+			l.add("")
 		}
 	}
 	if rep.Verdict == runner.CompileError {
-		b.WriteString(verdictBadge(rep.Verdict) + "\n\n")
-		for line := range strings.Lines(strings.TrimRight(rep.CompileError, "\n")) {
-			b.WriteString("  " + strings.TrimRight(line, "\n") + "\n")
+		l.add(verdictBadge(rep.Verdict))
+		l.add("")
+		for line := range strings.SplitSeq(strings.TrimRight(rep.CompileError, "\n"), "\n") {
+			l.add("  " + line)
 		}
-		return
+		return l.b.String(), 0, 0
 	}
 	total := ""
 	if !rep.Stopped {
 		total = " · " + ui.FormatDuration(rep.Elapsed)
 	}
 	if rep.Verdict == runner.NotJudged {
-		b.WriteString(verdictBadge(rep.Verdict) + "   " + ui.Bold.Render(plural(rep.Total, "case")) + ui.Faint.Render(" ran"+total) + "\n")
-		b.WriteString(ui.Faint.Render("Compare your output with the expected one yourself; "+o.NotReadyHint(p)+".") + "\n\n")
+		l.add(verdictBadge(rep.Verdict) + "   " + ui.Bold.Render(plural(rep.Total, "case")) + ui.Faint.Render(" ran"+total))
+		l.add(ui.Faint.Render("Compare your output with the expected one yourself; " + o.NotReadyHint(p) + "."))
 	} else {
-		b.WriteString(verdictBadge(rep.Verdict) + "   " + ui.Bold.Render(fmt.Sprintf("%d/%d", rep.Passed, rep.Total)) + ui.Faint.Render(" passed"+total) + "\n\n")
+		l.add(verdictBadge(rep.Verdict) + "   " + ui.Bold.Render(fmt.Sprintf("%d/%d", rep.Passed, rep.Total)) + ui.Faint.Render(" passed"+total))
 	}
+	l.add("")
 
 	// The verdict column is as wide as the widest verdict but Accepted.
 	verdictW := 0
@@ -51,7 +158,15 @@ func (m *model) report(b *strings.Builder, p *problem.Problem, rep *runner.Repor
 			verdictW = max(verdictW, len(c.Verdict)+2)
 		}
 	}
-	for _, c := range rep.Cases {
+	top, bottom := 0, 0
+	for i, c := range rep.Cases {
+		cur := i == b.cursor
+		r := newRow(nil)
+		if cur {
+			r = newRow(m.st.sel)
+			top = l.n
+		}
+		m.cursorBar(r, cur)
 		style := ui.VerdictStyle(c.Verdict)
 		mark := "✘"
 		switch c.Verdict {
@@ -62,49 +177,48 @@ func (m *model) report(b *strings.Builder, p *problem.Problem, rep *runner.Repor
 		case runner.NotRun:
 			mark = "·"
 		}
-		line := " " + style.Render(mark) + fmt.Sprintf(" Case %-4d", c.Index)
-		elapsed := ""
-		if c.Elapsed > 0 {
-			elapsed = ui.FormatDuration(c.Elapsed)
-		}
-		line += ui.Faint.Render(fmt.Sprintf("%-10s", elapsed))
+		r.add(style, mark).plain(fmt.Sprintf(" Case %-4d", c.Index)).add(ui.Faint, fmt.Sprintf("%-10s", caseTime(c)))
 		verdict := ""
 		if c.Verdict != runner.Accepted {
 			verdict = string(c.Verdict)
 		}
-		line += style.Render(fmt.Sprintf("%-*s", verdictW, verdict))
-		if c.Case.Note != "" {
-			line += ui.Faint.Render(c.Case.Note)
+		r.add(style, fmt.Sprintf("%-*s", verdictW, verdict)).add(ui.Faint, c.Case.Note)
+		l.add(clip(r.fill(width), width))
+		if cur {
+			l.add(m.caseBox(p, c, b, cases, width))
+			bottom = l.n - 1
 		}
-		b.WriteString(clip(line, width) + "\n")
 	}
+	if stderr && rep.Stderr != "" {
+		l.add("")
+		l.add(titledRule("stderr (tail)", width))
+		l.add(ui.Faint.Render(strings.TrimSpace(rep.Stderr)))
+	}
+	return l.b.String(), top, bottom
+}
 
-	// The details of the first failure, like LeetCode, and of the cases
-	// without an expected output. A case that did not run has none.
-	shownFailure := false
-	for _, c := range rep.Cases {
-		if c.Verdict == runner.NotRun {
-			continue
+// caseTime is how long a case took; "<0.1µs" for a case the clock could not
+// tell from nothing, and nothing for one that did not finish.
+func caseTime(c runner.CaseResult) string {
+	switch c.Verdict {
+	case runner.Accepted, runner.WrongAnswer, runner.NoExpected, runner.NotJudged:
+		if c.Elapsed < 100*time.Nanosecond {
+			return "<0.1µs"
 		}
-		failed := c.Verdict != runner.Accepted && !c.Verdict.Unjudged()
-		if !c.Verdict.Unjudged() && (!failed || shownFailure) {
-			continue
-		}
-		shownFailure = shownFailure || failed
-		b.WriteString("\n")
-		m.caseBox(b, p, c, failed, width)
 	}
-
-	if rep.Stderr != "" {
-		b.WriteString("\n" + titledRule("stderr (tail)", width) + "\n")
-		b.WriteString(ui.Faint.Render(strings.TrimSpace(rep.Stderr)) + "\n")
+	if c.Elapsed <= 0 {
+		return ""
 	}
+	return ui.FormatDuration(c.Elapsed)
 }
 
 // caseBox draws a case's details in a box: its input, and its output and
-// expected output, or its error; its output red when it failed.
-func (m *model) caseBox(b *strings.Builder, p *problem.Problem, c runner.CaseResult, failed bool, width int) {
+// expected output, or its error; the output red when it failed. A passed
+// case of a submission, whose details are not kept, shows the input and the
+// expected output of the problem's case it ran on, when known.
+func (m *model) caseBox(p *problem.Problem, c runner.CaseResult, b *browser, cases stored, width int) string {
 	width = max(width, 30)
+	var s strings.Builder
 	style := ui.VerdictStyle(c.Verdict)
 	head := fmt.Sprintf("Case %d", c.Index)
 	top := ui.Faint.Render("╭─ ") + style.Render(head) + ui.Faint.Render(" ─ ") + style.Render(string(c.Verdict))
@@ -113,48 +227,109 @@ func (m *model) caseBox(b *strings.Builder, p *problem.Problem, c runner.CaseRes
 		top += ui.Faint.Render(" · " + c.Case.Note)
 		used += 3 + runewidth.StringWidth(c.Case.Note)
 	}
-	b.WriteString(clip(top+ui.Faint.Render(" "+strings.Repeat("─", max(width-used-2, 0))+"╮"), width) + "\n")
+	s.WriteString(clip(top+ui.Faint.Render(" "+strings.Repeat("─", max(width-used-2, 0))+"╮"), width) + "\n")
 
 	const labelW = 12
 	inner := width - 2
 	field := func(label string, value string, vs ui.Style) {
-		lines := wrapCells(value, inner-labelW-1)
-		for i, line := range lines {
+		for i, line := range wrapCells(value, inner-labelW-1) {
 			lab := ""
 			if i == 0 {
 				lab = label
 			}
-			cell := ui.Faint.Render(runewidth.FillRight("  "+lab, labelW)) + vs.Render(line)
 			pad := inner - labelW - runewidth.StringWidth(line)
-			b.WriteString(ui.Faint.Render("│") + cell + strings.Repeat(" ", max(pad, 0)) + ui.Faint.Render("│") + "\n")
+			s.WriteString(ui.Faint.Render("│") + ui.Faint.Render(runewidth.FillRight("  "+lab, labelW)) + vs.Render(line) +
+				strings.Repeat(" ", max(pad, 0)) + ui.Faint.Render("│") + "\n")
 		}
 	}
-	input := c.InputText
-	if input == "" {
-		input = p.FormatInput(c.Case)
+	note := func(text string) {
+		for _, line := range wrapCells(text, inner-3) {
+			s.WriteString(ui.Faint.Render("│  "+runewidth.FillRight(line, inner-2)+"│") + "\n")
+		}
 	}
-	field("Input", truncate(input), ui.Plain)
-	switch c.Verdict {
-	case runner.RuntimeError:
-		field("Error", c.Error, ui.Red)
-	case runner.TimeLimit:
+
+	// A case of a submission that is not kept: a passed one.
+	kept := c.InputText != "" || c.Case.Input != nil || c.Case.Generated() || len(c.Output) > 0
+	var file *problem.Case
+	if !kept && c.Index >= 1 && c.Index <= len(cases) {
+		file = &cases[c.Index-1]
+	}
+	switch {
+	case c.Verdict == runner.NotRun:
+		note("did not run: the run stopped at an earlier case")
+	case !kept && file == nil:
+		note("not kept: the case passed, and the problem's cases are not the ones it ran on")
 	default:
-		out := ui.Plain
-		if failed {
-			out = ui.Red
+		input := c.InputText
+		if file != nil {
+			input = b.input(c.Index, p, *file)
+		} else if input == "" {
+			input = b.input(c.Index, p, c.Case)
 		}
-		field("Output", truncate(string(c.Output)), out)
-		if c.Case.HasExpected() {
-			field(ui.ExpectedLabel(p), truncate(string(c.Case.Expected)), ui.Green)
+		field("Input", truncate(input), ui.Plain)
+		switch c.Verdict {
+		case runner.RuntimeError:
+			field("Error", c.Error, ui.Red)
+		case runner.TimeLimit:
+		default:
+			switch {
+			case file != nil:
+				field("Output", "not kept: it passed", ui.Faint)
+			default:
+				out := ui.Plain
+				if failed(c.Verdict) {
+					out = ui.Red
+				}
+				field("Output", truncate(string(c.Output)), out)
+			}
+			expected := c.Case
+			if file != nil {
+				expected = *file
+			}
+			if expected.HasExpected() {
+				field(ui.ExpectedLabel(p), truncate(string(expected.Expected)), ui.Green)
+			}
+		}
+		if c.Message != "" {
+			field("Checker", c.Message, ui.Plain)
+		}
+		if c.JudgeErr != nil {
+			field("Judge", c.JudgeErr.Error(), ui.Red)
 		}
 	}
-	if c.Message != "" {
-		field("Checker", c.Message, ui.Plain)
+	s.WriteString(ui.Faint.Render("╰" + strings.Repeat("─", inner) + "╯"))
+	return s.String()
+}
+
+// input formats case index's input once: a large generated input takes a
+// while, and the box is drawn again on every key.
+func (b *browser) input(index int, p *problem.Problem, c problem.Case) string {
+	if s, ok := b.inputs[index]; ok {
+		return s
 	}
-	if c.JudgeErr != nil {
-		field("Judge", c.JudgeErr.Error(), ui.Red)
+	if b.inputs == nil {
+		b.inputs = map[int]string{}
 	}
-	b.WriteString(ui.Faint.Render("╰"+strings.Repeat("─", inner)+"╯") + "\n")
+	s := p.FormatInput(c)
+	b.inputs[index] = s
+	return s
+}
+
+// follow scrolls vp so that the lines top to bottom show, top first when
+// they do not fit, and the screen's first lines while they fit with them.
+func follow(vp *viewport.Model, top, bottom int) {
+	h := vp.Height()
+	off := vp.YOffset()
+	if bottom >= off+h {
+		off = bottom - h + 1
+	}
+	if top < off {
+		off = top
+	}
+	if bottom < h {
+		off = 0
+	}
+	vp.SetYOffset(off)
 }
 
 // truncate shortens a long value, saying how much is left out.

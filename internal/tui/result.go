@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
@@ -61,6 +62,7 @@ func (m *model) startRun(kind runKind, p *problem.Problem) tea.Cmd {
 	ctx, cancel := context.WithCancel(m.ctx)
 	run := &runState{kind: kind, ref: p.Ref(), langID: m.lang.ID(), running: true, cancel: cancel}
 	m.run, m.current = run, p
+	m.resBr = browser{}
 	m.message = ""
 	m.push(screenResult)
 
@@ -110,16 +112,19 @@ func (m *model) finishRun(msg runDoneMsg) {
 	r := m.run
 	r.running = false
 	r.report, r.output, r.subID, r.err = msg.report, msg.output, msg.subID, msg.err
+	m.resBr.reset(r.report)
 	m.refresh()
 	if m.top() == screenResult {
-		m.renderResult()
 		m.result.GotoTop()
+		m.renderResult()
 	}
 	if r.err == nil && r.report != nil {
 		m.message = ui.VerdictStyle(r.report.Verdict).Render(fmt.Sprintf("%s: %s", r.kind, r.report.Verdict))
 	}
 }
 
+// renderResult draws the result's tab: the run's cases, or its program
+// output.
 func (m *model) renderResult() {
 	r := m.run
 	if r == nil || m.current == nil {
@@ -127,23 +132,26 @@ func (m *model) renderResult() {
 		return
 	}
 	width := m.result.Width()
-	var b strings.Builder
 	switch {
 	case r.running:
-		b.WriteString(ui.Faint.Render("Building and running…") + "\n")
+		m.result.SetContent(ui.Faint.Render("Building and running…"))
+	case m.resBr.tab == tabOther:
+		out := strings.TrimRight(r.output, "\n")
+		if out == "" {
+			out = ui.Faint.Render("(the program printed nothing)")
+		}
+		m.result.SetContent(wrap(out, width))
 	case r.err != nil:
-		b.WriteString(ui.Red.Render(r.err.Error()) + "\n")
+		m.result.SetContent(wrap(ui.Red.Render(r.err.Error()), width))
 	case r.report != nil:
 		ro := ui.ReportOptions{Ref: m.app.WS.Ref(m.current)}
 		if l, err := m.app.Lang(r.langID); err == nil {
 			ro.Lang = l
 		}
-		m.report(&b, m.current, r.report, ro, width)
+		content, top, bottom := m.renderCases(m.current, r.report, ro, &m.resBr, nil, false, width)
+		m.result.SetContent(content)
+		follow(&m.result, top, bottom)
 	}
-	if out := strings.TrimRight(r.output, "\n"); out != "" && !r.running {
-		b.WriteString("\n" + titledRule("program output", width) + "\n" + out + "\n")
-	}
-	m.result.SetContent(wrap(b.String(), width))
 }
 
 func (m *model) updateResult(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -155,6 +163,23 @@ func (m *model) updateResult(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.pop()
 		return m, nil
+	case "tab", "shift+tab":
+		if m.run != nil && !m.run.running {
+			m.resBr.tab = 1 - m.resBr.tab
+			m.result.GotoTop()
+			m.renderResult()
+		}
+		return m, nil
+	case "d":
+		// The selected case, or what hc debug picks.
+		if r := m.run; r != nil && r.report != nil && m.resBr.tab == tabCases && len(r.report.Cases) > 0 {
+			l, err := m.app.Lang(r.langID)
+			if err != nil {
+				l = m.lang
+			}
+			return m, m.debug(m.current, l, r.report.Cases[m.resBr.cursor].Index)
+		}
+		return m, m.debug(m.current, m.lang, 0)
 	case "v", "enter":
 		// Show the statement: go back if we came from it, otherwise open it.
 		if len(m.stack) > 1 && m.stack[len(m.stack)-2] == screenDetail {
@@ -165,6 +190,12 @@ func (m *model) updateResult(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	default:
+		if r := m.run; r != nil && r.report != nil && m.resBr.tab == tabCases {
+			if m.resBr.browseKey(key, r.report, max(m.result.Height()/2, 1)) {
+				m.renderResult()
+				return m, nil
+			}
+		}
 		if cmd, ok := m.problemKey(key, m.current); ok {
 			return m, cmd
 		}
@@ -179,12 +210,16 @@ func (m *model) resultKeys() []string {
 	if m.run != nil && m.run.running {
 		return []string{"esc cancel"}
 	}
-	return []string{"t test", "s submit", "d debug", "e edit", "v statement", "h history", "esc back", "↑↓ scroll", "y copy-path", "L lang", "m star"}
+	if m.resBr.tab == tabOther {
+		return []string{"↑↓ scroll", "tab cases", "t test", "s submit", "d debug", "e edit", "v statement", "h history", "esc back", "y copy-path", "L lang", "m star"}
+	}
+	return []string{"↑↓ case", "tab output", "d debug-case", "t test", "s submit", "e edit", "v statement", "h history", "esc back",
+		"g/G first/last", "pgup/pgdn page", "y copy-path", "L lang", "m star"}
 }
 
 func (m *model) viewResult() string {
 	r := m.run
-	sub := ""
+	sub, tabs, pos := "", "", ""
 	if r != nil {
 		label := r.langID
 		if r.report != nil && r.report.Toolchain.Version != "" {
@@ -197,8 +232,19 @@ func (m *model) viewResult() string {
 		if r.subID > 0 {
 			sub = padBetween(sub, ui.Faint.Render(fmt.Sprintf("recorded as submission #%d", r.subID)), m.width)
 		}
+		tabs = m.caseTabs(m.resBr, r.report, "Output")
+		pos = m.position(m.resBr, r.report, m.result)
 	}
-	return m.frame(m.problemTitle(m.current), sub, withScrollbar(m.result, m.st.accent), scrollPosition(m.result), m.resultKeys()...)
+	return m.frame(m.problemTitle(m.current), sub, tabs+"\n"+withScrollbar(m.result, m.st.accent), pos, m.resultKeys()...)
+}
+
+// position says where a browser is: at which case in the cases tab, where
+// the view is in the other.
+func (m *model) position(b browser, rep *runner.Report, vp viewport.Model) string {
+	if b.tab == tabCases && rep != nil && len(rep.Cases) > 0 {
+		return fmt.Sprintf("case %d of %d", b.cursor+1, len(rep.Cases))
+	}
+	return scrollPosition(vp)
 }
 
 // wrap soft-wraps long lines so nothing is cut off at the right edge.

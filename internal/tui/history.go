@@ -148,9 +148,7 @@ func (m *model) updateHistory(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "enter", "v", "space":
 		if s != nil {
 			m.subProblem(*s)
-			m.sub = s
-			m.push(screenSubmission)
-			m.subView.GotoTop()
+			m.openSubmission(s)
 		}
 	case "o":
 		if s != nil && m.historyAll() {
@@ -162,7 +160,7 @@ func (m *model) updateHistory(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	case "d":
 		if s != nil {
-			m.askDebug(*s)
+			m.askDebug(*s, 0)
 		}
 	case "x", "delete", "backspace":
 		if s != nil {
@@ -198,9 +196,9 @@ func (m *model) askRestore(s store.Submission) {
 	})
 }
 
-// askDebug restores s and debugs it on its first failure, which the
-// restore remembers (app.RestoreSubmission).
-func (m *model) askDebug(s store.Submission) {
+// askDebug restores s and debugs it on case index, or with 0 on its first
+// failure, which the restore remembers (app.RestoreSubmission).
+func (m *model) askDebug(s store.Submission, index int) {
 	p := m.actOn(s)
 	if p == nil {
 		return
@@ -215,7 +213,7 @@ func (m *model) askDebug(s store.Submission) {
 			return nil
 		}
 		m.message = ui.Green.Render(fmt.Sprintf("restored #%d", s.ID))
-		return m.debug(p, l)
+		return m.debug(p, l, index)
 	})
 }
 
@@ -359,26 +357,42 @@ func (m *model) viewHistory() string {
 	return m.frame(m.problemTitle(m.historyProblem()), m.chip(m.st.accent.Bold(true), "History")+"  "+count, body, pos, m.historyKeys()...)
 }
 
+// openSubmission shows s, its problem m.current: its cases, the first
+// failure selected.
+func (m *model) openSubmission(s *store.Submission) {
+	m.sub = s
+	m.subRep = app.DecodeReport(s.Details)
+	m.subCases = nil
+	if m.current != nil {
+		m.subCases = app.SubmissionCases(m.current, s.Details)
+	}
+	m.subBr.reset(m.subRep)
+	m.subView.GotoTop()
+	m.push(screenSubmission)
+}
+
+// renderSubmission draws the submission's tab: its cases, or its code.
 func (m *model) renderSubmission() {
 	s := m.sub
 	if s == nil {
 		return
 	}
 	width := m.subView.Width()
-	var b strings.Builder
-	rep := app.DecodeReport(s.Details)
-	if rep != nil && m.current != nil {
-		m.report(&b, m.current, rep, ui.ReportOptions{Ref: m.app.WS.Ref(m.current)}, width)
-	} else {
+	switch {
+	case m.subBr.tab == tabOther:
+		m.subView.SetContent(m.md.Render("```"+s.Lang+"\n"+strings.TrimRight(s.Code, "\n")+"\n```\n", "", min(max(width-1, 20), 120)))
+	case m.subRep != nil && m.current != nil:
+		content, top, bottom := m.renderCases(m.current, m.subRep, ui.ReportOptions{Ref: m.app.WS.Ref(m.current)}, &m.subBr, m.subCases, true, width)
+		m.subView.SetContent(content)
+		follow(&m.subView, top, bottom)
+	default:
 		note := "(per-case details were not recorded for this submission)"
 		if m.current == nil {
 			note = "(problem " + s.Ref() + " no longer exists, so its per-case details cannot be shown)"
 		}
-		b.WriteString(verdictBadge(runner.Verdict(s.Verdict)) + "   " + ui.Bold.Render(fmt.Sprintf("%d/%d", s.Passed, s.Total)) +
+		m.subView.SetContent(verdictBadge(runner.Verdict(s.Verdict)) + "   " + ui.Bold.Render(fmt.Sprintf("%d/%d", s.Passed, s.Total)) +
 			ui.Faint.Render(" passed") + "\n" + ui.Faint.Render(note) + "\n")
 	}
-	code := m.md.Render("```"+s.Lang+"\n"+strings.TrimRight(s.Code, "\n")+"\n```\n", "", min(max(width-1, 20), 120))
-	m.subView.SetContent(wrap(b.String(), width) + "\n" + titledRule("code", width) + "\n" + code)
 }
 
 func (m *model) updateSubmission(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -396,10 +410,23 @@ func (m *model) updateSubmission(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.askRestore(*m.sub)
 		return m, nil
 	case "d":
-		m.askDebug(*m.sub)
+		index := 0
+		if m.subBr.tab == tabCases && m.subRep != nil && len(m.subRep.Cases) > 0 {
+			index = m.subRep.Cases[m.subBr.cursor].Index
+		}
+		m.askDebug(*m.sub, index)
+		return m, nil
+	case "tab", "shift+tab":
+		m.subBr.tab = 1 - m.subBr.tab
+		m.subView.GotoTop()
+		m.renderSubmission()
 		return m, nil
 	case "x", "delete", "backspace":
 		m.askDelete(*m.sub)
+		return m, nil
+	}
+	if m.subBr.tab == tabCases && m.subBr.browseKey(msg.String(), m.subRep, max(m.subView.Height()/2, 1)) {
+		m.renderSubmission()
 		return m, nil
 	}
 	var cmd tea.Cmd
@@ -409,9 +436,12 @@ func (m *model) updateSubmission(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 // submissionKeys are the keys of a submission.
 func (m *model) submissionKeys() []string {
-	keys := []string{"r restore", "d debug", "x delete", "esc back", "↑↓ scroll"}
+	keys := []string{"↑↓ case", "tab code", "d debug-case", "r restore", "x delete", "esc back", "g/G first/last", "pgup/pgdn page"}
+	if m.subBr.tab == tabOther {
+		keys = []string{"↑↓ scroll", "tab cases", "d debug", "r restore", "x delete", "esc back"}
+	}
 	if m.historyAll() {
-		keys = slices.Insert(keys, 1, "o problem")
+		keys = slices.Insert(keys, 2, "o problem")
 	}
 	return keys
 }
@@ -425,5 +455,6 @@ func (m *model) viewSubmission() string {
 	if m.current != nil {
 		title = m.problemTitle(m.current)
 	}
-	return m.frame(title, sub, withScrollbar(m.subView, m.st.accent), scrollPosition(m.subView), m.submissionKeys()...)
+	tabs := m.caseTabs(m.subBr, m.subRep, "Code")
+	return m.frame(title, sub, tabs+"\n"+withScrollbar(m.subView, m.st.accent), m.position(m.subBr, m.subRep, m.subView), m.submissionKeys()...)
 }

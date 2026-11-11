@@ -367,3 +367,36 @@ func TestSelectExamples(t *testing.T) {
 		t.Errorf("all: %v, %v; want 4 cases", indices(sel), err)
 	}
 }
+
+// A submission shows a passed case's details from the problem's cases file
+// while that file is as it was when the submission was recorded.
+func TestSubmissionCases(t *testing.T) {
+	t.Parallel()
+	a := newWorkspace(t)
+	p, err := a.WS.Problem("two-sum")
+	if err != nil {
+		t.Fatal(err)
+	}
+	details := app.EncodeReport(p, &runner.Report{Verdict: runner.Accepted, Passed: 1, Total: 1})
+	want, err := p.LoadCases()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := app.SubmissionCases(p, details); len(got) != len(want) {
+		t.Fatalf("%d cases, want %d", len(got), len(want))
+	}
+	if got := app.SubmissionCases(p, `{"verdict":"Accepted"}`); got != nil {
+		t.Errorf("a report without the cases' key: %d cases", len(got))
+	}
+	path := filepath.Join(p.Dir, problem.CasesFile)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := app.SubmissionCases(p, details); got != nil {
+		t.Errorf("cases changed: %d cases", len(got))
+	}
+}

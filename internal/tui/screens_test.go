@@ -11,6 +11,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -22,7 +23,7 @@ import (
 var update = flag.Bool("update", false, "rewrite the golden screens of TestScreens")
 
 // TestScreens draws every screen, 100 columns by 30 lines (the list also
-// 60 by 20), and compares it with its golden file in testdata/screens:
+// 60 by 20), and both tabs of the result and the submission, and compares it with its golden file in testdata/screens:
 // `go test ./internal/tui -run TestScreens -update` rewrites them, and
 // git diff shows what a change did to the screens. Screens are plain text,
 // since tests have no terminal (see ui.Colors); what changes from a run to
@@ -55,8 +56,14 @@ func TestScreens(t *testing.T) {
 	p := h.m.current
 	rep := madeUpReport(p)
 	h.m.run = &runState{kind: runSubmit, ref: p.Ref(), langID: "go", report: rep, output: "hello from solution\n", subID: 4}
+	h.m.resBr.reset(rep)
 	h.m.push(screenResult)
 	shot("result")
+	// A passed case in the middle of the list, its details under it.
+	h.press("j", "j")
+	shot("result-passed")
+	h.press("tab")
+	shot("result-output")
 
 	at := time.Date(2026, 11, 11, 11, 26, 0, 0, time.UTC)
 	elapsed := int64(1)
@@ -71,9 +78,13 @@ func TestScreens(t *testing.T) {
 	h.m.push(screenHistory)
 	shot("history")
 	sub := h.m.subs[0]
-	h.m.sub = &sub
-	h.m.push(screenSubmission)
+	h.m.openSubmission(&sub)
 	shot("submission")
+	// A passed case: its details come from the problem's cases file.
+	h.press("k")
+	shot("submission-passed")
+	h.press("tab")
+	shot("submission-code")
 
 	addLocal(t, h.m, "0001-two-sum")
 	pk := &harness{t: t, m: h.openModel(Options{})}
@@ -133,10 +144,12 @@ func maskPath(screen string) string {
 var gaps = regexp.MustCompile(` {2,}`)
 
 // golden compares a screen with testdata/screens/<name>.golden, or rewrites
-// the file with -update. Trailing spaces are not compared.
+// the file with -update. Trailing spaces are not compared, nor the colors
+// glamour gives code whatever ui.Colors says (chroma picks between two
+// equally close colors at random).
 func golden(t *testing.T, name, screen string) {
 	t.Helper()
-	lines := strings.Split(maskPath(screen), "\n")
+	lines := strings.Split(maskPath(ansi.Strip(screen)), "\n")
 	for i, l := range lines {
 		lines[i] = strings.TrimRight(l, " ")
 	}
