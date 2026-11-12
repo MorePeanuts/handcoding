@@ -2,6 +2,15 @@
  Submission #4   Wrong Answer  go  2026-11-11 11:26:00
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  Cases 7/9  Code
+hash map
+
+
+  O(n) time,  O(n)  space.
+
+  • Store each number’s index.
+  • Look up the complement.
+
+
 
 
     package main
@@ -16,15 +25,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 
- ↑↓ scroll    tab cases    d debug    r restore    x delete    esc back    ? help
+ ↑↓ scroll    tab cases    d debug    r restore    c note    x delete    esc back    ? help

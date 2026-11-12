@@ -154,6 +154,10 @@ func (m *model) updateHistory(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if s != nil && m.historyAll() {
 			m.openSubProblem(*s)
 		}
+	case "c":
+		if s != nil {
+			m.openNoteForm(*s)
+		}
 	case "r":
 		if s != nil {
 			m.askRestore(*s)
@@ -280,7 +284,7 @@ func (m *model) qualifySubs() bool {
 
 // historyKeys are the keys of a history.
 func (m *model) historyKeys() []string {
-	keys := []string{"↑↓ move", "enter view", "r restore", "d debug", "x delete", "esc back"}
+	keys := []string{"↑↓ move", "enter view", "c note", "r restore", "d debug", "x delete", "esc back"}
 	if m.historyAll() {
 		keys = slices.Insert(keys, 2, "o problem")
 	}
@@ -290,7 +294,7 @@ func (m *model) historyKeys() []string {
 func (m *model) viewHistory() string {
 	all := m.historyAll()
 	// The problem column of the history of the workspace fits the longest
-	// name, within what the other columns leave of the width.
+	// name, leaving room for the other columns and a short comment.
 	qualify, probW := false, 0
 	if all {
 		qualify = m.qualifySubs()
@@ -298,7 +302,7 @@ func (m *model) viewHistory() string {
 		for _, s := range m.subs {
 			probW = max(probW, len(subName(s, qualify)))
 		}
-		if room := m.width - 74; room < probW {
+		if room := m.width - 90; room < probW {
 			probW = max(room, 12)
 		}
 	}
@@ -309,7 +313,7 @@ func (m *model) viewHistory() string {
 		return fit(s, probW) + " "
 	}
 	var b strings.Builder
-	b.WriteString(ui.Faint.Render(fmt.Sprintf("  %-6s %s%-20s %-8s %-8s %-8s %s", "ID", probCol("PROBLEM"), "VERDICT", "LANG", "PASSED", "TIME", "SUBMITTED")) + "\n")
+	b.WriteString(clip(ui.Faint.Render(fmt.Sprintf("  %-6s %s%-20s %-8s %-8s %-8s %-16s %s", "ID", probCol("PROBLEM"), "VERDICT", "LANG", "PASSED", "TIME", "SUBMITTED", "COMMENT")), m.width) + "\n")
 	h := m.historyHeight()
 	if m.subCursor < m.subOffset {
 		m.subOffset = m.subCursor
@@ -330,7 +334,10 @@ func (m *model) viewHistory() string {
 		r.add(ui.VerdictStyle(runner.Verdict(s.Verdict)), fit(s.Verdict, 20)+" ")
 		r.plain(fmt.Sprintf("%-8s %-8s %-8s ", s.Lang, fmt.Sprintf("%d/%d", s.Passed, s.Total), ui.SubmissionTime(s.ElapsedMs)))
 		r.add(ui.Faint, s.CreatedAt.Format("2006-01-02 15:04"))
-		b.WriteString(r.fill(m.width) + "\n")
+		if room := m.width - r.width - 1; room > 0 {
+			r.plain(" " + fit(s.Note.Comment, room))
+		}
+		b.WriteString(clip(r.fill(m.width), m.width) + "\n")
 		rows++
 	}
 	if len(m.subs) == 0 {
@@ -380,7 +387,15 @@ func (m *model) renderSubmission() {
 	width := m.subView.Width()
 	switch {
 	case m.subBr.tab == tabOther:
-		m.subView.SetContent(m.md.Render("```"+s.Lang+"\n"+strings.TrimRight(s.Code, "\n")+"\n```\n", "", min(max(width-1, 20), 120)))
+		content := ""
+		if !s.Note.Empty() {
+			content = wrap(ui.Bold.Render(s.Note.Comment), width) + "\n\n"
+			if s.Note.Notes != "" {
+				content += m.md.Render(s.Note.Notes, "", min(max(width-1, 20), 120)) + "\n"
+			}
+		}
+		content += m.md.Render("```"+s.Lang+"\n"+strings.TrimRight(s.Code, "\n")+"\n```\n", "", min(max(width-1, 20), 120))
+		m.subView.SetContent(content)
 	case m.subRep != nil && m.current != nil:
 		content, top, bottom := m.renderCases(m.current, m.subRep, ui.ReportOptions{Ref: m.app.WS.Ref(m.current)}, &m.subBr, m.subCases, true, width)
 		m.subView.SetContent(content)
@@ -405,6 +420,9 @@ func (m *model) updateSubmission(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.historyAll() {
 			m.openSubProblem(*m.sub)
 		}
+		return m, nil
+	case "c":
+		m.openNoteForm(*m.sub)
 		return m, nil
 	case "r":
 		m.askRestore(*m.sub)
@@ -436,9 +454,9 @@ func (m *model) updateSubmission(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 // submissionKeys are the keys of a submission.
 func (m *model) submissionKeys() []string {
-	keys := []string{"↑↓ case", "tab code", "d debug-case", "r restore", "x delete", "esc back", "g/G first/last", "pgup/pgdn page"}
+	keys := []string{"↑↓ case", "tab code", "d debug-case", "r restore", "c note", "x delete", "esc back", "g/G first/last", "pgup/pgdn page"}
 	if m.subBr.tab == tabOther {
-		keys = []string{"↑↓ scroll", "tab cases", "d debug", "r restore", "x delete", "esc back"}
+		keys = []string{"↑↓ scroll", "tab cases", "d debug", "r restore", "c note", "x delete", "esc back"}
 	}
 	if m.historyAll() {
 		keys = slices.Insert(keys, 2, "o problem")

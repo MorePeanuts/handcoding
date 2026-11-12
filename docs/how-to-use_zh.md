@@ -157,7 +157,7 @@ hc list --plain --pack leetcode --group arrays   # 以表格列出某个题目�
 
 hc history                  # 全部提交记录（有多个题目包时，题目显示为 pack/slug）
 hc history two-sum          # 某道题的提交记录
-hc history show 12          # 某次提交的代码和判题报告
+hc history show 12          # 某次提交的代码、备注和判题报告
 hc history restore 12       # 把某次提交恢复为当前代码
 hc history rm 12 13         # 删除提交记录
 hc reset two-sum            # 重置为初始模板
@@ -169,6 +169,24 @@ hc discard two-sum          # 删除解答及其全部提交记录
 报告会列出每个用例在你的代码中花费的时间：函数题是函数调用本身，设计题是构造函数和每次方法调用，不含参数的解码和结果的编码。末尾的总用时是这些时间之和，不含启动程序和读取用例的时间。
 
 `--file` 运行放在任意位置的解答文件，而不是 `solutions/` 中的那份，便于比较不同的草稿，或者检查一份慢速解会不会超出[时间限制](#时间限制)（`--file` 指向参考解本身的文件即可看到它的用时）。它的语言由扩展名决定，除非用 `-l` 另行指定。这个文件会被复制到单独的目录中运行，所以不能依赖旁边的其他文件。
+
+### 提交备注
+
+给某次提交添加备注，记下它的实现思路：**comment（注释）** 是必填的一行摘要，类似 commit summary；**notes（笔记）** 可选，支持 Markdown。历史列表在最后一列显示 comment；`hc history show` 把 comment 和 notes 打印到 stderr，stdout 仍然只有当时提交的代码。
+
+```sh
+hc submit two-sum -m "使用哈希表实现" --notes "O(n) 时间，O(n) 空间"
+hc submit two-sum -e                        # 提交前在编辑器中填写备注
+hc history note 12 -m "使用滑动窗口实现"    # 替换整条备注（包括原有 notes）
+hc history note 12 -e                       # 编辑已有的 comment 和 notes
+hc history note 12 --clear                  # 删除备注
+```
+
+使用 `-e` / `--edit` 时，草稿第一行是 comment，空一行后填写 notes。编辑器的选择与 `hc edit` 相同：依次使用 `hc.yaml` 中的 `editor`、`$VISUAL`、`$EDITOR`，最后回退到 `vi`（图形编辑器需配置等待关闭的命令，例如 `code --wait`）。`-m` 和 `--notes` 会预填草稿的对应字段。空草稿会取消 `hc submit -e`；在 `hc history note -e` 中则会删除已有备注。只有 notes、没有 comment 时拒绝保存。如果编辑器出错或草稿不合法，hc 会保留草稿并打印其路径，历史记录不变。
+
+在 TUI 的历史列表或提交详情页按 `c` 编辑备注，表单会带出已有内容。`tab` / `shift+tab` 切换字段；comment 中按 `enter` 保存，notes 中按 `enter` 换行；`ctrl+s` 在任一字段中保存，`esc` 取消。清空两个字段后保存即删除备注。历史列表会截断过长的 comment 并加省略号；提交详情的 **Code** 标签在代码上方以标题显示 comment，并以 Markdown 渲染 notes。
+
+备注可以随时修改，即使题目已被删除。它们与原有历史一起保存在 `.hc/hc.db` 中，删除提交时也会删除其备注（包括清除题目或题目包的提交历史）。
 
 ### 你自己的用例
 

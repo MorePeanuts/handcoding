@@ -82,6 +82,7 @@ const (
 	screenHistory
 	screenSubmission
 	screenCaseForm
+	screenNoteForm
 )
 
 type confirmation struct {
@@ -157,7 +158,8 @@ type model struct {
 	caseList  caseList
 	casesView viewport.Model
 	// form is the form that adds a case, on screenCaseForm.
-	form *caseForm
+	form     *caseForm
+	noteForm *noteForm
 
 	// result screen
 	run     *runState
@@ -496,6 +498,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.top() == screenCaseForm {
 			return m.updateCaseForm(msg)
 		}
+		if m.top() == screenNoteForm {
+			return m.updateNoteForm(msg)
+		}
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -506,6 +511,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.help {
 			m.help = false
 			return m, nil
+		}
+		if m.top() == screenNoteForm {
+			return m.updateNoteForm(msg)
 		}
 		if m.top() == screenCaseForm {
 			// Every other key is text.
@@ -576,6 +584,8 @@ func (m *model) layout() {
 		m.renderResult()
 	case screenSubmission:
 		m.renderSubmission()
+	case screenNoteForm:
+		m.layoutNoteForm()
 	}
 }
 
@@ -615,6 +625,8 @@ func (m *model) screenKeys() (string, []string) {
 			return "cases", m.detailKeys()
 		}
 		return "statement", m.detailKeys()
+	case screenNoteForm:
+		return "submission note", noteKeys
 	case screenCaseForm:
 		return "add a case", formKeys
 	case screenResult:
@@ -680,6 +692,8 @@ func (m *model) content() string {
 		return m.viewSubmission()
 	case screenPacks:
 		return m.viewPacks()
+	case screenNoteForm:
+		return m.viewNoteForm()
 	case screenCaseForm:
 		return m.viewCaseForm()
 	}

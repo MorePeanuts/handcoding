@@ -157,7 +157,7 @@ hc list --plain --pack leetcode --group arrays   # a pack's group, in its order,
 
 hc history                  # every submission (problems as pack/slug when there are several packs)
 hc history two-sum          # submissions of a problem
-hc history show 12          # code and judge report of a submission
+hc history show 12          # code, note and judge report of a submission
 hc history restore 12       # make a past submission your current code
 hc history rm 12 13         # delete submissions
 hc reset two-sum            # back to the starter template
@@ -169,6 +169,24 @@ Run `hc <command> --help` for every flag.
 The report shows how long each case took in your code: the call of the function, or for a design problem the constructor and every method call, without decoding their arguments and encoding their results. The total at the bottom is the sum of these times, so it leaves out starting the program and reading the cases.
 
 `--file` runs a solution file kept anywhere instead of the one in `solutions/`, so you can compare drafts or check that a slow solution exceeds the [time limit](#time-limit) (`--file` with the reference's own file shows its times). Its language comes from its extension, unless `-l` says otherwise. The file is run alone, copied into a directory of its own.
+
+### Submission notes
+
+Attach a note to a submission to remember its approach: a required one-line **comment**, like a commit summary, and optional **notes** in Markdown. The history lists the comment in its last column; `hc history show` prints the comment and notes on stderr, keeping stdout as the submitted code.
+
+```sh
+hc submit two-sum -m "hash map" --notes "O(n) time, O(n) space"
+hc submit two-sum -e                        # write the note in your editor before submitting
+hc history note 12 -m "sliding window"      # replace the note (including its longer notes)
+hc history note 12 -e                       # edit the existing comment and notes
+hc history note 12 --clear                  # remove the note
+```
+
+With `-e` / `--edit`, the first line of the draft is the comment; after a blank line, write the notes. The editor is chosen as for `hc edit`: `editor` in `hc.yaml`, then `$VISUAL`, `$EDITOR`, or `vi` (for a graphical editor, configure a command that waits, such as `code --wait`). `-m` and `--notes` prefill their fields in the draft. An empty draft cancels `hc submit -e`; in `hc history note -e`, it removes the existing note. Notes without a comment are refused. If the editor fails or the draft is invalid, hc keeps the draft and prints its path, without changing history.
+
+In the TUI, press `c` on the history list or a submission to edit its note. The form opens with the current values: `tab` / `shift+tab` switches fields, `enter` in the comment saves, `enter` in the notes adds a line, `ctrl+s` saves from either field, and `esc` cancels. Clear both fields and save to remove the note. The history truncates long comments with an ellipsis; the submission's **Code** tab shows the comment as a heading and renders the notes as Markdown above the code.
+
+Notes can be changed at any time, even if the problem was removed. They live in `.hc/hc.db` alongside the existing history and are removed when their submission is deleted (including when a problem's or pack's history is purged).
 
 ### Your own cases
 

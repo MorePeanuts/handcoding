@@ -86,7 +86,7 @@ func TestScreens(t *testing.T) {
 	h.m.histories = append(h.m.histories, historyScope{p: p})
 	h.m.subs = []store.Submission{
 		{ID: 4, Pack: p.Pack, Slug: p.Slug, Lang: "go", Verdict: string(rep.Verdict), Passed: rep.Passed, Total: rep.Total, ElapsedMs: &elapsed,
-			Code: "package main\n\nfunc twoSum(nums []int, target int) []int {\n\treturn nil\n}\n", Details: app.EncodeReport(p, rep), CreatedAt: at},
+			Code: "package main\n\nfunc twoSum(nums []int, target int) []int {\n\treturn nil\n}\n", Details: app.EncodeReport(p, rep), CreatedAt: at, Note: store.Note{Comment: "hash map", Notes: "**O(n)** time, `O(n)` space.\n\n- Store each number’s index.\n- Look up the complement."}},
 		{ID: 3, Pack: p.Pack, Slug: p.Slug, Lang: "python", Verdict: string(runner.Accepted), Passed: 9, Total: 9, ElapsedMs: &elapsed, CreatedAt: at.Add(-time.Hour)},
 		{ID: 2, Pack: p.Pack, Slug: p.Slug, Lang: "go", Verdict: string(runner.TimeLimit), Passed: 8, Total: 9, CreatedAt: at.Add(-24 * time.Hour)},
 	}
@@ -101,6 +101,13 @@ func TestScreens(t *testing.T) {
 	shot("submission-passed")
 	h.press("tab")
 	shot("submission-code")
+	h.press("c")
+	shot("note-form")
+	h.press("tab")
+	shot("note-form-notes")
+	h.m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	shot("note-form-narrow")
+	h.press("esc")
 
 	addLocal(t, h.m, "0001-two-sum")
 	pk := &harness{t: t, m: h.openModel(Options{})}

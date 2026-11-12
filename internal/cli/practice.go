@@ -18,6 +18,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
+	"github.com/MorePeanuts/handcoding/internal/store"
 	"github.com/MorePeanuts/handcoding/internal/termimg"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 )
@@ -359,26 +360,51 @@ var errSilent = errors.New("")
 
 func newSubmitCmd(root *rootOptions) *cobra.Command {
 	var (
-		langName string
-		verbose  bool
-		doPause  bool
+		langName       string
+		verbose        bool
+		doPause        bool
+		comment, notes string
+		edit           bool
 	)
 	cmd := &cobra.Command{
 		Use:   "submit <problem>",
 		Short: "Judge the solution on all cases and record the submission",
-		Args:  cobra.ExactArgs(1),
+		Long: `Judge the solution on all cases and record the submission.
+Use -m to attach a one-line comment, with optional --notes (Markdown).
+Use -e to write the note in your editor; -m and --notes prefill the draft.
+The first line is the comment, followed by a blank line and optional notes.
+An empty editor draft cancels the submission.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if doPause {
 				defer pause()
+			}
+			note := store.Note{Comment: comment, Notes: notes}
+			if !edit {
+				var err error
+				note, err = store.NewNote(comment, notes)
+				if err != nil {
+					return err
+				}
 			}
 			return root.withProblem(args[0], langName, func(a *app.App, p *problem.Problem, l lang.Language) error {
 				if err := a.SubmitError(p, l); err != nil {
 					return err
 				}
+				if edit {
+					var err error
+					note, err = editNote(a, note)
+					if err != nil {
+						return err
+					}
+					if note.Empty() {
+						return fmt.Errorf("empty note: submission cancelled")
+					}
+				}
 				ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 				defer stop()
 				fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Submitting %s [%s]…", p.Slug, toolchainLabel(l))))
-				rep, sub, err := a.Submit(ctx, p, l, app.RunOptions{Stdout: os.Stdout, Stderr: os.Stderr})
+				rep, sub, err := a.Submit(ctx, p, l, app.RunOptions{Stdout: os.Stdout, Stderr: os.Stderr, Note: note})
 				if err != nil {
 					return err
 				}
@@ -393,6 +419,7 @@ func newSubmitCmd(root *rootOptions) *cobra.Command {
 	}
 	langFlag(cmd, &langName)
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "show every case in full")
+	noteFlags(cmd, &comment, &notes, &edit)
 	cmd.Flags().BoolVar(&doPause, "pause", false, "wait for Enter before exiting")
 	_ = cmd.Flags().MarkHidden("pause")
 	return cmd
