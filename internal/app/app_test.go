@@ -19,6 +19,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/regression"
 	"github.com/MorePeanuts/handcoding/internal/runner"
+	"github.com/MorePeanuts/handcoding/internal/store"
 	"github.com/MorePeanuts/handcoding/internal/testenv"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
@@ -213,7 +214,8 @@ func TestStartSubmitWrongAnswer(t *testing.T) {
 		if err := os.WriteFile(path, []byte(code), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		rep, sub, err := a.Submit(ctx, p, l, app.RunOptions{})
+		note := store.Note{Comment: "always [0, 1]", Notes: "on purpose"}
+		rep, sub, err := a.Submit(ctx, p, l, app.RunOptions{Note: note})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -232,6 +234,9 @@ func TestStartSubmitWrongAnswer(t *testing.T) {
 	subs, err := st.List(ctx, regression.Name, "two-sum")
 	if err != nil || len(subs) != 2 {
 		t.Fatalf("history: %d subs, err %v", len(subs), err)
+	}
+	if subs[0].Note.Comment != "always [0, 1]" || subs[0].Note.Notes != "on purpose" {
+		t.Errorf("the submission's note: %+v", subs[0].Note)
 	}
 }
 

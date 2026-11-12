@@ -95,3 +95,49 @@ func TestHistoryOfRemovedProblem(t *testing.T) {
 		t.Errorf("show of a removed problem, stderr:\n%s", errOut)
 	}
 }
+
+// TestHistoryNote checks that hc history note sets, shows and removes a
+// submission's note.
+func TestHistoryNote(t *testing.T) {
+	dir := packWorkspace(t)
+	ws, err := workspace.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := app.New(ws)
+	st, err := a.Store()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sub := &store.Submission{Pack: "regression", Slug: "two-sum", Lang: "go", Verdict: "Accepted", Passed: 1, Total: 1, Code: "package main\n"}
+	if err := st.Add(context.Background(), sub); err != nil {
+		t.Fatal(err)
+	}
+	a.Close()
+
+	for _, args := range [][]string{
+		{"1"},
+		{"1", "--notes", "no comment"},
+		{"1", "-m", "two\nlines"},
+		{"1", "-m", "queue", "--clear"},
+	} {
+		if _, _, err := captureAll(t, append([]string{"-w", dir, "history", "note"}, args...)...); err == nil {
+			t.Errorf("hc history note %q: no error", args)
+		}
+	}
+	if _, errOut, err := captureAll(t, "-w", dir, "history", "note", "1", "-m", "hash map", "--notes", "O(n) time"); err != nil || !strings.Contains(errOut, "noted submission #1") {
+		t.Fatalf("note: %v\n%s", err, errOut)
+	}
+	if out, err := capture(t, "-w", dir, "history"); err != nil || !strings.Contains(out, "COMMENT") || !strings.Contains(out, "hash map") {
+		t.Errorf("history: %v\n%s", err, out)
+	}
+	if _, errOut, err := captureAll(t, "-w", dir, "history", "show", "1"); err != nil || !strings.Contains(errOut, "hash map") || !strings.Contains(errOut, "O(n) time") {
+		t.Errorf("show: %v\n%s", err, errOut)
+	}
+	if _, _, err := captureAll(t, "-w", dir, "history", "note", "1", "--clear"); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := capture(t, "-w", dir, "history"); err != nil || strings.Contains(out, "hash map") {
+		t.Errorf("history after --clear: %v\n%s", err, out)
+	}
+}

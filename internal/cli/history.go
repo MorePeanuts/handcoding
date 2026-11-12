@@ -62,24 +62,24 @@ func newHistoryCmd(root *rootOptions) *cobra.Command {
 				return s.Slug
 			}
 			tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(tw, "ID\tPROBLEM\tLANG\tVERDICT\tPASSED\tTIME\tSUBMITTED")
+			fmt.Fprintln(tw, "ID\tPROBLEM\tLANG\tVERDICT\tPASSED\tTIME\tSUBMITTED\tCOMMENT")
 			for _, s := range subs {
 				elapsed := ui.SubmissionTime(s.ElapsedMs)
-				fmt.Fprintf(tw, "#%d\t%s\t%s\t%s\t%d/%d\t%s\t%s\n", s.ID, name(s), s.Lang,
+				fmt.Fprintf(tw, "#%d\t%s\t%s\t%s\t%d/%d\t%s\t%s\t%s\n", s.ID, name(s), s.Lang,
 					ui.VerdictStyle(runner.Verdict(s.Verdict)).Render(s.Verdict), s.Passed, s.Total, elapsed,
-					s.CreatedAt.Format("2006-01-02 15:04"))
+					s.CreatedAt.Format("2006-01-02 15:04"), s.Note.Comment)
 			}
 			if err := tw.Flush(); err != nil {
 				return err
 			}
 			fmt.Println()
-			fmt.Println(ui.Faint.Render("hc history show <id> · hc history restore <id> · hc history rm <id>"))
+			fmt.Println(ui.Faint.Render("hc history show <id> · hc history note <id> -m <comment> · hc history restore <id> · hc history rm <id>"))
 			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&doPause, "pause", false, "wait for Enter before exiting")
 	_ = cmd.Flags().MarkHidden("pause")
-	cmd.AddCommand(newHistoryShowCmd(root), newHistoryRmCmd(root), newHistoryRestoreCmd(root))
+	cmd.AddCommand(newHistoryShowCmd(root), newHistoryNoteCmd(root), newHistoryRmCmd(root), newHistoryRestoreCmd(root))
 	return cmd
 }
 
@@ -107,12 +107,19 @@ func withSubmission(root *rootOptions, cmd *cobra.Command, idArg string, fn func
 func newHistoryShowCmd(root *rootOptions) *cobra.Command {
 	return &cobra.Command{
 		Use:   "show <id>",
-		Short: "Print the code of a submission",
+		Short: "Print the code of a submission, with its note and judge details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withSubmission(root, cmd, args[0], func(a *app.App, _ *store.Store, s store.Submission) error {
 				fmt.Fprintf(os.Stderr, "%s #%d %s [%s] %s %d/%d · %s\n\n", ui.Bold.Render("submission"), s.ID, s.Ref(), s.Lang,
 					ui.VerdictStyle(runner.Verdict(s.Verdict)).Render(s.Verdict), s.Passed, s.Total, s.CreatedAt.Format("2006-01-02 15:04:05"))
+				if !s.Note.Empty() {
+					fmt.Fprintln(os.Stderr, ui.Bold.Render(s.Note.Comment))
+					if s.Note.Notes != "" {
+						fmt.Fprintln(os.Stderr, "\n"+s.Note.Notes)
+					}
+					fmt.Fprintln(os.Stderr)
+				}
 				if rep := app.DecodeReport(s.Details); rep != nil {
 					// The report is rendered with the problem's cases, so
 					// only with the very problem it was judged on.
@@ -128,6 +135,74 @@ func newHistoryShowCmd(root *rootOptions) *cobra.Command {
 			})
 		},
 	}
+}
+
+func newHistoryNoteCmd(root *rootOptions) *cobra.Command {
+	var (
+		comment, notes string
+		remove         bool
+		edit           bool
+	)
+	cmd := &cobra.Command{
+		Use:   "note <id>",
+		Short: "Set the note on a submission: a comment, and optional notes",
+		Long: `Set the note on a submission: a one-line comment, such as the approach it
+takes, which hc history shows, and optional longer notes (Markdown), which
+hc history show and the TUI show with the code. The note replaces the one
+the submission had; --clear removes it.
+Use -e to edit the existing note in your editor. The first line is the
+comment; after a blank line, write optional Markdown notes. -m and --notes
+replace those fields in the draft. Clearing the entire draft removes the note.`,
+		Example: `  hc history note 12 -m "sliding window"
+  hc history note 12 -m "sliding window" --notes "O(n) time, O(k) space"
+  hc history note 12 -e
+  hc history note 12 --clear`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			note := store.Note{Comment: comment, Notes: notes}
+			if !edit {
+				var err error
+				note, err = store.NewNote(comment, notes)
+				if err != nil {
+					return err
+				}
+				if !remove && note.Empty() {
+					return fmt.Errorf("give the note's --comment (-m), --edit (-e), or --clear to remove it")
+				}
+			}
+			return withSubmission(root, cmd, args[0], func(a *app.App, st *store.Store, s store.Submission) error {
+				if edit {
+					note = s.Note
+					if cmd.Flags().Changed("comment") {
+						note.Comment = comment
+					}
+					if cmd.Flags().Changed("notes") {
+						note.Notes = notes
+					}
+					var err error
+					note, err = editNote(a, note)
+					if err != nil {
+						return err
+					}
+				}
+				if err := st.SetNote(cmd.Context(), s.ID, note); err != nil {
+					return err
+				}
+				if note.Empty() {
+					fmt.Fprintf(os.Stderr, "%s the note on submission #%d (%s)\n", ui.Red.Render("removed"), s.ID, s.Ref())
+				} else {
+					fmt.Fprintf(os.Stderr, "%s submission #%d (%s): %s\n", ui.Green.Render("noted"), s.ID, s.Ref(), note.Comment)
+				}
+				return nil
+			})
+		},
+	}
+	noteFlags(cmd, &comment, &notes, &edit)
+	cmd.Flags().BoolVar(&remove, "clear", false, "remove the note")
+	for _, flag := range []string{"comment", "notes", "edit"} {
+		cmd.MarkFlagsMutuallyExclusive("clear", flag)
+	}
+	return cmd
 }
 
 func newHistoryRmCmd(root *rootOptions) *cobra.Command {

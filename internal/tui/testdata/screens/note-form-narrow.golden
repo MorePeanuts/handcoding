@@ -1,0 +1,20 @@
+ hc   regression/two-sum
+ Note on submission #4
+────────────────────────────────────────────────────────────
+
+Comment
+hash map
+
+Notes (Markdown)
+**O(n)** time, `O(n)` space.
+
+- Store each number’s index.
+- Look up the complement.
+
+
+
+Clear both fields to remove the note.
+
+────────────────────────────────────────────────────────────
+
+ ctrl+s save    tab switch    esc cancel

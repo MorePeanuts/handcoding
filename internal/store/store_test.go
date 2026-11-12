@@ -181,3 +181,160 @@ func TestStars(t *testing.T) {
 		t.Errorf("DeletePack kept the star: %v", err)
 	}
 }
+
+// TestNotes checks that notes are recorded with a submission or set later,
+// changed, removed and deleted with their submissions.
+func TestNotes(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "hc.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	note := func(id int64) Note {
+		t.Helper()
+		sub, err := s.Get(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return sub.Note
+	}
+	a := &Submission{Pack: "local", Slug: "lru", Lang: "go", Verdict: "Accepted", Note: Note{Comment: "doubly linked list", Notes: "O(1) get and put"}}
+	b := &Submission{Pack: "local", Slug: "lru", Lang: "go", Verdict: "Accepted"}
+	for _, sub := range []*Submission{a, b} {
+		if err := s.Add(ctx, sub); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := note(a.ID); got != a.Note {
+		t.Errorf("note of a: %+v, want %+v", got, a.Note)
+	}
+	if got := note(b.ID); !got.Empty() {
+		t.Errorf("note of b: %+v, want none", got)
+	}
+	queue := Note{Comment: "queue"}
+	if err := s.SetNote(ctx, b.ID, queue); err != nil {
+		t.Fatal(err)
+	}
+	if subs, err := s.List(ctx, "local", "lru"); err != nil || subs[0].Note != queue || subs[1].Note != a.Note {
+		t.Fatalf("List: %+v, %v", subs, err)
+	}
+	if err := s.SetNote(ctx, a.ID, Note{}); err != nil || !note(a.ID).Empty() {
+		t.Errorf("removing a's note: %v, %+v", err, note(a.ID))
+	}
+	if err := s.SetNote(ctx, a.ID, Note{Notes: "orphan"}); !errors.Is(err, ErrNoComment) {
+		t.Errorf("notes without a comment: %v", err)
+	}
+	if err := s.SetNote(ctx, 99, queue); !errors.Is(err, ErrNotFound) {
+		t.Errorf("SetNote on a missing submission: %v", err)
+	}
+	for _, del := range []func() error{
+		func() error { return s.Delete(ctx, b.ID) },
+		func() error { _, err := s.DeleteProblem(ctx, "local", "lru"); return err },
+	} {
+		if err := del(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var n int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM submission_notes`).Scan(&n); err != nil || n != 0 {
+		t.Errorf("notes left after deleting their submissions: %d, %v", n, err)
+	}
+}
+
+func TestNewNote(t *testing.T) {
+	for _, tc := range []struct {
+		comment, notes string
+		want           Note
+		err            bool
+	}{
+		{" queue \n", "\n  O(n)\n", Note{Comment: "queue", Notes: "O(n)"}, false},
+		{"", " ", Note{}, false},
+		{"", "orphan", Note{}, true},
+		{"two\nlines", "", Note{}, true},
+	} {
+		got, err := NewNote(tc.comment, tc.notes)
+		if got != tc.want || (err != nil) != tc.err {
+			t.Errorf("NewNote(%q, %q) = %+v, %v", tc.comment, tc.notes, got, err)
+		}
+	}
+}
+
+// Adding notes must leave a history written before their table existed
+// readable, including its code and judge details.
+func TestNotesExistingHistory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hc.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(table); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO submissions
+		(pack, slug, lang, verdict, passed, total, elapsed_ms, code, details, created_at)
+		VALUES ('local', 'two-sum', 'go', 'Accepted', 3, 3, 42, 'original code', 'original report', 123)`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	ctx := context.Background()
+	sub, err := s.Get(ctx, 1)
+	if err != nil || !sub.Note.Empty() || sub.Code != "original code" || sub.Details != "original report" || sub.ElapsedMs == nil || *sub.ElapsedMs != 42 {
+		t.Fatalf("existing history: %+v, %v", sub, err)
+	}
+	if err := s.SetNote(ctx, 1, Note{Comment: "annotated later"}); err != nil {
+		t.Fatal(err)
+	}
+	if sub, err := s.Get(ctx, 1); err != nil || sub.Note.Comment != "annotated later" || sub.Code != "original code" {
+		t.Fatalf("annotated history: %+v, %v", sub, err)
+	}
+}
+
+func TestDeleteNotes(t *testing.T) {
+	for _, scope := range []string{"submission", "problem", "pack"} {
+		t.Run(scope, func(t *testing.T) {
+			s, err := Open(filepath.Join(t.TempDir(), "hc.db"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Close()
+			ctx := context.Background()
+			for _, sub := range []*Submission{
+				{Pack: "local", Slug: "two-sum", Note: Note{Comment: "a"}},
+				{Pack: "local", Slug: "two-sum", Note: Note{Comment: "b"}},
+				{Pack: "local", Slug: "other", Note: Note{Comment: "c"}},
+				{Pack: "installed", Slug: "two-sum", Note: Note{Comment: "keep"}},
+			} {
+				if err := s.Add(ctx, sub); err != nil {
+					t.Fatal(err)
+				}
+			}
+			want := 0
+			switch scope {
+			case "submission":
+				err, want = s.Delete(ctx, 1), 3
+			case "problem":
+				_, err = s.DeleteProblem(ctx, "local", "two-sum")
+				want = 2
+			case "pack":
+				_, err = s.DeletePack(ctx, "local")
+				want = 1
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			var n int
+			if err := s.db.QueryRow(`SELECT COUNT(*) FROM submission_notes`).Scan(&n); err != nil || n != want {
+				t.Fatalf("remaining notes: %d, %v; want %d", n, err, want)
+			}
+			if sub, err := s.Get(ctx, 4); err != nil || sub.Note.Comment != "keep" {
+				t.Fatalf("deleted another pack's note: %+v, %v", sub, err)
+			}
+		})
+	}
+}

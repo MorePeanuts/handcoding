@@ -422,6 +422,9 @@ type RunOptions struct {
 	// input of hc test --input: the run is then not remembered for
 	// debugging (see LastFailure).
 	Custom bool
+	// Note is the note Submit records with the submission (see
+	// store.NewNote).
+	Note store.Note
 }
 
 // Run runs the user's solution against the selected cases, building the
@@ -608,7 +611,7 @@ func (a *App) Submit(ctx context.Context, p *problem.Problem, l lang.Language, o
 	sub := &store.Submission{
 		Pack: p.Pack, Slug: p.Slug, Lang: l.ID(), Verdict: string(rep.Verdict),
 		Passed: rep.Passed, Total: rep.Total, Code: string(code),
-		Details: EncodeReport(p, rep),
+		Details: EncodeReport(p, rep), Note: o.Note,
 	}
 	if !rep.Stopped {
 		ms := rep.Elapsed.Milliseconds()
