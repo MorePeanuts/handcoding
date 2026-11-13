@@ -374,7 +374,7 @@ Report:
 
 ## Useful commands
 
-- `hc show <slug>`: the statement
+- `hc show <slug> --raw`: the statement as Markdown, without opening the TUI
 - `hc cases list <slug> [--case N]`: inspect cases (`--expand --json`
   pipes generated inputs into a script)
 - `hc cases build <slug> [--force] [--lang python]`: fill expected outputs from the reference

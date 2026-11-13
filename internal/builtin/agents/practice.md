@@ -27,8 +27,8 @@ A problem is named by its slug (`two-sum`), or as `<pack>/<slug>` when
 several packs have it.
 
 ```sh
-hc show <problem>                  # the statement
-hc show <problem> --locale zh-CN   # the statement in another language
+hc show <problem> --raw            # the statement as Markdown, without opening the TUI
+hc show <problem> --raw --locale zh-CN   # the statement in another language
 hc list                            # every problem and its status
 hc history <problem>               # the user's past submissions
 hc test <problem>                  # run the user's solution on the examples and the user's own cases

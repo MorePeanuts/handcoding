@@ -15,12 +15,14 @@ type packLocale struct {
 	// locales are the pack's, the default first; nil when it declares
 	// none.
 	locales []string
-	// current is the one shown, remembered per pack (app.Locale).
+	// current is the session's choice; switching with i remembers it per pack.
 	current string
 }
 
-// loadLocales reads the locales of packs and the one each is shown in.
+// loadLocales reads the locales of packs, keeping the session's choice when
+// it is still available (including show --locale, which is not saved).
 func (m *model) loadLocales(packs []*workspace.Pack) error {
+	previous := m.locales
 	m.locales = map[string]*packLocale{}
 	for _, k := range packs {
 		if k.Err != nil {
@@ -29,6 +31,16 @@ func (m *model) loadLocales(packs []*workspace.Pack) error {
 		cur, err := m.app.Locale(m.ctx, k)
 		if err != nil {
 			return err
+		}
+		if pl := previous[k.Name]; pl != nil {
+			if slices.Contains(k.Manifest.Locales, pl.current) {
+				cur = pl.current
+			}
+		} else if m.opts.Problem != nil && m.opts.Problem.Pack == k.Name && m.opts.Locale != "" {
+			if err := app.CheckLocale(k, m.opts.Locale); err != nil {
+				return err
+			}
+			cur = m.opts.Locale
 		}
 		m.locales[k.Name] = &packLocale{locales: k.Manifest.Locales, current: cur}
 	}

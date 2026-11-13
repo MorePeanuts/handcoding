@@ -165,7 +165,8 @@ set `output_length: return`. Read `hc docs protocol in-place-output`.
 
 ## description.md
 
-The statement users read with `hc show <slug>`, in Markdown.
+The statement users read in the TUI with `hc show <slug>`. Use
+`hc show <slug> --raw` to read its Markdown without opening the TUI.
 
 - Start with `# <id>. <title>` (`# <title>` without an id), then the
   statement, the examples and the constraints, as LeetCode shows them.

@@ -70,6 +70,12 @@ type Options struct {
 	// shows first (see workspace.Filter). By default it shows the pack and
 	// group shown last.
 	Pack, Group string
+	// Problem opens its detail screen in view-only mode, skipping the pack
+	// picker. The list beneath it selects this problem in its own pack.
+	Problem *problem.Problem
+	// Locale overrides the initial statement locale of Problem for this
+	// session. Only an explicit switch with i saves it as a preference.
+	Locale string
 }
 
 type screen int
@@ -241,7 +247,13 @@ func newModel(ctx context.Context, a *app.App, opts Options) (*model, error) {
 	if err := m.reload(); err != nil {
 		return nil, err
 	}
-	m.pickPack()
+	if opts.Problem != nil {
+		if err := m.openInitialProblem(opts.Problem); err != nil {
+			return nil, err
+		}
+	} else {
+		m.pickPack()
+	}
 	return m, nil
 }
 
@@ -255,6 +267,8 @@ func (m *model) start() error {
 	}
 	m.groups = map[string]string{}
 	switch {
+	case m.opts.Problem != nil:
+		m.pack = m.opts.Problem.Pack
 	case m.opts.Group != "":
 		m.pack = m.opts.Pack
 		if m.pack == "" {
@@ -569,6 +583,11 @@ func (m *model) ask(prompt string, yes func() tea.Cmd) {
 
 // layout sizes the viewports of the visible screen.
 func (m *model) layout() {
+	// A directly opened detail screen must wait for the terminal size,
+	// rather than render and upload images before the program starts.
+	if m.width <= 0 || m.height <= 0 {
+		return
+	}
 	h := max(m.height-headerLines-footerLines, 3)
 	for _, vp := range []*viewport.Model{&m.detail, &m.casesView, &m.result, &m.subView} {
 		vp.SetWidth(max(m.width-1, 1)) // the scrollbar's column aside

@@ -68,16 +68,10 @@ func runList(cmd *cobra.Command, root *rootOptions, o listOptions) error {
 		return err
 	}
 	if !o.plain && isTerminal(os.Stdout) && isTerminal(os.Stdin) {
-		exe, err := os.Executable()
-		if err != nil {
-			return err
-		}
-		return tui.Run(cmd.Context(), a, tui.Options{
-			Exe:       exe,
-			Lang:      l,
-			EditorCmd: func(path string) (*exec.Cmd, error) { return editorCommand(a.WS.Config, path) },
-			Pack:      o.pack,
-			Group:     o.group,
+		return runTUI(cmd, a, tui.Options{
+			Lang:  l,
+			Pack:  o.pack,
+			Group: o.group,
 		})
 	}
 	if loadErr != nil {
@@ -123,6 +117,17 @@ func runList(cmd *cobra.Command, root *rootOptions, o listOptions) error {
 	}
 	_, err = io.WriteString(os.Stdout, formatTable(rows))
 	return err
+}
+
+// runTUI shares the editor and debugger setup of list and show.
+func runTUI(cmd *cobra.Command, a *app.App, opts tui.Options) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	opts.Exe = exe
+	opts.EditorCmd = func(path string) (*exec.Cmd, error) { return editorCommand(a.WS.Config, path) }
+	return tui.Run(cmd.Context(), a, opts)
 }
 
 // formatTable aligns columns by display width, so that wide (CJK) titles
