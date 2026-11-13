@@ -335,10 +335,10 @@ func TestListGroups(t *testing.T) {
 		t.Fatalf("local shows group %v", h.m.group())
 	}
 	h.press("c")
-	if h.m.picking || !strings.Contains(h.m.message, "no groups") {
-		t.Errorf("c in a pack without groups: %q", h.m.message)
+	if !h.m.picking {
+		t.Fatal("an empty pack must allow creating its first group")
 	}
-	h.press("tab")
+	h.press("esc", "tab")
 	if g := h.m.group(); g == nil || g.Name != "design" {
 		t.Fatalf("back in regression: group %v", g)
 	}

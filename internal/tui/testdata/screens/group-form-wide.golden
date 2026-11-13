@@ -1,0 +1,30 @@
+ hc   Personal group
+Copy Design problems · regression
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Name                                                                                                           Title
+design-copy                                                                                                    Design problems
+
+╭─ Available 50/50 ─────────────────────────────────────────────────────────────────────────────────────────╮  ╭─ Selected 5 ──────────────────────────────────────────────────────────────────────────────────────────────╮
+│/ Search title, ID or tag                                                                                  │  │K/J reorder · x remove                                                                                     │
+│    #      TITLE                                            LEVEL    TAGS                                  │  │    #      TITLE                                            LEVEL    TAGS                                  │
+├───────────────────────────────────────────────────────────────────────────────────────────────────────────┤  ├───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│▌   1      Two Sum                                          Easy     array · hash-table                    │  │  ● 146    LRU Cache                                        Medium   design · hash-table · linked-list · d…│
+│    4      Median of Two Sorted Arrays                      Hard     array · binary-search · divide-and-co…│  │  ● 173    Binary Search Tree Iterator                      Medium   stack · tree · design · binary-search…│
+│    5      Longest Palindromic Substring                    Medium   two-pointers · string · dynamic-progr…│  │  ● 297    Serialize and Deserialize Binary Tree            Hard     string · tree · depth-first-search · …│
+│    23     Merge k Sorted Lists                             Hard     linked-list · divide-and-conquer · he…│  │  ● 535    Encode and Decode TinyURL                        Medium   hash-table · string · design · hash-f…│
+│    27     Remove Element                                   Easy     array · two-pointers                  │  │  ● 341    Flatten Nested List Iterator                     Medium   stack · tree · depth-first-search · d…│
+│    46     Permutations                                     Medium   array · backtracking                  │  │                                                                                                           │
+│    49     Group Anagrams                                   Medium   array · hash-table · string · sorting │  │                                                                                                           │
+│    95     Unique Binary Search Trees II                    Medium   dynamic-programming · backtracking · …│  │                                                                                                           │
+│    104    Maximum Depth of Binary Tree                     Easy     tree · depth-first-search · breadth-f…│  │                                                                                                           │
+│    108    Convert Sorted Array to Binary Search Tree       Easy     tree · binary-search-tree · array · d…│  │                                                                                                           │
+│    114    Flatten Binary Tree to Linked List               Medium   stack · tree · depth-first-search · l…│  │                                                                                                           │
+│    117    Populating Next Right Pointers in Each Node II   Medium   tree · depth-first-search · breadth-f…│  │                                                                                                           │
+│    130    Surrounded Regions                               Medium   depth-first-search · breadth-first-se…│  │                                                                                                           │
+│    133    Clone Graph                                      Medium   depth-first-search · breadth-first-se…│  │                                                                                                           │
+│    138    Copy List with Random Pointer                    Medium   hash-table · linked-list              │  │                                                                                                           │
+│    141    Linked List Cycle                                Easy     hash-table · linked-list · two-pointe…│  │                                                                                                           │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────────╯  ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+● selected · 1 · Two Sum · Easy
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ctrl+s save    space select    / search    tab selected    esc cancel    ? help

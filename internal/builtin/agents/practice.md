@@ -12,6 +12,10 @@ comes second. Answer in the user's language.
   and `reference/` (the pack's model solutions). Installed packs, every pack
   but `local`, are read-only: never edit them.
 - `packs/local/problems/`: the user's own problems.
+- `groups/<pack>.yaml`: the user's ordered personal groups. Use `hc group`
+  to list, create, copy, rename, add/remove members, or order them. Pack
+  groups remain in `pack.yaml`; `user:<name>` and `pack:<name>` distinguish
+  equal names. Personal groups may retain slugs removed by a pack update.
 - `cases/<pack>/<slug>.jsonl`: the user's own cases of a problem of an
   installed pack, which `hc test` runs and `hc submit` does not. Change them
   with `hc cases add` and `hc cases rm`.

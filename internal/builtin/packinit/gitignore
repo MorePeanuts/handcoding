@@ -1,6 +1,7 @@
 # What hc adds to a pack checkout is yours, not the pack's.
 /.hc/
 /solutions/
+/groups/
 /hc.yaml
 /pyrightconfig.json
 /ty.toml

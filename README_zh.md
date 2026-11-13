@@ -38,6 +38,7 @@
 - **本地判题**：支持 Go 和 Python，题型包括设计题（`LRUCache`）、原地修改、链表、二叉树、字符矩阵、浮点误差、任意顺序答案，为合法答案很多或输出随机的题目准备的判题程序，通过解码来评判的编码器（二叉树的序列化与反序列化），以及由生成器构造而不必存储的大规模输入。不需要联网。
 - **真正的调试器**：`hc debug` 启动 Delve 或 pdb，停在你的函数入口；`--headless` 提供 DAP 服务，可用 nvim-dap 或 VS Code 连接。
 - **交互界面**：rustlings 风格的题目列表，每个题目包一个标签并显示进度；题面、配图、测试结果和提交历史都在同一个界面里，编辑器开在旁边的窗格。
+- **个人分组**：通过 `hc group` 或交互界面保存有序的复习题单和学习计划，与题目包分组并存，更新题目包时会保留。见[个人分组](docs/how-to-use_zh.md#个人分组)。
 - **导入 LeetCode 题目**：`hc fetch 146` 下载题面、配图、函数签名、起始模板和示例。在 `hc.yaml` 中设置 `locales: [en, zh-CN]` 后，`hc fetch --site cn` 会同时保留英文和中文题面，在交互界面中按 `i` 切换。
 - **提交到 LeetCode**：`hc leetcode submit two-sum` 把解答提交到你自己的 LeetCode 账号并显示 LeetCode 的判定结果，`hc leetcode test` 在 LeetCode 上用示例运行它。只需用浏览器的会话登录一次（`hc leetcode login`）。
 - **智能体生成测试用例**：`hc gen` 让 Claude Code 或 Codex 判断题目该怎么判（顺序是否重要？是否有多个正确答案？），并写参考解和测试输入。期望输出由 hc 运行参考解得到，而不是让模型猜。用例有错时，用 `hc fix` 修复。

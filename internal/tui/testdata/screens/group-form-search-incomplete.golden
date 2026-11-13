@@ -1,0 +1,30 @@
+ hc   Personal group
+Copy Design problems · regression
+────────────────────────────────────────────────────────────────────────────────────────────────────
+Name                                               Title
+design-copy                                        Design problems
+
+╭─ Available 0/50 ──────────────────────────────╮  ╭─ Selected 5 ──────────────────────────────────╮
+│/ id:700..                                     │  │K/J reorder · x remove                         │
+│    #      TITLE                       LEVEL   │  │    #      TITLE                       LEVEL   │
+├───────────────────────────────────────────────┤  ├───────────────────────────────────────────────┤
+│enter the range's upper bound                  │  │  ● 297    Serialize and Deserialize … Hard    │
+│                                               │  │  ● 173    Binary Search Tree Iterator Medium  │
+│                                               │  │  ● 535    Encode and Decode TinyURL   Medium  │
+│                                               │  │  ● 341    Flatten Nested List Iterat… Medium  │
+│                                               │  │  ● 1      Two Sum                     Easy    │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+╰───────────────────────────────────────────────╯  ╰───────────────────────────────────────────────╯
+● selected · enter the range's upper bound
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ ctrl+s save    enter browse    esc clear    tab selected

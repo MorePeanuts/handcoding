@@ -393,6 +393,9 @@ func printUpdate(a *app.App, u *app.PackUpdate) {
 	if len(u.Removed) > 0 {
 		fmt.Printf("     %s %s\n", ui.Red.Render("removed:"), strings.Join(u.Removed, ", "))
 	}
+	if u.GroupWarning != "" {
+		fmt.Printf("     %s %s\n", ui.Yellow.Render("warn:"), u.GroupWarning)
+	}
 	for _, o := range u.Orphans {
 		var kept []string
 		if len(o.Solutions) > 0 {
@@ -403,6 +406,9 @@ func printUpdate(a *app.App, u *app.PackUpdate) {
 		}
 		if o.Cases != "" {
 			kept = append(kept, "your cases ("+o.Cases+")")
+		}
+		if len(o.Groups) > 0 {
+			kept = append(kept, "your group memberships ("+strings.Join(o.Groups, ", ")+")")
 		}
 		what := "was removed"
 		if !slices.Contains(u.Removed, o.Slug) {
@@ -423,9 +429,9 @@ func newPackRemoveCmd(root *rootOptions) *cobra.Command {
 		Aliases: []string{"rm"},
 		Short:   "Remove an installed pack",
 		Long: `Delete packs/<name>/ and its entry in hc.yaml. Your solutions
-(solutions/<name>/), your own cases (cases/<name>/) and the history of its
-problems are kept, so installing the pack again brings them back; --purge
-deletes them too. local, the workspace's own problems, cannot be removed.`,
+(solutions/<name>/), your own cases (cases/<name>/), personal groups
+(groups/<name>.yaml) and submission history are kept, so installing the
+pack again brings them back; --purge deletes them too. local, the workspace's own problems, cannot be removed.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, err := root.openApp()
@@ -434,7 +440,7 @@ deletes them too. local, the workspace's own problems, cannot be removed.`,
 			}
 			defer a.Close()
 			name := args[0]
-			if purge && !yes && !confirm(fmt.Sprintf("Remove %s, and delete your solutions, cases and submission history of its problems?", name)) {
+			if purge && !yes && !confirm(fmt.Sprintf("Remove %s, and delete your solutions, cases, personal groups and submission history of its problems?", name)) {
 				return errors.New("aborted (use --yes to skip the prompt)")
 			}
 			res, err := a.RemovePack(cmd.Context(), name, purge)
@@ -454,9 +460,12 @@ deletes them too. local, the workspace's own problems, cannot be removed.`,
 				if res.Cases {
 					dirs += ", " + workspace.CasesDir + "/" + name
 				}
+				if res.Groups {
+					dirs += ", groups/" + name + ".yaml"
+				}
 				fmt.Printf("     deleted %s and %d submission(s)\n", dirs, res.Submissions)
 			} else {
-				fmt.Println(ui.Faint.Render("     your solutions, cases and history are kept (--purge deletes them)"))
+				fmt.Println(ui.Faint.Render("     your solutions, cases, groups and history are kept (--purge deletes them)"))
 			}
 			return nil
 		},

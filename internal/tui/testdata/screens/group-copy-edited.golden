@@ -1,0 +1,30 @@
+ hc   Personal group
+Copy Design problems · regression
+────────────────────────────────────────────────────────────────────────────────────────────────────
+Name                                               Title
+design-copy                                        Design problems
+
+╭─ Available 1/50 ──────────────────────────────╮  ╭─ Selected 5 ──────────────────────────────────╮
+│/ Two Sum                                      │  │K/J reorder · x remove                         │
+│    #      TITLE                       LEVEL   │  │    #      TITLE                       LEVEL   │
+├───────────────────────────────────────────────┤  ├───────────────────────────────────────────────┤
+│  ● 1      Two Sum                     Easy    │  │  ● 297    Serialize and Deserialize … Hard    │
+│                                               │  │  ● 173    Binary Search Tree Iterator Medium  │
+│                                               │  │  ● 535    Encode and Decode TinyURL   Medium  │
+│                                               │  │  ● 341    Flatten Nested List Iterat… Medium  │
+│                                               │  │▌ ● 1      Two Sum                     Easy    │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+╰───────────────────────────────────────────────╯  ╰───────────────────────────────────────────────╯
+● selected · 1 · Two Sum · Easy
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ ctrl+s save    x remove    K/J reorder    tab next    / search    esc cancel    ? help

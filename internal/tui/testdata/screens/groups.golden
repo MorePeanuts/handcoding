@@ -2,11 +2,11 @@
 
 50 problems    ✔ 0 solved    ● 0 attempted    ★ 1 starred               ━━━━━━━━━━━━━━━━━━━━━━━━  0%
 
-  GROUP                                             SOLVED  NAME
+  GROUP                                             SOLVED  SOURCE  NAME
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 ▌ All problems                                        0/50
-  Structure inputs                                     0/5  structure-inputs
-  Design problems                                      0/5  design
+  Structure inputs                                     0/5          structure-inputs
+  Design problems                                      0/5          design
 
 
 
@@ -27,4 +27,4 @@
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 
- ↑↓ move    enter choose    esc cancel    ? help
+ ↑↓ move    enter choose/add    / search    n new    e edit    C copy    x delete    ? help

@@ -15,7 +15,7 @@ import (
 func TestShowProblem(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct{ ref, group string }{
-		{"regression/lru-cache", "design"},
+		{"regression/lru-cache", "pack:design"},
 		{"regression/two-sum", ""},
 		{"local/two-sum", ""},
 	} {

@@ -393,6 +393,8 @@ type PackUpdate struct {
 	// any more: of removed problems, or of problems whose directory was
 	// renamed. hc keeps them.
 	Orphans []Orphan
+	// GroupWarning reports malformed personal data without failing the pack update.
+	GroupWarning string
 	// Failed are the problems that fail to load after the update.
 	Failed []*pack.LoadError
 }
@@ -408,6 +410,8 @@ type Orphan struct {
 	// a removed problem).
 	Submissions int
 	Cases       string
+	// Groups are the personal groups retaining the removed slug.
+	Groups []string
 }
 
 // UpdatePack updates the installed pack called name from its source: a git
@@ -565,6 +569,10 @@ func (a *App) diff(ctx context.Context, u *PackUpdate, before, after []*problem.
 			u.Added = append(u.Added, p.Slug)
 		}
 	}
+	groups, groupErr := a.WS.ReadUserGroups(u.Name)
+	if groupErr != nil {
+		u.GroupWarning = groupErr.Error()
+	}
 	var statuses map[string]int
 	for _, p := range before {
 		q, kept := afterBySlug[p.Slug]
@@ -596,11 +604,16 @@ func (a *App) diff(ctx context.Context, u *PackUpdate, before, after []*problem.
 				}
 			}
 			o.Submissions = statuses[p.Ref()]
+			for _, g := range groups {
+				if slices.Contains(g.Problems, p.Slug) {
+					o.Groups = append(o.Groups, g.Name)
+				}
+			}
 			if path := a.WS.UserCasesPath(p); exists(path) {
 				o.Cases = a.WS.Rel(path)
 			}
 		}
-		if len(o.Solutions) > 0 || o.Submissions > 0 || o.Cases != "" {
+		if len(o.Solutions) > 0 || o.Submissions > 0 || o.Cases != "" || len(o.Groups) > 0 {
 			u.Orphans = append(u.Orphans, o)
 		}
 	}
@@ -613,16 +626,18 @@ type RemoveResult struct {
 	// whether its entry left hc.yaml.
 	Deleted, Unlisted bool
 	// Solutions and Cases report whether solutions/<name> and
-	// cases/<name> were deleted, and Submissions how many submissions were
+	// cases/<name> were deleted, Groups whether groups/<name>.yaml was,
+	// and Submissions how many submissions were
 	// (with purge).
 	Solutions, Cases bool
+	Groups           bool
 	Submissions      int64
 }
 
 // RemovePack deletes the installed pack called name, packs/<name>/, and its
 // entry in hc.yaml. The user's solutions, own cases and history of its
-// problems stay, unless purge, which deletes solutions/<name>/,
-// cases/<name>/ and the pack's submissions.
+// problems and personal groups stay, unless purge, which deletes
+// solutions/<name>/, cases/<name>/, groups/<name>.yaml and the submissions.
 func (a *App) RemovePack(ctx context.Context, name string, purge bool) (*RemoveResult, error) {
 	unlock, err := a.lockPacks()
 	if err != nil {
@@ -669,6 +684,10 @@ func (a *App) RemovePack(ctx context.Context, name string, purge bool) (*RemoveR
 			return res, err
 		}
 		res.Cases = true
+	}
+	res.Groups, err = a.WS.PurgeUserGroups(name)
+	if err != nil {
+		return res, err
 	}
 	st, err := a.Store()
 	if err != nil {
