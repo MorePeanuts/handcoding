@@ -76,6 +76,7 @@ list right away, and --group a group of a pack.`,
 	}
 	add("practice",
 		newListCmd(opts),
+		newGroupCmd(opts),
 		newStartCmd(opts),
 		newEditCmd(opts),
 		newShowCmd(opts),

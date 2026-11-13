@@ -24,6 +24,7 @@
   solutions/local/go/0001-two-sum/         你的代码：solution.go，以及自动生成的 go.mod 和 zz_hc_driver.go
   solutions/local/python/0001-two-sum/     你的代码：solution.py，以及自动生成的 _hc_runner.py
   cases/<pack>/<slug>.jsonl                你为已安装题目包的题目保存的自己的用例（见“你自己的用例”）
+  groups/<pack>.yaml                      按顺序排列的个人分组（见“个人分组”）
   .hc/hc.db                                提交历史（SQLite）
   .hc/venv/                                hc 管理的 Python 虚拟环境
   .hc/runtime/python/                      hc_runtime.py，所有 Python 解答共用
@@ -111,11 +112,11 @@ ty.toml
 - 调试器会接管终端：启动前清屏，退出后回到界面。按 `d` 调试代码第一个失败的用例，选择方式和 [`hc debug`](#调试) 相同。在历史中按 `d`，会恢复该次提交并调试它第一个失败的用例。
 - 题面图片直接画在终端里。kitty 和 Ghostty 显示原图；其他真彩色终端用块字符近似显示，会损失细节，可以按 `o` 用看图软件打开原图。显示方式见 [`images`](#配置)。
 - 题面配色跟随终端背景色。TUI 运行时终端在明暗之间切换，在会报告切换的终端里（Ghostty、kitty 0.38 及以上等）题面随之切换；在其他终端里正文仍会跟随，标题和代码保持原来的颜色，直到重新打开 hc。如果颜色不对，在 `hc.yaml` 中设置 `theme`。
-- 列表一次显示一个题目包。有多个题目包时，顶部的标签栏列出每个题目包及其进度（已通过/总数），用 `tab` / `shift+tab` 切换题目包；终端较窄时，标签栏会滚动，让当前题目包保持可见。没有题目的题目包（例如还没添加题目时的 `local`）不显示标签，除非所有题目包都还没有题目。
+- 列表一次显示一个题目包。有多个题目包时，顶部的标签栏列出每个题目包及其进度（已通过/总数），用 `tab` / `shift+tab` 切换题目包；终端较窄时，标签栏会滚动，让当前题目包保持可见。既没有题目也没有个人分组的题目包（例如刚创建的 `local`）不显示标签，除非用 `--pack` 指定它，或所有题目包都还没有题目。
 - 按 `m` 收藏想回头再做的题目，再按一次 `m` 取消收藏。收藏的题目在列表和题面标题中显示 `★`，`f` 筛选可以只列出收藏的题目。收藏保存在 `.hc/hc.db` 中，放弃题目的解答后仍会保留。
-- 按 `c` 选择题目包中的一个分组，或者全部题目，每一项都显示进度。分组按分组中的顺序列出题目。搜索和筛选作用于当前显示的题目包和分组。
+- 按 `c` 选择个人分组（`user:`）、题目包分组（`pack:`）或全部题目，每一项都显示进度。在分组选择页，`n` 新建个人分组，`e` 编辑它（包括题目顺序），`C` 复制任一来源的分组，`x` 确认后删除个人分组。在题目列表中按 `a` 把当前题目加入个人分组；在这个选择页按 `n`，会新建一个包含当前题目的分组。分组按分组中的顺序列出题目。搜索和筛选作用于当前显示的题目包和分组。
 - 有多个包含题目的题目包时，`hc` 会先打开题目包选择页，列出这些题目包及其进度，光标停在上次所在的题目包上。按 `enter` 打开题目包的列表，在列表中按 `esc` 回到选择页。只有一个这样的题目包时，`hc` 直接打开它的列表。
-- `hc --pack <name>`（或 `hc list --pack <name>`）跳过选择页，直接打开该题目包（即使它是空的），`--group <name>` 打开该分组（只有一个题目包使用的分组名不需要 `--pack`）。每个题目包都会打开上次选择的分组。
+- `hc --pack <name>`（或 `hc list --pack <name>`）跳过选择页，直接打开该题目包（即使它是空的），`--group <name>` 打开该分组（分组无歧义时不需要 `--pack`；两种来源同名时，用 `user:<name>` 或 `pack:<name>` 区分）。每个题目包都会打开上次选择的分组。
 - 题目包的题面有[多种语言](#多语言题面)时，按 `i` 切换题面语言：列表中的标题和详情页的题面都会切换。列表顶部和题面的标题行会显示当前使用的语言区域。
 
 按 `/` 开始搜索，结果随输入实时更新。普通文本按包含关系匹配标题（所有语言版本，不区分大小写）、slug 或标签，也可以精确匹配 ID：`70` 不会匹配 ID `707`。整段输入作为一个查询，不会按空格分词。使用 `id:` 可以只搜索 ID：
@@ -145,10 +146,44 @@ ty.toml
 | `tab` | 题目页面：在题面和用例之间切换 | `a` | 题目页面：添加用例（已安装的题目包中为你自己的用例） |
 | `↑↓` / `j` `k` | 题目页面的用例标签：选中用例 | `x` / `d` | 题目页面的用例标签：删除选中的用例（已安装的题目包中只能删除你自己的）/ 调试它 |
 
+### 个人分组
+
+为每个题目包（包括 `local`）保存复习题单和学习计划，无需编辑题目包。分组保存按顺序排列的 slug；同一道题可以加入多个分组，各处共享解答、历史和完成状态。目前不支持跨题目包分组。
+
+```sh
+hc group create revisit --pack leetcode --title "需要复习"
+hc group add revisit --pack leetcode 1 lru-cache
+hc list --pack leetcode --group user:revisit
+hc group list --pack leetcode
+hc group show revisit --pack leetcode
+hc group order revisit --pack leetcode lru-cache two-sum
+hc group rename revisit review --pack leetcode --title "复习"
+hc group copy pack:arrays my-arrays --pack leetcode
+hc group remove review two-sum --pack leetcode
+hc group rm review --pack leetcode
+```
+
+`create` 必须指定 `--pack`；其他命令在分组唯一时可以推断题目包。`user:<name>` 和 `pack:<name>` 分别指定个人分组和题目包分组，不带来源的名称必须无歧义。即使在创作工作区，这些命令也不会修改题目包分组：要自定义它，先复制一份。复制得到的是快照，不随上游变化。`add` 接受同一题目包中的题号或 slug，把新成员追加到末尾，已有成员的位置不变。`remove` 和 `order` 使用保存的 slug；`order` 必须按新顺序列出每个成员且恰好一次。删除分组或成员会保留解答、用例、收藏和历史。
+
+文件位于工作区的 `groups/<pack>.yaml`，在已安装题目包和 `.hc/` 之外，可以手工编辑并纳入 Git。例如：
+
+```yaml
+groups:
+  - name: revisit
+    title: 需要复习
+    problems:
+      - lru-cache
+      - two-sum
+```
+
+名称使用小写字母、数字和单个连字符；标题可以使用任意语言，不受题目包 locales 限制。允许空分组。TUI 编辑表单中，每行填写一个 slug，按练习顺序排列；`tab` 切换字段，`ctrl+s` 保存，`esc` 取消。没有任何分组时也能通过 `c` → `n` 创建第一个。有个人分组的题目包即使没有可用题目，也会保留在标签栏中。
+
+更新移除题目后，其 slug 仍保留在个人分组中。分组选择页显示不可用数量，打开分组时提示缺失的 slug，`hc group show` 将其标为 unavailable。可用成员保持顺序，进度只统计可用成员。过时条目由你决定是否删除；hc 不会猜测改名后的对应题目。个人文件格式错误会单独报告，不会让题目包或 `hc pack check` 校验失败；仍可浏览全部题目或明确选择 `pack:` 分组。修改个人分组前需修复文件。正常卸载题目包会保留该文件，重新安装后可继续使用；`--purge` 会一并删除。
+
 ## 命令
 
 ```
-练习          list  start  edit  show  test  submit  debug  reset  discard  history  leetcode
+练习          list  group  start  edit  show  test  submit  debug  reset  discard  history  leetcode
 题目          init  fetch  new  import  cases  validate  pack  docs
 编码智能体    gen  fix  skill
 ```
@@ -359,8 +394,8 @@ hc pack remove leetcode --purge             # ……连同它们一起删除
 
 - **`hc pack install <source>`** 接受 git URL 或目录。git URL 以部分克隆（`--filter=blob:none`）的方式克隆：hc 下载所有 commit，但只下载它检出的 commit 中的文件，所以无论题目包的文件曾经多大，它的历史都不占多少空间。本身是 git 仓库的目录会被完整克隆；其他包含 `pack.yaml` 的目录会被复制（只复制 `pack.yaml` 和 `problems/`）。`--ref` 安装 git 来源的某个 tag 或分支，而不是默认分支。题目包安装到 `packs/<name>/`，名字取自它的 `pack.yaml`。hc 拒绝不合法的 `pack.yaml`、为它不支持的协议版本编写的 `pack.yaml`（并说明该升级 hc 还是题目包），以及与 `packs/` 中已有题目包重名的题目包。加载失败的题目会被报告，但不会阻止安装。
 - **`hc pack list`** 显示每个题目包的名字、版本、题目数、进度（有通过提交的题目数）、已安装的 commit 和来源。`packs/` 中 `hc.yaml` 没有列出的目录（例如手动复制进来的）标为 *unmanaged*（未托管）；`hc.yaml` 列出了但 `packs/` 中没有的题目包标为 *missing*（缺失）。
-- **`hc pack update [name]...`** 拉取每个题目包，并检出它的 ref 的最新 commit：分支会前进，tag 保持不动（除非上游移动了它），`--ref` 改为跟随另一个 ref。安装时没有指定 `--ref` 的题目包跟随源仓库的默认分支，源仓库给默认分支改名后也一样。复制安装的题目包会重新复制。已安装的题目包是只读的，所以有本地修改的题目包会被拒绝更新；`--force` 丢弃这些修改。如果更新后 hc 无法读取 `pack.yaml`，或者题目包改了名，更新会被撤销。更新后 hc 列出新增和删除的题目。你的解答和提交历史按题目的目录名和 slug 关联，所以被删除的题目（或目录被改名的题目）的解答和历史会保留，但不再属于任何题目：hc 会说明这一点，不会删除任何东西。被删除题目的你自己的用例也是如此。
-- **`hc pack remove <name>`** 删除 `packs/<name>/` 和它在 `hc.yaml` 中的条目。你的解答（`solutions/<name>/`）、你自己的用例（`cases/<name>/`）和提交历史保留，重新安装题目包后它们又会出现；`--purge` 会在确认后把它们一并删除（`--yes` 跳过确认）。`local` 不能删除。
+- **`hc pack update [name]...`** 拉取每个题目包，并检出它的 ref 的最新 commit：分支会前进，tag 保持不动（除非上游移动了它），`--ref` 改为跟随另一个 ref。安装时没有指定 `--ref` 的题目包跟随源仓库的默认分支，源仓库给默认分支改名后也一样。复制安装的题目包会重新复制。已安装的题目包是只读的，所以有本地修改的题目包会被拒绝更新；`--force` 丢弃这些修改。如果更新后 hc 无法读取 `pack.yaml`，或者题目包改了名，更新会被撤销。更新后 hc 列出新增和删除的题目。你的解答和提交历史按题目的目录名和 slug 关联，所以被删除的题目（或目录被改名的题目）的解答和历史会保留，但不再属于任何题目：hc 会说明这一点，不会删除任何东西。被删除题目的个人用例和个人分组成员关系也是如此。
+- **`hc pack remove <name>`** 删除 `packs/<name>/` 和它在 `hc.yaml` 中的条目。你的解答（`solutions/<name>/`）、你自己的用例（`cases/<name>/`）、个人分组（`groups/<name>.yaml`）和提交历史保留，重新安装题目包后它们又会出现；`--purge` 会在确认后把它们一并删除（`--yes` 跳过确认）。`local` 不能删除。
 - 同一个工作区里，`hc pack install`、`update` 和 `remove` 一次只能运行一个：一个正在运行时，另一个会拒绝启动并给出说明，而不会撤销前者对 `packs/` 和 `hc.yaml` 的修改。
 
 ### packs 列表

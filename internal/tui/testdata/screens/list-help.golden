@@ -9,6 +9,7 @@
    /           search; id:707 | id:70* | id:700..800
    f           filter
    c           group
+   a           add-to-group
    L           lang
    i           locale
    y           copy-path
@@ -19,7 +20,6 @@
    q           quit
    ?           help
    ctrl+c      quit
-
 
 
 

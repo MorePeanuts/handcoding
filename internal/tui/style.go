@@ -146,7 +146,7 @@ func (m *model) keyHelp(right string, keys ...string) string {
 		return m.st.key.Render(" "+key+" ") + ui.Faint.Render(label+"   ")
 	}
 	help := part("? help")
-	if m.top() == screenCaseForm || m.top() == screenNoteForm {
+	if m.top() == screenCaseForm || m.top() == screenNoteForm || m.top() == screenGroupForm {
 		help = "" // ? is text there
 	}
 	used := lipgloss.Width(help)

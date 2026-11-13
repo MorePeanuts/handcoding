@@ -89,6 +89,7 @@ const (
 	screenSubmission
 	screenCaseForm
 	screenNoteForm
+	screenGroupForm
 )
 
 type confirmation struct {
@@ -142,6 +143,8 @@ type model struct {
 	// cursor, 0 being every problem of the pack.
 	picking     bool
 	groupCursor int
+	groupTarget *problem.Problem
+	groupForm   *groupForm
 	// packCursor is the cursor of the pack picker, an index into tabs.
 	packCursor int
 	// multiPack is set when the list has several tabs: the detail screen
@@ -270,15 +273,11 @@ func (m *model) start() error {
 	case m.opts.Problem != nil:
 		m.pack = m.opts.Problem.Pack
 	case m.opts.Group != "":
-		m.pack = m.opts.Pack
-		if m.pack == "" {
-			k, err := m.app.WS.GroupPack(m.opts.Group)
-			if err != nil {
-				return err
-			}
-			m.pack = k.Name
+		g, err := m.app.ResolveGroup(m.opts.Pack, m.opts.Group)
+		if err != nil {
+			return err
 		}
-		m.groups[m.pack] = m.opts.Group
+		m.pack, m.groups[g.Pack] = g.Pack, g.Key()
 	case m.opts.Pack != "":
 		m.pack = m.opts.Pack
 	default:
@@ -383,21 +382,27 @@ func (m *model) reload() error {
 	var tabs []packTab
 	for _, k := range packs {
 		t := packTab{pack: k}
+		if k.Err == nil {
+			t.groupList, t.groupErr = m.app.Groups(k.Name)
+			if t.groupErr != nil {
+				m.message = ui.Red.Render(t.groupErr.Error())
+			}
+		}
 		for _, p := range probs {
 			if p.Pack == k.Name {
 				t.probs = append(t.probs, p)
 			}
 		}
-		// A pack without problems, such as the local pack before hc new or
-		// hc fetch, has no tab unless --pack names it; only when no pack
-		// has problems does the list show the first, empty. A pack that
-		// cannot be read has no tab either: the error says why.
-		if k.Err == nil && (len(t.probs) > 0 || k.Name == m.opts.Pack) {
+		// A pack without problems or personal groups has no tab unless
+		// --pack names it; only when no pack has either does the list show
+		// the first, empty. An unreadable pack has no tab: the error says why.
+		if k.Err == nil && (len(t.probs) > 0 || len(t.groupList) > 0 || k.Name == m.opts.Pack) {
 			tabs = append(tabs, t)
 		}
 	}
 	if len(tabs) == 0 && len(packs) > 0 && packs[0].Err == nil {
-		tabs = append(tabs, packTab{pack: packs[0]})
+		gs, groupErr := m.app.Groups(packs[0].Name)
+		tabs = append(tabs, packTab{pack: packs[0], groupList: gs, groupErr: groupErr})
 	}
 	m.tabs, m.statuses, m.readyFor = tabs, statuses, map[string]bool{}
 	m.multiPack = len(tabs) > 1
@@ -516,6 +521,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.top() == screenNoteForm {
 			return m.updateNoteForm(msg)
 		}
+		if m.top() == screenGroupForm {
+			return m.updateGroupForm(msg)
+		}
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -529,6 +537,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.top() == screenNoteForm {
 			return m.updateNoteForm(msg)
+		}
+		if m.top() == screenGroupForm {
+			return m.updateGroupForm(msg)
 		}
 		if m.top() == screenCaseForm {
 			// Every other key is text.
@@ -606,6 +617,8 @@ func (m *model) layout() {
 		m.renderSubmission()
 	case screenNoteForm:
 		m.layoutNoteForm()
+	case screenGroupForm:
+		m.layoutGroupForm()
 	}
 }
 
@@ -645,6 +658,8 @@ func (m *model) screenKeys() (string, []string) {
 			return "cases", m.detailKeys()
 		}
 		return "statement", m.detailKeys()
+	case screenGroupForm:
+		return "personal group", groupFormKeys
 	case screenNoteForm:
 		return "submission note", noteKeys
 	case screenCaseForm:
@@ -715,6 +730,8 @@ func (m *model) content() string {
 		return m.viewSubmission()
 	case screenPacks:
 		return m.viewPacks()
+	case screenGroupForm:
+		return m.viewGroupForm()
 	case screenNoteForm:
 		return m.viewNoteForm()
 	case screenCaseForm:

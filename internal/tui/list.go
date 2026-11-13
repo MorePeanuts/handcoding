@@ -11,7 +11,6 @@ import (
 	"github.com/mattn/go-runewidth"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
-	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
@@ -33,16 +32,13 @@ func (f filter) String() string {
 
 // packTab is a pack the list has a tab for, with its problems in id order.
 type packTab struct {
-	pack  *workspace.Pack
-	probs []*problem.Problem
+	pack      *workspace.Pack
+	probs     []*problem.Problem
+	groupList []app.Group
+	groupErr  error
 }
 
-func (t *packTab) groups() []pack.Group {
-	if t.pack.Manifest == nil {
-		return nil
-	}
-	return t.pack.Manifest.Groups
-}
+func (t *packTab) groups() []app.Group { return t.groupList }
 
 // tab is the tab of the pack shown, or nil when there is none.
 func (m *model) tab() *packTab {
@@ -56,27 +52,16 @@ func (m *model) tab() *packTab {
 
 // group is the group shown, or nil when the list shows every problem of
 // the pack.
-func (m *model) group() *pack.Group {
+func (m *model) group() *app.Group {
 	t := m.tab()
 	if t == nil {
 		return nil
 	}
 	gs := t.groups()
-	if i := slices.IndexFunc(gs, func(g pack.Group) bool { return g.Name == m.groups[m.pack] }); i >= 0 {
+	if i := slices.IndexFunc(gs, func(g app.Group) bool { return g.Key() == m.groups[m.pack] }); i >= 0 {
 		return &gs[i]
 	}
 	return nil
-}
-
-// groupProblems are the problems of g, in its order.
-func groupProblems(probs []*problem.Problem, g *pack.Group) []*problem.Problem {
-	var out []*problem.Problem
-	for _, slug := range g.Problems {
-		if i := slices.IndexFunc(probs, func(p *problem.Problem) bool { return p.Slug == slug }); i >= 0 {
-			out = append(out, probs[i])
-		}
-	}
-	return out
 }
 
 // selectProblems lists the problems of the pack and group shown. A group
@@ -86,7 +71,11 @@ func (m *model) selectProblems() {
 	if t := m.tab(); t != nil {
 		m.probs = t.probs
 		if g := m.group(); g != nil {
-			m.probs = groupProblems(t.probs, g)
+			var missing []string
+			m.probs, missing = g.Select(t.probs)
+			if len(missing) > 0 {
+				m.message = ui.Yellow.Render("Unavailable group members (kept): " + strings.Join(missing, ", "))
+			}
 		} else {
 			m.groups[m.pack] = ""
 		}
@@ -214,6 +203,12 @@ func (m *model) updateList(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.switchPack(-1)
 	case "c":
 		m.openGroups()
+	case "a":
+		if p != nil {
+			m.openGroups()
+			m.groupTarget = p
+			m.message = "Choose a personal group for " + p.Slug + "; n creates one"
+		}
 	case "i":
 		m.switchLocale(m.pack)
 	case "h":
@@ -252,41 +247,6 @@ func (m *model) updateSearch(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.cursor = 0
 	m.applyFilter()
 	return m, cmd
-}
-
-// openGroups shows the group picker of the pack shown.
-func (m *model) openGroups() {
-	t := m.tab()
-	if t == nil || len(t.groups()) == 0 {
-		m.message = "pack " + m.pack + " has no groups"
-		return
-	}
-	m.picking = true
-	m.groupCursor = slices.IndexFunc(t.groups(), func(g pack.Group) bool { return g.Name == m.groups[m.pack] }) + 1
-}
-
-func (m *model) updateGroups(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	groups := m.tab().groups()
-	switch msg.String() {
-	case "esc", "q", "c":
-		m.picking = false
-	case "up", "k":
-		m.groupCursor = max(m.groupCursor-1, 0)
-	case "down", "j":
-		m.groupCursor = min(m.groupCursor+1, len(groups))
-	case "home", "g":
-		m.groupCursor = 0
-	case "end", "G":
-		m.groupCursor = len(groups)
-	case "enter", "space":
-		m.picking = false
-		m.groups[m.pack] = ""
-		if m.groupCursor > 0 {
-			m.groups[m.pack] = groups[m.groupCursor-1].Name
-		}
-		m.show()
-	}
-	return m, nil
 }
 
 func (m *model) listHeight() int {
@@ -374,8 +334,8 @@ func (m *model) listKeys() []string {
 		keys = append(keys, "esc packs")
 	}
 	keys = append(keys, "v view", "e edit", "h history", "m star", "/ search", "f filter")
-	if t := m.tab(); t != nil && len(t.groups()) > 0 {
-		keys = append(keys, "c group")
+	if t := m.tab(); t != nil {
+		keys = append(keys, "c group", "a add-to-group")
 	}
 	keys = append(keys, "L lang")
 	if m.localeLabel(m.pack) != "" {
@@ -384,7 +344,7 @@ func (m *model) listKeys() []string {
 	return append(keys, "y copy-path", "r reset", "D discard", "pgup/pgdn page", "g/G first/last", "q quit")
 }
 
-var groupKeys = []string{"↑↓ move", "enter choose", "esc cancel"}
+var groupKeys = []string{"↑↓ move", "enter choose/add", "n new", "e edit", "C copy", "x delete", "esc cancel"}
 
 func (m *model) viewList() string {
 	var b strings.Builder
@@ -579,7 +539,12 @@ func (m *model) viewGroups(b *strings.Builder, h int) {
 		if i > 0 {
 			g := &groups[i-1]
 			cur, _ := m.locale(m.pack)
-			title, probs, name = g.TitleIn(cur), groupProblems(t.probs, g), g.Name
+			var missing []string
+			probs, missing = g.Select(t.probs)
+			title, name = g.TitleIn(cur), g.Key()
+			if len(missing) > 0 {
+				title += fmt.Sprintf(" (%d unavailable)", len(missing))
+			}
 		}
 		cur := i == m.groupCursor
 		r := newRow(nil)

@@ -60,7 +60,7 @@ decide; do not do it on your own.
    a statement and a title in every locale ([Locales](#locales)).
 5. Land one problem per commit (or pull request), whose message names the
    problem, with its group changes in the same commit. Commit only the pack's
-   files: `pack.yaml` and `problems/<dir>/`, never `solutions/`, `.hc/`,
+   files: `pack.yaml` and `problems/<dir>/`, never `solutions/`, `groups/`, `.hc/`,
    `hc.yaml`, `pyrightconfig.json` or `ty.toml`.
 
 To fix a problem that has landed, use `hc-problem` or `hc-cases` the same
@@ -87,8 +87,15 @@ pack.yaml; the first is the default, the language of `description.md` and
 
 ## Groups
 
-Groups only arrange the problems for display (`hc list --group <name>`).
-Read `hc docs protocol groups`.
+Pack groups in `pack.yaml` arrange problems for display
+(`hc list --group pack:<name>`). Read `hc docs protocol groups`.
+
+Personal review lists are separate: `hc group` manages `groups/<pack>.yaml`,
+even in a pack checkout. These files are not published pack content, and
+personal groups may retain missing references after an update. For pack
+maintenance, edit the groups in `pack.yaml`; do not use `hc group` to change
+them. A practitioner can use `hc group copy pack:<name> <personal-name>`
+to customize a snapshot without editing the manifest.
 
 - **A new problem** goes into every group whose topic it fits, possibly
   none. Keep the order the group follows (difficulty, a study plan's
@@ -107,7 +114,7 @@ Read `hc docs protocol groups`.
 
 Removing a problem is a breaking change: users lose it from the pack, and
 their solutions to it stay behind. Do it only when asked. `hc rm <slug> --yes`
-deletes its directory and removes its slug from every group; note it for the
+deletes its directory and removes its slug from every pack group; note it for the
 next release, and never reuse the slug ([Identity](#identity-never-rename-never-reuse)).
 Removing a language from `languages` is breaking too.
 

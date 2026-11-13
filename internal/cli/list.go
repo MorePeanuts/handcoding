@@ -39,7 +39,8 @@ group shown last.
 
 With --plain, or when not in a terminal, it prints a table of every pack's
 problems, or only those of one pack (--pack), or of one group of a pack
-(--group). A group name that only one pack uses needs no --pack.`,
+(--group). Personal and pack groups are available; use user:<name> or
+pack:<name> when their names collide. An unambiguous group needs no --pack.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runList(cmd, root, o)
@@ -63,9 +64,12 @@ func runList(cmd *cobra.Command, root *rootOptions, o listOptions) error {
 		return err
 	}
 	all, loadErr := a.WS.Problems()
-	probs, err := a.WS.Filter(all, o.pack, o.group)
+	probs, missing, err := a.FilterProblems(all, o.pack, o.group)
 	if err != nil {
 		return err
+	}
+	if len(missing) > 0 {
+		fmt.Fprintln(os.Stderr, "Unavailable group members (kept): "+strings.Join(missing, ", "))
 	}
 	if !o.plain && isTerminal(os.Stdout) && isTerminal(os.Stdin) {
 		return runTUI(cmd, a, tui.Options{

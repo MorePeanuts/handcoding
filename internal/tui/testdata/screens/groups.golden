@@ -5,8 +5,8 @@
   GROUP                                             SOLVED  NAME
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 ▌ All problems                                        0/50
-  Structure inputs                                     0/5  structure-inputs
-  Design problems                                      0/5  design
+  Structure inputs                                     0/5  pack:structure-inputs
+  Design problems                                      0/5  pack:design
 
 
 
@@ -27,4 +27,4 @@
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 
- ↑↓ move    enter choose    esc cancel    ? help
+ ↑↓ move    enter choose/add    n new    e edit    C copy    x delete    esc cancel    ? help

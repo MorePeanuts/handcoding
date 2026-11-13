@@ -24,6 +24,7 @@ English · [简体中文](how-to-use_zh.md)
   solutions/local/go/0001-two-sum/         your code: solution.go, plus generated go.mod and zz_hc_driver.go
   solutions/local/python/0001-two-sum/     your code: solution.py, plus a generated _hc_runner.py
   cases/<pack>/<slug>.jsonl                your own cases of an installed pack's problem (see Your own cases)
+  groups/<pack>.yaml                      your ordered personal groups (see Personal groups)
   .hc/hc.db                                submission history (SQLite)
   .hc/venv/                                Python virtual environment managed by hc
   .hc/runtime/python/                      hc_runtime.py, shared by every Python solution
@@ -111,11 +112,11 @@ To open a problem directly, run `hc show 707` or `hc show <pack>/<slug>`. In a t
 - The debugger takes over the terminal. The screen is cleared before it starts, and the TUI comes back when it exits. `d` debugs the first case your code fails, as [`hc debug`](#debugging) picks it. In the history, `d` restores the submission and debugs its first failure.
 - Statement images are drawn in the terminal. kitty and Ghostty show the original image. Other truecolor terminals show a block-character approximation that loses detail; press `o` to open the original in your image viewer. See [`images`](#configuration) to choose the mode.
 - Statement colors follow the terminal background. When the terminal switches between light and dark while the TUI runs, the statement follows it in terminals that report the switch (Ghostty, kitty 0.38 and later, among others); elsewhere its text still follows, its headings and code keep their colors until you reopen hc. If they look wrong, set `theme` in `hc.yaml`.
-- The list shows one pack at a time. With more than one pack, a tab bar at the top names each pack with its progress (solved/total), and `tab` / `shift+tab` switch packs; on a narrow terminal the bar scrolls to keep the current pack in view. A pack without problems, such as `local` before you add one, gets no tab, unless no pack has problems yet.
+- The list shows one pack at a time. With more than one pack, a tab bar at the top names each pack with its progress (solved/total), and `tab` / `shift+tab` switch packs; on a narrow terminal the bar scrolls to keep the current pack in view. A pack without problems or personal groups, such as a new `local`, gets no tab unless `--pack` names it or no pack has problems yet.
 - `m` stars a problem you want to come back to, and `m` again unstars it. Starred problems show `★` in the list and the statement's title, and the `f` filter can list only them. Stars are kept in `.hc/hc.db`, and survive discarding a problem's solution.
-- `c` chooses a group of the pack, or all of its problems, and shows the progress of each. A group lists its problems in the group's order. Search and the filter apply to the pack and group shown.
+- `c` chooses a personal group (`user:`), a group from the pack (`pack:`), or all of its problems, and shows the progress of each. In the picker, `n` creates a personal group, `e` edits it (including member order), `C` copies either kind of group, and `x` deletes a personal group after asking. In the problem list, `a` adds the selected problem to a personal group; `n` in that picker creates one containing the problem. A group lists its problems in the group's order. Search and the filter apply to the pack and group shown.
 - With more than one pack that has problems, `hc` opens on a pack picker that lists them with their progress, the pack you were in last under the cursor. `enter` opens a pack's list, and `esc` on the list comes back to the picker. With one such pack, `hc` opens its list directly.
-- `hc --pack <name>` (or `hc list --pack <name>`) skips the picker and opens that pack, even an empty one, and `--group <name>` that group (a group name that only one pack uses needs no `--pack`). Each pack opens on the group you chose last.
+- `hc --pack <name>` (or `hc list --pack <name>`) skips the picker and opens that pack, even an empty one, and `--group <name>` that group (an unambiguous group needs no `--pack`; use `user:<name>` or `pack:<name>` when the sources share a name). Each pack opens on the group you chose last.
 - `i` switches the statement language of a pack whose statements come in [several languages](#statements-in-several-languages): titles in the list, and the statement on the detail screen. The list header and the statement's title line show the one in use.
 
 Press `/` to search as you type. Ordinary text matches a title (in any language, ignoring case), slug or tag by substring, or an ID exactly: `70` does not match ID `707`. The whole input is one query, without splitting it into words. Use `id:` to search only IDs:
@@ -145,10 +146,44 @@ Exact and prefix searches compare the ID's text (including leading zeros); they 
 | `tab` | Problem: switch between the statement and the cases | `a` | Problem: add a case (one of your own in an installed pack) |
 | `↑↓` / `j` `k` | Problem, cases tab: select a case | `x` / `d` | Problem, cases tab: remove the selected case (in an installed pack, only yours) / debug it |
 
+### Personal groups
+
+Keep review lists and study plans for each pack, including `local`, without editing the pack. Groups contain ordered slugs; the same problem can belong to several groups and shares its solution, history and solved status everywhere. Cross-pack groups are not supported.
+
+```sh
+hc group create revisit --pack leetcode --title "Review again"
+hc group add revisit --pack leetcode 1 lru-cache
+hc list --pack leetcode --group user:revisit
+hc group list --pack leetcode
+hc group show revisit --pack leetcode
+hc group order revisit --pack leetcode lru-cache two-sum
+hc group rename revisit review --pack leetcode --title "Review"
+hc group copy pack:arrays my-arrays --pack leetcode
+hc group remove review two-sum --pack leetcode
+hc group rm review --pack leetcode
+```
+
+`create` requires `--pack`; the other commands can infer it when the group is unique. `user:<name>` and `pack:<name>` distinguish personal and pack groups, and a bare name must be unambiguous. Pack groups are read-only through these commands, including in an authoring checkout: copy one first. A copy is a snapshot and does not follow upstream changes. `add` accepts problem IDs or slugs within the group's pack, appends new members and leaves existing ones in place. `remove` and `order` take stored slugs; `order` requires every member exactly once. Removing a group or member keeps solutions, cases, stars and history.
+
+The file is `groups/<pack>.yaml` in the workspace, outside the installed pack and `.hc/`, so you can edit it and keep it in Git. For example:
+
+```yaml
+groups:
+  - name: revisit
+    title: Review again
+    problems:
+      - lru-cache
+      - two-sum
+```
+
+Names use lower-case letters, digits and single hyphens; titles can be in any language, independently of the pack's locales. Empty groups are allowed. In the TUI form, enter one slug per line in the desired order; `tab` switches fields, `ctrl+s` saves and `esc` cancels. Even a pack without groups has the `c` → `n` entry point. A pack with personal groups stays accessible in the tabs even if it has no available problems.
+
+When an update removes a problem, its slug stays in your groups. The picker shows an unavailable count; opening the group warns about the missing slugs, and `hc group show` lists them as unavailable. Available members keep their order, and only they count toward progress. Remove obsolete entries yourself; hc never guesses that a renamed problem is the same one. A malformed personal file is reported separately and does not invalidate the pack or its `hc pack check`; you can still browse all problems or explicitly select a `pack:` group. Fix the file before editing personal groups. Normal pack removal keeps the file for reinstallation; `--purge` deletes it as well.
+
 ## Commands
 
 ```
-Practice       list  start  edit  show  test  submit  debug  reset  discard  history  leetcode
+Practice       list  group  start  edit  show  test  submit  debug  reset  discard  history  leetcode
 Problems       init  fetch  new  import  cases  validate  pack  docs
 Coding agent   gen  fix  skill
 ```
@@ -359,8 +394,8 @@ hc pack remove leetcode --purge             # ... and delete them too
 
 - **`hc pack install <source>`** takes a git URL, or a directory. A git URL is cloned partially (`--filter=blob:none`): hc downloads every commit, but only the files of the commits it checks out, so a pack's history costs little however large its files once were. A directory that is a git repository is cloned whole; any other directory holding `pack.yaml` is copied (its `pack.yaml` and `problems/` only). `--ref` installs a tag or branch of a git source instead of its default branch. The pack goes into `packs/<name>/`, named after its `pack.yaml`. hc refuses a `pack.yaml` that is invalid or written for a protocol it does not read (and says whether to upgrade hc or the pack), and a name that another pack in `packs/` has. Problems that fail to load are reported, but do not keep the pack from being installed.
 - **`hc pack list`** shows each pack's name, version, number of problems, progress (problems with an accepted submission), installed commit and source. A directory of `packs/` that `hc.yaml` does not list, such as one copied by hand, is *unmanaged*; a pack that `hc.yaml` lists but `packs/` lacks is *missing*.
-- **`hc pack update [name]...`** fetches each pack and checks out the latest commit of its ref: a branch moves on, a tag stays put unless it was moved upstream, and `--ref` switches to another one. A pack installed without `--ref` follows the source's default branch, also when the source renames it. A copied pack is copied again. Installed packs are read-only, so a pack with local changes is refused; `--force` discards them. An update whose `pack.yaml` hc cannot read, or that renames the pack, is undone. Afterwards hc lists the problems added and removed. Your solutions and history are keyed by the problem's directory and slug, so those of a removed problem, or of one whose directory was renamed, are kept but no problem uses them: hc says so, and deletes nothing. The same goes for your own cases of a removed problem.
-- **`hc pack remove <name>`** deletes `packs/<name>/` and its entry in `hc.yaml`. Your solutions (`solutions/<name>/`), your own cases (`cases/<name>/`) and its history stay, so installing the pack again brings them back; `--purge` deletes them too, after asking (`--yes` skips the question). `local` cannot be removed.
+- **`hc pack update [name]...`** fetches each pack and checks out the latest commit of its ref: a branch moves on, a tag stays put unless it was moved upstream, and `--ref` switches to another one. A pack installed without `--ref` follows the source's default branch, also when the source renames it. A copied pack is copied again. Installed packs are read-only, so a pack with local changes is refused; `--force` discards them. An update whose `pack.yaml` hc cannot read, or that renames the pack, is undone. Afterwards hc lists the problems added and removed. Your solutions and history are keyed by the problem's directory and slug, so those of a removed problem, or of one whose directory was renamed, are kept but no problem uses them: hc says so, and deletes nothing. The same goes for your own cases and personal group memberships of a removed problem.
+- **`hc pack remove <name>`** deletes `packs/<name>/` and its entry in `hc.yaml`. Your solutions (`solutions/<name>/`), your own cases (`cases/<name>/`), personal groups (`groups/<name>.yaml`) and its history stay, so installing the pack again brings them back; `--purge` deletes them too, after asking (`--yes` skips the question). `local` cannot be removed.
 - `hc pack install`, `update` and `remove` run one at a time in a workspace: while one runs, another refuses to start and says so, rather than undo its changes to `packs/` and `hc.yaml`.
 
 ### The packs list
