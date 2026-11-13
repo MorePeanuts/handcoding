@@ -232,20 +232,31 @@ func (m *model) updateList(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // updateSearch handles a key or a paste while the search field has focus.
 func (m *model) updateSearch(msg tea.Msg) (tea.Model, tea.Cmd) {
 	key, _ := msg.(tea.KeyPressMsg)
+	if moveSearch(key.String(), &m.cursor, len(m.visible)) {
+		return m, nil
+	}
 	switch key.String() {
+	case "ctrl+o":
+		if p := m.selected(); p != nil {
+			m.openDetail(p, true)
+		}
+		return m, nil
 	case "esc":
 		m.search.SetValue("")
+		m.applyFilter()
 		fallthrough
 	case "enter":
 		m.searching = false
 		m.search.Blur()
-		m.applyFilter()
 		return m, nil
 	}
 	var cmd tea.Cmd
+	before := m.search.Value()
 	m.search, cmd = m.search.Update(msg)
-	m.cursor = 0
-	m.applyFilter()
+	if m.search.Value() != before {
+		m.cursor, m.offset = 0, 0
+		m.applyFilter()
+	}
 	return m, cmd
 }
 
@@ -341,10 +352,10 @@ func (m *model) listKeys() []string {
 	if m.localeLabel(m.pack) != "" {
 		keys = append(keys, "i locale")
 	}
-	return append(keys, "y copy-path", "r reset", "D discard", "pgup/pgdn page", "g/G first/last", "q quit")
+	return append(keys, "y copy-path", "r reset", "D discard", "pgup/pgdn page", "g/G first/last", "q quit", "ctrl+n/p move in search", "ctrl+o open in search")
 }
 
-var groupKeys = []string{"↑↓ move", "enter choose/add", "/ search", "n new", "e edit", "C copy", "x delete", "esc cancel"}
+var groupKeys = []string{"↑↓ move", "enter choose/add", "/ search", "n new", "e edit", "C copy", "x delete", "esc cancel", "ctrl+n/p move in search", "ctrl+o choose/add in search"}
 
 func (m *model) viewList() string {
 	var b strings.Builder
@@ -414,7 +425,15 @@ func (m *model) viewList() string {
 	b.WriteString("\n")
 	if m.picking {
 		if m.groupSearching {
-			b.WriteString(m.keyHelp("", "enter browse", "esc clear"))
+			if m.message != "" {
+				b.WriteString(clip(m.message, m.width))
+				return b.String()
+			}
+			action := "choose"
+			if m.groupTarget != nil {
+				action = "add"
+			}
+			b.WriteString(m.keyHelp("", searchKeys(action)...))
 			return b.String()
 		}
 		b.WriteString(m.keyHelp("", groupKeys...))
@@ -424,7 +443,11 @@ func (m *model) viewList() string {
 	if len(m.visible) > h {
 		pos = fmt.Sprintf("%d–%d of %d", m.offset+1, min(m.offset+h, len(m.visible)), len(m.visible))
 	}
-	b.WriteString(m.keyHelp(pos, m.listKeys()...))
+	keys := m.listKeys()
+	if m.searching {
+		keys = searchKeys("open")
+	}
+	b.WriteString(m.keyHelp(pos, keys...))
 	return b.String()
 }
 

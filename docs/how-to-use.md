@@ -139,7 +139,9 @@ To open a problem directly, run `hc show 707` or `hc show <pack>/<slug>`. In a t
 - `hc --pack <name>` (or `hc list --pack <name>`) skips the picker and opens that pack, even an empty one, and `--group <name>` that group (an unambiguous group needs no `--pack`; use `user:<name>` or `pack:<name>` when the sources share a name). Each pack opens on the group you chose last.
 - `i` switches the statement language of a pack whose statements come in [several languages](#statements-in-several-languages): titles in the list, and the statement on the detail screen. The list header and the statement's title line show the one in use.
 
-Press `/` to search as you type. Ordinary text matches a title (in any language, ignoring case), slug or tag by substring, or an ID exactly: `70` does not match ID `707`. The whole input is one query, without splitting it into words. Use `id:` to search only IDs:
+Press `/` to search as you type. While typing, `↑` / `↓` or `ctrl+p` / `ctrl+n` move the result highlight without leaving the input. `ctrl+o` opens the highlighted problem; returning restores the query, highlight and active input. `enter` finishes typing and browses from the highlighted result; `esc` clears the search. Editing the query moves the highlight to the first match, but moving the text cursor does not. Spaces and ordinary list shortcuts such as `j` / `k` remain query text.
+
+Ordinary text matches a title (in any language, ignoring case), slug or tag by substring, or an ID exactly: `70` does not match ID `707`. The whole input is one query, without splitting it into words. Use `id:` to search only IDs:
 
 | Query | Matches |
 |---|---|
@@ -198,11 +200,11 @@ groups:
 
 Names use lower-case letters, digits and single hyphens; titles can be in any language, independently of the pack's locales. Empty groups are allowed.
 
-In the group picker, `/` searches names and titles in any locale, ignoring case. `enter` finishes typing so you can browse the matches; `esc` clears the search before closing the picker. This filter is separate from the problem list’s search.
+In the group picker, `/` searches names and titles in any locale, ignoring case. While typing, `↑` / `↓` or `ctrl+p` / `ctrl+n` move the highlight and `ctrl+o` chooses that group. In the picker opened with `a`, it instead adds the current problem to that personal group and opens the group. `enter` finishes typing so you can browse from the highlighted match; `esc` clears the search before closing the picker. This filter is separate from the problem list’s search.
 
 The TUI editor has two lists: available problems on the left, selected problems in practice order on the right. Both reuse the problem list’s aligned columns and colors: IDs, localized titles, difficulty, and tags when space permits. A small green `●` in a separate column marks problems already selected for the group; titles keep their normal color.
 
-- Press `/` to search by title, ID or tag (including the list's `id:` queries); `enter` leaves search to browse its results, and `esc` clears an active search.
+- Press `/` to search by title, ID or tag (including the list's `id:` queries). While typing, `↑` / `↓` or `ctrl+p` / `ctrl+n` move the highlight and `ctrl+o` selects or removes that problem in the draft, keeping search active so you can choose several matches. `enter` leaves search to browse from the highlighted result, and `esc` clears an active search. No match, including an incomplete or invalid query, means there is nothing to select.
 - `space` or `enter` toggles the highlighted problem on the left.
 - On the right, `x` removes a member and `K` / `J` (or `alt+up` / `alt+down`) moves it up or down.
 - `tab` cycles through name, title and the two panes; arrow left/right switches panes, and up/down or page keys navigate each list. In name/title fields, `enter` advances to the next field.

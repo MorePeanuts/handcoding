@@ -64,6 +64,8 @@ func TestScreens(t *testing.T) {
 
 	h.press("/")
 	shot("list-search")
+	h.press("ctrl+n", "down")
+	shot("list-search-selected")
 	h.m.Update(tea.PasteMsg{Content: "id:100.."})
 	shot("list-search-incomplete")
 	h.m.Update(tea.PasteMsg{Content: "110"})

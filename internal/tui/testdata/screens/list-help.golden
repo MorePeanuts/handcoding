@@ -18,10 +18,10 @@
    pgup/pgdn   page
    g/G         first/last
    q           quit
+   ctrl+n/p    move in search
+   ctrl+o      open in search
    ?           help
    ctrl+c      quit
-
-
 
 
 

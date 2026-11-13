@@ -1,0 +1,20 @@
+ hc   Personal group
+Copy Design problems · regression
+────────────────────────────────────────────────────────────
+Name                           Title
+design-copy                    Design problems
+╭─ Available 19/50 ────────────────────────────────────────╮
+│/ id:1..150                                               │
+│    #      TITLE                                  LEVEL   │
+├──────────────────────────────────────────────────────────┤
+│▌ ● 4      Median of Two Sorted Arrays            Hard    │
+╰──────────────────────────────────────────────────────────╯
+╭─ Selected 6 ─────────────────────────────────────────────╮
+│K/J reorder · x remove                                    │
+│    #      TITLE                                  LEVEL   │
+├──────────────────────────────────────────────────────────┤
+│  ● 4      Median of Two Sorted Arrays            Hard    │
+╰──────────────────────────────────────────────────────────╯
+● selected · 4 · Median of Two Sorted Arrays · Hard
+────────────────────────────────────────────────────────────
+ ↑↓ move    ctrl+o select/remove    enter browse
