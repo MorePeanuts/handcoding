@@ -529,19 +529,23 @@ func difficultyLabel(d string) string {
 func (m *model) viewGroups(b *strings.Builder, h int) {
 	t := m.tab()
 	groups := t.groups()
-	titleW := min(max(m.width-30, 20), 48)
-	b.WriteString(ui.Faint.Render(fmt.Sprintf("  %s %7s  %s", fit("GROUP", titleW), "SOLVED", "NAME")) + "\n")
+	titleW := min(max(m.width-40, 10), 48)
+	nameW := max(m.width-titleW-20, 0)
+	b.WriteString(ui.Faint.Render(fmt.Sprintf("  %s %7s  %-6s  %s", fit("GROUP", titleW), "SOLVED", "SOURCE", fit("NAME", nameW))) + "\n")
 	b.WriteString(m.rule() + "\n")
 	first := max(m.groupCursor-h+1, 0)
 	n := 0
 	for i := first; i < min(first+h, len(groups)+1); i++ {
-		title, probs, name := "All problems", t.probs, ""
+		title, probs, name, source := "All problems", t.probs, "", ""
 		if i > 0 {
 			g := &groups[i-1]
 			cur, _ := m.locale(m.pack)
 			var missing []string
 			probs, missing = g.Select(t.probs)
-			title, name = g.TitleIn(cur), g.Key()
+			title, name = g.TitleIn(cur), g.Name
+			if g.User {
+				source = "user"
+			}
 			if len(missing) > 0 {
 				title += fmt.Sprintf(" (%d unavailable)", len(missing))
 			}
@@ -553,7 +557,7 @@ func (m *model) viewGroups(b *strings.Builder, h int) {
 			r, titleStyle = newRow(m.st.sel), m.st.title
 		}
 		m.cursorBar(r, cur)
-		r.add(titleStyle, fit(title, titleW)+" ").plain(fmt.Sprintf("%7s  ", m.progress(probs))).add(ui.Faint, name)
+		r.add(titleStyle, fit(title, titleW)+" ").plain(fmt.Sprintf("%7s  ", m.progress(probs))).add(ui.Faint, fit(source, 6)+"  "+fit(name, nameW))
 		b.WriteString(r.fill(m.width) + "\n")
 		n++
 	}

@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+
+	"github.com/MorePeanuts/handcoding/internal/ui"
 
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
@@ -16,7 +19,7 @@ func TestPersonalGroupTUI(t *testing.T) {
 	h := newHarness(t)
 	selected := h.m.selected().Slug
 	h.press("a", "n")
-	if h.m.top() != screenGroupForm || h.m.groupForm.members.Value() != selected {
+	if h.m.top() != screenGroupForm || !slices.Equal(h.m.groupForm.selected, []string{selected}) {
 		t.Fatal("add/new did not start from selected problem")
 	}
 	h.m.Update(tea.PasteMsg{Content: "review"})
@@ -32,7 +35,9 @@ func TestPersonalGroupTUI(t *testing.T) {
 	}
 	h.press("c", "e")
 	h.m.groupForm.name.SetValue("renamed")
-	h.m.groupForm.members.SetValue("lru-cache\n" + selected)
+	h.press("tab", "tab", "/")
+	h.m.Update(tea.PasteMsg{Content: "146"})
+	h.press("enter", "space", "tab", "K")
 	h.press("ctrl+s")
 	if h.m.group() == nil || h.m.group().Name != "renamed" || len(h.m.probs) != 2 || h.m.probs[0].Slug != "lru-cache" {
 		t.Fatal("rename/reorder failed")
@@ -77,10 +82,10 @@ func TestPersonalGroupEmptyAndErrors(t *testing.T) {
 		t.Fatal("empty group did not open")
 	}
 	h.press("c", "e")
-	h.m.groupForm.members.SetValue("unknown")
+	h.m.groupForm.name.SetValue("Invalid name")
 	h.press("ctrl+s")
 	if h.m.top() != screenGroupForm || h.m.groupForm.err == "" {
-		t.Fatal("invalid new member accepted")
+		t.Fatal("invalid group name accepted")
 	}
 	h.press("esc", "esc")
 	// A pack with personal groups and no problems still gets a tab.
@@ -148,4 +153,194 @@ func TestPersonalGroupRememberedSource(t *testing.T) {
 	if m.group() == nil || m.group().Key() != "user:design" {
 		t.Fatal("personal source was not remembered across a collision")
 	}
+}
+
+func TestGroupEditorSearchAndSelection(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	h.press("c", "n")
+	f := h.m.groupForm
+	h.m.Update(tea.PasteMsg{Content: "review"})
+	h.press("enter")
+	if f.focus != groupTitle || h.m.top() != screenGroupForm {
+		t.Fatal("enter saved instead of advancing")
+	}
+	h.m.Update(tea.PasteMsg{Content: "复习 ?"})
+	h.press("enter")
+	search := func(query string) {
+		t.Helper()
+		h.press("/")
+		h.m.Update(tea.PasteMsg{Content: query})
+		h.press("enter")
+	}
+	search("两数之和")
+	if len(f.available) != 1 || f.available[0].Slug != "two-sum" {
+		t.Fatal("localized title search failed")
+	}
+	h.press("space")
+	if !slices.Equal(f.selected, []string{"two-sum"}) {
+		t.Fatal("title-based selection failed")
+	}
+	// A filter edit does not lose selections. Esc clears only active search.
+	h.press("/", "esc")
+	if h.m.top() != screenGroupForm || f.search.Value() != "" || len(f.selected) != 1 {
+		t.Fatal("clearing search lost the draft")
+	}
+	search("id:146")
+	h.press("space", "space", "space")
+	if !slices.Equal(f.selected, []string{"two-sum", "lru-cache"}) {
+		t.Fatal("selection toggle duplicated or lost members")
+	}
+	h.press("tab", "K")
+	if !slices.Equal(f.selected, []string{"lru-cache", "two-sum"}) {
+		t.Fatal("selected pane did not reorder")
+	}
+	h.press("J", "x")
+	if !slices.Equal(f.selected, []string{"two-sum"}) {
+		t.Fatal("selected pane did not remove")
+	}
+	h.press("/", "esc")
+	search("id:100..")
+	h.press("space")
+	if f.searchHint == "" || len(f.available) != 0 || len(f.selected) != 1 {
+		t.Fatal("invalid ID search selected a problem")
+	}
+	h.press("/", "esc")
+	search("hash-table")
+	if len(f.available) < 2 {
+		t.Fatal("tag search failed")
+	}
+	h.press("G", "pgup", "right")
+	if f.focus != groupSelected {
+		t.Fatal("pane switch failed")
+	}
+	h.press("?", "esc")
+	if h.m.top() != screenGroupForm || h.m.help {
+		t.Fatal("help closed the editor")
+	}
+	h.press("ctrl+s")
+	g, err := h.m.app.ResolveGroup("regression", "user:review")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(g.Problems, []string{"two-sum"}) || g.Title != "复习 ?" {
+		t.Fatalf("saved draft: %+v", g)
+	}
+}
+
+func TestGroupCopyEditsBeforeSaving(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	original, err := h.m.app.ResolveGroup("regression", "pack:design")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.press("c", "G", "C")
+	f := h.m.groupForm
+	if f.source == nil || !slices.Equal(f.selected, original.Problems) {
+		t.Fatal("copy did not preload members")
+	}
+	if strings.Contains(h.view(), "pack:") {
+		t.Fatal("copy view exposed the internal source prefix")
+	}
+	if _, err := h.m.app.ResolveGroup("regression", "user:design-copy"); err == nil {
+		t.Fatal("copy wrote before save")
+	}
+	// Remove and reorder inherited members, then add a title search result.
+	h.press("tab", "tab", "tab", "x", "J", "/")
+	h.m.Update(tea.PasteMsg{Content: "Two Sum"})
+	h.press("enter", "space")
+	want := slices.Clone(f.selected)
+	if slices.Contains(want, original.Problems[0]) || !slices.Contains(want, "two-sum") || want[0] != original.Problems[2] {
+		t.Fatalf("copy draft: %v", want)
+	}
+	h.press("ctrl+s")
+	g, err := h.m.app.ResolveGroup("regression", "user:design-copy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(g.Problems, want) {
+		t.Fatalf("saved unedited source: %v", g.Problems)
+	}
+	source, err := h.m.app.ResolveGroup("regression", "pack:design")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(source.Problems, original.Problems) {
+		t.Fatal("changed source group")
+	}
+	h.press("c", "C", "tab", "tab", "tab", "x", "esc")
+	if _, err := h.m.app.ResolveGroup("regression", "user:design-copy-copy"); err == nil {
+		t.Fatal("cancelled copy was created")
+	}
+}
+
+func TestGroupPickerSourceColumn(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	if err := h.m.app.CreateGroup("regression", "design", "My design"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.m.reload(); err != nil {
+		t.Fatal(err)
+	}
+	h.press("c")
+	view := h.view()
+	if !strings.Contains(view, "SOURCE") || !strings.Contains(view, "user") || strings.Contains(view, "user:") || strings.Contains(view, "pack:") {
+		t.Fatalf("source column:\n%s", view)
+	}
+	for _, line := range strings.Split(view, "\n") {
+		if strings.Contains(line, "Design problems") && strings.Contains(line, "user") {
+			t.Fatalf("pack group has a user marker: %s", line)
+		}
+	}
+}
+
+func TestGroupEditorLayout(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	h.press("c", "G", "C", "tab", "tab")
+	for _, size := range []struct{ width, height int }{{100, 30}, {61, 24}, {60, 20}, {40, 20}, {40, 30}} {
+		h.m.Update(tea.WindowSizeMsg{Width: size.width, Height: size.height})
+		for _, key := range []string{"G", "right", "G", "K", "left"} {
+			h.press(key)
+			view := h.view()
+			lines := strings.Split(view, "\n")
+			if len(lines) > size.height {
+				t.Fatalf("%dx%d: %d lines", size.width, size.height, len(lines))
+			}
+			for _, line := range lines {
+				if w := lipgloss.Width(line); w > size.width {
+					t.Fatalf("%dx%d: line width %d: %s", size.width, size.height, w, line)
+				}
+			}
+		}
+	}
+}
+
+func TestGroupEditorScreens(t *testing.T) {
+	t.Parallel()
+	if ui.Colors() {
+		t.Skip("stdout is a terminal: the screens would have colors")
+	}
+	h := newHarness(t)
+	if err := h.m.app.SaveGroup("regression", "", workspace.UserGroup{Name: "design", Title: "My design problems", Problems: []string{"two-sum", "lru-cache"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.m.reload(); err != nil {
+		t.Fatal(err)
+	}
+	h.m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	h.press("c")
+	golden(t, "groups-personal", h.view())
+	h.press("G", "C", "tab", "tab", "tab", "x", "J", "/")
+	h.m.Update(tea.PasteMsg{Content: "Two Sum"})
+	h.press("enter", "space", "right")
+	golden(t, "group-copy-edited", h.view())
+	h.press("/", "esc", "/")
+	h.m.Update(tea.PasteMsg{Content: "id:700.."})
+	golden(t, "group-form-search-incomplete", h.view())
+	h.press("esc", "/")
+	h.m.Update(tea.PasteMsg{Content: "no matching title"})
+	golden(t, "group-form-search-empty", h.view())
 }

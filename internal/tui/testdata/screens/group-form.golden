@@ -1,29 +1,30 @@
  hc   Personal group
-Your groups · regression · pack files stay unchanged
+regression · Choose problems for your group
 ────────────────────────────────────────────────────────────────────────────────────────────────────
+Name                                               Title
+review                                             需要复习
 
-Name
-review
-
-Title
-需要复习
-
-Problem slugs (one per line, in order)
-two-sum
-lru-cache
-
-
-
-
-
-
-
-
-
-
-
-
-Missing existing members may be kept; new members must exist.
+╭─ Available 50/50 ─────────────────────────────╮  ╭─ Selected 2 ──────────────────────────────────╮
+│/ Search title, ID or tag                      │  │K/J reorder · x remove                         │
+├───────────────────────────────────────────────┤  ├───────────────────────────────────────────────┤
+│▌ [x] 1 Two Sum                                │  │  1 Two Sum                                    │
+│  [ ] 4 Median of Two Sorted Arrays            │  │  146 LRU Cache                                │
+│  [ ] 5 Longest Palindromic Substring          │  │                                               │
+│  [ ] 23 Merge k Sorted Lists                  │  │                                               │
+│  [ ] 27 Remove Element                        │  │                                               │
+│  [ ] 46 Permutations                          │  │                                               │
+│  [ ] 49 Group Anagrams                        │  │                                               │
+│  [ ] 95 Unique Binary Search Trees II         │  │                                               │
+│  [ ] 104 Maximum Depth of Binary Tree         │  │                                               │
+│  [ ] 108 Convert Sorted Array to Binary Searc…│  │                                               │
+│  [ ] 114 Flatten Binary Tree to Linked List   │  │                                               │
+│  [ ] 117 Populating Next Right Pointers in Ea…│  │                                               │
+│  [ ] 130 Surrounded Regions                   │  │                                               │
+│  [ ] 133 Clone Graph                          │  │                                               │
+│  [ ] 138 Copy List with Random Pointer        │  │                                               │
+│  [ ] 141 Linked List Cycle                    │  │                                               │
+╰───────────────────────────────────────────────╯  ╰───────────────────────────────────────────────╯
+1 · Two Sum · Easy
 ────────────────────────────────────────────────────────────────────────────────────────────────────
-
- ctrl+s save    tab switch    esc cancel    enter save/newline                                   1/3
+Tab: switch · Ctrl+S: save · Esc: cancel
+ ctrl+s save    space select    / search    tab selected    esc cancel    ? help

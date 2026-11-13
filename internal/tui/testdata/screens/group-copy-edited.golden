@@ -1,0 +1,30 @@
+ hc   Personal group
+Copy Design problems · regression
+────────────────────────────────────────────────────────────────────────────────────────────────────
+Name                                               Title
+design-copy                                        Design problems
+
+╭─ Available 1/50 ──────────────────────────────╮  ╭─ Selected 5 ──────────────────────────────────╮
+│/ Two Sum                                      │  │K/J reorder · x remove                         │
+├───────────────────────────────────────────────┤  ├───────────────────────────────────────────────┤
+│  [x] 1 Two Sum                                │  │  297 Serialize and Deserialize Binary Tree    │
+│                                               │  │  173 Binary Search Tree Iterator              │
+│                                               │  │  535 Encode and Decode TinyURL                │
+│                                               │  │  341 Flatten Nested List Iterator             │
+│                                               │  │▌ 1 Two Sum                                    │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+│                                               │  │                                               │
+╰───────────────────────────────────────────────╯  ╰───────────────────────────────────────────────╯
+1 · Two Sum · Easy
+────────────────────────────────────────────────────────────────────────────────────────────────────
+Tab: switch · Ctrl+S: save · Esc: cancel
+ ctrl+s save    x remove    K/J reorder    tab next    / search    esc cancel    ? help

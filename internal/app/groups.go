@@ -179,9 +179,7 @@ func (a *App) CopyGroup(packName, source, name, title string) error {
 	if title == "" {
 		title = g.Title
 	}
-	return a.WS.UpdateUserGroups(g.Pack, func(gs []workspace.UserGroup) ([]workspace.UserGroup, error) {
-		return append(gs, workspace.UserGroup{Name: name, Title: title, Problems: slices.Clone(g.Problems)}), nil
-	})
+	return a.SaveGroupCopy(g, workspace.UserGroup{Name: name, Title: title, Problems: slices.Clone(g.Problems)})
 }
 
 // editGroup resolves the source before writing and rechecks existence
@@ -288,7 +286,19 @@ func (a *App) OrderGroupProblems(packName, selector string, slugs []string) erro
 // unavailable slugs may be retained; newly added ones must resolve exactly.
 // The whole edit, including a rename, is committed in one write.
 func (a *App) SaveGroup(packName, original string, group workspace.UserGroup) error {
-	if _, err := a.WS.Pack(packName); err != nil {
+	return a.saveGroup(packName, original, group, nil)
+}
+
+// SaveGroupCopy saves an edited snapshot in one write. The source was read
+// when editing began: its unavailable members can be retained even if the
+// source changes meanwhile. Newly selected members must still exist.
+func (a *App) SaveGroupCopy(source Group, group workspace.UserGroup) error {
+	return a.saveGroup(source.Pack, "", group, source.Problems)
+}
+
+func (a *App) saveGroup(packName, original string, group workspace.UserGroup, retained []string) error {
+	k, err := a.WS.Pack(packName)
+	if err != nil {
 		return err
 	}
 	return a.WS.UpdateUserGroups(packName, func(gs []workspace.UserGroup) ([]workspace.UserGroup, error) {
@@ -300,12 +310,27 @@ func (a *App) SaveGroup(packName, original string, group workspace.UserGroup) er
 		if i >= 0 {
 			old = gs[i].Problems
 		}
+		var available map[string]bool
 		for _, slug := range group.Problems {
-			if slices.Contains(old, slug) {
+			if slices.Contains(old, slug) || slices.Contains(retained, slug) {
 				continue
 			}
-			if _, err := a.WS.ProblemOf(packName, slug); err != nil {
-				return nil, err
+			// Load the pack once when adding many selected problems. Only a
+			// missing member needs ProblemOf's detailed load error.
+			if available == nil {
+				probs, _, err := k.Problems()
+				if err != nil {
+					return nil, err
+				}
+				available = map[string]bool{}
+				for _, p := range probs {
+					available[p.Slug] = true
+				}
+			}
+			if !available[slug] {
+				if _, err := a.WS.ProblemOf(packName, slug); err != nil {
+					return nil, err
+				}
 			}
 		}
 		if i >= 0 {

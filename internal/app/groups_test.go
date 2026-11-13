@@ -223,3 +223,46 @@ func TestPersonalGroupsAuthoring(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// A copy is a mutable draft, including its inherited unavailable members.
+// Saving it is atomic and never changes the source or leaves a half-copy.
+func TestSaveEditedGroupCopy(t *testing.T) {
+	t.Parallel()
+	a := newWorkspace(t)
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(a.WS.UpdateUserGroups("regression", func(gs []workspace.UserGroup) ([]workspace.UserGroup, error) {
+		return append(gs, workspace.UserGroup{Name: "source", Problems: []string{"two-sum", "gone"}}), nil
+	}))
+	source, err := a.ResolveGroup("regression", "user:source")
+	must(err)
+	// Capture the source when opening the editor, rather than re-reading it
+	// on save and losing the user's draft when it changes elsewhere.
+	must(a.DeleteGroup("regression", "source"))
+	must(a.SaveGroupCopy(source, workspace.UserGroup{Name: "copy", Title: "Edited copy", Problems: []string{"gone", "lru-cache"}}))
+	copy, err := a.ResolveGroup("regression", "user:copy")
+	must(err)
+	if !slices.Equal(copy.Problems, []string{"gone", "lru-cache"}) {
+		t.Fatalf("copy: %+v", copy)
+	}
+	path := a.WS.UserGroupsPath("regression")
+	before, err := os.ReadFile(path)
+	must(err)
+	err = a.SaveGroupCopy(source, workspace.UserGroup{Name: "invalid", Problems: []string{"new-missing"}})
+	if err == nil {
+		t.Fatal("new missing member was allowed")
+	}
+	after, err := os.ReadFile(path)
+	must(err)
+	if !bytes.Equal(before, after) {
+		t.Fatal("failed copy changed the groups file")
+	}
+	err = a.SaveGroupCopy(source, workspace.UserGroup{Name: "copy", Problems: []string{"two-sum"}})
+	if err == nil {
+		t.Fatal("copy overwrote an existing group")
+	}
+}

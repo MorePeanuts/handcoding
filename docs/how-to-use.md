@@ -114,7 +114,7 @@ To open a problem directly, run `hc show 707` or `hc show <pack>/<slug>`. In a t
 - Statement colors follow the terminal background. When the terminal switches between light and dark while the TUI runs, the statement follows it in terminals that report the switch (Ghostty, kitty 0.38 and later, among others); elsewhere its text still follows, its headings and code keep their colors until you reopen hc. If they look wrong, set `theme` in `hc.yaml`.
 - The list shows one pack at a time. With more than one pack, a tab bar at the top names each pack with its progress (solved/total), and `tab` / `shift+tab` switch packs; on a narrow terminal the bar scrolls to keep the current pack in view. A pack without problems or personal groups, such as a new `local`, gets no tab unless `--pack` names it or no pack has problems yet.
 - `m` stars a problem you want to come back to, and `m` again unstars it. Starred problems show `★` in the list and the statement's title, and the `f` filter can list only them. Stars are kept in `.hc/hc.db`, and survive discarding a problem's solution.
-- `c` chooses a personal group (`user:`), a group from the pack (`pack:`), or all of its problems, and shows the progress of each. In the picker, `n` creates a personal group, `e` edits it (including member order), `C` copies either kind of group, and `x` deletes a personal group after asking. In the problem list, `a` adds the selected problem to a personal group; `n` in that picker creates one containing the problem. A group lists its problems in the group's order. Search and the filter apply to the pack and group shown.
+- `c` chooses a personal group, a group from the pack, or all of its problems, and shows the progress of each. The SOURCE column shows `user` for personal groups and stays blank for pack groups; names have no prefix in the TUI. In the picker, `n` creates a personal group, `e` edits it (including member order), `C` copies either kind of group, and `x` deletes a personal group after asking. In the problem list, `a` adds the selected problem to a personal group; `n` in that picker creates one containing the problem. A group lists its problems in the group's order. Search and the filter apply to the pack and group shown.
 - With more than one pack that has problems, `hc` opens on a pack picker that lists them with their progress, the pack you were in last under the cursor. `enter` opens a pack's list, and `esc` on the list comes back to the picker. With one such pack, `hc` opens its list directly.
 - `hc --pack <name>` (or `hc list --pack <name>`) skips the picker and opens that pack, even an empty one, and `--group <name>` that group (an unambiguous group needs no `--pack`; use `user:<name>` or `pack:<name>` when the sources share a name). Each pack opens on the group you chose last.
 - `i` switches the statement language of a pack whose statements come in [several languages](#statements-in-several-languages): titles in the list, and the statement on the detail screen. The list header and the statement's title line show the one in use.
@@ -176,7 +176,17 @@ groups:
       - two-sum
 ```
 
-Names use lower-case letters, digits and single hyphens; titles can be in any language, independently of the pack's locales. Empty groups are allowed. In the TUI form, enter one slug per line in the desired order; `tab` switches fields, `ctrl+s` saves and `esc` cancels. Even a pack without groups has the `c` → `n` entry point. A pack with personal groups stays accessible in the tabs even if it has no available problems.
+Names use lower-case letters, digits and single hyphens; titles can be in any language, independently of the pack's locales. Empty groups are allowed.
+
+The TUI editor has two lists: available problems on the left, selected problems in practice order on the right. Both show IDs and localized titles.
+
+- Press `/` to search by title, ID or tag (including the list's `id:` queries); `enter` leaves search to browse its results, and `esc` clears an active search.
+- `space` or `enter` toggles the highlighted problem on the left.
+- On the right, `x` removes a member and `K` / `J` (or `alt+up` / `alt+down`) moves it up or down.
+- `tab` cycles through name, title and the two panes; arrow left/right switches panes, and up/down or page keys navigate each list. In name/title fields, `enter` advances to the next field.
+- `ctrl+s` saves the entire draft; `esc` outside search cancels without writing.
+
+Copy opens the same editor with the source's members already selected, so you can add, remove and reorder them before the first save. On terminals narrower than 60 columns, the two lists stack vertically. From a list pane, `?` shows all editor keys; in text fields it is text. Even a pack without groups has the `c` → `n` entry point. A pack with personal groups stays accessible in the tabs even if it has no available problems.
 
 When an update removes a problem, its slug stays in your groups. The picker shows an unavailable count; opening the group warns about the missing slugs, and `hc group show` lists them as unavailable. Available members keep their order, and only they count toward progress. Remove obsolete entries yourself; hc never guesses that a renamed problem is the same one. A malformed personal file is reported separately and does not invalidate the pack or its `hc pack check`; you can still browse all problems or explicitly select a `pack:` group. Fix the file before editing personal groups. Normal pack removal keeps the file for reinstallation; `--purge` deletes it as well.
 

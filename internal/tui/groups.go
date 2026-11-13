@@ -5,12 +5,12 @@ import (
 	"slices"
 	"strings"
 
-	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
+	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
@@ -100,119 +100,234 @@ func (m *model) updateGroups(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// The two lists share one draft for create, edit and copy. Slugs identify
+// members internally; people choose problems by title and ID.
+const (
+	groupName = iota
+	groupTitle
+	groupAvailable
+	groupSelected
+	groupFields
+)
+
 type groupForm struct {
-	original    string
-	source      string // nonempty: copy a source group, members are not edited yet
-	name, title textinput.Model
-	members     textarea.Model
-	focus       int
-	err         string
+	original                        string
+	source                          *app.Group
+	sourceTitle                     string
+	name, title, search             textinput.Model
+	all                             []*problem.Problem
+	bySlug                          map[string]*problem.Problem
+	available                       []*problem.Problem
+	selected                        []string
+	focus                           int
+	searching                       bool
+	availableCursor, selectedCursor int
+	searchHint, err                 string
 }
 
 func (m *model) openGroupForm(g *app.Group, copyGroup bool) {
-	f := &groupForm{name: textinput.New(), title: textinput.New(), members: textarea.New()}
-	for _, field := range []*textinput.Model{&f.name, &f.title} {
+	f := &groupForm{name: textinput.New(), title: textinput.New(), search: textinput.New(), bySlug: map[string]*problem.Problem{}}
+	for _, field := range []*textinput.Model{&f.name, &f.title, &f.search} {
 		field.Prompt = ""
 		field.SetStyles(searchStyles())
 		field.CharLimit = 0
 	}
 	f.name.Placeholder = "lower-case-name"
-	f.title.Placeholder = "optional title, in any language"
-	f.members.Prompt = ""
-	f.members.Placeholder = "One problem slug per line, in practice order"
-	f.members.ShowLineNumbers = false
-	f.members.CharLimit, f.members.MaxHeight, f.members.MaxWidth = 0, 0, 0
-	styles := textarea.DefaultStyles(m.opts.Theme == ui.ThemeDark)
-	state := textarea.StyleState{}
-	if ui.Colors() {
-		state.Placeholder = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	f.title.Placeholder = "optional display title"
+	f.search.Prompt = "/ "
+	f.search.Placeholder = "Search title, ID or tag"
+	f.all = slices.Clone(m.tab().probs)
+	for _, p := range f.all {
+		f.bySlug[p.Slug] = p
 	}
-	state.Selection = lipgloss.NewStyle().Reverse(true)
-	styles.Focused, styles.Blurred, styles.Cursor.Color = state, state, nil
-	f.members.SetStyles(styles)
 	if g != nil {
 		f.name.SetValue(g.Name)
 		f.title.SetValue(g.Title)
-		f.members.SetValue(strings.Join(g.Problems, "\n"))
+		f.selected = slices.Clone(g.Problems)
 		if copyGroup {
-			f.source = g.Key()
+			snapshot := *g
+			snapshot.Problems = slices.Clone(g.Problems)
+			f.source = &snapshot
+			locale, _ := m.locale(m.pack)
+			f.sourceTitle = g.TitleIn(locale)
 			f.name.SetValue(g.Name + "-copy")
 		} else {
 			f.original = g.Name
 		}
 	} else if m.groupTarget != nil {
-		f.members.SetValue(m.groupTarget.Slug)
+		f.selected = []string{m.groupTarget.Slug}
 	}
+	f.filterAvailable()
 	f.name.Focus()
+	m.message = ""
 	m.groupForm = f
 	m.push(screenGroupForm)
+}
+
+func (f *groupForm) filterAvailable() {
+	match, hint := parseSearch(f.search.Value())
+	f.searchHint = hint
+	f.available = nil
+	if hint == "" {
+		for _, p := range f.all {
+			if match(p) {
+				f.available = append(f.available, p)
+			}
+		}
+	}
+	f.availableCursor = 0
+}
+
+func (f *groupForm) setFocus(focus int) tea.Cmd {
+	f.focus = focus
+	f.searching = false
+	f.name.Blur()
+	f.title.Blur()
+	f.search.Blur()
+	switch focus {
+	case groupName:
+		return f.name.Focus()
+	case groupTitle:
+		return f.title.Focus()
+	}
+	return nil
 }
 
 func (m *model) updateGroupForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	f := m.groupForm
 	if key, ok := msg.(tea.KeyPressMsg); ok {
 		switch key.String() {
-		case "esc":
-			m.groupForm = nil
-			m.pop()
-			return m, nil
-		case "tab", "shift+tab":
-			n := 3
-			if f.source != "" {
-				n = 2
-			}
-			step := 1
-			if key.String() == "shift+tab" {
-				step = n - 1
-			}
-			f.focus = (f.focus + step) % n
-			f.name.Blur()
-			f.title.Blur()
-			f.members.Blur()
-			switch f.focus {
-			case 0:
-				return m, f.name.Focus()
-			case 1:
-				return m, f.title.Focus()
-			default:
-				return m, f.members.Focus()
-			}
 		case "ctrl+s":
 			m.saveGroupForm()
 			return m, nil
-		case "enter":
-			if f.focus < 2 {
-				m.saveGroupForm()
+		case "tab", "shift+tab":
+			step := 1
+			if key.String() == "shift+tab" {
+				step = groupFields - 1
+			}
+			return m, f.setFocus((f.focus + step) % groupFields)
+		case "esc":
+			if f.searching {
+				f.search.SetValue("")
+				f.filterAvailable()
+				return m, f.setFocus(groupAvailable)
+			}
+			m.groupForm = nil
+			m.pop()
+			return m, nil
+		}
+		switch {
+		case f.searching:
+			if key.String() == "enter" {
+				return m, f.setFocus(groupAvailable)
+			}
+		case f.focus == groupName || f.focus == groupTitle:
+			if key.String() == "enter" {
+				return m, f.setFocus(f.focus + 1)
+			}
+		default:
+			if key.String() == "?" {
+				m.help = true
 				return m, nil
 			}
+			if key.String() == "/" {
+				f.setFocus(groupAvailable)
+				f.searching = true
+				return m, f.search.Focus()
+			}
+			switch key.String() {
+			case "left", "h":
+				return m, f.setFocus(groupAvailable)
+			case "right", "l":
+				return m, f.setFocus(groupSelected)
+			}
+			m.updateGroupList(key.String())
+			return m, nil
 		}
 	}
 	var cmd tea.Cmd
-	switch f.focus {
-	case 0:
+	switch {
+	case f.searching:
+		f.search, cmd = f.search.Update(msg)
+		f.filterAvailable()
+	case f.focus == groupName:
 		f.name, cmd = f.name.Update(msg)
-	case 1:
+	case f.focus == groupTitle:
 		f.title, cmd = f.title.Update(msg)
-	case 2:
-		f.members, cmd = f.members.Update(msg)
 	}
 	return m, cmd
 }
 
+func (m *model) updateGroupList(key string) {
+	f := m.groupForm
+	cursor, n := &f.availableCursor, len(f.available)
+	if f.focus == groupSelected {
+		cursor, n = &f.selectedCursor, len(f.selected)
+	}
+	rows := m.groupRows()
+	switch key {
+	case "up", "k":
+		*cursor = max(*cursor-1, 0)
+	case "down", "j":
+		*cursor = min(*cursor+1, max(n-1, 0))
+	case "home", "g":
+		*cursor = 0
+	case "end", "G":
+		*cursor = max(n-1, 0)
+	case "pgup", "ctrl+u":
+		*cursor = max(*cursor-rows, 0)
+	case "pgdown", "ctrl+d":
+		*cursor = min(*cursor+rows, max(n-1, 0))
+	case "enter", "space":
+		if f.focus == groupAvailable && n > 0 {
+			slug := f.available[*cursor].Slug
+			if i := slices.Index(f.selected, slug); i >= 0 {
+				f.removeSelected(i)
+			} else {
+				f.selected = append(f.selected, slug)
+				f.selectedCursor = len(f.selected) - 1
+			}
+		} else if f.focus == groupSelected && n > 0 {
+			f.removeSelected(*cursor)
+		}
+	case "x", "delete", "backspace":
+		if f.focus == groupSelected && n > 0 {
+			f.removeSelected(*cursor)
+		}
+	case "K", "alt+up":
+		if f.focus == groupSelected && *cursor > 0 {
+			i := *cursor
+			f.selected[i], f.selected[i-1] = f.selected[i-1], f.selected[i]
+			*cursor--
+		}
+	case "J", "alt+down":
+		if f.focus == groupSelected && *cursor < n-1 {
+			i := *cursor
+			f.selected[i], f.selected[i+1] = f.selected[i+1], f.selected[i]
+			*cursor++
+		}
+	}
+}
+
+func (f *groupForm) removeSelected(i int) {
+	f.selected = slices.Delete(f.selected, i, i+1)
+	f.selectedCursor = min(f.selectedCursor, max(len(f.selected)-1, 0))
+}
+
 func (m *model) saveGroupForm() {
 	f := m.groupForm
-	name := strings.TrimSpace(f.name.Value())
+	group := workspace.UserGroup{Name: strings.TrimSpace(f.name.Value()), Title: f.title.Value(), Problems: slices.Clone(f.selected)}
 	var err error
-	if f.source != "" {
-		err = m.app.CopyGroup(m.pack, f.source, name, f.title.Value())
+	if f.source != nil {
+		err = m.app.SaveGroupCopy(*f.source, group)
 	} else {
-		err = m.app.SaveGroup(m.pack, f.original, workspace.UserGroup{Name: name, Title: f.title.Value(), Problems: strings.Fields(f.members.Value())})
+		err = m.app.SaveGroup(m.pack, f.original, group)
 	}
 	if err != nil {
 		f.err = err.Error()
 		return
 	}
-	m.groups[m.pack] = "user:" + name
+	m.groups[m.pack] = "user:" + group.Name
 	m.message = ""
 	m.groupForm = nil
 	m.groupTarget = nil
@@ -223,45 +338,174 @@ func (m *model) saveGroupForm() {
 		return
 	}
 	m.show()
-	// Preserve missing-member warnings produced by show.
 	if m.message == "" {
-		m.message = "saved personal group " + name
+		m.message = "saved personal group " + group.Name
 	}
 }
 
-var groupFormKeys = []string{"ctrl+s save", "tab switch", "esc cancel", "enter save/newline"}
+// groupFormKeys lists all list controls; the footer prioritizes the action
+// for the focused field. Text fields still treat ? as literal text.
+var groupFormKeys = []string{"ctrl+s save", "tab field/pane", "/ search", "space select/remove", "x remove", "K/J reorder", "←/→ pane", "↑↓ move", "pgup/pgdn page", "esc cancel"}
+
+func (m *model) groupKeys() []string {
+	f := m.groupForm
+	if f.searching {
+		return []string{"ctrl+s save", "enter browse", "esc clear", "tab selected"}
+	}
+	switch f.focus {
+	case groupName, groupTitle:
+		return []string{"ctrl+s save", "tab next", "esc cancel", "enter next"}
+	case groupSelected:
+		return []string{"ctrl+s save", "x remove", "K/J reorder", "tab next", "/ search", "esc cancel"}
+	default:
+		return []string{"ctrl+s save", "space select", "/ search", "tab selected", "esc cancel"}
+	}
+}
+
+// At narrow widths the two panes stack, keeping both visible and usable.
+func (m *model) groupRows() int {
+	if m.width < 60 {
+		return max((m.height-18)/2, 1)
+	}
+	return max(m.height-14, 1)
+}
 
 func (m *model) layoutGroupForm() {
 	f := m.groupForm
-	f.name.SetWidth(max(m.width-2, 1))
-	f.title.SetWidth(max(m.width-2, 1))
-	f.members.SetWidth(max(m.width-2, 1))
-	f.members.SetHeight(max(m.height-headerLines-footerLines-10, 1))
+	half := max((m.width-2)/2, 1)
+	f.name.SetWidth(half)
+	f.title.SetWidth(max(m.width-half-2, 1))
+	paneWidth := half
+	if m.width < 60 {
+		paneWidth = m.width
+	}
+	f.search.SetWidth(max(paneWidth-6, 1))
 }
 
 func (m *model) viewGroupForm() string {
 	f := m.groupForm
+	half := max((m.width-2)/2, 1)
 	label := func(s string, focus int) string {
 		if f.focus == focus {
 			return m.st.accent.Bold(true).Render(s)
 		}
 		return ui.Faint.Render(s)
 	}
-	members := "Problem slugs (one per line, in order)"
-	subtitle := "Your groups · " + m.pack + " · pack files stay unchanged"
-	if f.source != "" {
-		subtitle = "Copy " + f.source + " · " + m.pack
-		members = "Source members (copied on save; edit the copy to reorder)"
-	}
-	body := "\n" + label("Name", 0) + "\n" + f.name.View() + "\n\n" + label("Title", 1) + "\n" + f.title.View() + "\n\n" + label(clip(members, m.width), 2) + "\n" + f.members.View()
-	if f.err != "" {
-		body += "\n" + ui.Red.Render(wrap(f.err, m.width))
+	body := label(fit("Name", half), groupName) + "  " + label("Title", groupTitle) + "\n" +
+		groupCell(f.name.View(), half) + "  " + groupCell(f.title.View(), max(m.width-half-2, 1)) + "\n\n"
+	if m.width < 60 {
+		body += strings.Join(m.groupPane(false, m.width), "\n") + "\n" + strings.Join(m.groupPane(true, m.width), "\n")
 	} else {
-		body += "\n" + ui.Faint.Render("Missing existing members may be kept; new members must exist.")
+		left, right := m.groupPane(false, half), m.groupPane(true, m.width-half-2)
+		for i := range left {
+			if i > 0 {
+				body += "\n"
+			}
+			body += left[i] + "  " + right[i]
+		}
 	}
-	fields := 3
-	if f.source != "" {
-		fields = 2
+	body += "\n" + ui.Faint.Render(clip(m.groupProblemHint(), m.width))
+	subtitle := m.pack + " · Choose problems for your group"
+	if f.source != nil {
+		subtitle = "Copy " + f.sourceTitle + " · " + m.pack
 	}
-	return m.frame(m.badge()+"  "+ui.Bold.Render("Personal group"), subtitle, body, fmt.Sprintf("%d/%d", f.focus+1, fields), groupFormKeys...)
+	// Keep validation errors in the fixed footer, leaving both lists visible.
+	status := "Tab: switch · Ctrl+S: save · Esc: cancel"
+	if f.err != "" {
+		status = ui.Red.Render(f.err)
+	}
+	return strings.Join([]string{
+		clip(m.badge()+"  "+ui.Bold.Render("Personal group"), m.width),
+		clip(subtitle, m.width), m.rule(), body, m.rule(), clip(status, m.width), m.keyHelp("", m.groupKeys()...),
+	}, "\n")
+}
+
+func groupCell(s string, width int) string {
+	s = clip(s, width)
+	return s + strings.Repeat(" ", max(width-lipgloss.Width(s), 0))
+}
+
+func (m *model) groupPane(selected bool, width int) []string {
+	f := m.groupForm
+	focus, cursor, n := groupAvailable, f.availableCursor, len(f.available)
+	heading := fmt.Sprintf("Available %d/%d", n, len(f.all))
+	second := f.search.View()
+	if selected {
+		focus, cursor, n = groupSelected, f.selectedCursor, len(f.selected)
+		heading = fmt.Sprintf("Selected %d", n)
+		second = ui.Faint.Render("K/J reorder · x remove")
+	}
+	inner := max(width-2, 1)
+	border := ui.Faint
+	if f.focus == focus {
+		border = m.st.accent
+	}
+	edge := func(left, middle, right string) string { return border.Render(left + fit(middle, inner) + right) }
+	heading = clip("─ "+heading+" ", inner)
+	lines := []string{edge("╭", heading+strings.Repeat("─", max(inner-lipgloss.Width(heading), 0)), "╮"), border.Render("│") + groupCell(second, inner) + border.Render("│"), edge("├", strings.Repeat("─", inner), "┤")}
+	rows := m.groupRows()
+	first := max(cursor-rows+1, 0)
+	for rowIndex := range rows {
+		i := first + rowIndex
+		r := newRow(nil)
+		current := i < n && i == cursor && f.focus == focus && !f.searching
+		if current {
+			r = newRow(m.st.sel)
+		}
+		if i < n {
+			m.cursorBar(r, current)
+			var title string
+			if selected {
+				slug := f.selected[i]
+				if p := f.bySlug[slug]; p != nil {
+					title = p.ID + " " + m.title(p)
+				} else {
+					title = "[unavailable] " + slug
+				}
+			} else {
+				p := f.available[i]
+				mark := "[ ]"
+				if slices.Contains(f.selected, p.Slug) {
+					mark = "[x]"
+				}
+				title = mark + " " + p.ID + " " + m.title(p)
+			}
+			r.plain(fit(strings.TrimSpace(title), max(inner-2, 0)))
+		} else if rowIndex == 0 {
+			hint := "No matching problems"
+			switch {
+			case selected:
+				hint = "Choose from Available"
+			case f.searchHint != "":
+				hint = f.searchHint
+			case len(f.all) == 0:
+				hint = "No problems in this pack"
+			}
+			r.add(ui.Faint, fit(hint, inner))
+		}
+		lines = append(lines, border.Render("│")+r.fill(inner)+border.Render("│"))
+	}
+	lines = append(lines, edge("╰", strings.Repeat("─", inner), "╯"))
+	return lines
+}
+
+func (m *model) groupProblemHint() string {
+	f := m.groupForm
+	if f.searchHint != "" {
+		return f.searchHint
+	}
+	var p *problem.Problem
+	if f.focus == groupSelected && len(f.selected) > 0 {
+		slug := f.selected[f.selectedCursor]
+		p = f.bySlug[slug]
+		if p == nil {
+			return "Unavailable: " + slug + " · x removes this entry"
+		}
+	} else if len(f.available) > 0 {
+		p = f.available[f.availableCursor]
+	}
+	if p == nil {
+		return "Search by title, ID or tag · " + searchExamples
+	}
+	return p.ID + " · " + m.title(p) + " · " + difficultyLabel(p.Difficulty)
 }
