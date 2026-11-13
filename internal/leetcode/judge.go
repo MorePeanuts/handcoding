@@ -109,7 +109,7 @@ func (c *Client) Username(ctx context.Context) (string, error) {
 
 const questionMetaQuery = `query questionMeta($titleSlug: String!) {
   question(titleSlug: $titleSlug) {
-    questionId questionFrontendId titleSlug isPaidOnly exampleTestcases
+    questionId questionFrontendId titleSlug isPaidOnly exampleTestcases metaData
   }
 }`
 

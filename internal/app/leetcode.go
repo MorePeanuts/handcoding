@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -19,9 +21,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/problem"
 )
 
-// LeetCodeSessionsPath is the file holding the LeetCode sessions hc signs in
-// with, one per site: in the user's configuration directory, shared by every
-// workspace and never inside one, so that it cannot end up in a pack.
+// LeetCodeSessionsPath is global to the user, shared by every workspace.
 func LeetCodeSessionsPath() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
@@ -30,30 +30,45 @@ func LeetCodeSessionsPath() (string, error) {
 	return filepath.Join(dir, "hc", "leetcode.json"), nil
 }
 
-// leetCodeSessions are the sessions of the file, by site name.
-type leetCodeSessions map[string]leetcode.Session
+// LeetCodeAccount is the single account used for online runs and submissions.
+type LeetCodeAccount struct {
+	Site    leetcode.Site
+	User    string
+	Session leetcode.Session
+}
 
-func loadLeetCodeSessions() (leetCodeSessions, string, error) {
+type savedLeetCodeAccount struct {
+	Site    string           `json:"site"`
+	User    string           `json:"user"`
+	Session leetcode.Session `json:"credentials"`
+}
+
+func loadLeetCodeAccount() (*LeetCodeAccount, string, error) {
 	path, err := LeetCodeSessionsPath()
 	if err != nil {
 		return nil, "", err
 	}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return leetCodeSessions{}, path, nil
+		return nil, path, nil
 	}
 	if err != nil {
 		return nil, path, err
 	}
-	s := leetCodeSessions{}
-	if err := json.Unmarshal(data, &s); err != nil {
-		return nil, path, fmt.Errorf("%s is broken (%w); run hc leetcode logout, then log in again", path, err)
+	var saved savedLeetCodeAccount
+	if err := json.Unmarshal(data, &saved); err != nil ||
+		(saved.Site != "com" && saved.Site != "cn") || strings.TrimSpace(saved.Session.Token) == "" {
+		return nil, path, fmt.Errorf("%s contains invalid or older login state; run hc leetcode login --site cn or --site com again", path)
 	}
-	return s, path, nil
+	site, err := leetcode.SiteByName(saved.Site)
+	if err != nil {
+		return nil, path, err
+	}
+	return &LeetCodeAccount{Site: site, User: saved.User, Session: saved.Session}, path, nil
 }
 
-// save writes the sessions readable by the user only, atomically.
-func (s leetCodeSessions) save(path string) error {
+// save replaces the single login atomically, with user-only permissions.
+func (s savedLeetCodeAccount) save(path string) error {
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
@@ -84,26 +99,27 @@ func (s leetCodeSessions) save(path string) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// LeetCodeSession returns the session saved for site.
-func LeetCodeSession(site leetcode.Site) (*leetcode.Session, error) {
-	s, _, err := loadLeetCodeSessions()
+// LeetCodeSession loads the current account, never choosing a site from a pack.
+func LeetCodeSession() (*LeetCodeAccount, error) {
+	a, _, err := loadLeetCodeAccount()
 	if err != nil {
 		return nil, err
 	}
-	sess, ok := s[site.Name]
-	if !ok {
-		return nil, fmt.Errorf("not logged in to leetcode.%s; run `hc leetcode login --site %s`", site.Name, site.Name)
+	if a == nil {
+		return nil, fmt.Errorf("not logged in to LeetCode; run hc leetcode login")
 	}
-	return &sess, nil
+	return a, nil
 }
 
-// LeetCodeLogin checks that s signs in to c's site and saves it for the
-// site. It returns the user's name and where the session is kept. A session
-// LeetCode does not accept is not saved.
+// LeetCodeLogin verifies a new login before replacing the previous account.
+// Invalid, cancelled or failed logins leave the previous login intact.
 func LeetCodeLogin(ctx context.Context, c *leetcode.Client, s leetcode.Session) (user, path string, err error) {
+	if c.Site.Name != "cn" && c.Site.Name != "com" {
+		return "", "", fmt.Errorf("unsupported LeetCode site %q", c.Site.Name)
+	}
 	s.Token = strings.TrimSpace(s.Token)
 	if s.Token == "" {
-		return "", "", errors.New("LEETCODE_SESSION is needed")
+		return "", "", fmt.Errorf("LEETCODE_SESSION is needed")
 	}
 	c.Session = &s
 	user, err = c.Username(ctx)
@@ -113,73 +129,33 @@ func LeetCodeLogin(ctx context.Context, c *leetcode.Client, s leetcode.Session) 
 	case err != nil:
 		return "", "", err
 	}
-	all, path, err := loadLeetCodeSessions()
+	if err := ctx.Err(); err != nil {
+		return "", "", err
+	}
+	path, err = LeetCodeSessionsPath()
 	if err != nil {
 		return "", "", err
 	}
-	all[c.Site.Name] = s
-	return user, path, all.save(path)
+	return user, path, (savedLeetCodeAccount{Site: c.Site.Name, User: user, Session: s}).save(path)
 }
 
-// leetCodeSites are the sites hc can log in to.
-var leetCodeSites = []leetcode.Site{leetcode.SiteCom, leetcode.SiteCN}
-
-// LeetCodeSites returns the names of the sites hc has a session of.
-func LeetCodeSites() ([]string, error) {
-	all, _, err := loadLeetCodeSessions()
-	if err != nil {
-		return nil, err
-	}
-	var names []string
-	for _, s := range leetCodeSites {
-		if _, ok := all[s.Name]; ok {
-			names = append(names, s.Name)
-		}
-	}
-	return names, nil
-}
-
-// LeetCodeSiteStatus is the state of hc's session of a site.
+// LeetCodeSiteStatus describes the current login, including an expired session.
 type LeetCodeSiteStatus struct {
 	Site leetcode.Site
-	// Saved reports whether hc has a session of the site.
-	Saved bool
-	// User is the user the session signs in as, when LeetCode accepts it.
 	User string
-	// Err is why a saved session does not sign in: leetcode.ErrNotSignedIn
-	// when LeetCode no longer accepts it, another error when it could not
-	// be checked.
-	Err error
+	Err  error
 }
 
-// LeetCodeStatus checks the sessions hc saved of sites, or of every site
-// when none is given, with LeetCode. It also returns where the sessions are
-// kept.
-func LeetCodeStatus(ctx context.Context, sites ...leetcode.Site) ([]LeetCodeSiteStatus, string, error) {
-	if len(sites) == 0 {
-		sites = leetCodeSites
-	}
-	all, path, err := loadLeetCodeSessions()
-	if err != nil {
+// LeetCodeStatus checks only the current account. A nil status means signed out.
+func LeetCodeStatus(ctx context.Context) (*LeetCodeSiteStatus, string, error) {
+	a, path, err := loadLeetCodeAccount()
+	if err != nil || a == nil {
 		return nil, path, err
 	}
-	out := make([]LeetCodeSiteStatus, len(sites))
-	var wg sync.WaitGroup
-	for i, site := range sites {
-		out[i].Site = site
-		sess, ok := all[site.Name]
-		if !ok {
-			continue
-		}
-		out[i].Saved = true
-		wg.Go(func() {
-			c := leetcode.NewClient(site, "")
-			c.Session = &sess
-			out[i].User, out[i].Err = c.Username(ctx)
-		})
-	}
-	wg.Wait()
-	return out, path, nil
+	c := leetcode.NewClient(a.Site, "")
+	c.Session = &a.Session
+	user, err := c.Username(ctx)
+	return &LeetCodeSiteStatus{Site: a.Site, User: user, Err: err}, path, nil
 }
 
 // LeetCodeBrowserLogin is a login through the browser, as LeetCode's VS Code
@@ -193,12 +169,13 @@ type LeetCodeBrowserLogin struct {
 	// Port is the port of 127.0.0.1 the callback listens on.
 	Port int
 
-	c    *leetcode.Client
-	path string
-	ln   net.Listener
-	srv  *http.Server
-	once sync.Once
-	done chan browserLogin
+	c      *leetcode.Client
+	cancel context.CancelFunc
+	path   string
+	ln     net.Listener
+	srv    *http.Server
+	once   sync.Once
+	done   chan browserLogin
 }
 
 type browserLogin struct {
@@ -213,12 +190,13 @@ func StartLeetCodeBrowserLogin(c *leetcode.Client, port int) (*LeetCodeBrowserLo
 	if err != nil {
 		return nil, fmt.Errorf("starting the login's callback on 127.0.0.1: %w", err)
 	}
+	ctx, cancel := context.WithCancel(context.Background())
 	b := &LeetCodeBrowserLogin{
-		c: c, path: "/callback/" + rand.Text(), ln: ln, done: make(chan browserLogin, 1),
+		c: c, cancel: cancel, path: "/callback/" + rand.Text(), ln: ln, done: make(chan browserLogin, 1),
 	}
 	b.Port = ln.Addr().(*net.TCPAddr).Port
 	b.URL = c.Site.AuthorizeURL(ln.Addr().String() + b.path)
-	b.srv = &http.Server{Handler: http.HandlerFunc(b.callback), ReadHeaderTimeout: 10 * time.Second}
+	b.srv = &http.Server{Handler: http.HandlerFunc(b.callback), ReadHeaderTimeout: 10 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
 	go func() { _ = b.srv.Serve(ln) }()
 	return b, nil
 }
@@ -261,64 +239,43 @@ func (b *LeetCodeBrowserLogin) Wait(ctx context.Context) (user, path string, err
 	case res := <-b.done:
 		return res.user, res.path, res.err
 	case <-ctx.Done():
+		b.cancel()
 		return "", "", ctx.Err()
 	}
 }
 
 // Close stops the callback server, after the reply to the browser is sent.
 func (b *LeetCodeBrowserLogin) Close() error {
+	b.cancel()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return b.srv.Shutdown(ctx)
 }
 
-// LeetCodeLogout forgets the sessions of sites, or every session when no
-// site is given, and returns the names of the sites it forgot one of. Only
-// hc forgets them: LeetCode keeps a session valid until it expires or the
-// browser logs out.
-func LeetCodeLogout(sites ...leetcode.Site) ([]string, error) {
-	if len(sites) == 0 {
-		sites = leetCodeSites
-	}
-	all, path, err := loadLeetCodeSessions()
+// LeetCodeLogout clears hc's login, including malformed or older state.
+// It does not invalidate the browser's session on LeetCode.
+func LeetCodeLogout() (bool, error) {
+	path, err := LeetCodeSessionsPath()
 	if err != nil {
-		// A broken file is removed whole.
-		if path == "" {
-			return nil, err
-		}
-		var names []string
-		for _, s := range sites {
-			names = append(names, s.Name)
-		}
-		return names, os.Remove(path)
+		return false, err
 	}
-	var names []string
-	for _, s := range sites {
-		if _, ok := all[s.Name]; ok {
-			delete(all, s.Name)
-			names = append(names, s.Name)
-		}
+	if err := os.Remove(path); errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	} else if err != nil {
+		return false, err
 	}
-	switch {
-	case len(names) == 0:
-		return nil, nil
-	case len(all) == 0:
-		return names, os.Remove(path)
-	}
-	return names, all.save(path)
+	return true, nil
 }
 
-// LeetCodeTarget is where a problem is on LeetCode.
+// LeetCodeTarget identifies the original problem on its source site.
 type LeetCodeTarget struct {
 	Site leetcode.Site
 	Slug string
 }
 
-// LeetCodeProblem finds p on LeetCode from its source in problem.yaml: the
-// site and slug of source.url, else source.site and p's slug. site, when
-// set (com or cn), overrides the site. A problem that does not come from
-// LeetCode is refused.
-func LeetCodeProblem(p *problem.Problem, site string) (LeetCodeTarget, error) {
+// LeetCodeProblem resolves provenance only; the login chooses the destination.
+// source.url takes precedence over source.site and the local slug.
+func LeetCodeProblem(p *problem.Problem) (LeetCodeTarget, error) {
 	var t LeetCodeTarget
 	if s, slug, ok := leetcode.ParseURL(p.Source.URL); ok {
 		t = LeetCodeTarget{Site: s, Slug: slug}
@@ -330,13 +287,6 @@ func LeetCodeProblem(p *problem.Problem, site string) (LeetCodeTarget, error) {
 		t = LeetCodeTarget{Site: s, Slug: p.Slug}
 	} else {
 		return t, fmt.Errorf("%s does not come from LeetCode (source in %s), so hc leetcode cannot run it there", p.Slug, problem.MetaFile)
-	}
-	if site != "" {
-		s, err := leetcode.SiteByName(site)
-		if err != nil {
-			return t, err
-		}
-		t.Site = s
 	}
 	return t, nil
 }
@@ -355,7 +305,7 @@ type LeetCodeRun struct {
 
 // leetCodeCode reads the user's solution of p in l and turns it into
 // LeetCode's code, through the driver.
-func (a *App) leetCodeCode(ctx context.Context, c *leetcode.Client, p *problem.Problem, l lang.Language, slug string) (leetcode.Code, *leetcode.Question, error) {
+func (a *App) leetCodeCode(ctx context.Context, c *leetcode.Client, p *problem.Problem, l lang.Language) (leetcode.Code, *leetcode.Question, error) {
 	conv, ok := l.(lang.LeetCoder)
 	if !ok {
 		return leetcode.Code{}, nil, fmt.Errorf("hc cannot run %s solutions on LeetCode", l.Name())
@@ -372,18 +322,64 @@ func (a *App) leetCodeCode(ctx context.Context, c *leetcode.Client, p *problem.P
 	if err != nil {
 		return leetcode.Code{}, nil, err
 	}
-	q, err := c.QuestionMeta(ctx, slug)
+	q, err := leetCodeQuestion(ctx, c, p)
 	if err != nil {
 		return leetcode.Code{}, nil, err
 	}
 	return leetcode.Code{Slug: q.TitleSlug, QuestionID: q.QuestionID, Lang: langSlug, Code: code}, q, nil
 }
 
+// leetCodeQuestion resolves the candidate on the signed-in site. For cross-site
+// runs require a standard numbered question, matching canonical slug and ID,
+// and identical signature metadata from both live sites. No title/ID fallback.
+func leetCodeQuestion(ctx context.Context, c *leetcode.Client, p *problem.Problem) (*leetcode.Question, error) {
+	source, err := LeetCodeProblem(p)
+	if err != nil {
+		return nil, err
+	}
+	target, err := c.QuestionMeta(ctx, source.Slug)
+	if err != nil {
+		return nil, fmt.Errorf("cannot resolve %s on logged-in site leetcode.%s: %w", source.Slug, c.Site.Name, err)
+	}
+	if target.QuestionID == "" {
+		return nil, fmt.Errorf("missing question ID for %s on leetcode.%s", source.Slug, c.Site.Name)
+	}
+	if source.Site.Name == c.Site.Name {
+		return target, nil
+	}
+	// Use the same HTTP transport (timeouts/proxies), but never the target
+	// session or cookie jar when contacting the source site.
+	origin := leetcode.NewClient(source.Site, "")
+	client := *c.HTTP
+	client.Jar = nil
+	origin.HTTP = &client
+	original, err := origin.QuestionMeta(ctx, source.Slug)
+	if err != nil {
+		// A refusal of anonymous source metadata is not evidence that the
+		// destination login expired; do not propagate its authentication sentinel.
+		if errors.Is(err, leetcode.ErrBlocked) {
+			return nil, fmt.Errorf("leetcode.%s refused source metadata; cannot verify cross-site mapping to leetcode.%s; try again or log in to the source site with hc leetcode login --site %s", source.Site.Name, c.Site.Name, source.Site.Name)
+		}
+		return nil, fmt.Errorf("cannot verify cross-site mapping from leetcode.%s to leetcode.%s: %w", source.Site.Name, c.Site.Name, err)
+	}
+	id, idErr := strconv.ParseUint(original.QuestionFrontendID, 10, 64)
+	var sourceMeta, targetMeta map[string]any
+	validSource := json.Unmarshal([]byte(original.MetaData), &sourceMeta) == nil && len(sourceMeta) > 0
+	validTarget := json.Unmarshal([]byte(target.MetaData), &targetMeta) == nil && len(targetMeta) > 0
+	if idErr != nil || id == 0 || strconv.FormatUint(id, 10) != original.QuestionFrontendID ||
+		original.QuestionFrontendID != target.QuestionFrontendID ||
+		original.TitleSlug != source.Slug || target.TitleSlug != source.Slug ||
+		!validSource || !validTarget || !reflect.DeepEqual(sourceMeta, targetMeta) {
+		return nil, fmt.Errorf("cannot verify cross-site mapping for %s from leetcode.%s to leetcode.%s (standard question ID, slug and signature must match); log in to the source site with hc leetcode login --site %s", source.Slug, source.Site.Name, c.Site.Name, source.Site.Name)
+	}
+	return target, nil
+}
+
 // LeetCodeTest runs the user's solution of p in l on LeetCode, signed in by
 // c, on input (LeetCode's format), or on the question's example testcases
 // when input is empty.
-func (a *App) LeetCodeTest(ctx context.Context, c *leetcode.Client, p *problem.Problem, l lang.Language, slug, input string) (*LeetCodeRun, error) {
-	code, q, err := a.leetCodeCode(ctx, c, p, l, slug)
+func (a *App) LeetCodeTest(ctx context.Context, c *leetcode.Client, p *problem.Problem, l lang.Language, input string) (*LeetCodeRun, error) {
+	code, q, err := a.leetCodeCode(ctx, c, p, l)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +387,7 @@ func (a *App) LeetCodeTest(ctx context.Context, c *leetcode.Client, p *problem.P
 		input = q.ExampleTestcases
 	}
 	if strings.TrimSpace(input) == "" {
-		return nil, fmt.Errorf("%s has no example testcases on leetcode.%s; give an input with --input", slug, c.Site.Name)
+		return nil, fmt.Errorf("%s has no example testcases on leetcode.%s; give an input with --input", q.TitleSlug, c.Site.Name)
 	}
 	id, err := c.Interpret(ctx, code, input)
 	if err != nil {
@@ -406,8 +402,8 @@ func (a *App) LeetCodeTest(ctx context.Context, c *leetcode.Client, p *problem.P
 
 // LeetCodeSubmit submits the user's solution of p in l to LeetCode, signed
 // in by c. When it fails on a case whose input maps onto p's, Case holds it.
-func (a *App) LeetCodeSubmit(ctx context.Context, c *leetcode.Client, p *problem.Problem, l lang.Language, slug string) (*LeetCodeRun, error) {
-	code, _, err := a.leetCodeCode(ctx, c, p, l, slug)
+func (a *App) LeetCodeSubmit(ctx context.Context, c *leetcode.Client, p *problem.Problem, l lang.Language) (*LeetCodeRun, error) {
+	code, _, err := a.leetCodeCode(ctx, c, p, l)
 	if err != nil {
 		return nil, err
 	}
