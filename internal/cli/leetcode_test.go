@@ -4,11 +4,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
+	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/leetcode"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
@@ -23,8 +23,7 @@ func TestLeetCodeCommands(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	t.Setenv("AppData", filepath.Join(home, "AppData"))
 
-	// logout forgets the session of --site, else every session, whatever
-	// leetcode.site says.
+	// Logout clears the global login, whatever leetcode.site says.
 	path, err := app.LeetCodeSessionsPath()
 	if err != nil {
 		t.Fatal(err)
@@ -32,15 +31,14 @@ func TestLeetCodeCommands(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte(`{"cn": {"session": "s"}}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"site":"cn","credentials":{"session":"s"}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
 		args []string
 		want string
 	}{
-		{[]string{"--site", "com"}, "Not logged in to leetcode.com (logged in to leetcode.cn)."},
-		{nil, "logged out of leetcode.cn"},
+		{nil, "logged out of LeetCode"},
 		{nil, "Not logged in to LeetCode."},
 	} {
 		out, err := capture(t, append([]string{"-w", dir, "leetcode", "logout"}, tc.args...)...)
@@ -53,7 +51,7 @@ func TestLeetCodeCommands(t *testing.T) {
 	}
 	for ref, want := range map[string]string{
 		"local/two-sum":      "does not come from LeetCode",
-		"regression/two-sum": "not logged in to leetcode.com; run `hc leetcode login --site com`",
+		"regression/two-sum": "not logged in to LeetCode; run hc leetcode login",
 	} {
 		for _, sub := range []string{"test", "submit"} {
 			if _, err := capture(t, "-w", dir, "leetcode", sub, ref, "-l", "go"); err == nil || !strings.Contains(err.Error(), want) {
@@ -61,6 +59,16 @@ func TestLeetCodeCommands(t *testing.T) {
 			}
 		}
 	}
+	for _, sub := range []string{"test", "submit", "status", "logout"} {
+		args := []string{"-w", dir, "leetcode", sub, "--site", "cn"}
+		if sub == "test" || sub == "submit" {
+			args = append(args, "regression/two-sum")
+		}
+		if _, err := capture(t, args...); err == nil || !strings.Contains(err.Error(), "unknown flag") {
+			t.Errorf("%s accepts obsolete --site: %v", sub, err)
+		}
+	}
+
 }
 
 func TestSplitTestcases(t *testing.T) {
@@ -100,20 +108,14 @@ func TestPrintLeetCodeStatus(t *testing.T) {
 	com, cn := leetcode.SiteCom, leetcode.SiteCN
 	for _, tc := range []struct {
 		name   string
-		status []app.LeetCodeSiteStatus
+		status *app.LeetCodeSiteStatus
 		ok     bool
 		want   []string
 	}{
-		{"none", []app.LeetCodeSiteStatus{{Site: com}, {Site: cn}}, false,
-			[]string{"Not logged in to LeetCode; run `hc leetcode login`."}},
-		{"one site", []app.LeetCodeSiteStatus{{Site: com}, {Site: cn, Saved: true, User: "alice"}}, true,
-			[]string{"leetcode.com  not logged in", "leetcode.cn   logged in as alice", "Sessions are kept in /cfg/leetcode.json."}},
-		{"--site", []app.LeetCodeSiteStatus{{Site: com}}, false,
-			[]string{"leetcode.com  not logged in (hc leetcode login --site com)"}},
-		{"expired", []app.LeetCodeSiteStatus{{Site: com, Saved: true, Err: leetcode.ErrNotSignedIn}, {Site: cn, Saved: true, User: "alice"}}, false,
-			[]string{"session no longer accepted; log in again with `hc leetcode login --site com`"}},
-		{"unchecked", []app.LeetCodeSiteStatus{{Site: cn, Saved: true, Err: io.ErrUnexpectedEOF}}, false,
-			[]string{"could not check the session: unexpected EOF"}},
+		{"none", nil, false, []string{"Not logged in to LeetCode; run `hc leetcode login`."}},
+		{"current", &app.LeetCodeSiteStatus{Site: cn, User: "alice"}, true, []string{"leetcode.cn logged in as alice", "Login is kept in /cfg/leetcode.json."}},
+		{"expired", &app.LeetCodeSiteStatus{Site: com, Err: leetcode.ErrNotSignedIn}, false, []string{"session no longer accepted; log in again with `hc leetcode login --site com`"}},
+		{"unchecked", &app.LeetCodeSiteStatus{Site: cn, Err: io.ErrUnexpectedEOF}, false, []string{"could not check the session: unexpected EOF"}},
 	} {
 		var ok bool
 		out := captureFunc(t, func() { ok = printLeetCodeStatus(tc.status, "/cfg/leetcode.json") })
@@ -126,7 +128,7 @@ func TestPrintLeetCodeStatus(t *testing.T) {
 			}
 		}
 		// The file is named only when it holds a session.
-		if saved := slices.ContainsFunc(tc.status, func(s app.LeetCodeSiteStatus) bool { return s.Saved }); saved != strings.Contains(out, "/cfg/leetcode.json") {
+		if saved := tc.status != nil; saved != strings.Contains(out, "/cfg/leetcode.json") {
 			t.Errorf("%s: sessions file shown = %v:\n%s", tc.name, !saved, out)
 		}
 	}
@@ -196,4 +198,37 @@ func captureFunc(t *testing.T, fn func()) string {
 	w.Close()
 	os.Stdout = stdout
 	return <-done
+}
+
+func TestLeetCodeCurrentLoginChoosesDestination(t *testing.T) {
+	dir := packWorkspace(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	path, err := app.LeetCodeSessionsPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"site":"cn","user":"alice","credentials":{"session":"current"}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	root := &rootOptions{workspace: dir}
+	defaultLogin, err := defaultSite(root, "")
+	if err != nil || defaultLogin.Name != "com" {
+		t.Fatalf("fixture default: %+v, %v", defaultLogin, err)
+	}
+	called := false
+	err = withLeetCode(root, "regression/two-sum", &leetCodeOptions{lang: "go"}, func(a *app.App, p *problem.Problem, l lang.Language, source app.LeetCodeTarget, c *leetcode.Client) error {
+		called = true
+		if source.Site.Name != "com" || c.Site.Name != "cn" || c.Session.Token != "current" {
+			t.Fatal("source/default overrode the current account")
+		}
+		return nil
+	})
+	if err != nil || !called {
+		t.Fatalf("current login: %v", err)
+	}
 }

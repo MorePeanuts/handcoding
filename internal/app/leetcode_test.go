@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -58,106 +58,116 @@ func TestLeetCodeSessions(t *testing.T) {
 	path := isolateConfig(t)
 	srv := userStatus(t)
 	ctx := context.Background()
-	com := leetcode.Site{Name: leetcode.SiteCom.Name, Base: srv.URL}
-	cn := leetcode.Site{Name: leetcode.SiteCN.Name, Base: srv.URL}
-
-	// A session LeetCode does not accept, or half of one, is not saved.
-	if _, _, err := app.LeetCodeLogin(ctx, leetcode.NewClient(com, ""), leetcode.Session{Token: "bad"}); err == nil || !strings.Contains(err.Error(), "does not accept") {
-		t.Errorf("signed-out session: err = %v", err)
+	com := leetcode.Site{Name: "com", Base: srv.URL}
+	cn := leetcode.Site{Name: "cn", Base: srv.URL}
+	if _, err := app.LeetCodeSession(); err == nil {
+		t.Fatal("signed out session accepted")
 	}
-	if _, _, err := app.LeetCodeLogin(ctx, leetcode.NewClient(com, ""), leetcode.Session{Token: " \n"}); err == nil {
-		t.Error("empty session accepted")
-	}
-	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("sessions file written for refused sessions: %v", err)
-	}
-	if _, err := app.LeetCodeSession(com); err == nil || !strings.Contains(err.Error(), "hc leetcode login --site com") {
-		t.Errorf("not logged in: err = %v", err)
-	}
-
 	user, saved, err := app.LeetCodeLogin(ctx, leetcode.NewClient(com, ""), leetcode.Session{Token: " good\n"})
 	if err != nil || user != "alice" || saved != path {
-		t.Fatalf("LeetCodeLogin = %q, %q, %v", user, saved, err)
+		t.Fatalf("login: %q, %q, %v", user, saved, err)
+	}
+	before, _ := os.ReadFile(path)
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	for _, tc := range []struct {
+		ctx   context.Context
+		token string
+	}{{ctx, "bad"}, {ctx, " "}, {cancelled, "good"}} {
+		if _, _, err := app.LeetCodeLogin(tc.ctx, leetcode.NewClient(cn, ""), leetcode.Session{Token: tc.token}); err == nil {
+			t.Fatal("failed login succeeded")
+		}
+		after, _ := os.ReadFile(path)
+		if string(before) != string(after) {
+			t.Fatal("failed login replaced previous login")
+		}
 	}
 	if _, _, err := app.LeetCodeLogin(ctx, leetcode.NewClient(cn, ""), leetcode.Session{Token: "good"}); err != nil {
 		t.Fatal(err)
 	}
+	account, err := app.LeetCodeSession()
+	if err != nil || account.Site.Name != "cn" || account.User != "alice" || account.Session.Token != "good" {
+		t.Fatalf("single account: %+v, %v", account, err)
+	}
+	data, _ := os.ReadFile(path)
+	if strings.Contains(string(data), "com") {
+		t.Fatal("old account retained")
+	}
 	for p, want := range map[string]os.FileMode{path: 0o600, filepath.Dir(path): 0o700} {
 		if st, err := os.Stat(p); err != nil || st.Mode().Perm() != want {
-			t.Errorf("%s: mode %v, %v; want %v", p, st.Mode().Perm(), err, want)
+			t.Fatalf("permissions of %s: %v", p, err)
 		}
 	}
-	s, err := app.LeetCodeSession(com)
-	if err != nil || s.Token != "good" {
-		t.Errorf("LeetCodeSession(com) = %+v, %v", s, err)
+	for _, old := range []string{`{"com":{"session":"good"},"cn":{"session":"good"}}`, `{"cn":{"session":"good"}}`, `{bad`, `{"site":"cn","credentials":{"session":""}}`} {
+		if err := os.WriteFile(path, []byte(old), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := app.LeetCodeSession(); err == nil || !strings.Contains(err.Error(), "login") {
+			t.Fatal("old/invalid state silently selected an account")
+		}
+		if _, _, err := app.LeetCodeLogin(ctx, leetcode.NewClient(cn, ""), leetcode.Session{Token: "good"}); err != nil {
+			t.Fatalf("login cannot replace old state: %v", err)
+		}
 	}
-
-	if sites, err := app.LeetCodeSites(); !slices.Equal(sites, []string{"com", "cn"}) || err != nil {
-		t.Errorf("LeetCodeSites() = %v, %v", sites, err)
+	if err := os.WriteFile(path, []byte(`{broken`), 0o600); err != nil {
+		t.Fatal(err)
 	}
-
-	if removed, err := app.LeetCodeLogout(com); !slices.Equal(removed, []string{"com"}) || err != nil {
-		t.Errorf("LeetCodeLogout(com) = %v, %v", removed, err)
-	}
-	if _, err := app.LeetCodeSession(com); err == nil {
-		t.Error("com still logged in")
-	}
-	if s, err := app.LeetCodeSession(cn); err != nil || s.Token != "good" {
-		t.Errorf("cn lost on logout of com: %+v, %v", s, err)
-	}
-	if removed, err := app.LeetCodeLogout(com); removed != nil || err != nil {
-		t.Errorf("second LeetCodeLogout(com) = %v, %v", removed, err)
-	}
-	// Without a site, every session goes.
-	if removed, err := app.LeetCodeLogout(); !slices.Equal(removed, []string{"cn"}) || err != nil {
-		t.Errorf("LeetCodeLogout() = %v, %v", removed, err)
+	if removed, err := app.LeetCodeLogout(); !removed || err != nil {
+		t.Fatalf("logout broken state: %v, %v", removed, err)
 	}
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("sessions file left after the last logout: %v", err)
+		t.Fatalf("login file retained: %v", err)
 	}
-	if removed, err := app.LeetCodeLogout(); removed != nil || err != nil {
-		t.Errorf("LeetCodeLogout() logged out = %v, %v", removed, err)
+	if removed, err := app.LeetCodeLogout(); removed || err != nil {
+		t.Fatalf("already logged out: %v, %v", removed, err)
 	}
 }
 
-// Status checks each saved session with LeetCode, and reports the sites
-// without one.
+type leetCodeTransport func(*http.Request) (*http.Response, error)
+
+func (f leetCodeTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
 func TestLeetCodeStatus(t *testing.T) {
 	path := isolateConfig(t)
-	srv := userStatus(t)
-	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "down", http.StatusInternalServerError)
-	}))
-	t.Cleanup(down.Close)
 	ctx := context.Background()
-	com := leetcode.Site{Name: leetcode.SiteCom.Name, Base: srv.URL}
-	cn := leetcode.Site{Name: leetcode.SiteCN.Name, Base: srv.URL}
-
-	status, saved, err := app.LeetCodeStatus(ctx, com, cn)
-	if err != nil || saved != path || len(status) != 2 || status[0].Saved || status[1].Saved {
-		t.Fatalf("LeetCodeStatus without sessions = %+v, %q, %v", status, saved, err)
+	status, saved, err := app.LeetCodeStatus(ctx)
+	if err != nil || saved != path || status != nil {
+		t.Fatalf("signed out status: %+v, %v", status, err)
 	}
-
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	srv := userStatus(t)
+	u, _ := url.Parse(srv.URL)
+	transport := http.DefaultTransport
+	http.DefaultTransport = leetCodeTransport(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Host != "leetcode.cn" {
+			t.Errorf("status queried %s", r.URL.Host)
+		}
+		r = r.Clone(r.Context())
+		r.URL.Scheme, r.URL.Host = u.Scheme, u.Host
+		return transport.RoundTrip(r)
+	})
+	t.Cleanup(func() { http.DefaultTransport = transport })
+	cn := leetcode.Site{Name: "cn", Base: srv.URL}
+	// Login uses its own explicit transport here to avoid the host assertion.
+	c := leetcode.NewClient(cn, "")
+	c.HTTP.Transport = transport
+	if _, _, err := app.LeetCodeLogin(ctx, c, leetcode.Session{Token: "good"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte(`{"com": {"session": "good"}, "cn": {"session": "expired"}}`), 0o600); err != nil {
+	status, _, err = app.LeetCodeStatus(ctx)
+	if err != nil || status == nil || status.Err != nil || status.User != "alice" || status.Site.Name != "cn" {
+		t.Fatalf("current status: %+v, %v", status, err)
+	}
+	if err := os.WriteFile(path, []byte(`{"site":"cn","credentials":{"session":"expired"}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	status, _, err = app.LeetCodeStatus(ctx, com, cn)
-	if err != nil || len(status) != 2 {
-		t.Fatalf("LeetCodeStatus = %+v, %v", status, err)
+	status, _, err = app.LeetCodeStatus(ctx)
+	if err != nil || !errors.Is(status.Err, leetcode.ErrNotSignedIn) {
+		t.Fatalf("expired status: %+v, %v", status, err)
 	}
-	if s := status[0]; !s.Saved || s.User != "alice" || s.Err != nil {
-		t.Errorf("com: %+v", s)
-	}
-	if s := status[1]; !s.Saved || s.User != "" || !errors.Is(s.Err, leetcode.ErrNotSignedIn) {
-		t.Errorf("cn: %+v", s)
-	}
-
-	status, _, err = app.LeetCodeStatus(ctx, leetcode.Site{Name: leetcode.SiteCom.Name, Base: down.URL})
-	if err != nil || len(status) != 1 || !status[0].Saved || status[0].Err == nil || errors.Is(status[0].Err, leetcode.ErrNotSignedIn) {
-		t.Errorf("unreachable site: %+v, %v", status, err)
+	http.DefaultTransport = leetCodeTransport(func(r *http.Request) (*http.Response, error) { return nil, io.ErrUnexpectedEOF })
+	status, _, err = app.LeetCodeStatus(ctx)
+	if err != nil || status.Err == nil || errors.Is(status.Err, leetcode.ErrNotSignedIn) {
+		t.Fatalf("unreachable status: %+v, %v", status, err)
 	}
 }
 
@@ -213,7 +223,7 @@ func TestLeetCodeBrowserLogin(t *testing.T) {
 	if user, err := wait(b); user != "alice" || err != nil {
 		t.Errorf("Wait = %q, %v", user, err)
 	}
-	if s, err := app.LeetCodeSession(c.Site); err != nil || s.Token != "good" {
+	if s, err := app.LeetCodeSession(); err != nil || s.Session.Token != "good" {
 		t.Errorf("saved session %+v, %v", s, err)
 	}
 	if _, body := get(callback + cookie); !strings.Contains(body, "over") {
@@ -242,21 +252,21 @@ func TestLeetCodeProblem(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		source       problem.Source
-		site, want   string
+		want         string
 		wantErr      bool
 		wantSiteName string
 	}{
 		{source: problem.Source{Site: "leetcode.cn", URL: "https://leetcode.cn/problems/two-sum/"}, want: "two-sum", wantSiteName: "cn"},
 		{source: problem.Source{Site: "builtin", URL: "https://leetcode.com/problems/add-two-numbers/description/"}, want: "add-two-numbers", wantSiteName: "com"},
 		{source: problem.Source{Site: "leetcode.com"}, want: "two-sum", wantSiteName: "com"},
-		{source: problem.Source{Site: "leetcode.cn"}, site: "com", want: "two-sum", wantSiteName: "com"},
+		{source: problem.Source{Site: "leetcode.cn"}, want: "two-sum", wantSiteName: "cn"},
 		{source: problem.Source{Site: "custom"}, wantErr: true},
 		{source: problem.Source{}, wantErr: true},
 	} {
 		p := &problem.Problem{Slug: "two-sum", Source: tc.source}
-		got, err := app.LeetCodeProblem(p, tc.site)
+		got, err := app.LeetCodeProblem(p)
 		if (err != nil) != tc.wantErr || (err == nil && (got.Slug != tc.want || got.Site.Name != tc.wantSiteName)) {
-			t.Errorf("LeetCodeProblem(%+v, %q) = %+v, %v", tc.source, tc.site, got, err)
+			t.Errorf("LeetCodeProblem(%+v) = %+v, %v", tc.source, got, err)
 		}
 	}
 }
@@ -367,7 +377,7 @@ func TestLeetCodeTestAndSubmit(t *testing.T) {
 	c := fakeLeetCode(t, &typed)
 	ctx := context.Background()
 
-	if _, err := a.LeetCodeSubmit(ctx, c, p, l, "two-sum"); err == nil || !strings.Contains(err.Error(), "hc start") {
+	if _, err := a.LeetCodeSubmit(ctx, c, p, l); err == nil || !strings.Contains(err.Error(), "hc start") {
 		t.Errorf("without a solution: err = %v", err)
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -378,7 +388,7 @@ func TestLeetCodeTestAndSubmit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	run, err := a.LeetCodeTest(ctx, c, p, l, "two-sum", "")
+	run, err := a.LeetCodeTest(ctx, c, p, l, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,7 +399,7 @@ func TestLeetCodeTestAndSubmit(t *testing.T) {
 		t.Errorf("typed_code %q", typed)
 	}
 
-	run, err = a.LeetCodeSubmit(ctx, c, p, l, "two-sum")
+	run, err = a.LeetCodeSubmit(ctx, c, p, l)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,5 +408,222 @@ func TestLeetCodeTestAndSubmit(t *testing.T) {
 	}
 	if string(run.Case.Input["nums"]) != "[3,3]" || string(run.Case.Input["target"]) != "6" || string(run.Case.Expected) != "[0,1]" {
 		t.Errorf("failing case %+v", run.Case)
+	}
+}
+
+// Cross-site runs must resolve identity before sending code, and must use the
+// destination's internal question ID. Metadata reads on the source are anonymous.
+func TestLeetCodeCrossSite(t *testing.T) {
+	t.Parallel()
+	a := newWorkspace(t)
+	p, err := a.WS.Problem("regression/two-sum")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A pack's local ID is not an authoritative cross-site identifier.
+	p.ID = "987654"
+	l := mustLang(t, a, "go")
+	path := a.SolutionPath(p, l)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("package main\nfunc twoSum(nums []int, target int) []int {return nil}\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	const metadata = `{"name":"twoSum","params":[{"name":"nums","type":"integer[]"},{"name":"target","type":"integer"}],"return":{"type":"integer[]"}}`
+	for _, tc := range []struct {
+		name, sourceID, targetID, targetSlug, sourceMeta, targetMeta string
+		sameSite, missing, sourceFailure, expired, emptyInternal, ok bool
+	}{
+		{name: "matching", ok: true},
+		{name: "metadata key order", targetMeta: `{"return":{"type":"integer[]"},"params":[{"type":"integer[]","name":"nums"},{"type":"integer","name":"target"}],"name":"twoSum"}`, ok: true},
+		{name: "same site series", sameSite: true, sourceID: "LCR 001", targetID: "LCR 001", ok: true},
+		{name: "series is not mapped", sourceID: "LCR 001", targetID: "LCR 001"},
+		{name: "different ID", targetID: "2"},
+		{name: "different slug", targetSlug: "similar-two-sum"},
+		{name: "different signature", targetMeta: `{"name":"twoSum","params":[],"return":{"type":"integer"}}`},
+		{name: "missing signature", targetMeta: `null`},
+		{name: "invalid source signature", sourceMeta: `{`},
+		{name: "missing destination", missing: true},
+		{name: "source unavailable", sourceFailure: true},
+		{name: "expired destination", expired: true},
+		{name: "missing internal ID", emptyInternal: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, destination := range []leetcode.Site{leetcode.SiteCN, leetcode.SiteCom} {
+				for _, submit := range []bool{false, true} {
+					source := leetcode.SiteCom
+					if destination.Name == "com" {
+						source = leetcode.SiteCN
+					}
+					if tc.sameSite {
+						source = destination
+					}
+					local := *p
+					local.Source = problem.Source{URL: source.Base + "/problems/two-sum/"}
+					original := leetcode.Question{QuestionID: "101", QuestionFrontendID: "1", TitleSlug: "two-sum", MetaData: metadata}
+					target := original
+					target.QuestionID = "9001"
+					target.ExampleTestcases = "[2,7]\n9"
+					if tc.sourceID != "" {
+						original.QuestionFrontendID = tc.sourceID
+					}
+					if tc.targetID != "" {
+						target.QuestionFrontendID = tc.targetID
+					}
+					if tc.targetSlug != "" {
+						target.TitleSlug = tc.targetSlug
+					}
+					if tc.sourceMeta != "" {
+						original.MetaData = tc.sourceMeta
+					}
+					if tc.targetMeta != "" {
+						target.MetaData = tc.targetMeta
+					}
+					if tc.emptyInternal {
+						target.QuestionID = ""
+					}
+					sources, sends := 0, 0
+					c := leetcode.NewClient(destination, "")
+					c.Session = &leetcode.Session{Token: "destination-only"}
+					if !tc.sameSite {
+						jar, _ := cookiejar.New(nil)
+						u, _ := url.Parse(source.Base)
+						jar.SetCookies(u, []*http.Cookie{{Name: "LEETCODE_SESSION", Value: "jar-secret"}})
+						c.HTTP.Jar = jar
+					}
+					c.PollInterval = time.Millisecond
+					c.HTTP.Transport = leetCodeTransport(func(r *http.Request) (*http.Response, error) {
+						var body []byte
+						if r.Body != nil {
+							body, _ = io.ReadAll(r.Body)
+						}
+						respond := func(status int, value any) (*http.Response, error) {
+							data, _ := json.Marshal(value)
+							return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(string(data))), Request: r}, nil
+						}
+						if r.URL.Host != strings.TrimPrefix(destination.Base, "https://") {
+							sources++
+							if r.URL.Host != strings.TrimPrefix(source.Base, "https://") || r.URL.Path != "/graphql/" {
+								t.Errorf("unexpected source request: %s", r.URL)
+							}
+							if r.Header.Get("Cookie") != "" || strings.Contains(string(body), "typed_code") {
+								t.Error("credentials or code sent to source")
+							}
+							if tc.sourceFailure {
+								return respond(503, map[string]any{})
+							}
+							return respond(200, map[string]any{"data": map[string]any{"question": original}})
+						}
+						if !strings.Contains(r.Header.Get("Cookie"), "destination-only") {
+							t.Error("missing destination session")
+						}
+						if r.URL.Path == "/graphql/" {
+							if tc.expired {
+								return respond(401, map[string]any{})
+							}
+							if tc.missing {
+								return respond(200, map[string]any{"data": map[string]any{"question": nil}})
+							}
+							if !strings.Contains(string(body), "metaData") {
+								t.Error("signature not requested")
+							}
+							return respond(200, map[string]any{"data": map[string]any{"question": target}})
+						}
+						if strings.HasSuffix(r.URL.Path, "/check/") {
+							return respond(200, map[string]any{"state": "SUCCESS", "status_code": 10, "status_msg": "Accepted", "run_success": true})
+						}
+						sends++
+						var req map[string]any
+						if err := json.Unmarshal(body, &req); err != nil {
+							t.Fatal(err)
+						}
+						if req["question_id"] != "9001" {
+							t.Errorf("wrong destination question ID: %v", req["question_id"])
+						}
+						if !strings.Contains(fmt.Sprint(req["typed_code"]), "func twoSum") {
+							t.Error("missing solution")
+						}
+						if submit {
+							return respond(200, map[string]any{"submission_id": 7})
+						}
+						return respond(200, map[string]any{"interpret_id": "7"})
+					})
+					if submit {
+						_, err = a.LeetCodeSubmit(context.Background(), c, &local, l)
+					} else {
+						_, err = a.LeetCodeTest(context.Background(), c, &local, l, "")
+					}
+					if tc.ok && (err != nil || sends != 1) {
+						t.Fatalf("%s submit=%v: sends=%d err=%v", destination.Name, submit, sends, err)
+					}
+					if !tc.ok && (err == nil || sends != 0) {
+						t.Fatalf("unsafe mapping %s submit=%v: sends=%d err=%v", destination.Name, submit, sends, err)
+					}
+					if tc.sameSite && sources != 0 {
+						t.Fatal("same-site run contacted another site")
+					}
+					if tc.expired && sources != 0 {
+						t.Fatal("expired destination fell back to source")
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestLeetCodeBrowserCancelPreservesAccount(t *testing.T) {
+	path := isolateConfig(t)
+	existing := userStatus(t)
+	if _, _, err := app.LeetCodeLogin(context.Background(), leetcode.NewClient(leetcode.Site{Name: "com", Base: existing.URL}, ""), leetcode.Session{Token: "good"}); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.ReadFile(path)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	pending := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		select {
+		case <-release:
+		case <-r.Context().Done():
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":{"userStatus":{"isSignedIn":true,"username":"bob"}}}`))
+	}))
+	defer pending.Close()
+	defer close(release)
+	b, err := app.StartLeetCodeBrowserLogin(leetcode.NewClient(leetcode.Site{Name: "cn", Base: pending.URL}, ""), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Close()
+	page, _ := url.Parse(b.URL)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		resp, err := http.Get("http://" + page.Query().Get("path") + "?cookie=" + url.QueryEscape("LEETCODE_SESSION=good"))
+		if err == nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+		}
+	}()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("authorization did not start")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, _, err := b.Wait(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancel: %v", err)
+	}
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancel did not stop authorization")
+	}
+	after, _ := os.ReadFile(path)
+	if string(before) != string(after) {
+		t.Fatal("cancelled browser authorization replaced the current account")
 	}
 }

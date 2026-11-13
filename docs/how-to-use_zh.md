@@ -521,15 +521,17 @@ table.insert(dap.configurations.python, { type = "hc", name = "hc attach", reque
 
 ## 在 LeetCode 上运行
 
-`hc leetcode` 在 LeetCode 上运行解答，或把它提交到你自己的账号，相当于题目页面上的"运行"和"提交"按钮。它只用于来自 LeetCode 的题目（用 `hc fetch` 获取，或来自官方题目包等题目包）：站点和 slug 取自 `problem.yaml` 的 `source`，`--site` 可以换成另一个站点。
+`hc leetcode` 在 LeetCode 上运行解答，或把它提交到你自己的账号，相当于题目页面上的"运行"和"提交"按钮。它只用于来自 LeetCode 的题目（用 `hc fetch` 获取，或来自官方题目包等题目包）：`problem.yaml` 的 `source` 标识来源题目，**当前登录决定提交站点**。hc 在所有工作区之间共享一个登录。`hc leetcode login --site cn` 或 `--site com` 只有在新登录成功后才切换；登录失败或取消时保留原登录。`hc.yaml` 的 `leetcode.site` 仅提供 `fetch` 和 `login` 的默认站点，不影响 `test` 或 `submit`。`test`、`submit`、`status` 和 `logout` 不再提供 `--site` 参数。
+
+跨站运行或提交时，hc 会先查询来源站和目标站，再发送解答代码。两站必须具有相同的正整数前端题号、规范 slug 和签名元数据（JSON 对象字段顺序不影响比较）。实际请求始终使用目标站的内部题目 ID。LCR 等系列题号、目标题目不存在、元数据不可用或不匹配时会拒绝操作；hc 不会按本地题号、标题或相同题意猜测对应关系。校验失败时，可以改为登录来源站。查询来源站元数据不携带目标站的登录会话。登录过期会直接报错，不会自动切换站点。
 
 ```sh
-hc leetcode login --site cn          # 每个站点一次：在浏览器中授权 hc
-hc leetcode status                   # hc 登录了哪些站点，以谁的身份
+hc leetcode login --site cn          # 通过浏览器将全局登录切换为 cn
+hc leetcode status                   # 当前站点、用户名和会话有效性
 hc leetcode test two-sum             # 在 LeetCode 的示例测试用例上运行
 hc leetcode test two-sum -i $'[3,3]\n6'   # 或者用自己的输入，采用 LeetCode 的格式
 hc leetcode submit two-sum -l python # 提交到你的账号
-hc leetcode logout                   # 忘掉所有站点的会话（--site：只忘掉一个）
+hc leetcode logout                   # 清除当前登录
 ```
 
 **登录。** LeetCode 登录需要验证码，所以 hc 不用密码，而是使用浏览器的会话。默认情况下，`hc leetcode login` 会像 LeetCode 的 VS Code 插件那样，在浏览器中打开该站点的授权页面（尚未登录的话，先在那里登录）。随后 LeetCode 把浏览器的 cookie 发送到 hc 在 `127.0.0.1` 上监听的端口，页面会提示 hc 已经登录。cookie 是通过这个 URL 传递的，所以它会留在浏览器的历史记录中。在没有桌面环境的机器上，或者通过 SSH 登录时，先转发端口，再在你自己的机器上打开 hc 打印的页面：
@@ -546,7 +548,7 @@ hc leetcode login --port 8765         # 在服务器上
 
 在 `hc leetcode login --paste` 询问时粘贴（粘贴时不会显示任何内容），或者通过管道传入（macOS 上是 `pbpaste | hc leetcode login --site cn`）。hc 从粘贴的内容中找出 `LEETCODE_SESSION`。
 
-无论哪种方式，hc 都会向 LeetCode 验证会话，然后保存到用户配置目录（macOS 上是 `~/Library/Application Support`，Linux 上是 `~/.config`）下的 `hc/leetcode.json`，只有你自己可读，绝不会放在工作区里。会话的有效期是几周；LeetCode 拒绝它时，重新登录即可。`hc leetcode status` 向 LeetCode 逐个验证已保存的会话，显示它登录的用户名，或者 LeetCode 已不再接受它；只有 hc 已登录（`--site` 指定的站点，或者任意一个站点）且每个已保存的会话都有效时，退出码才是 0，否则是 1。`hc leetcode logout` 忘掉所有站点的会话，或者 `--site` 指定的那个，但只是 hc 不再保存：会话在过期之前在 LeetCode 那边仍然有效，要让它失效，需要在浏览器中退出登录。
+无论哪种方式，hc 都会向 LeetCode 验证会话，然后将唯一的登录保存到用户配置目录（macOS 上是 `~/Library/Application Support`，Linux 上是 `~/.config`）下的 `hc/leetcode.json`，只有你自己可读，绝不会放在工作区里。LeetCode 拒绝会话时，重新登录即可。`hc leetcode status` 验证当前账号并显示站点和用户名；未登录、会话过期或无法验证时，退出码为 1。`hc leetcode logout` 清除登录（也可以清除损坏或旧版登录文件），但不会使浏览器的会话失效。旧版按站点分别保存的登录文件需要重新登录；hc 不会自行选取其中一个账号。
 
 **代码。** hc 发送的是 `hc test` 会运行的那份解答（`-l` 的用法相同），并转换成 LeetCode 的代码：Python 去掉从 `hc_runtime` 的导入（LeetCode 自己定义了 `ListNode`、`TreeNode` 和 `Node`），Go 去掉 `package main`。Python 的函数题在 LeetCode 上必须是 `class Solution` 的方法；hc 也接受模块级函数，但 LeetCode 不接受。
 
@@ -567,7 +569,7 @@ python:
 agent:
   name: claude        # claude | codex，或者设置 command（见上文）
 leetcode:
-  site: com           # com | cn
+  site: com           # fetch/login 的默认站点：com | cn；提交使用当前登录
 locales: [en]         # 你自己题目的题面语言，默认的排在第一
 ```
 

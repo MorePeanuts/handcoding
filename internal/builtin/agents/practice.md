@@ -47,6 +47,12 @@ hc cases add <problem> --input '{"nums": [3, 2, 4], "target": 6}'  # keep an inp
 every case), and keeps no history. `hc submit <problem>` records a
 submission in the user's history: run it only when they ask.
 `hc debug <problem>` is an interactive debugger: suggest it, never run it.
+`hc leetcode test` and `hc leetcode submit` use the user's single current
+LeetCode login, not the pack's source site. Run them only when asked.
+`hc leetcode status` reports the current account; switching with
+`hc leetcode login --site cn` or `--site com` affects every workspace.
+Cross-site identity checks may refuse a problem; never change its source
+metadata to bypass that check.
 
 ## Helping the user learn
 

@@ -521,15 +521,17 @@ Set breakpoints in your solution file, start `hc debug --headless`, then pick "h
 
 ## Running on LeetCode
 
-`hc leetcode` runs a solution on LeetCode, or submits it to your own account, as the Run and Submit buttons of the problem's page do. It works on problems that come from LeetCode (fetched with `hc fetch`, or from a pack such as the official one): the site and slug are those of `source` in `problem.yaml`, and `--site` picks the other site.
+`hc leetcode` runs a solution on LeetCode, or submits it to your own account, as the Run and Submit buttons of the problem's page do. It works on problems that come from LeetCode (fetched with `hc fetch`, or from a pack such as the official one): `source` in `problem.yaml` identifies the original problem, while **your current login chooses the submission site**. hc keeps one login across all workspaces. `hc leetcode login --site cn` or `--site com` switches it only after the new login succeeds; a failed or cancelled login keeps the previous one. `leetcode.site` in `hc.yaml` supplies the default for `fetch` and `login`, not for `test` or `submit`. The `test`, `submit`, `status` and `logout` commands have no `--site` option.
+
+For a cross-site run or submission, hc queries the source and destination sites before sending code. It requires the same positive numeric frontend question ID, canonical slug and signature metadata (JSON object key order does not matter). It always uses the destination site's internal question ID for the actual request. Series-specific IDs such as LCR, missing questions, unavailable metadata and mismatches are refused; hc does not guess by local ID, title or equivalent content. If verification fails, you can log in to the source site instead. Source metadata is fetched without your destination session. An expired login is reported and never causes an automatic site switch.
 
 ```sh
-hc leetcode login --site cn          # once per site: authorize hc in the browser
-hc leetcode status                   # which sites hc is logged in to, and as whom
+hc leetcode login --site cn          # switch the global login to cn via the browser
+hc leetcode status                   # current site, username and session validity
 hc leetcode test two-sum             # run on LeetCode's example testcases
 hc leetcode test two-sum -i $'[3,3]\n6'   # or on your own, in LeetCode's format
 hc leetcode submit two-sum -l python # submit to your account
-hc leetcode logout                   # forget every site's session (--site: one)
+hc leetcode logout                   # forget the current login
 ```
 
 **Logging in.** LeetCode signs in with a CAPTCHA, so hc logs in with the session of a browser instead of a password. By default `hc leetcode login` opens the site's authorization page in your browser, as LeetCode's VS Code extension does (sign in there if you are not yet). LeetCode then sends the browser's cookies to hc on a port of `127.0.0.1`, and the page says when hc is logged in. The cookies travel in that URL, so it stays in the browser's history. On a machine without a desktop, or over SSH, open the page hc prints on your own machine with the port forwarded:
@@ -546,7 +548,7 @@ The authorization page is not a documented API of LeetCode's. If it stops workin
 
 Paste it when `hc leetcode login --paste` asks (nothing is shown as you paste), or pipe it in (`pbpaste | hc leetcode login --site cn` on macOS). hc finds `LEETCODE_SESSION` in what you paste.
 
-Either way, hc checks the session with LeetCode and saves it, readable by you only, in `hc/leetcode.json` of your user configuration directory (`~/Library/Application Support` on macOS, `~/.config` on Linux), never in the workspace. A session lasts a few weeks; when LeetCode refuses one, log in again. `hc leetcode status` checks each saved session with LeetCode and shows the user it signs in as, or that LeetCode no longer accepts it; its exit status is 1 unless hc is logged in (to `--site`, or to some site) and every saved session works. `hc leetcode logout` forgets the sessions of every site, or of `--site`, but only in hc: LeetCode keeps a session valid until it expires, so log out in the browser to end it there.
+Either way, hc checks the session with LeetCode and saves the single login, readable by you only, in `hc/leetcode.json` of your user configuration directory (`~/Library/Application Support` on macOS, `~/.config` on Linux), never in the workspace. When LeetCode rejects the session, log in again. `hc leetcode status` verifies the current account and shows its site and username; its exit status is 1 when signed out, expired or unable to verify the session. `hc leetcode logout` clears the login (including an invalid or older login file), but does not invalidate the browser's session. Older per-site login files require logging in again; hc never silently picks one of their accounts.
 
 **Code.** hc sends the solution `hc test` would run (`-l` as there), turned into LeetCode's code: Python drops its imports from `hc_runtime` (LeetCode defines `ListNode`, `TreeNode` and `Node` itself), and Go its `package main`. A Python function problem must be a method of `class Solution` there; hc also accepts a module-level function, LeetCode does not.
 
@@ -567,7 +569,7 @@ python:
 agent:
   name: claude        # claude | codex, or set command (see above)
 leetcode:
-  site: com           # com | cn
+  site: com           # default for fetch/login: com | cn; submissions use the current login
 locales: [en]         # the statement languages of your own problems, the default first
 ```
 

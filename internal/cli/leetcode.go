@@ -30,7 +30,8 @@ func newLeetCodeCmd(root *rootOptions) *cobra.Command {
 		Short: "Run and submit solutions on your LeetCode account",
 		Long: `Run a solution on LeetCode, or submit it to your account, as on the
 problem's page. Problems come from LeetCode (hc fetch, or a pack such as the
-official leetcode pack); the site and slug are those of source in problem.yaml.
+official leetcode pack). Runs and submissions use the one signed-in account;
+source in problem.yaml identifies the original problem, not the destination.
 
 Log in first with hc leetcode login. hc keeps the session in your user
 configuration directory, never in the workspace. LeetCode results are not
@@ -85,7 +86,8 @@ instead. Open the site signed in and the developer tools (F12), then either
 and paste it (nothing is shown as you paste), or pipe it in: on macOS, copy
 it and run pbpaste | hc leetcode login.
 
-hc checks the session with LeetCode before saving it, readable by you only,
+A successful login replaces the previous login across all workspaces; a failed
+or cancelled login keeps it. hc checks the session before saving it, readable by you only,
 in hc/leetcode.json of your user configuration directory. A session lasts a
 few weeks; log in again when LeetCode refuses it.
 
@@ -218,73 +220,34 @@ func readSession(cmd *cobra.Command) (string, error) {
 }
 
 func newLeetCodeLogoutCmd() *cobra.Command {
-	var siteName string
-	cmd := &cobra.Command{
-		Use:   "logout",
-		Short: "Forget the LeetCode sessions hc saved",
-		Long: `Forget the LeetCode sessions hc saved: of every site, or of the site of
---site. Only hc forgets them: LeetCode keeps a session valid until it expires,
-so log out in the browser too to end it there.`,
+	return &cobra.Command{
+		Use: "logout", Short: "Forget the current LeetCode login",
+		Long: "Forget hc's current login across all workspaces. This does not sign the browser out of LeetCode.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var sites []leetcode.Site
-			if siteName != "" {
-				site, err := leetcode.SiteByName(siteName)
-				if err != nil {
-					return err
-				}
-				sites = append(sites, site)
-			}
-			removed, err := app.LeetCodeLogout(sites...)
+			removed, err := app.LeetCodeLogout()
 			if err != nil {
 				return err
 			}
-			for _, name := range removed {
-				fmt.Printf("%s of leetcode.%s\n", ui.Green.Render("logged out"), name)
-			}
-			if len(removed) > 0 {
-				return nil
-			}
-			if len(sites) == 0 {
+			if removed {
+				fmt.Println(ui.Green.Render("logged out of LeetCode"))
+			} else {
 				fmt.Println("Not logged in to LeetCode.")
-				return nil
 			}
-			msg := fmt.Sprintf("Not logged in to leetcode.%s", sites[0].Name)
-			if others, err := app.LeetCodeSites(); err == nil && len(others) > 0 {
-				msg += " (logged in to leetcode." + strings.Join(others, ", leetcode.") + ")"
-			}
-			fmt.Println(msg + ".")
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&siteName, "site", "", "com or cn (default: every site)")
-	return cmd
 }
 
 func newLeetCodeStatusCmd() *cobra.Command {
-	var siteName string
-	cmd := &cobra.Command{
-		Use:   "status",
-		Short: "Show which LeetCode sites hc is logged in to",
-		Long: `Show whether hc has a session of each site, or of --site, and check it with
-LeetCode: as whom it signs in, or that LeetCode no longer accepts it (it has
-expired, or the browser logged out), in which case log in again.
-
-The exit status is 0 when hc is logged in (to --site, or to some site) and
-every session it saved works, else 1.`,
+	return &cobra.Command{
+		Use: "status", Short: "Check the current LeetCode login",
+		Long: "Show the current site and username, checking whether LeetCode still accepts the session. Exits non-zero when signed out, expired or unable to verify the session.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var sites []leetcode.Site
-			if siteName != "" {
-				site, err := leetcode.SiteByName(siteName)
-				if err != nil {
-					return err
-				}
-				sites = append(sites, site)
-			}
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 			defer stop()
-			status, path, err := app.LeetCodeStatus(ctx, sites...)
+			status, path, err := app.LeetCodeStatus(ctx)
 			if err != nil {
 				return err
 			}
@@ -294,64 +257,45 @@ every session it saved works, else 1.`,
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&siteName, "site", "", "com or cn (default: every site)")
-	return cmd
 }
 
-// printLeetCodeStatus prints the state of hc's sessions and reports whether
-// hc is logged in and every saved session works.
-func printLeetCodeStatus(status []app.LeetCodeSiteStatus, path string) bool {
-	saved, ok := 0, true
-	for _, s := range status {
-		if s.Saved {
-			saved++
-		}
-	}
-	if saved == 0 && len(status) > 1 {
+func printLeetCodeStatus(s *app.LeetCodeSiteStatus, path string) bool {
+	if s == nil {
 		fmt.Println("Not logged in to LeetCode; run `hc leetcode login`.")
 		return false
 	}
-	for _, s := range status {
-		site := fmt.Sprintf("leetcode.%-4s", s.Site.Name)
-		switch {
-		case !s.Saved:
-			fmt.Printf("%s %s\n", site, ui.Faint.Render(fmt.Sprintf("not logged in (hc leetcode login --site %s)", s.Site.Name)))
-			ok = ok && len(status) > 1
-		case s.Err == nil:
-			fmt.Printf("%s %s as %s\n", site, ui.Green.Render("logged in"), s.User)
-		case errors.Is(s.Err, leetcode.ErrNotSignedIn):
-			fmt.Printf("%s %s; log in again with `hc leetcode login --site %s`\n", site, ui.Red.Render("session no longer accepted"), s.Site.Name)
-			ok = false
-		default:
-			fmt.Printf("%s %s: %v\n", site, ui.Red.Render("could not check the session"), leetCodeErr(s.Err, s.Site))
-			ok = false
-		}
+	site := "leetcode." + s.Site.Name
+	switch {
+	case s.Err == nil:
+		fmt.Printf("%s %s as %s\n", site, ui.Green.Render("logged in"), s.User)
+	case errors.Is(s.Err, leetcode.ErrNotSignedIn):
+		fmt.Printf("%s %s; log in again with `hc leetcode login --site %s`\n", site, ui.Red.Render("session no longer accepted"), s.Site.Name)
+	default:
+		fmt.Printf("%s %s: %v\n", site, ui.Red.Render("could not check the session"), leetCodeErr(s.Err, s.Site))
 	}
-	if saved > 0 {
-		fmt.Println(ui.Faint.Render("Sessions are kept in " + path + "."))
-	}
-	return ok
+	fmt.Println(ui.Faint.Render("Login is kept in " + path + "."))
+	return s.Err == nil
 }
 
 type leetCodeOptions struct {
-	lang, site, input string
-	verbose           bool
+	lang, input string
+	verbose     bool
 }
 
-// withLeetCode resolves the problem, its language and where it is on
-// LeetCode, and signs a client in to that site.
+// withLeetCode resolves the local problem and its provenance, then creates
+// a client for the single current account, independent of workspace defaults.
 func withLeetCode(root *rootOptions, ref string, o *leetCodeOptions, fn func(a *app.App, p *problem.Problem, l lang.Language, t app.LeetCodeTarget, c *leetcode.Client) error) error {
 	return root.withProblem(ref, o.lang, func(a *app.App, p *problem.Problem, l lang.Language) error {
-		t, err := app.LeetCodeProblem(p, o.site)
+		t, err := app.LeetCodeProblem(p)
 		if err != nil {
 			return err
 		}
-		sess, err := app.LeetCodeSession(t.Site)
+		account, err := app.LeetCodeSession()
 		if err != nil {
 			return err
 		}
-		c := leetcode.NewClient(t.Site, a.WS.StatePath())
-		c.Session = sess
+		c := leetcode.NewClient(account.Site, a.WS.StatePath())
+		c.Session = &account.Session
 		return fn(a, p, l, t, c)
 	})
 }
@@ -374,6 +318,9 @@ testcases, or on --input, testcases in LeetCode's format (one JSON value per
 line, a line per parameter, cases one after another). Each case shows your
 output next to LeetCode's expected answer.
 
+Uses the current login's site. Change it with hc leetcode login --site cn
+or --site com. Cross-site runs require matching question identity and metadata.
+
   hc leetcode test two-sum
   hc leetcode test two-sum --input $'[3,3]\n6'`,
 		Args: cobra.ExactArgs(1),
@@ -381,10 +328,10 @@ output next to LeetCode's expected answer.
 			return withLeetCode(root, args[0], o, func(a *app.App, p *problem.Problem, l lang.Language, t app.LeetCodeTarget, c *leetcode.Client) error {
 				ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 				defer stop()
-				fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Running %s on leetcode.%s [%s]…", t.Slug, t.Site.Name, l.Name())))
-				run, err := a.LeetCodeTest(ctx, c, p, l, t.Slug, o.input)
+				fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Running %s on leetcode.%s [%s]…", t.Slug, c.Site.Name, l.Name())))
+				run, err := a.LeetCodeTest(ctx, c, p, l, o.input)
 				if err != nil {
-					return leetCodeErr(err, t.Site)
+					return leetCodeErr(err, c.Site)
 				}
 				if !printLeetCodeTest(p, run, o.verbose) {
 					return errSilent
@@ -394,7 +341,6 @@ output next to LeetCode's expected answer.
 		},
 	}
 	langFlag(cmd, &o.lang)
-	cmd.Flags().StringVar(&o.site, "site", "", "com or cn (default: the problem's source)")
 	cmd.Flags().StringVarP(&o.input, "input", "i", "", "testcases in LeetCode's format (default: the examples)")
 	cmd.Flags().BoolVarP(&o.verbose, "verbose", "v", false, "show inputs and outputs in full")
 	return cmd
@@ -411,16 +357,19 @@ output and the expected one; for a function problem whose input LeetCode gives
 as it is, also the hc cases add command that adds it to the problem's cases
 (to your own cases of the problem, for a problem of an installed pack).
 
+Uses the current login's site. Change it with hc leetcode login --site cn
+or --site com. Cross-site submissions require matching question identity and metadata.
+
   hc leetcode submit two-sum -l python`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return withLeetCode(root, args[0], o, func(a *app.App, p *problem.Problem, l lang.Language, t app.LeetCodeTarget, c *leetcode.Client) error {
 				ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 				defer stop()
-				fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Submitting %s to leetcode.%s [%s]…", t.Slug, t.Site.Name, l.Name())))
-				run, err := a.LeetCodeSubmit(ctx, c, p, l, t.Slug)
+				fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Submitting %s to leetcode.%s [%s]…", t.Slug, c.Site.Name, l.Name())))
+				run, err := a.LeetCodeSubmit(ctx, c, p, l)
 				if err != nil {
-					return leetCodeErr(err, t.Site)
+					return leetCodeErr(err, c.Site)
 				}
 				if !printLeetCodeSubmit(a, p, run, o.verbose) {
 					return errSilent
@@ -430,7 +379,6 @@ as it is, also the hc cases add command that adds it to the problem's cases
 		},
 	}
 	langFlag(cmd, &o.lang)
-	cmd.Flags().StringVar(&o.site, "site", "", "com or cn (default: the problem's source)")
 	cmd.Flags().BoolVarP(&o.verbose, "verbose", "v", false, "show the failing case in full")
 	return cmd
 }
