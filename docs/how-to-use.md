@@ -102,6 +102,8 @@ A pack installed in a practice workspace (`packs/<name>/`, beside `hc.yaml`) is 
 
 Run `hc` (or `hc list`) to open the problem list. It works best with the terminal split in two: `hc` on one side, your editor on the other.
 
+To open a problem directly, run `hc show 707` or `hc show <pack>/<slug>`. In a terminal it opens the TUI's detail screen: scroll the statement, press `tab` for cases, or use the usual edit, test and debug actions. Viewing alone creates no solution and copies nothing to the clipboard. `esc` (or `q`) returns to the list with that problem selected; if the remembered group excludes it, the list shows all problems in its pack. Press `q` on the list to quit. With `--raw`, or when stdin or stdout is not a terminal, `hc show` prints Markdown instead, for example `hc show 707 --raw` or `hc show 707 > statement.md`.
+
 - Press `enter` on a problem to open it. The statement is shown, the solution file is created from the template, and its absolute path is **copied to the clipboard**. In the editor, `:e <paste>` and start writing. To read a statement without starting the problem, press `v` instead: nothing is created or copied until an action such as `e`, `t` or `y` needs the solution.
 - Test, submit and debug are available from the statement and the result screen, not from the list, as on LeetCode. The result screen lists the cases, the first failure selected and its input, output and expected output shown under it; move to any other case, passed ones included, to see its own. `tab` shows what your program printed. A submission in the history shows the same; a passed case of it shows its input and expected output only while the problem's cases are the ones it ran on, since its output is not kept.
 - `h` on the list shows every submission of the workspace, newest first, with its problem; `o` there opens the submission's problem, and `esc` comes back. `h` in a problem (the statement or the result screen) shows only that problem's submissions.
@@ -298,7 +300,7 @@ locales: [en, zh-CN]   # your own problems: English first, Chinese too
 ```
 
 - `i` in the list switches a pack's locale, and hc remembers the choice for each pack in `.hc/`. A pack you open for the first time shows its default locale.
-- `hc show <problem> --locale zh-CN` shows a statement in a locale; without `--locale`, it shows the one you chose last in the list.
+- `hc show <problem> --locale zh-CN` opens the statement in that locale (or prints it with `--raw` or non-interactive input/output); without `--locale`, it uses the remembered choice. `--locale` applies to this session only; pressing `i` in the TUI saves a new choice.
 - When a problem lacks the chosen locale, which only happens in a pack that does not validate, hc shows the default one and says so.
 - `hc validate` reports a problem without a statement or a title in one of the pack's locales, and statements or titles in a locale the pack does not declare. `hc pack check` fails on them too.
 - hc translates nothing. `hc fetch` writes the statements LeetCode has (see [above](#from-leetcode)); for your own problems, you write each locale's statement yourself. `hc gen` and `hc fix` read only the statement in the default locale, and never write one.

@@ -19,7 +19,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/store"
-	"github.com/MorePeanuts/handcoding/internal/termimg"
+	"github.com/MorePeanuts/handcoding/internal/tui"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 )
 
@@ -101,20 +101,25 @@ func openEditor(a *app.App, path string) error {
 
 func newShowCmd(root *rootOptions) *cobra.Command {
 	var (
-		raw     bool
-		doPause bool
-		locale  string
+		raw    bool
+		locale string
 	)
 	cmd := &cobra.Command{
 		Use:   "show <problem>",
-		Short: "Show the problem statement",
-		Long: `Show the statement of a problem. When its pack has statements in several
-languages (locales in pack.yaml, or in hc.yaml for your own problems),
---locale chooses one; the default is the one last chosen in the TUI (key i),
-else the pack's default locale.
+		Short: "Open the problem in the TUI (print Markdown when piped)",
+		Long: `Open the problem's detail screen in a terminal, without creating a solution
+or copying its path. Scroll the statement, switch to its cases with tab,
+or use the usual TUI actions. Esc returns to the list on this problem.
+With --raw, or when stdin or stdout is not a terminal, print Markdown instead.
+
+When the pack has statements in several languages (locales in pack.yaml,
+or in hc.yaml for your own problems), --locale chooses one for this session.
+The default is the one last chosen in the TUI (key i), else the pack's
+default locale.
 
   hc show two-sum
-  hc show two-sum --locale zh-CN`,
+  hc show two-sum --locale zh-CN
+  hc show two-sum --raw`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, err := root.openApp()
@@ -137,6 +142,13 @@ else the pack's default locale.
 			} else if locale, err = a.Locale(cmd.Context(), k); err != nil {
 				return err
 			}
+			if !raw && isTerminal(os.Stdout) && isTerminal(os.Stdin) {
+				l, _, err := a.SolutionLang(p, "")
+				if err != nil {
+					return err
+				}
+				return runTUI(cmd, a, tui.Options{Lang: l, Problem: p, Locale: locale})
+			}
 			st, err := app.StatementIn(p, locale, k.Manifest.DefaultLocale())
 			if err != nil {
 				return err
@@ -148,28 +160,12 @@ else the pack's default locale.
 			if desc == "" {
 				desc = "# " + app.TitleIn(p, st.Locale, k.Manifest.DefaultLocale()) + "\n\n_No description._\n"
 			}
-			meta := fmt.Sprintf("%s · %s", ui.Difficulty(p.Difficulty), ui.Faint.Render(strings.Join(p.Tags, ", ")))
-			if p.Source.URL != "" {
-				meta += "  " + ui.Faint.Render(p.Source.URL)
-			}
-			if raw || !isTerminal(os.Stdout) {
-				fmt.Println(desc)
-				return nil
-			}
-			images := termimg.New(termimg.Detect(a.WS.Config.Images, true), os.Stdout)
-			out := ui.NewMarkdown(ui.DetectTheme(a.WS.Config.Theme), images).Render(desc, p.Dir, 100)
-			fmt.Println("  " + meta)
-			fmt.Print(out)
-			if doPause {
-				pause()
-			}
+			fmt.Println(desc)
 			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&raw, "raw", false, "print raw Markdown")
 	cmd.Flags().StringVar(&locale, "locale", "", "the statement's locale, such as en or zh-CN (default: the one last chosen, else the pack's default)")
-	cmd.Flags().BoolVar(&doPause, "pause", false, "wait for Enter before exiting")
-	_ = cmd.Flags().MarkHidden("pause")
 	return cmd
 }
 
