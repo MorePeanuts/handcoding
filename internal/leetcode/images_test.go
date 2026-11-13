@@ -7,7 +7,12 @@ import (
 	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path"
+	"path/filepath"
+	"reflect"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -72,5 +77,71 @@ func TestDownloadImages(t *testing.T) {
 	}
 	if len(c.Warnings) != 2 {
 		t.Errorf("warnings: %q", c.Warnings)
+	}
+}
+
+func TestDownloadStatementPreImages(t *testing.T) {
+	for _, tt := range statementImageFixtures {
+		t.Run(tt.slug, func(t *testing.T) {
+			files := map[string][]byte{}
+			for i, name := range tt.images {
+				files[name] = pngOfSize(t, i+2)
+			}
+			var mu sync.Mutex
+			requests := map[string]int{}
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				name := path.Base(r.URL.Path)
+				data, ok := files[name]
+				if !ok {
+					http.NotFound(w, r)
+					return
+				}
+				mu.Lock()
+				requests[name]++
+				mu.Unlock()
+				_, _ = w.Write(data)
+			}))
+			defer srv.Close()
+			q := loadQuestion(t, tt.slug)
+			q.Content = strings.ReplaceAll(q.Content, "https://assets.leetcode.com", srv.URL)
+			q.TranslatedContent = strings.ReplaceAll(q.TranslatedContent, "https://assets.leetcode.com", srv.URL)
+			c, err := Convert(q, SiteCN)
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.Localize([]string{"en", "zh-CN"}, "en")
+			NewClient(SiteCN, "").DownloadImages(context.Background(), c)
+			if len(c.Warnings) != 0 {
+				t.Fatalf("warnings: %q", c.Warnings)
+			}
+			dir := filepath.Join(t.TempDir(), tt.slug)
+			if err := c.Save(dir); err != nil {
+				t.Fatal(err)
+			}
+			var want []string
+			for _, name := range tt.images {
+				rel := "assets/" + name
+				want = append(want, rel)
+				data, err := os.ReadFile(filepath.Join(dir, rel))
+				if err != nil || !bytes.Equal(data, files[name]) {
+					t.Errorf("asset %s: %v, content matches=%v", name, err, bytes.Equal(data, files[name]))
+				}
+				mu.Lock()
+				count := requests[name]
+				mu.Unlock()
+				if count != 1 {
+					t.Errorf("%s requested %d times; want once across locales", name, count)
+				}
+			}
+			for _, file := range []string{"description.md", "description.zh-CN.md"} {
+				data, err := os.ReadFile(filepath.Join(dir, file))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := markdownImages(string(data)); !reflect.DeepEqual(got, want) {
+					t.Errorf("%s images=%v want=%v", file, got, want)
+				}
+			}
+		})
 	}
 }
