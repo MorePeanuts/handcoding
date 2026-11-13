@@ -215,6 +215,7 @@ func (m *model) commandProblem(ref string) *problem.Problem {
 }
 
 func (m *model) commandFallback() {
+	m.commandReturns = nil
 	m.stack = []screen{screenList}
 	m.current, m.run, m.sub, m.subRep, m.subCases = nil, nil, nil, nil, nil
 	m.histories = nil

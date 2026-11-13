@@ -216,57 +216,88 @@ When an update removes a problem, its slug stays in your groups. The picker show
 
 ### Command mode
 
-Press `:` on a browsing screen to run an hc command without leaving the TUI.
-This works in the pack and group pickers, problem list, statement/cases,
-results, and submission history/details, including empty lists. While editing
-a search, `:` is ordinary text (as in `id:707`). Finish an active run or close
-a form, confirmation, or help overlay before opening command mode.
+Press `:` on any browsing screen, including empty lists, to navigate or run
+an hc operation. Omit the `hc` prefix. Search fields keep `:` as ordinary text
+(as in `id:707`); finish the search first. Finish or cancel an active run, or
+close an editing form, confirmation, or quick-help overlay before entering a
+command.
 
-```text
-:leetcode login --site cn
-:leetcode submit
-:pack install https://github.com/MorePeanuts/leetcode.hc.git
-:pack update leetcode
-:test --all
-:cases list
-```
+| Command | Action inside the TUI |
+| --- | --- |
+| `:list` / `:ls` | Return to the problem list, keeping valid filters and position. |
+| `:show two-sum` / `:view two-sum` | View the statement and cases without creating a solution or copying a path. |
+| `:open two-sum` | Create the selected language's template if missing, open its details and copy its path, like Enter in the list. Existing code is kept. |
+| `:group` / `:group list` | Open the current pack's group picker; `--pack` chooses another pack. |
+| `:group show user:practice` | Browse that group's members in their stored order. |
+| `:pack list` | Open the pack picker. |
+| `:cases list [problem]` | View cases; `-c` filters by original case numbers and `-v` shows complete values. |
+| `:history [problem]` | Browse all submissions, or those of the explicitly named problem. |
+| `:history show 42` | View that submission's report, saved code and notes. |
+| `:test` / `:submit` | Run locally in the existing TUI result page. |
+| `:q` / `:quit` | Exit the TUI. |
+| `:help` | Open the full TUI guide. |
 
-Omit the `hc` prefix. Enter runs the command; Esc closes the input without
-changing the page beneath it. Tab/Shift+Tab cycle completions for commands,
-flags, and relevant workspace names. Up/Down (or Ctrl+p/n) recall commands
-from this TUI session. Quotes and backslashes group literal arguments, so
-JSON inputs and names with spaces work. This is not a shell: pipelines,
-redirection, command substitution, and chained commands are not supported.
+`show`/`view` only reads a problem, including when you switch languages while
+viewing. `open` starts it; use `-l` to choose its language. Both accept the usual
+ID, slug or qualified `pack/slug`, and `--locale` for the statement. The standalone
+`hc show` remains read-only too; `view`, `open` and `quit` are command-mode names.
+Esc returns from a command-opened page to the previous page, restoring its
+search, selection, language and scroll position where still valid. `:list` and
+the picker commands return to navigation roots. Explicit `:list --pack` or
+`--group` chooses a new list and clears the old search/filter.
 
-Commands use the current workspace. When a command requires one problem,
-omitting it uses the highlighted problem in the list or the problem shown
-on a statement, case, or result screen, together with the current language
-unless `-l` was given. Explicitly naming that same problem also keeps the
-current language; a different target uses its normal CLI default. A group
-picker or history screen supplies no implicit solution:
-name the problem there. In particular, running or submitting from a history
-screen uses the current solution file, never the historical code being viewed.
-Destructive commands such as `cases rm` require explicit targets; highlighted
-rows never supply submission IDs. The effective command and target are printed
-before execution.
+Enter executes; Esc dismisses the command input without changing its page.
+Tab/Shift+Tab cycle completions for commands, flags, relevant workspace names
+and help topics. Up/Down (or Ctrl+p/n) recall this session's commands. Quotes and
+backslashes preserve spaces and JSON inputs. This is not a shell: pipelines,
+redirection, command substitution and chained commands are unavailable. Invalid
+commands retain their input and show an error for correction.
 
-Optional arguments keep their CLI meaning: `:pack update` updates all managed
-packs, `:validate` validates the workspace, and `:history` lists the workspace's
-history. Command mode does not narrow these to the highlighted item.
+Commands use the current workspace. A required problem may default to the
+highlighted problem in the list or the problem in the statement, cases or result
+page. Operations on that problem use the current language unless explicitly
+specified; other targets use the CLI default. `:test --file draft.py` resolves
+relative paths from the workspace and infers language from the extension unless
+`-l` is given. Pack/group pickers, the guide and history screens provide no
+implicit solution target. Running from history uses the current solution file,
+never the historical code. Destructive targets and submission IDs remain explicit.
 
-The terminal temporarily shows the existing CLI's output and prompts. Ctrl+c
-cancels the command; after it finishes, press Enter to return. hc reloads
-configuration, packs, problems, groups, and history even after a failure,
-keeping your place where possible. A removed problem returns you to the list.
+Optional arguments keep their scope: bare `:history` shows the workspace's
+history, `:validate` validates the workspace, and `:pack update` updates all
+managed packs. Command mode does not narrow them to the highlighted item.
 
-Available commands are `leetcode` (login/logout/status/test/submit), `pack`
-(list/install/update/remove/check), `fetch`, `validate`, `env`, `test`,
-`submit`, `debug`, `cases`, `group`, `history`, `gen`, `fix`, `clean`, `help`,
-and `docs`, with their existing flags and aliases. `:help <command>` and
-`:<command> --help` show CLI help. Top-level `list`/`ls`, `show`, `init`, and
-`pack init` are unavailable: command mode does not open another TUI or create
-another workspace. Nested commands such as `cases list` and `history show`
-remain available. Existing TUI shortcuts still work as before.
+Local tests support `--all`, `--case`, `--input`, `--generate`, `--args`, `--seed`
+and `--file`. `:submit -m 'hash map' --notes 'O(n)'` records a note; `:submit -e`
+opens the TUI note form, where saving starts submission and Esc cancels without
+running. Results show the target and language, with Cases/Output tabs;
+`--verbose` displays all case details. Esc cancels a run and returns once it has
+stopped. File/custom-input results require an explicit debugging command, so
+pressing `d` cannot accidentally debug a different stored case or solution.
+
+Operations without native pages retain the terminal flow: LeetCode commands,
+pack changes/checks, fetching, validation, environment setup, agents, cache
+cleanup, documentation, and group/case/history mutations. Interactive debuggers
+retain their own terminal controls. Explicit `list --plain`, `show --raw`, and
+`cases list --json`/`--expand` also request terminal output; false flag values
+keep the native page. The effective command is printed, Ctrl+c cancels the child,
+and Enter returns. Configuration, packs, problems, groups and history reload
+even after failure. Missing targets fall back to a valid list. No command opens
+a nested TUI. `init`, `pack init`, workspace switching and `--pause` remain
+unavailable.
+
+### TUI guide and quick help
+
+`?` shows the current page's shortcut reference. `:help` opens a separate,
+scrollable guide covering navigation, search, groups, practice, history and
+command context, with examples. Wide terminals show a topic list beside the
+page; narrow terminals show the page at full width. Tab switches topics/page
+focus, arrows navigate or scroll, and Ctrl+n/p changes topics. `/` searches
+both titles and full content; Enter reads the selected match, and Esc clears
+a search before returning to the originating page.
+
+Use `:help search` to open a workflow topic, or `:help submit` / `:submit --help`
+for command behavior and options derived from the actual command definitions.
+Help never executes the command it describes.
 
 ## Commands
 

@@ -1,0 +1,30 @@
+ hc   TUI Guide
+Start here  ·  1/7
+────────────────────────────────────────────────────────────────────────────────────────────────────
+▌ Start here                                                                                       ┃
+  Browse, view & open           Make progress without leaving the TUI                              ┃
+  Search while browsing                                                                            ┃
+  Personal & pack groups       Browse a problem, read its statement, open a solution in your       ┃
+  Test, submit & debug         editor, then test, submit and review.                               ┃
+  Review past submissions                                                                          ┃
+  Command mode & context       ## A first session                                                  ┃
+                                                                                                   ┃
+                               1. Choose a pack and highlight a problem.                           ┃
+                               2. Press v to read it without creating files, or Enter to create    ┃
+                               a missing solution template and copy its path.                      ┃
+                               3. Press e to edit, t to test examples, and s to judge and record   ┃
+                               a submission.                                                       ┃
+                               4. Inspect Cases and Output with Tab. Use h for submission          ┃
+                               history.                                                            ┃
+                                                                                                   ┃
+                               ## Find your way                                                    ┃
+                                                                                                   ┃
+                               Esc goes back. :list returns to the problem list. :pack list        ┃
+                               opens the pack picker. :q exits the TUI.                            ┃
+                                                                                                   ┃
+                               ? shows the current page's shortcut reference. This guide           │
+                               explains the workflow. Use Tab to choose topics or read the page,   │
+                               / to search topic names and content, and Ctrl+n/p to change         │
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ esc back    / search    tab topics/page    ↑↓ scroll    ctrl+n/p topic               top · 27 lines

@@ -74,6 +74,8 @@ hc                      # 打开题目列表
 
 运行 `hc show two-sum` 可以直接进入这道题的 TUI 详情页，仅查看不会创建解答文件。需要打印 Markdown 时使用 `hc show two-sum --raw`；通过管道或重定向输出时也会打印 Markdown。
 
+在 TUI 内，`:show two-sum`（或 `:view`）也只查看；`:open two-sum` 像 Enter 一样创建缺少的模板。`:help` 打开可搜索的 TUI 指南，`:q` 退出。
+
 > [!TIP]
 > 题面图片在 kitty、Ghostty 中以原图显示。在 [herdr](https://herdr.dev) 中，只要 herdr 外层的终端支持 kitty 图片协议，也会显示原图。如果在 herdr 中图片区域显示为空白，说明外层终端不支持 kitty 图片协议，请在 `hc.yaml` 中设置 `images: blocks`。详见[使用指南](docs/how-to-use_zh.md#配置)。
 

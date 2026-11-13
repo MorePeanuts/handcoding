@@ -27,9 +27,10 @@ const (
 // its tab, and in the cases tab the selected case, whose details open
 // under it.
 type browser struct {
-	tab    int
-	cursor int            // the selected case's position in the report
-	inputs map[int]string // the cases' inputs as shown, by position
+	verbose bool
+	tab     int
+	cursor  int            // the selected case's position in the report
+	inputs  map[int]string // the cases' inputs as shown, by position
 }
 
 // reset shows rep's cases, the first failure selected, or the first case
@@ -188,9 +189,11 @@ func (m *model) renderCases(p *problem.Problem, rep *runner.Report, o ui.ReportO
 		}
 		r.add(ui.Faint, c.Case.Note)
 		l.add(clip(r.fill(width), width))
-		if cur {
+		if cur || o.Verbose {
 			l.add(m.caseBox(p, c, b, cases, width))
-			bottom = l.n - 1
+			if cur {
+				bottom = l.n - 1
+			}
 		}
 	}
 	if stderr && rep.Stderr != "" {
@@ -222,6 +225,10 @@ func caseTime(c runner.CaseResult) string {
 // expected output of the problem's case it ran on, when known.
 func (m *model) caseBox(p *problem.Problem, c runner.CaseResult, b *browser, cases stored, width int) string {
 	width = max(width, 30)
+	trim := truncate
+	if b.verbose {
+		trim = func(s string) string { return s }
+	}
 	var s strings.Builder
 	style := ui.VerdictStyle(c.Verdict)
 	head := fmt.Sprintf("Case %d", c.Index)
@@ -273,7 +280,7 @@ func (m *model) caseBox(p *problem.Problem, c runner.CaseResult, b *browser, cas
 		} else if input == "" {
 			input = b.input(c.Index, p, c.Case)
 		}
-		field("Input", truncate(input), ui.Plain)
+		field("Input", trim(input), ui.Plain)
 		switch c.Verdict {
 		case runner.RuntimeError:
 			field("Error", c.Error, ui.Red)
@@ -287,14 +294,14 @@ func (m *model) caseBox(p *problem.Problem, c runner.CaseResult, b *browser, cas
 				if failed(c.Verdict) {
 					out = ui.Red
 				}
-				field("Output", truncate(string(c.Output)), out)
+				field("Output", trim(string(c.Output)), out)
 			}
 			expected := c.Case
 			if file != nil {
 				expected = *file
 			}
 			if expected.HasExpected() {
-				field(ui.ExpectedLabel(p), truncate(string(expected.Expected)), ui.Green)
+				field(ui.ExpectedLabel(p), trim(string(expected.Expected)), ui.Green)
 			}
 		}
 		if c.Message != "" {

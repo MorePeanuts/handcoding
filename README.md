@@ -74,6 +74,8 @@ Press `enter` on a problem. `hc` shows the statement, creates `solution.go` from
 
 To jump straight to a problem's TUI detail screen, run `hc show two-sum`. Viewing alone creates no solution. Use `hc show two-sum --raw` to print its Markdown; piping or redirecting the command also prints Markdown.
 
+In the TUI, `:show two-sum` (or `:view`) also only views; `:open two-sum` creates a missing template like Enter. Use `:help` for the searchable TUI guide, and `:q` to quit.
+
 > [!TIP]
 > Statement images are shown at full resolution in kitty and Ghostty, and in [herdr](https://herdr.dev) when the terminal around it supports kitty graphics. If images inside herdr come out blank, your terminal lacks kitty graphics: set `images: blocks` in `hc.yaml`. See [statement images](docs/how-to-use.md#configuration).
 

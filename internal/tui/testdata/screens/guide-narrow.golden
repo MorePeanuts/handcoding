@@ -1,0 +1,20 @@
+ hc   TUI Guide
+Start here  ·  1/7
+────────────────────────────────────────────────────────────
+                                                           ┃
+   Make progress without leaving the TUI                   ┃
+                                                           ┃
+  Browse a problem, read its statement, open a solution    ┃
+  in your editor, then test, submit and review.            ┃
+                                                           ┃
+  ## A first session                                       │
+                                                           │
+  1. Choose a pack and highlight a problem.                │
+  2. Press v to read it without creating files, or Enter   │
+  to create a missing solution template and copy its       │
+  path.                                                    │
+  3. Press e to edit, t to test examples, and s to judge   │
+  and record a submission.                                 │
+────────────────────────────────────────────────────────────
+
+ esc back    / search    tab topics           top · 29 lines

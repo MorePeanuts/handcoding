@@ -294,7 +294,7 @@ func selectForTest(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.La
 			return nil, err
 		}
 		sel := []runner.Selected{{Index: 1, Case: c}}
-		if err := a.BuildCase(cmd.Context(), p, l, sel, app.RunOptions{Stderr: os.Stderr}); err != nil {
+		if err := a.BuildCase(cmd.Context(), p, l, sel, app.RunOptions{Stderr: cmd.ErrOrStderr()}); err != nil {
 			return nil, err
 		}
 		return sel, nil
@@ -312,11 +312,11 @@ func selectForTest(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.La
 			ref = l.ID()
 		}
 		if _, _, err := a.ReferenceLang(p, ref); err == nil {
-			rep, _, err := a.RunReference(cmd.Context(), p, ref, sel, app.RunOptions{})
+			rep, _, err := a.RunReference(cmd.Context(), p, ref, sel, app.RunOptions{Stdout: cmd.ErrOrStderr(), Stderr: cmd.ErrOrStderr()})
 			if err == nil && len(rep.Cases) == 1 && rep.Cases[0].Verdict == runner.NoExpected {
 				sel[0].Case.Expected = rep.Cases[0].Output
 			} else if err == nil && len(rep.Cases) == 1 {
-				fmt.Fprintf(os.Stderr, "%s reference solution failed on this input: %s\n", ui.Yellow.Render("warning:"), rep.Cases[0].Error)
+				fmt.Fprintf(cmd.ErrOrStderr(), "%s reference solution failed on this input: %s\n", ui.Yellow.Render("warning:"), rep.Cases[0].Error)
 			}
 		}
 		return sel, nil

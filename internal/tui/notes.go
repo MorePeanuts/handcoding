@@ -16,6 +16,7 @@ import (
 // noteForm edits a submission's note, independently of whether its problem
 // still exists. Nothing is written until the user saves.
 type noteForm struct {
+	submit  *Command
 	sub     store.Submission
 	comment textinput.Model
 	notes   textarea.Model
@@ -67,12 +68,10 @@ func (m *model) updateNoteForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 			f.comment.Blur()
 			return m, f.notes.Focus()
 		case "ctrl+s":
-			m.saveNote()
-			return m, nil
+			return m, m.saveNote()
 		case "enter":
 			if f.focus == 0 {
-				m.saveNote()
-				return m, nil
+				return m, m.saveNote()
 			}
 		}
 	}
@@ -85,9 +84,22 @@ func (m *model) updateNoteForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *model) saveNote() {
+func (m *model) saveNote() tea.Cmd {
 	f := m.noteForm
 	note, err := store.NewNote(f.comment.Value(), f.notes.Value())
+	if err == nil && f.submit != nil {
+		if note.Empty() {
+			f.err = "empty note: submission cancelled; enter a comment or Esc to return"
+			return nil
+		}
+		c := *f.submit
+		c.Note = note
+		c.EditNote = false
+		m.noteForm = nil
+		// Replace the draft with its result; the command's saved origin remains.
+		m.stack[len(m.stack)-1] = screenResult
+		return m.startCommandRun(c, m.current)
+	}
 	if err == nil {
 		var st *store.Store
 		st, err = m.app.Store()
@@ -97,7 +109,7 @@ func (m *model) saveNote() {
 	}
 	if err != nil {
 		f.err = err.Error()
-		return
+		return nil
 	}
 	// Refresh both the list and an open submission before pop renders it.
 	m.loadHistory()
@@ -108,6 +120,8 @@ func (m *model) saveNote() {
 	} else {
 		m.message = ui.Green.Render(fmt.Sprintf("noted submission #%d", f.sub.ID))
 	}
+
+	return nil
 }
 
 var noteKeys = []string{"ctrl+s save", "tab switch", "esc cancel", "enter save/newline"}
@@ -132,10 +146,18 @@ func (m *model) viewNoteForm() string {
 	if f.err != "" {
 		body += clip(ui.Red.Render(f.err), m.width)
 	} else {
-		body += clip(ui.Faint.Render("Clear both fields to remove the note."), m.width)
+		hint := "Clear both fields to remove the note."
+		if f.submit != nil {
+			hint = "Save to submit; Esc cancels without running."
+		}
+		body += clip(ui.Faint.Render(hint), m.width)
 	}
 	h := max(m.height-headerLines-footerLines, 3)
 	body += strings.Repeat("\n", max(h-lipgloss.Height(body), 0))
+	title := fmt.Sprintf("Note on submission #%d", f.sub.ID)
+	if f.submit != nil {
+		title = "Note before submitting"
+	}
 	return m.frame(m.badge()+"  "+m.st.title.Render(f.sub.Ref()),
-		m.chip(m.st.accent.Bold(true), fmt.Sprintf("Note on submission #%d", f.sub.ID)), body, "", noteKeys...)
+		m.chip(m.st.accent.Bold(true), title), body, "", noteKeys...)
 }

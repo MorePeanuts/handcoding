@@ -149,6 +149,9 @@ func (m *model) keyHelp(right string, keys ...string) string {
 	if m.canCommand() {
 		help = part(": command") + help
 	}
+	if m.top() == screenGuide {
+		help = ""
+	}
 	if m.top() == screenList && (m.searching || m.picking && m.groupSearching) || m.top() == screenCaseForm || m.top() == screenNoteForm || m.top() == screenGroupForm && (m.groupForm.focus <= groupTitle || m.groupForm.searching) {
 		help = "" // ? is text there
 	}

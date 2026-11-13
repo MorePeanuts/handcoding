@@ -102,12 +102,12 @@ func TestCommandInputHistoryAndCompletion(t *testing.T) {
 	m := h.m
 	var got string
 	m.opts.Commands = &Commands{
-		Resolve: func(line string, _ CommandContext) ([]string, error) {
+		Resolve: func(line string, _ CommandContext) (Command, error) {
 			got = line
 			if line == "bad" {
-				return nil, errors.New("bad command")
+				return Command{}, errors.New("bad command")
 			}
-			return []string{"help"}, nil
+			return Command{Args: []string{"help"}}, nil
 		},
 		Complete: func(prefix string, _ CommandContext) []string {
 			if prefix != "pack u" {
@@ -235,8 +235,8 @@ func TestCommandReturnToActiveSearch(t *testing.T) {
 	h.press("ctrl+o")
 	m.detail.SetYOffset(2)
 	detailOffset := m.detail.YOffset()
-	m.opts.Commands = &Commands{Resolve: func(string, CommandContext) ([]string, error) {
-		return []string{"pack", "list"}, nil
+	m.opts.Commands = &Commands{Resolve: func(string, CommandContext) (Command, error) {
+		return Command{Args: []string{"pack", "list"}}, nil
 	}}
 	h.press(":")
 	if m.command == nil {

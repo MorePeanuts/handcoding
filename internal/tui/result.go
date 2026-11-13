@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
+	"github.com/MorePeanuts/handcoding/internal/store"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 )
 
@@ -26,11 +28,15 @@ const (
 
 // runState is the latest test or submit run.
 type runState struct {
-	kind    runKind
-	ref     string // the problem's pack/slug
-	langID  string
-	running bool
-	cancel  context.CancelFunc
+	kind         runKind
+	ref          string // the problem's pack/slug
+	langID       string
+	running      bool
+	cancel       context.CancelFunc
+	returnOnDone bool
+	verbose      bool
+	alternate    bool
+	file         string
 
 	report *runner.Report
 	output string // what the program printed
@@ -56,11 +62,22 @@ func (m *model) startRun(kind runKind, p *problem.Problem) tea.Cmd {
 		m.message = "no " + m.lang.Name() + " solution yet — press enter or e first"
 		return nil
 	}
+	return m.runWith(kind, p, func(ctx context.Context, a *app.App, p *problem.Problem, l lang.Language, out io.Writer, note store.Note) (*runner.Report, *store.Submission, error) {
+		opts := app.RunOptions{Stdout: out, Stderr: out, Note: note}
+		if kind == runSubmit {
+			return a.Submit(ctx, p, l, opts)
+		}
+		rep, err := testExamples(ctx, a, p, l, opts)
+		return rep, nil, err
+	}, store.Note{}, false, "")
+}
+
+func (m *model) runWith(kind runKind, p *problem.Problem, execute RunCommand, note store.Note, verbose bool, file string) tea.Cmd {
 	// The user may have fixed what made creating the Python environment
 	// fail on an earlier run.
 	m.app.RetryEnv()
 	ctx, cancel := context.WithCancel(m.ctx)
-	run := &runState{kind: kind, ref: p.Ref(), langID: m.lang.ID(), running: true, cancel: cancel}
+	run := &runState{kind: kind, ref: p.Ref(), langID: m.lang.ID(), running: true, cancel: cancel, verbose: verbose, file: file}
 	m.run, m.current = run, p
 	m.resBr = browser{}
 	m.message = ""
@@ -70,16 +87,11 @@ func (m *model) startRun(kind runKind, p *problem.Problem) tea.Cmd {
 	exec := func() tea.Msg {
 		defer cancel()
 		out := &syncBuffer{max: 64 << 10}
-		opts := app.RunOptions{Stdout: out, Stderr: out}
 		msg := runDoneMsg{run: run}
-		if kind == runSubmit {
-			rep, sub, err := a.Submit(ctx, p, l, opts)
-			msg.report, msg.err = rep, err
-			if sub != nil {
-				msg.subID = sub.ID
-			}
-		} else {
-			msg.report, msg.err = testExamples(ctx, a, p, l, opts)
+		rep, sub, err := execute(ctx, a, p, l, out, note)
+		msg.report, msg.err = rep, err
+		if sub != nil {
+			msg.subID = sub.ID
 		}
 		msg.output = out.String()
 		return msg
@@ -117,7 +129,12 @@ func (m *model) finishRun(msg runDoneMsg) {
 	r.running = false
 	r.report, r.output, r.subID, r.err = msg.report, msg.output, msg.subID, msg.err
 	m.resBr.reset(r.report)
+	m.resBr.verbose = r.verbose
 	m.refresh()
+	if r.returnOnDone {
+		m.pop()
+		return
+	}
 	if m.top() == screenResult {
 		m.result.GotoTop()
 		m.renderResult()
@@ -148,7 +165,7 @@ func (m *model) renderResult() {
 	case r.err != nil:
 		m.result.SetContent(wrap(ui.Red.Render(r.err.Error()), width))
 	case r.report != nil:
-		ro := ui.ReportOptions{Ref: m.app.WS.Ref(m.current)}
+		ro := ui.ReportOptions{Ref: m.app.WS.Ref(m.current), Verbose: r.verbose}
 		if l, err := m.app.Lang(r.langID); err == nil {
 			ro.Lang = l
 		}
@@ -163,7 +180,10 @@ func (m *model) updateResult(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch key := msg.String(); key {
 	case "esc", "q":
 		if m.run != nil && m.run.running {
+			m.run.returnOnDone = true
 			m.run.cancel()
+			m.message = "cancelling…"
+			return m, nil
 		}
 		m.pop()
 		return m, nil
@@ -175,6 +195,10 @@ func (m *model) updateResult(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "d":
+		if m.run != nil && m.run.alternate {
+			m.message = "this run used a file or custom input; use :debug with an explicit input for the current solution"
+			return m, nil
+		}
 		// The selected case, or what hc debug picks.
 		if r := m.run; r != nil && r.report != nil && m.resBr.tab == tabCases && len(r.report.Cases) > 0 {
 			l, err := m.app.Lang(r.langID)
@@ -186,11 +210,16 @@ func (m *model) updateResult(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.debug(m.current, m.lang, 0)
 	case "v", "enter":
 		// Show the statement: go back if we came from it, otherwise open it.
-		if len(m.stack) > 1 && m.stack[len(m.stack)-2] == screenDetail {
+		back := len(m.stack) > 1 && m.stack[len(m.stack)-2] == screenDetail
+		if n := len(m.commandReturns); n > 0 && m.commandReturns[n-1].depth == len(m.stack) {
+			previous := m.commandReturns[n-1].saved.current
+			back = back && previous != nil && previous.Ref() == m.current.Ref()
+		}
+		if back {
 			m.pop()
 		} else {
 			m.stack[len(m.stack)-1] = screenDetail
-			m.layout()
+			m.openDetail(m.current, false)
 		}
 		return m, nil
 	default:
@@ -230,6 +259,11 @@ func (m *model) viewResult() string {
 			label = r.report.Toolchain.String()
 		}
 		sub = m.chip(m.st.accent.Bold(true), string(r.kind)) + "  " + ui.Faint.Render(label)
+		if r.file != "" {
+			sub += "  " + displayPath(r.file)
+		} else if r.alternate {
+			sub += "  custom input"
+		}
 		if r.running {
 			sub += "  " + m.spinner.View() + " running…"
 		}
