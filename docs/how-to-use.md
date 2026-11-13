@@ -214,6 +214,60 @@ Copy opens the same editor with the source's members already selected, so you ca
 
 When an update removes a problem, its slug stays in your groups. The picker shows an unavailable count; opening the group warns about the missing slugs, and `hc group show` lists them as unavailable. Available members keep their order, and only they count toward progress. Remove obsolete entries yourself; hc never guesses that a renamed problem is the same one. A malformed personal file is reported separately and does not invalidate the pack or its `hc pack check`; you can still browse all problems or explicitly select a `pack:` group. Fix the file before editing personal groups. Normal pack removal keeps the file for reinstallation; `--purge` deletes it as well.
 
+### Command mode
+
+Press `:` on a browsing screen to run an hc command without leaving the TUI.
+This works in the pack and group pickers, problem list, statement/cases,
+results, and submission history/details, including empty lists. While editing
+a search, `:` is ordinary text (as in `id:707`). Finish an active run or close
+a form, confirmation, or help overlay before opening command mode.
+
+```text
+:leetcode login --site cn
+:leetcode submit
+:pack install https://github.com/MorePeanuts/leetcode.hc.git
+:pack update leetcode
+:test --all
+:cases list
+```
+
+Omit the `hc` prefix. Enter runs the command; Esc closes the input without
+changing the page beneath it. Tab/Shift+Tab cycle completions for commands,
+flags, and relevant workspace names. Up/Down (or Ctrl+p/n) recall commands
+from this TUI session. Quotes and backslashes group literal arguments, so
+JSON inputs and names with spaces work. This is not a shell: pipelines,
+redirection, command substitution, and chained commands are not supported.
+
+Commands use the current workspace. When a command requires one problem,
+omitting it uses the highlighted problem in the list or the problem shown
+on a statement, case, or result screen, together with the current language
+unless `-l` was given. Explicitly naming that same problem also keeps the
+current language; a different target uses its normal CLI default. A group
+picker or history screen supplies no implicit solution:
+name the problem there. In particular, running or submitting from a history
+screen uses the current solution file, never the historical code being viewed.
+Destructive commands such as `cases rm` require explicit targets; highlighted
+rows never supply submission IDs. The effective command and target are printed
+before execution.
+
+Optional arguments keep their CLI meaning: `:pack update` updates all managed
+packs, `:validate` validates the workspace, and `:history` lists the workspace's
+history. Command mode does not narrow these to the highlighted item.
+
+The terminal temporarily shows the existing CLI's output and prompts. Ctrl+c
+cancels the command; after it finishes, press Enter to return. hc reloads
+configuration, packs, problems, groups, and history even after a failure,
+keeping your place where possible. A removed problem returns you to the list.
+
+Available commands are `leetcode` (login/logout/status/test/submit), `pack`
+(list/install/update/remove/check), `fetch`, `validate`, `env`, `test`,
+`submit`, `debug`, `cases`, `group`, `history`, `gen`, `fix`, `clean`, `help`,
+and `docs`, with their existing flags and aliases. `:help <command>` and
+`:<command> --help` show CLI help. Top-level `list`/`ls`, `show`, `init`, and
+`pack init` are unavailable: command mode does not open another TUI or create
+another workspace. Nested commands such as `cases list` and `history show`
+remain available. Existing TUI shortcuts still work as before.
+
 ## Commands
 
 ```

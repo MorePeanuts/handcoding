@@ -130,6 +130,7 @@ func runTUI(cmd *cobra.Command, a *app.App, opts tui.Options) error {
 		return err
 	}
 	opts.Exe = exe
+	opts.Commands = tuiCommands()
 	opts.EditorCmd = func(path string) (*exec.Cmd, error) { return editorCommand(a.WS.Config, path) }
 	return tui.Run(cmd.Context(), a, opts)
 }

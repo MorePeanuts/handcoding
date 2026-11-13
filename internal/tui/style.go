@@ -146,6 +146,9 @@ func (m *model) keyHelp(right string, keys ...string) string {
 		return m.st.key.Render(" "+key+" ") + ui.Faint.Render(label+"   ")
 	}
 	help := part("? help")
+	if m.canCommand() {
+		help = part(": command") + help
+	}
 	if m.top() == screenList && (m.searching || m.picking && m.groupSearching) || m.top() == screenCaseForm || m.top() == screenNoteForm || m.top() == screenGroupForm && (m.groupForm.focus <= groupTitle || m.groupForm.searching) {
 		help = "" // ? is text there
 	}

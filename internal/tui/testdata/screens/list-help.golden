@@ -20,9 +20,9 @@
    q           quit
    ctrl+n/p    move in search
    ctrl+o      open in search
+   :           command
    ?           help
    ctrl+c      quit
-
 
 
 
