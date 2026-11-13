@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -291,7 +290,7 @@ func Convert(q *Question, site Site) (*Converted, error) {
 		}
 	}
 
-	cases, warn := examples(p, q, english, exampleKeys)
+	cases, warn := examples(p, q, english, exampleKeys, md)
 	if warn != "" {
 		conv.Warnings = append(conv.Warnings, warn)
 	}
@@ -365,89 +364,6 @@ func toMarkdown(content string) (string, error) {
 	content = supRE.ReplaceAllString(content, "^$1")
 	content = strings.ReplaceAll(content, "&nbsp;", " ")
 	return htmltomarkdown.ConvertString(content)
-}
-
-var (
-	tagRE    = regexp.MustCompile(`<[^>]+>`)
-	outputRE = regexp.MustCompile(`(?m)(?:Output|输出)\s*[:：]?\s*\n?\s*(.+)$`)
-)
-
-// examples builds the statement examples: inputs from exampleTestcases,
-// expected outputs scraped from the statement when they parse as JSON.
-// keys, when given, name the input of each value of an example ("" to drop
-// it); otherwise the values are the signature's inputs in order.
-func examples(p *problem.Problem, q *Question, english string, keys []string) ([]problem.Case, string) {
-	lines := strings.Split(strings.TrimSpace(q.ExampleTestcases), "\n")
-	if len(lines) == 1 && lines[0] == "" {
-		return nil, "no example test cases provided by LeetCode"
-	}
-	perCase := 2
-	switch {
-	case keys != nil:
-		perCase = len(keys)
-	case p.Judge.RoundTrip != nil:
-		perCase = 1 // the value to encode
-	case p.Kind == problem.KindFunction:
-		perCase = len(p.Function.Params)
-	}
-	if perCase == 0 || len(lines)%perCase != 0 {
-		return nil, "could not split the example test cases; run hc gen"
-	}
-	if keys == nil {
-		keys = p.InputKeys()
-	}
-	var cases []problem.Case
-	for i := 0; i < len(lines); i += perCase {
-		c := problem.Case{Input: map[string]json.RawMessage{}, Example: true}
-		for j, k := range keys {
-			v := strings.TrimSpace(lines[i+j])
-			if !json.Valid([]byte(v)) {
-				return nil, fmt.Sprintf("example input %q is not JSON; run hc gen", v)
-			}
-			if k != "" {
-				c.Input[k] = json.RawMessage(v)
-			}
-		}
-		cases = append(cases, c)
-	}
-
-	src := english
-	if src == "" {
-		src = q.TranslatedContent
-	}
-	text := html.UnescapeString(tagRE.ReplaceAllString(src, ""))
-	var outputs []string
-	for _, m := range outputRE.FindAllStringSubmatch(text, -1) {
-		outputs = append(outputs, strings.TrimSpace(m[1]))
-	}
-	if len(outputs) != len(cases) {
-		return cases, "could not match example outputs to inputs; expected outputs left empty (run hc gen)"
-	}
-	missing := 0
-	for i, out := range outputs {
-		out = strings.ReplaceAll(out, " ", " ")
-		if json.Valid([]byte(out)) {
-			cases[i].Expected = json.RawMessage(compactJSON(out))
-		} else {
-			missing++
-		}
-	}
-	if missing > 0 {
-		return cases, fmt.Sprintf("%d example output(s) are not plain JSON and were left empty (run hc gen)", missing)
-	}
-	return cases, ""
-}
-
-func compactJSON(s string) string {
-	var v any
-	if err := json.Unmarshal([]byte(s), &v); err != nil {
-		return s
-	}
-	b, err := json.Marshal(v)
-	if err != nil {
-		return s
-	}
-	return string(b)
 }
 
 // Save writes a converted problem into dir.
