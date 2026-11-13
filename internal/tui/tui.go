@@ -124,13 +124,14 @@ type model struct {
 	// the next reload, since the list asks on every render.
 	readyFor map[string]bool
 	// stars are the starred problems, by pack/slug.
-	stars     map[string]bool
-	visible   []int // indexes into probs
-	cursor    int
-	offset    int
-	filter    filter
-	search    textinput.Model
-	searching bool
+	stars      map[string]bool
+	visible    []int // indexes into probs
+	cursor     int
+	offset     int
+	filter     filter
+	search     textinput.Model
+	searching  bool
+	searchHint string // incomplete or invalid ID query, shown in place of results
 	// picking is set while the group picker is shown; groupCursor is its
 	// cursor, 0 being every problem of the pack.
 	picking     bool
@@ -227,7 +228,7 @@ func newModel(ctx context.Context, a *app.App, opts Options) (*model, error) {
 	}
 	m.search = textinput.New()
 	m.search.Prompt = "/"
-	m.search.Placeholder = "search title, slug, id or tag"
+	m.search.Placeholder = "title, slug, tag; " + searchExamples
 	m.search.SetStyles(searchStyles())
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Dot))
 	m.detail = viewport.New()
@@ -657,6 +658,9 @@ func (m *model) viewHelp() string {
 	lines := 2
 	for _, k := range keys {
 		key, label, _ := strings.Cut(k, " ")
+		if name == "problems" && key == "/" {
+			label += "; " + searchExamples
+		}
 		b.WriteString("  " + m.st.key.Render(" "+runewidth.FillRight(key, keyW)+" ") + "  " + label + "\n")
 		lines++
 	}
