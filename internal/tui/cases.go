@@ -26,10 +26,12 @@ const (
 // cases followed by the user's own (app.Cases), and the selected one,
 // whose details open under it.
 type caseList struct {
-	cases  []problem.Case
-	err    error
-	cursor int
-	inputs map[int]string // the cases' inputs as shown, by index
+	numbers []int // original case numbers for command-filtered views
+	verbose bool
+	cases   []problem.Case
+	err     error
+	cursor  int
+	inputs  map[int]string // the cases' inputs as shown, by index
 }
 
 // loadCases reads p's cases for the cases tab, keeping the cursor where
@@ -46,7 +48,14 @@ func (m *model) selectedCase() (*problem.Case, int) {
 	if cl.cursor < 0 || cl.cursor >= len(cl.cases) {
 		return nil, 0
 	}
-	return &cl.cases[cl.cursor], cl.cursor + 1
+	return &cl.cases[cl.cursor], cl.number(cl.cursor)
+}
+
+func (cl *caseList) number(i int) int {
+	if len(cl.numbers) == len(cl.cases) {
+		return cl.numbers[i]
+	}
+	return i + 1
 }
 
 // moveCase moves the cursor of the cases tab by delta cases.
@@ -107,7 +116,7 @@ func (m *model) renderCaseList() {
 			top = l.n
 		}
 		m.cursorBar(r, cur)
-		r.plain(fmt.Sprintf("Case %-4d", i+1))
+		r.plain(fmt.Sprintf("Case %-4d", cl.number(i)))
 		var tags []string
 		if c.Example {
 			r.add(ui.Cyan, "example ")
@@ -124,7 +133,7 @@ func (m *model) renderCaseList() {
 		r.add(ui.Faint, strings.Join(tags, " · "))
 		l.add(clip(r.fill(width), width))
 		if cur {
-			l.add(m.caseDetails(p, c, i+1, width))
+			l.add(m.caseDetails(p, c, cl.number(i), width))
 			bottom = l.n - 1
 		}
 	}
@@ -166,16 +175,22 @@ func (m *model) caseDetails(p *problem.Problem, c problem.Case, index int, width
 		}
 	}
 	more := fmt.Sprintf("hc cases list %s -c %d shows all", m.app.WS.Ref(p), index)
+	trim := func(s string) string {
+		if m.caseList.verbose {
+			return s
+		}
+		return truncateWith(s, more)
+	}
 	if c.Generated() {
 		field("Generate", c.Generate.String(), ui.Plain)
 		field("Input", "built by generator.py when the case runs", ui.Faint)
 	} else {
-		field("Input", truncateWith(m.caseInput(p, c, index), more), ui.Plain)
+		field("Input", trim(m.caseInput(p, c, index)), ui.Plain)
 	}
 	expected := ui.ExpectedLabel(p)
 	switch {
 	case c.HasExpected():
-		field(expected, truncateWith(string(c.Expected), more), ui.Green)
+		field(expected, trim(string(c.Expected)), ui.Green)
 	case (c.User || c.Generated()) && len(m.app.ReferenceLangs(p)) > 0:
 		field(expected, "computed by the reference solution when the case runs", ui.Faint)
 	case c.User:

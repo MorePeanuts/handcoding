@@ -145,8 +145,8 @@ func TestTUICommandExplicitCurrentProblemLanguage(t *testing.T) {
 func TestResolveTUICommandRestrictions(t *testing.T) {
 	ctx := tui.CommandContext{Workspace: "/tmp/work", Problem: "leetcode/two-sum", Language: "go"}
 	for _, line := range []string{
-		"list", "ls", "show two-sum", "init", "pack init demo", "hc", "unknown", "pack unknown",
-		"help list", "help pack init", "show --help", "test --wat", "test --workspace /tmp/other",
+		"init", "pack init demo", "hc", "unknown", "pack unknown",
+		"help pack init", "test --wat", "test --workspace /tmp/other",
 		"-w /tmp/other test", "test --pause", "group rm", "history restore", "cases rm",
 		"test too many args", "group --pack local create", "test | cat",
 	} {
@@ -192,7 +192,7 @@ func TestCompleteTUICommand(t *testing.T) {
 	}
 	for _, line := range []string{"", "help ", "pack ", "help pack "} {
 		for _, got := range completeTUICommand(line, ctx) {
-			if got == "list" || got == "ls" || got == "show" || strings.HasSuffix(got, "init") {
+			if strings.HasSuffix(got, "init") {
 				t.Errorf("%q offers excluded command %q", line, got)
 			}
 		}

@@ -15,7 +15,7 @@ import (
 )
 
 func tuiCommands() *tui.Commands {
-	return &tui.Commands{Resolve: resolveTUICommand, Complete: completeTUICommand}
+	return &tui.Commands{Resolve: planTUICommand, Complete: completeTUICommand, Topics: tuiHelpTopics}
 }
 
 // supportedTUICommand is the command-mode policy, not a second command tree.
@@ -30,7 +30,7 @@ func supportedTUICommand(cmd *cobra.Command) bool {
 		return true
 	case "pack":
 		return len(parts) == 2 || parts[2] != "init"
-	case "test", "submit", "debug", "fetch", "validate", "gen", "fix", "clean":
+	case "list", "show", "open", "quit", "test", "submit", "debug", "fetch", "validate", "gen", "fix", "clean":
 		return len(parts) == 2
 	}
 	return false
@@ -38,7 +38,7 @@ func supportedTUICommand(cmd *cobra.Command) bool {
 
 func commandUsesCurrentProblem(cmd *cobra.Command) bool {
 	switch strings.TrimPrefix(cmd.CommandPath(), "hc ") {
-	case "test", "submit", "debug", "gen", "fix", "leetcode test", "leetcode submit",
+	case "show", "open", "test", "submit", "debug", "gen", "fix", "leetcode test", "leetcode submit",
 		"cases list", "cases build", "cases add", "cases edit":
 		return true
 	}
@@ -47,6 +47,12 @@ func commandUsesCurrentProblem(cmd *cobra.Command) bool {
 
 func commandRoot() *cobra.Command {
 	root := newRootCmd()
+	show, _, _ := root.Find([]string{"show"})
+	show.Aliases = append(show.Aliases, "view")
+	open := &cobra.Command{Use: "open [problem]", Short: "Create the solution if missing and open its detail page", Args: cobra.ExactArgs(1)}
+	open.Flags().StringP("lang", "l", "", "solution language")
+	open.Flags().String("locale", "", "statement locale")
+	root.AddCommand(open, &cobra.Command{Use: "quit", Aliases: []string{"q"}, Short: "Exit the TUI", Args: cobra.NoArgs})
 	root.SetOut(io.Discard)
 	root.SetErr(io.Discard)
 	return root
@@ -111,7 +117,7 @@ func resolveTUICommand(line string, ctx tui.CommandContext) ([]string, error) {
 			injected = append(injected, ctx.Problem)
 			pos = []string{ctx.Problem}
 		}
-		if commandUsesCurrentProblem(cmd) && len(pos) > 0 && isCurrentCommandProblem(pos[0], ctx) && cmd.Flags().Lookup("lang") != nil && !cmd.Flags().Changed("lang") && ctx.Language != "" {
+		if commandUsesCurrentProblem(cmd) && len(pos) > 0 && isCurrentCommandProblem(pos[0], ctx) && cmd.Flags().Lookup("lang") != nil && !cmd.Flags().Changed("lang") && ctx.Language != "" && !cmd.Flags().Changed("file") {
 			injected = append(injected, "--lang", ctx.Language)
 		}
 		if err := cmd.ValidateArgs(pos); err != nil {
@@ -212,6 +218,11 @@ func completeTUICommand(line string, ctx tui.CommandContext) []string {
 			}
 			if cmd == root {
 				candidates = append(candidates, "help")
+			}
+		}
+		if help && cmd == root {
+			for _, topic := range tui.GuideTopics() {
+				candidates = append(candidates, topic.Name)
 			}
 		}
 		if !help {

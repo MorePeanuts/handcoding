@@ -92,6 +92,7 @@ const (
 	screenCaseForm
 	screenNoteForm
 	screenGroupForm
+	screenGuide
 )
 
 type confirmation struct {
@@ -151,6 +152,8 @@ type model struct {
 	groupForm      *groupForm
 	command        *commandInput
 	commandHistory []string
+	commandReturns []commandReturn
+	guide          *guidePage
 	// packCursor is the cursor of the pack picker, an index into tabs.
 	packCursor int
 	// multiPack is set when the list has several tabs: the detail screen
@@ -345,6 +348,9 @@ func (m *model) push(s screen) {
 // pop goes back to the screen beneath. Back on a history screen, which may
 // list another scope than the one popped, it re-reads its submissions.
 func (m *model) pop() {
+	if m.popCommandPage() {
+		return
+	}
 	if len(m.stack) > 1 {
 		if m.top() == screenHistory {
 			m.closeHistory()
@@ -518,6 +524,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setTheme(ui.ThemeLight)
 		return m, nil
 	case tea.PasteMsg:
+		if m.top() == screenGuide && m.command == nil {
+			return m.updateGuide(msg)
+		}
 		if m.command != nil {
 			return m.updateCommand(msg)
 		}
@@ -565,11 +574,16 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Every other key is text.
 			return m.updateCaseForm(msg)
 		}
+		if m.top() == screenGuide && m.guide.searching {
+			return m.updateGuide(msg)
+		}
 		if msg.String() == "?" && (m.top() != screenList || !m.searching && (!m.picking || !m.groupSearching)) {
 			m.help = true
 			return m, nil
 		}
 		switch m.top() {
+		case screenGuide:
+			return m.updateGuide(msg)
 		case screenList:
 			return m.updateList(msg)
 		case screenPacks:
@@ -633,6 +647,8 @@ func (m *model) layout() {
 		m.command.input.SetWidth(max(m.width-2, 1))
 	}
 	switch m.top() {
+	case screenGuide:
+		m.layoutGuide()
 	case screenDetail:
 		m.renderDetail()
 	case screenResult:
@@ -675,6 +691,8 @@ func (m *model) badge() string { return m.st.badge.Render(" hc ") }
 // screenKeys are the keys of the screen shown, for its full key help.
 func (m *model) screenKeys() (string, []string) {
 	switch m.top() {
+	case screenGuide:
+		return "guide", guideKeys
 	case screenPacks:
 		return "packs", packKeys
 	case screenDetail:
@@ -752,6 +770,8 @@ func (m *model) content() (content string) {
 		return m.viewHelp()
 	}
 	switch m.top() {
+	case screenGuide:
+		return m.viewGuide()
 	case screenDetail:
 		return m.viewDetail()
 	case screenResult:

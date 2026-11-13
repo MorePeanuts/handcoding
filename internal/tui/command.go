@@ -35,6 +35,8 @@ func (m *model) canCommand() bool {
 		return false
 	}
 	switch m.top() {
+	case screenGuide:
+		return m.guide != nil && !m.guide.searching
 	case screenCaseForm, screenNoteForm, screenGroupForm:
 		return false
 	case screenList:
@@ -110,19 +112,31 @@ func (m *model) updateCommand(msg tea.Msg) (tea.Model, tea.Cmd) {
 				c.err = "command mode is unavailable"
 				return m, nil
 			}
-			args, err := m.opts.Commands.Resolve(line, m.commandContext())
+			plan, err := m.opts.Commands.Resolve(line, m.commandContext())
 			if err != nil {
 				c.err = err.Error()
 				return m, nil
 			}
-			if len(args) == 0 {
+			if len(plan.Args) == 0 && plan.Action == "" {
 				m.command = nil
 				return m, nil
+			}
+			var native tea.Cmd
+			if plan.Action != "" {
+				native, err = m.nativeCommand(plan)
+				if err != nil {
+					c.err = err.Error()
+					return m, nil
+				}
 			}
 			if len(m.commandHistory) == 0 || m.commandHistory[len(m.commandHistory)-1] != line {
 				m.commandHistory = append(m.commandHistory, line)
 			}
 			m.command = nil
+			if plan.Action != "" {
+				return m, native
+			}
+			args := plan.Args
 			cmd := exec.Command(m.opts.Exe, args...)
 			cmd.Dir = m.app.WS.Root
 			c := &commandExec{handOffCmd: m.handOff(cmd, false), label: commandLabel(args)}
