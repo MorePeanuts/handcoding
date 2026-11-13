@@ -56,6 +56,8 @@ type Options struct {
 	Exe string
 	// EditorCmd builds the editor command for a path.
 	EditorCmd func(path string) (*exec.Cmd, error)
+	// Commands resolves command input using the CLI's existing definitions.
+	Commands *Commands
 	// Lang is the initial language.
 	Lang lang.Language
 	// Theme is "dark" or "light"; empty means detect from the terminal.
@@ -147,6 +149,8 @@ type model struct {
 	groupSearching bool
 	groupTarget    *problem.Problem
 	groupForm      *groupForm
+	command        *commandInput
+	commandHistory []string
 	// packCursor is the cursor of the pack picker, an index into tabs.
 	packCursor int
 	// multiPack is set when the list has several tabs: the detail screen
@@ -495,6 +499,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// The program had the mode off, and the theme may have switched
 		// meanwhile.
 		return m, m.themeReports()
+	case commandDoneMsg:
+		return m, m.finishCommand(msg)
 	case tea.FocusMsg:
 		// Another tmux client may have attached, without the images (see
 		// termimg.Renderer.Detachable).
@@ -512,6 +518,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setTheme(ui.ThemeLight)
 		return m, nil
 	case tea.PasteMsg:
+		if m.command != nil {
+			return m.updateCommand(msg)
+		}
 		// Pasted text goes to the search field and the form's fields;
 		// elsewhere, as when it arrived as keys, it does nothing.
 		if m.top() == screenList && m.picking && m.groupSearching && m.confirm == nil {
@@ -532,6 +541,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
+		}
+		if m.command != nil {
+			return m.updateCommand(msg)
+		}
+		if msg.String() == ":" && m.canCommand() {
+			return m, m.openCommand()
 		}
 		if m.confirm != nil {
 			return m.updateConfirm(msg)
@@ -614,6 +629,9 @@ func (m *model) layout() {
 	// without a width, the field shows only the placeholder's first letter.
 	m.search.SetWidth(max(m.width-2, 1))
 	m.groupSearch.SetWidth(max(m.width-2, 1))
+	if m.command != nil {
+		m.command.input.SetWidth(max(m.width-2, 1))
+	}
 	switch m.top() {
 	case screenDetail:
 		m.renderDetail()
@@ -686,6 +704,9 @@ func (m *model) screenKeys() (string, []string) {
 // viewHelp shows every key of the screen shown, with the global ones.
 func (m *model) viewHelp() string {
 	name, keys := m.screenKeys()
+	if m.top() != screenCaseForm && m.top() != screenNoteForm && m.top() != screenGroupForm {
+		keys = append(slices.Clone(keys), ": command")
+	}
 	keys = append(slices.Clone(keys), "? help", "ctrl+c quit")
 	keyW := 0
 	for _, k := range keys {
@@ -721,7 +742,12 @@ func (m *model) View() tea.View {
 }
 
 // content draws the screen on top of the stack.
-func (m *model) content() string {
+func (m *model) content() (content string) {
+	defer func() {
+		if m.command != nil {
+			content = m.commandView(content)
+		}
+	}()
 	if m.help {
 		return m.viewHelp()
 	}

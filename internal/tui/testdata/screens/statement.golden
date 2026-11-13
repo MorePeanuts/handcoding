@@ -27,4 +27,4 @@
   Example 2:                                                                                       │
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 copied: …/solutions/regression/go/0001-two-sum/solution.go
- t test    s submit    d debug    e edit    h history    y copy-path    ? help        top · 54 lines
+ t test    s submit    d debug    e edit    h history    : command    ? help          top · 54 lines

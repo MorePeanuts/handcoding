@@ -214,7 +214,7 @@ func (m *model) detailKeys() []string {
 	if m.run != nil && m.run.ref == p.Ref() {
 		keys = append(keys, "enter last-result")
 	}
-	keys = append(keys, "t test", "s submit", "d debug", "e edit", "h history", "y copy-path", "L lang", "esc back",
+	keys = append(keys, "t test", "s submit", "d debug", "e edit", "h history", "esc back", "y copy-path", "L lang",
 		"tab cases", "a add-case", "↑↓ scroll", "m star", "r reset", "D discard")
 	if m.localeLabel(p.Pack) != "" {
 		keys = append(keys, "i locale")
