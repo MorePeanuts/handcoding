@@ -135,10 +135,15 @@ func runAgent(cmd *cobra.Command, a *app.App, ag *agent.Agent, task, prompt stri
 		fmt.Printf("cd %s\n%s %s\n\nPrompt:\n%s", a.WS.Root, strings.Join(env, " "), strings.Join(ag.Argv, " "), prompt)
 		return nil
 	}
+	release, err := a.WS.UseCaches()
+	if err != nil {
+		return err
+	}
+	defer release()
 	// The agent's sandbox could not create the Python environment: uv
 	// writes its cache in the home directory and downloads Python.
 	for _, l := range a.Langs.All() {
-		setupEnv(cmd.Context(), l, "building and checking cases for the agent")
+		setupEnv(cmd.Context(), a, l, "building and checking cases for the agent")
 	}
 	o := agent.RunOptions{
 		Dir: a.WS.Root, Prompt: prompt, Env: env,

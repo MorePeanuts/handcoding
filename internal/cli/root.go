@@ -88,6 +88,7 @@ list right away, and --group a group of a pack.`,
 		newHistoryCmd(opts),
 		newLeetCodeCmd(opts),
 		newEnvCmd(opts),
+		newCleanCmd(opts),
 	)
 	add("bank",
 		newInitCmd(opts),

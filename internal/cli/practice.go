@@ -43,7 +43,7 @@ func newStartCmd(root *rootOptions) *cobra.Command {
 				if created {
 					fmt.Fprintf(os.Stderr, "%s %s\n", ui.Green.Render("created"), path)
 				}
-				setupEnv(cmd.Context(), l, "running Python solutions")
+				setupEnv(cmd.Context(), a, l, "running Python solutions")
 				if edit {
 					return openEditor(a, path)
 				}
@@ -70,7 +70,7 @@ func newEditCmd(root *rootOptions) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				setupEnv(cmd.Context(), l, "running Python solutions")
+				setupEnv(cmd.Context(), a, l, "running Python solutions")
 				return openEditor(a, path)
 			})
 		},
@@ -83,7 +83,13 @@ func newEditCmd(root *rootOptions) *cobra.Command {
 // environment, so the editor (or an agent) finds it; why says what needs
 // it (see app.SetUpEnv). A failure is only a warning here: the solution can
 // be edited anyway, and running it reports the error.
-func setupEnv(ctx context.Context, l lang.Language, why string) {
+func setupEnv(ctx context.Context, a *app.App, l lang.Language, why string) {
+	release, err := a.WS.UseCaches()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, ui.Yellow.Render("warning:")+" "+err.Error())
+		return
+	}
+	defer release()
 	if err := app.SetUpEnv(ctx, l, os.Stderr, why); err != nil {
 		fmt.Fprintln(os.Stderr, ui.Yellow.Render("warning:")+" "+err.Error())
 	}
@@ -254,7 +260,7 @@ func runTest(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.Language
 	if o.file != "" {
 		what = o.file
 	}
-	fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Running %d case(s) of %s [%s]…", len(sel), what, toolchainLabel(l))))
+	fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Running %d case(s) of %s [%s]…", len(sel), what, toolchainLabel(a, l))))
 	ro := app.RunOptions{Stdout: os.Stdout, Stderr: os.Stderr, Custom: o.input != "" || o.generate != ""}
 	var rep *runner.Report
 	if o.file != "" {
@@ -343,7 +349,12 @@ func parseInput(p *problem.Problem, s string) (problem.Case, error) {
 
 // toolchainLabel names the toolchain a run uses, e.g. "Python 3.12.9", or
 // just the language when it cannot be detected (the run then reports why).
-func toolchainLabel(l lang.Language) string {
+func toolchainLabel(a *app.App, l lang.Language) string {
+	release, err := a.WS.UseCaches()
+	if err != nil {
+		return l.Name()
+	}
+	defer release()
 	if tc, err := l.Toolchain(); err == nil {
 		return tc.String()
 	}
@@ -399,7 +410,7 @@ An empty editor draft cancels the submission.`,
 				}
 				ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 				defer stop()
-				fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Submitting %s [%s]…", p.Slug, toolchainLabel(l))))
+				fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Submitting %s [%s]…", p.Slug, toolchainLabel(a, l))))
 				rep, sub, err := a.Submit(ctx, p, l, app.RunOptions{Stdout: os.Stdout, Stderr: os.Stderr, Note: note})
 				if err != nil {
 					return err
@@ -462,6 +473,11 @@ server for your editor to attach to:
 				}()
 			}
 			return root.withProblem(args[0], langName, func(a *app.App, p *problem.Problem, l lang.Language) error {
+				release, err := a.WS.UseCaches()
+				if err != nil {
+					return err
+				}
+				defer release()
 				if !a.HasSolution(p, l) {
 					return fmt.Errorf("no %s solution for %s yet; run `hc start %s`", l.Name(), p.Slug, a.WS.Ref(p))
 				}
@@ -544,7 +560,7 @@ func firstFailure(cmd *cobra.Command, a *app.App, p *problem.Problem, l lang.Lan
 		}
 		return d.Index, nil
 	}
-	fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Running every case to find the first that fails [%s]…", toolchainLabel(l))))
+	fmt.Fprintln(os.Stderr, ui.Faint.Render(fmt.Sprintf("Running every case to find the first that fails [%s]…", toolchainLabel(a, l))))
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 	defer stop()
 	d, err := a.RunFailure(ctx, p, l, app.RunOptions{Stdout: io.Discard, Stderr: io.Discard})

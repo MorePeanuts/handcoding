@@ -26,6 +26,11 @@ import (
 // (.hc/cache/cases/), which later runs read. A case hc cannot build is a
 // *runner.GeneratedCaseError.
 func (a *App) Materialize(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, o RunOptions) error {
+	release, lockErr := a.WS.UseCaches()
+	if lockErr != nil {
+		return lockErr
+	}
+	defer release()
 	if !slices.ContainsFunc(sel, unbuilt) {
 		return nil
 	}
@@ -82,7 +87,12 @@ func unbuilt(s runner.Selected) bool { return s.Case.Generated() && s.Case.Input
 // p has a reference solution, their expected outputs, with the reference in
 // l when there is one. Nothing is cached.
 func (a *App) BuildCase(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, o RunOptions) error {
-	err := a.generateInputs(ctx, p, sel, false, o.Stderr)
+	release, err := a.WS.UseCaches()
+	if err != nil {
+		return err
+	}
+	defer release()
+	err = a.generateInputs(ctx, p, sel, false, o.Stderr)
 	if err == nil && len(a.ReferenceLangs(p)) > 0 {
 		var ref lang.Language
 		if ref, err = a.generatedRef(p, l); err == nil {
@@ -154,6 +164,11 @@ func (a *App) generator(ctx context.Context, p *problem.Problem, w io.Writer) (l
 // generateInputs builds the inputs of the generated cases in sel that have
 // none. With checkDigest, each must match its case's digest.
 func (a *App) generateInputs(ctx context.Context, p *problem.Problem, sel []runner.Selected, checkDigest bool, w io.Writer) error {
+	release, lockErr := a.WS.UseCaches()
+	if lockErr != nil {
+		return lockErr
+	}
+	defer release()
 	if !slices.ContainsFunc(sel, unbuilt) {
 		return nil
 	}

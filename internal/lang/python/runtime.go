@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -64,13 +65,28 @@ func (l Language) runtimeDir() (string, error) {
 		}
 	}
 	if err := os.Rename(tmp, dir); err != nil && !complete(dir, files) {
-		return "", err
+		// Explicit cache cleanup preserves unknown files and directories, so
+		// an incomplete hash directory can remain. Repair its known files
+		// atomically without removing those entries. Concurrent writers use
+		// identical sources for this hash; complete still gates readers.
+		info, statErr := os.Lstat(dir)
+		if statErr != nil {
+			return "", statErr
+		}
+		if !info.IsDir() {
+			return "", fmt.Errorf("runtime %s is not a directory", dir)
+		}
+		for name := range files {
+			if err := os.Rename(filepath.Join(tmp, name), filepath.Join(dir, name)); err != nil {
+				return "", err
+			}
+		}
 	}
 	return dir, writeEditorCopy(root, true)
 }
 
-// complete reports whether dir holds files, by name: a runtime directory is
-// written whole and never changed, its name being its content's hash.
+// complete reports whether dir holds every generated file. A runtime hash
+// identifies immutable sources; missing files are repaired after cleanup.
 func complete(dir string, files map[string][]byte) bool {
 	for name := range files {
 		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
