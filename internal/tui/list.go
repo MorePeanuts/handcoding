@@ -344,7 +344,7 @@ func (m *model) listKeys() []string {
 	return append(keys, "y copy-path", "r reset", "D discard", "pgup/pgdn page", "g/G first/last", "q quit")
 }
 
-var groupKeys = []string{"↑↓ move", "enter choose/add", "n new", "e edit", "C copy", "x delete", "esc cancel"}
+var groupKeys = []string{"↑↓ move", "enter choose/add", "/ search", "n new", "e edit", "C copy", "x delete", "esc cancel"}
 
 func (m *model) viewList() string {
 	var b strings.Builder
@@ -398,17 +398,25 @@ func (m *model) viewList() string {
 	b.WriteString(m.rule() + "\n")
 
 	switch {
+	case m.picking && m.groupSearching:
+		b.WriteString(m.groupSearch.View())
 	case m.searching:
 		b.WriteString(m.search.View())
 	case m.confirm != nil:
 		b.WriteString(ui.Yellow.Render(m.confirm.prompt + " [y/N]"))
 	case m.message != "":
 		b.WriteString(clip(m.message, m.width))
-	case m.search.Value() != "":
+	case m.picking && m.groupSearch.Value() != "":
+		b.WriteString(ui.Faint.Render(clip("search: "+m.groupSearch.Value()+" (esc to clear)", m.width)))
+	case !m.picking && m.search.Value() != "":
 		b.WriteString(ui.Faint.Render("search: " + m.search.Value() + " (esc to clear)"))
 	}
 	b.WriteString("\n")
 	if m.picking {
+		if m.groupSearching {
+			b.WriteString(m.keyHelp("", "enter browse", "esc clear"))
+			return b.String()
+		}
 		b.WriteString(m.keyHelp("", groupKeys...))
 		return b.String()
 	}
@@ -523,17 +531,17 @@ func difficultyLabel(d string) string {
 // every problem of the pack, then each group, with its progress.
 func (m *model) viewGroups(b *strings.Builder, h int) {
 	t := m.tab()
-	groups := t.groups()
+	groups, choices := t.groups(), m.groupChoices()
 	titleW := min(max(m.width-40, 10), 48)
 	nameW := max(m.width-titleW-20, 0)
 	b.WriteString(ui.Faint.Render(fmt.Sprintf("  %s %7s  %-6s  %s", fit("GROUP", titleW), "SOLVED", "SOURCE", fit("NAME", nameW))) + "\n")
 	b.WriteString(m.rule() + "\n")
 	first := max(m.groupCursor-h+1, 0)
 	n := 0
-	for i := first; i < min(first+h, len(groups)+1); i++ {
+	for i := first; i < min(first+h, len(choices)); i++ {
 		title, probs, name, source := "All problems", t.probs, "", ""
-		if i > 0 {
-			g := &groups[i-1]
+		if choices[i] >= 0 {
+			g := &groups[choices[i]]
 			cur, _ := m.locale(m.pack)
 			var missing []string
 			probs, missing = g.Select(t.probs)
@@ -554,6 +562,10 @@ func (m *model) viewGroups(b *strings.Builder, h int) {
 		m.cursorBar(r, cur)
 		r.add(titleStyle, fit(title, titleW)+" ").plain(fmt.Sprintf("%7s  ", m.progress(probs))).add(ui.Faint, fit(source, 6)+"  "+fit(name, nameW))
 		b.WriteString(r.fill(m.width) + "\n")
+		n++
+	}
+	if len(choices) == 0 {
+		b.WriteString(ui.Faint.Render("  no groups match") + "\n")
 		n++
 	}
 	for ; n < h; n++ {

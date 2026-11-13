@@ -333,6 +333,15 @@ func TestGroupEditorScreens(t *testing.T) {
 	h.m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	h.press("c")
 	golden(t, "groups-personal", h.view())
+	h.press("/")
+	h.m.Update(tea.PasteMsg{Content: "design"})
+	golden(t, "groups-search", h.view())
+	h.press("enter")
+	golden(t, "groups-search-results", h.view())
+	h.press("esc", "/")
+	h.m.Update(tea.PasteMsg{Content: "no matching group"})
+	golden(t, "groups-search-empty", h.view())
+	h.press("esc")
 	h.press("G", "C", "tab", "tab")
 	h.m.Update(tea.WindowSizeMsg{Width: 220, Height: 30})
 	golden(t, "group-form-wide", h.view())
@@ -361,7 +370,7 @@ func TestGroupEditorProblemColumns(t *testing.T) {
 		if strings.Contains(view, "[x]") || strings.Contains(view, "[ ]") || strings.Contains(view, "✔") {
 			t.Fatalf("ambiguous selection marker at width %d", width)
 		}
-		if strings.Count(view, "🟢 1      Two Sum") != 2 || strings.Count(view, "Easy") < 2 {
+		if strings.Count(view, "● 1      Two Sum") != 2 || strings.Count(view, "Easy") < 2 {
 			t.Fatalf("missing selection or difficulty in a pane at width %d:\n%s", width, view)
 		}
 		if width == 220 && (strings.Count(view, "TAGS") != 2 || strings.Count(view, "array · hash-table") < 2) {
@@ -369,7 +378,111 @@ func TestGroupEditorProblemColumns(t *testing.T) {
 		}
 	}
 	h.press("space")
-	if strings.Contains(ansi.Strip(h.view()), "🟢 1") {
+	if strings.Contains(ansi.Strip(h.view()), "● 1") {
 		t.Fatal("deselected problem still marked")
+	}
+}
+
+func TestGroupPickerSearch(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	for _, g := range []workspace.UserGroup{{Name: "review", Title: "复习计划"}, {Name: "design", Title: "My design"}} {
+		if err := h.m.app.SaveGroup("regression", "", g); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := h.m.reload(); err != nil {
+		t.Fatal(err)
+	}
+	h.press("/")
+	h.m.Update(tea.PasteMsg{Content: "two sum"})
+	h.press("enter", "c")
+	search := func(q string) {
+		t.Helper()
+		h.press("/", "esc", "/")
+		h.m.Update(tea.PasteMsg{Content: q})
+	}
+	search("  DESIGN  ")
+	if len(h.m.groupChoices()) != 2 {
+		t.Fatal("search should find both personal and pack groups")
+	}
+	h.press("enter", "j", "enter")
+	if h.m.groups[h.m.pack] != "pack:design" {
+		t.Fatal("filtered selection picked the wrong group")
+	}
+	h.press("c")
+	search("结构")
+	h.press("enter", "enter")
+	if h.m.groups[h.m.pack] != "pack:structure-inputs" {
+		t.Fatal("localized title search picked the wrong group")
+	}
+	h.press("c")
+	search("nothing matches")
+	h.press("?", "n", "x")
+	if h.m.help || !h.m.groupSearching || !strings.Contains(h.m.groupSearch.Value(), "?nx") {
+		t.Fatal("search characters triggered actions")
+	}
+	h.press("enter", "enter", "space", "e", "C", "x")
+	if !h.m.picking || h.m.top() != screenList || h.m.confirm != nil || !strings.Contains(h.view(), "no groups match") {
+		t.Fatal("empty results performed an action")
+	}
+	search("复习")
+	h.press("enter", "e")
+	if h.m.groupForm.original != "review" {
+		t.Fatal("filtered edit targeted the wrong group")
+	}
+	h.press("esc", "C")
+	if h.m.groupForm.source == nil || h.m.groupForm.source.Key() != "user:review" {
+		t.Fatal("filtered copy targeted the wrong group")
+	}
+	h.press("esc", "x", "y")
+	if _, err := h.m.app.ResolveGroup("regression", "user:review"); err == nil {
+		t.Fatal("filtered delete did not remove review")
+	}
+	if h.m.groupCursor != 0 || len(h.m.groupChoices()) != 0 {
+		t.Fatal("delete left an invalid filtered cursor")
+	}
+	h.press("esc")
+	if !h.m.picking || h.m.groupSearch.Value() != "" {
+		t.Fatal("escape should clear the query before closing")
+	}
+	h.press("esc")
+	if h.m.picking {
+		t.Fatal("second escape should close picker")
+	}
+}
+
+func TestGroupPickerSearchAddAndIsolation(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	if err := h.m.app.CreateGroup("regression", "target", "My target"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.m.reload(); err != nil {
+		t.Fatal(err)
+	}
+	h.press("/")
+	h.m.Update(tea.PasteMsg{Content: "two sum"})
+	h.press("enter", "c", "/")
+	h.m.Update(tea.PasteMsg{Content: "target"})
+	h.press("esc", "esc")
+	if h.m.search.Value() != "two sum" || h.m.selected().Slug != "two-sum" {
+		t.Fatal("group search changed problem search")
+	}
+	h.press("a", "/")
+	h.m.Update(tea.PasteMsg{Content: "TARGET"})
+	h.press("enter", "enter")
+	g, err := h.m.app.ResolveGroup("regression", "user:target")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(g.Problems, []string{"two-sum"}) {
+		t.Fatalf("filtered add: %v", g.Problems)
+	}
+	h.press("c", "/")
+	h.m.Update(tea.PasteMsg{Content: "All problems"})
+	h.press("enter", "enter")
+	if h.m.group() != nil {
+		t.Fatal("cannot select All problems through search")
 	}
 }

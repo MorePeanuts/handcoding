@@ -140,11 +140,13 @@ type model struct {
 	searching  bool
 	searchHint string // incomplete or invalid ID query, shown in place of results
 	// picking is set while the group picker is shown; groupCursor is its
-	// cursor, 0 being every problem of the pack.
-	picking     bool
-	groupCursor int
-	groupTarget *problem.Problem
-	groupForm   *groupForm
+	// cursor into the filtered choices (All problems first without a query).
+	picking        bool
+	groupCursor    int
+	groupSearch    textinput.Model
+	groupSearching bool
+	groupTarget    *problem.Problem
+	groupForm      *groupForm
 	// packCursor is the cursor of the pack picker, an index into tabs.
 	packCursor int
 	// multiPack is set when the list has several tabs: the detail screen
@@ -512,6 +514,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.PasteMsg:
 		// Pasted text goes to the search field and the form's fields;
 		// elsewhere, as when it arrived as keys, it does nothing.
+		if m.top() == screenList && m.picking && m.groupSearching && m.confirm == nil {
+			return m.updateGroupSearch(msg)
+		}
 		if m.top() == screenList && m.searching && m.confirm == nil {
 			return m.updateSearch(msg)
 		}
@@ -545,7 +550,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Every other key is text.
 			return m.updateCaseForm(msg)
 		}
-		if msg.String() == "?" && (m.top() != screenList || !m.searching) {
+		if msg.String() == "?" && (m.top() != screenList || !m.searching && (!m.picking || !m.groupSearching)) {
 			m.help = true
 			return m, nil
 		}
@@ -608,6 +613,7 @@ func (m *model) layout() {
 	// The search field fills its line, the prompt and the cursor aside:
 	// without a width, the field shows only the placeholder's first letter.
 	m.search.SetWidth(max(m.width-2, 1))
+	m.groupSearch.SetWidth(max(m.width-2, 1))
 	switch m.top() {
 	case screenDetail:
 		m.renderDetail()

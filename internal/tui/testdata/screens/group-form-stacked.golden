@@ -5,16 +5,16 @@ Name                 Title
 review               需要复习
 ╭─ Available 50/50 ────────────────────╮
 │/ Search title, ID or tag             │
-│     #      TITLE             LEVEL   │
+│    #      TITLE              LEVEL   │
 ├──────────────────────────────────────┤
-│▌ 🟢 1      Two Sum           Easy    │
+│▌ ● 1      Two Sum            Easy    │
 ╰──────────────────────────────────────╯
 ╭─ Selected 2 ─────────────────────────╮
 │K/J reorder · x remove                │
-│     #      TITLE             LEVEL   │
+│    #      TITLE              LEVEL   │
 ├──────────────────────────────────────┤
-│  🟢 1      Two Sum           Easy    │
+│  ● 1      Two Sum            Easy    │
 ╰──────────────────────────────────────╯
-🟢 selected · 1 · Two Sum · Easy
+● selected · 1 · Two Sum · Easy
 ────────────────────────────────────────
  ctrl+s save    ? help

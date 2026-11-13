@@ -178,7 +178,9 @@ groups:
 
 Names use lower-case letters, digits and single hyphens; titles can be in any language, independently of the pack's locales. Empty groups are allowed.
 
-The TUI editor has two lists: available problems on the left, selected problems in practice order on the right. Both reuse the problem list’s aligned columns and colors: IDs, localized titles, difficulty, and tags when space permits. A `🟢` in a separate column marks problems already selected for the group; titles keep their normal color.
+In the group picker, `/` searches names and titles in any locale, ignoring case. `enter` finishes typing so you can browse the matches; `esc` clears the search before closing the picker. This filter is separate from the problem list’s search.
+
+The TUI editor has two lists: available problems on the left, selected problems in practice order on the right. Both reuse the problem list’s aligned columns and colors: IDs, localized titles, difficulty, and tags when space permits. A small green `●` in a separate column marks problems already selected for the group; titles keep their normal color.
 
 - Press `/` to search by title, ID or tag (including the list's `id:` queries); `enter` leaves search to browse its results, and `esc` clears an active search.
 - `space` or `enter` toggles the highlighted problem on the left.

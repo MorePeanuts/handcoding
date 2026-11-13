@@ -23,30 +23,95 @@ func (m *model) openGroups() {
 	}
 	m.groupTarget = nil
 	m.picking = true
+	m.groupSearch = textinput.New()
+	m.groupSearch.Prompt = "/ "
+	m.groupSearch.Placeholder = "Search group title or name"
+	m.groupSearch.CharLimit = 0
+	m.groupSearch.SetStyles(searchStyles())
+	m.groupSearch.SetWidth(max(m.width-2, 1))
+	m.groupSearching = false
 	m.groupCursor = slices.IndexFunc(t.groups(), func(g app.Group) bool { return g.Key() == m.groups[m.pack] }) + 1
 	if t.groupErr != nil {
 		m.message = ui.Red.Render(t.groupErr.Error())
 	}
 }
 
+// groupChoices maps visible rows to the pack's groups; -1 is All problems.
+// Keep the mapping separate so actions always use the filtered row's group.
+func (m *model) groupChoices() []int {
+	q := strings.ToLower(strings.TrimSpace(m.groupSearch.Value()))
+	matches := func(s string) bool { return strings.Contains(strings.ToLower(s), q) }
+	var choices []int
+	if matches("All problems") {
+		choices = append(choices, -1)
+	}
+	for i, g := range m.tab().groups() {
+		match := matches(g.Name) || matches(g.Title)
+		for _, title := range g.Titles {
+			match = match || matches(title)
+		}
+		if match {
+			choices = append(choices, i)
+		}
+	}
+	return choices
+}
+
+func (m *model) updateGroupSearch(msg tea.Msg) (tea.Model, tea.Cmd) {
+	key, _ := msg.(tea.KeyPressMsg)
+	switch key.String() {
+	case "esc":
+		m.groupSearch.SetValue("")
+		m.groupCursor = 0
+		fallthrough
+	case "enter":
+		m.groupSearching = false
+		m.groupSearch.Blur()
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.groupSearch, cmd = m.groupSearch.Update(msg)
+	m.groupCursor = 0
+	return m, cmd
+}
+
 func (m *model) updateGroups(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	groups := m.tab().groups()
+	if m.groupSearching {
+		return m.updateGroupSearch(msg)
+	}
+	groups, choices := m.tab().groups(), m.groupChoices()
+	last := max(len(choices)-1, 0)
 	var g *app.Group
-	if m.groupCursor > 0 && m.groupCursor <= len(groups) {
-		g = &groups[m.groupCursor-1]
+	if m.groupCursor < len(choices) && choices[m.groupCursor] >= 0 {
+		g = &groups[choices[m.groupCursor]]
 	}
 	switch msg.String() {
-	case "esc", "q", "c":
+	case "/":
+		m.groupSearching = true
+		m.message = ""
+		return m, m.groupSearch.Focus()
+	case "esc":
+		if m.groupSearch.Value() != "" {
+			m.groupSearch.SetValue("")
+			m.groupCursor = 0
+			break
+		}
+		fallthrough
+	case "q", "c":
 		m.picking = false
 		m.groupTarget = nil
 	case "up", "k":
 		m.groupCursor = max(m.groupCursor-1, 0)
 	case "down", "j":
-		m.groupCursor = min(m.groupCursor+1, len(groups))
+		m.groupCursor = min(m.groupCursor+1, last)
+	case "pgup", "ctrl+u":
+		m.groupCursor = max(m.groupCursor-m.listHeight(), 0)
+	case "pgdown", "ctrl+d":
+		m.groupCursor = min(m.groupCursor+m.listHeight(), last)
 	case "home", "g":
 		m.groupCursor = 0
 	case "end", "G":
-		m.groupCursor = len(groups)
+		m.groupCursor = last
 	case "n":
 		m.openGroupForm(nil, false)
 	case "e", "C":
@@ -68,12 +133,15 @@ func (m *model) updateGroups(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 					m.message = ui.Red.Render(err.Error())
 					return nil
 				}
-				m.groupCursor = min(m.groupCursor, len(m.tab().groups()))
+				m.groupCursor = min(m.groupCursor, max(len(m.groupChoices())-1, 0))
 				m.message = "deleted personal group " + g.Name
 				return nil
 			})
 		}
 	case "enter", "space":
+		if len(choices) == 0 {
+			break
+		}
 		if m.groupTarget != nil {
 			if g == nil || !g.User {
 				m.message = "Choose a personal group, or press n to create one"
@@ -405,7 +473,7 @@ func (m *model) viewGroupForm() string {
 			body += left[i] + "  " + right[i]
 		}
 	}
-	hint := clip(ui.Plain.Render("🟢 selected")+ui.Faint.Render(" · "+m.groupProblemHint()), m.width)
+	hint := clip(ui.Green.Render("●")+" selected"+ui.Faint.Render(" · "+m.groupProblemHint()), m.width)
 	if f.err != "" {
 		hint = ui.Red.Render(clip(f.err, m.width))
 	}
@@ -442,11 +510,11 @@ func (m *model) groupPane(selected bool, width int) []string {
 	}
 	edge := func(left, middle, right string) string { return border.Render(left + fit(middle, inner) + right) }
 	heading = clip("─ "+heading+" ", inner)
-	columns := compactProblemColumns(inner - 5)
+	columns := compactProblemColumns(inner - 4)
 	lines := []string{
 		edge("╭", heading+strings.Repeat("─", max(inner-lipgloss.Width(heading), 0)), "╮"),
 		border.Render("│") + groupCell(second, inner) + border.Render("│"),
-		border.Render("│") + groupCell(columns.header(5), inner) + border.Render("│"),
+		border.Render("│") + groupCell(columns.header(4), inner) + border.Render("│"),
 		edge("├", strings.Repeat("─", inner), "┤"),
 	}
 	rows := m.groupRows()
@@ -469,14 +537,14 @@ func (m *model) groupPane(selected bool, width int) []string {
 				chosen = slices.Contains(f.selected, p.Slug)
 			}
 			if chosen {
-				r.plain(groupCell("🟢", 3))
+				r.add(ui.Green, "● ")
 			} else {
-				r.plain("   ")
+				r.plain("  ")
 			}
 			if p != nil {
 				m.problemCells(r, p, columns, current)
 			} else {
-				r.add(ui.Yellow, fit("[unavailable] "+f.selected[i], max(inner-5, 0)))
+				r.add(ui.Yellow, fit("[unavailable] "+f.selected[i], max(inner-4, 0)))
 			}
 		} else if rowIndex == 0 {
 			hint := "No matching problems"
