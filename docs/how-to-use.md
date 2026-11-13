@@ -178,7 +178,7 @@ groups:
 
 Names use lower-case letters, digits and single hyphens; titles can be in any language, independently of the pack's locales. Empty groups are allowed.
 
-The TUI editor has two lists: available problems on the left, selected problems in practice order on the right. Both show IDs and localized titles.
+The TUI editor has two lists: available problems on the left, selected problems in practice order on the right. Both reuse the problem list’s aligned columns and colors: IDs, localized titles, difficulty, and tags when space permits. A `🟢` in a separate column marks problems already selected for the group; titles keep their normal color.
 
 - Press `/` to search by title, ID or tag (including the list's `id:` queries); `enter` leaves search to browse its results, and `esc` clears an active search.
 - `space` or `enter` toggles the highlighted problem on the left.
@@ -186,7 +186,7 @@ The TUI editor has two lists: available problems on the left, selected problems 
 - `tab` cycles through name, title and the two panes; arrow left/right switches panes, and up/down or page keys navigate each list. In name/title fields, `enter` advances to the next field.
 - `ctrl+s` saves the entire draft; `esc` outside search cancels without writing.
 
-Copy opens the same editor with the source's members already selected, so you can add, remove and reorder them before the first save. On terminals narrower than 60 columns, the two lists stack vertically. From a list pane, `?` shows all editor keys; in text fields it is text. Even a pack without groups has the `c` → `n` entry point. A pack with personal groups stays accessible in the tabs even if it has no available problems.
+Copy opens the same editor with the source's members already selected, so you can add, remove and reorder them before the first save. On terminals narrower than 80 columns, the two lists stack vertically. From a list pane, `?` shows all editor keys; in text fields it is text. Even a pack without groups has the `c` → `n` entry point. A pack with personal groups stays accessible in the tabs even if it has no available problems.
 
 When an update removes a problem, its slug stays in your groups. The picker shows an unavailable count; opening the group warns about the missing slugs, and `hc group show` lists them as unavailable. Available members keep their order, and only they count toward progress. Remove obsolete entries yourself; hc never guesses that a renamed problem is the same one. A malformed personal file is reported separately and does not invalidate the pack or its `hc pack check`; you can still browse all problems or explicitly select a `pack:` group. Fix the file before editing personal groups. Normal pack removal keeps the file for reinstallation; `--purge` deletes it as well.
 

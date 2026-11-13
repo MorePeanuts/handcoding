@@ -8,9 +8,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/MorePeanuts/handcoding/internal/ui"
-
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
@@ -300,7 +300,7 @@ func TestGroupEditorLayout(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	h.press("c", "G", "C", "tab", "tab")
-	for _, size := range []struct{ width, height int }{{100, 30}, {61, 24}, {60, 20}, {40, 20}, {40, 30}} {
+	for _, size := range []struct{ width, height int }{{220, 40}, {100, 30}, {80, 24}, {79, 24}, {61, 24}, {60, 20}, {40, 20}, {40, 30}} {
 		h.m.Update(tea.WindowSizeMsg{Width: size.width, Height: size.height})
 		for _, key := range []string{"G", "right", "G", "K", "left"} {
 			h.press(key)
@@ -333,7 +333,11 @@ func TestGroupEditorScreens(t *testing.T) {
 	h.m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	h.press("c")
 	golden(t, "groups-personal", h.view())
-	h.press("G", "C", "tab", "tab", "tab", "x", "J", "/")
+	h.press("G", "C", "tab", "tab")
+	h.m.Update(tea.WindowSizeMsg{Width: 220, Height: 30})
+	golden(t, "group-form-wide", h.view())
+	h.m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	h.press("tab", "x", "J", "/")
 	h.m.Update(tea.PasteMsg{Content: "Two Sum"})
 	h.press("enter", "space", "right")
 	golden(t, "group-copy-edited", h.view())
@@ -343,4 +347,29 @@ func TestGroupEditorScreens(t *testing.T) {
 	h.press("esc", "/")
 	h.m.Update(tea.PasteMsg{Content: "no matching title"})
 	golden(t, "group-form-search-empty", h.view())
+}
+
+// Selection belongs to the group, not to the problem's solved status. Keep
+// its marker separate from the title and the difficulty, including on resize.
+func TestGroupEditorProblemColumns(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	h.press("c", "n", "tab", "tab", "space")
+	for _, width := range []int{220, 100, 80, 60, 40} {
+		h.m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
+		view := ansi.Strip(h.view())
+		if strings.Contains(view, "[x]") || strings.Contains(view, "[ ]") || strings.Contains(view, "✔") {
+			t.Fatalf("ambiguous selection marker at width %d", width)
+		}
+		if strings.Count(view, "🟢 1      Two Sum") != 2 || strings.Count(view, "Easy") < 2 {
+			t.Fatalf("missing selection or difficulty in a pane at width %d:\n%s", width, view)
+		}
+		if width == 220 && (strings.Count(view, "TAGS") != 2 || strings.Count(view, "array · hash-table") < 2) {
+			t.Fatalf("wide panes omit tags:\n%s", view)
+		}
+	}
+	h.press("space")
+	if strings.Contains(ansi.Strip(h.view()), "🟢 1") {
+		t.Fatal("deselected problem still marked")
+	}
 }

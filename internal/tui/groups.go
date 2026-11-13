@@ -364,7 +364,7 @@ func (m *model) groupKeys() []string {
 
 // At narrow widths the two panes stack, keeping both visible and usable.
 func (m *model) groupRows() int {
-	if m.width < 60 {
+	if m.width < 80 {
 		return max((m.height-18)/2, 1)
 	}
 	return max(m.height-14, 1)
@@ -376,7 +376,7 @@ func (m *model) layoutGroupForm() {
 	f.name.SetWidth(half)
 	f.title.SetWidth(max(m.width-half-2, 1))
 	paneWidth := half
-	if m.width < 60 {
+	if m.width < 80 {
 		paneWidth = m.width
 	}
 	f.search.SetWidth(max(paneWidth-6, 1))
@@ -393,7 +393,8 @@ func (m *model) viewGroupForm() string {
 	}
 	body := label(fit("Name", half), groupName) + "  " + label("Title", groupTitle) + "\n" +
 		groupCell(f.name.View(), half) + "  " + groupCell(f.title.View(), max(m.width-half-2, 1)) + "\n\n"
-	if m.width < 60 {
+	if m.width < 80 {
+		body = strings.TrimSuffix(body, "\n")
 		body += strings.Join(m.groupPane(false, m.width), "\n") + "\n" + strings.Join(m.groupPane(true, m.width), "\n")
 	} else {
 		left, right := m.groupPane(false, half), m.groupPane(true, m.width-half-2)
@@ -404,19 +405,18 @@ func (m *model) viewGroupForm() string {
 			body += left[i] + "  " + right[i]
 		}
 	}
-	body += "\n" + ui.Faint.Render(clip(m.groupProblemHint(), m.width))
+	hint := clip(ui.Plain.Render("🟢 selected")+ui.Faint.Render(" · "+m.groupProblemHint()), m.width)
+	if f.err != "" {
+		hint = ui.Red.Render(clip(f.err, m.width))
+	}
+	body += "\n" + hint
 	subtitle := m.pack + " · Choose problems for your group"
 	if f.source != nil {
 		subtitle = "Copy " + f.sourceTitle + " · " + m.pack
 	}
-	// Keep validation errors in the fixed footer, leaving both lists visible.
-	status := "Tab: switch · Ctrl+S: save · Esc: cancel"
-	if f.err != "" {
-		status = ui.Red.Render(f.err)
-	}
 	return strings.Join([]string{
 		clip(m.badge()+"  "+ui.Bold.Render("Personal group"), m.width),
-		clip(subtitle, m.width), m.rule(), body, m.rule(), clip(status, m.width), m.keyHelp("", m.groupKeys()...),
+		clip(subtitle, m.width), m.rule(), body, m.rule(), m.keyHelp("", m.groupKeys()...),
 	}, "\n")
 }
 
@@ -442,7 +442,13 @@ func (m *model) groupPane(selected bool, width int) []string {
 	}
 	edge := func(left, middle, right string) string { return border.Render(left + fit(middle, inner) + right) }
 	heading = clip("─ "+heading+" ", inner)
-	lines := []string{edge("╭", heading+strings.Repeat("─", max(inner-lipgloss.Width(heading), 0)), "╮"), border.Render("│") + groupCell(second, inner) + border.Render("│"), edge("├", strings.Repeat("─", inner), "┤")}
+	columns := compactProblemColumns(inner - 5)
+	lines := []string{
+		edge("╭", heading+strings.Repeat("─", max(inner-lipgloss.Width(heading), 0)), "╮"),
+		border.Render("│") + groupCell(second, inner) + border.Render("│"),
+		border.Render("│") + groupCell(columns.header(5), inner) + border.Render("│"),
+		edge("├", strings.Repeat("─", inner), "┤"),
+	}
 	rows := m.groupRows()
 	first := max(cursor-rows+1, 0)
 	for rowIndex := range rows {
@@ -454,23 +460,24 @@ func (m *model) groupPane(selected bool, width int) []string {
 		}
 		if i < n {
 			m.cursorBar(r, current)
-			var title string
+			var p *problem.Problem
+			chosen := selected
 			if selected {
-				slug := f.selected[i]
-				if p := f.bySlug[slug]; p != nil {
-					title = p.ID + " " + m.title(p)
-				} else {
-					title = "[unavailable] " + slug
-				}
+				p = f.bySlug[f.selected[i]]
 			} else {
-				p := f.available[i]
-				mark := "[ ]"
-				if slices.Contains(f.selected, p.Slug) {
-					mark = "[x]"
-				}
-				title = mark + " " + p.ID + " " + m.title(p)
+				p = f.available[i]
+				chosen = slices.Contains(f.selected, p.Slug)
 			}
-			r.plain(fit(strings.TrimSpace(title), max(inner-2, 0)))
+			if chosen {
+				r.plain(groupCell("🟢", 3))
+			} else {
+				r.plain("   ")
+			}
+			if p != nil {
+				m.problemCells(r, p, columns, current)
+			} else {
+				r.add(ui.Yellow, fit("[unavailable] "+f.selected[i], max(inner-5, 0)))
+			}
 		} else if rowIndex == 0 {
 			hint := "No matching problems"
 			switch {

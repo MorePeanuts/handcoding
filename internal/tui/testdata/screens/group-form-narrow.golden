@@ -3,18 +3,18 @@ regression · Choose problems for your group
 ────────────────────────────────────────────────────────────
 Name                           Title
 review                         需要复习
-
-╭─ Available 50/50 ─────────╮  ╭─ Selected 2 ──────────────╮
-│/ Search title, ID or tag  │  │K/J reorder · x remove     │
-├───────────────────────────┤  ├───────────────────────────┤
-│▌ [x] 1 Two Sum            │  │  1 Two Sum                │
-│  [ ] 4 Median of Two Sort…│  │  146 LRU Cache            │
-│  [ ] 5 Longest Palindromi…│  │                           │
-│  [ ] 23 Merge k Sorted Li…│  │                           │
-│  [ ] 27 Remove Element    │  │                           │
-│  [ ] 46 Permutations      │  │                           │
-╰───────────────────────────╯  ╰───────────────────────────╯
-1 · Two Sum · Easy
+╭─ Available 50/50 ────────────────────────────────────────╮
+│/ Search title, ID or tag                                 │
+│     #      TITLE                                 LEVEL   │
+├──────────────────────────────────────────────────────────┤
+│▌ 🟢 1      Two Sum                               Easy    │
+╰──────────────────────────────────────────────────────────╯
+╭─ Selected 2 ─────────────────────────────────────────────╮
+│K/J reorder · x remove                                    │
+│     #      TITLE                                 LEVEL   │
+├──────────────────────────────────────────────────────────┤
+│  🟢 1      Two Sum                               Easy    │
+╰──────────────────────────────────────────────────────────╯
+🟢 selected · 1 · Two Sum · Easy
 ────────────────────────────────────────────────────────────
-Tab: switch · Ctrl+S: save · Esc: cancel
  ctrl+s save    space select    / search    ? help

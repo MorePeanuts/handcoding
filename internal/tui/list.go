@@ -436,7 +436,8 @@ func (m *model) viewProblems(b *strings.Builder, h int) {
 	// cursor(2) + status(2) + star(2) + id(7) + title + level(9) + tags
 	titleW := min(max(m.width-62, 20), 48)
 	tagsW := max(m.width-2-2-2-7-titleW-1-9, 0)
-	b.WriteString(ui.Faint.Render(fmt.Sprintf("      %-6s %s %-8s %s", "#", fit("TITLE", titleW), "LEVEL", "TAGS")) + "\n")
+	columns := problemColumns{id: 6, title: titleW, level: 8, tags: tagsW}
+	b.WriteString(columns.header(6) + "\n")
 	b.WriteString(m.rule() + "\n")
 
 	if m.cursor < m.offset {
@@ -472,13 +473,7 @@ func (m *model) viewProblems(b *strings.Builder, h int) {
 		} else {
 			r.plain("  ")
 		}
-		title := ui.Plain
-		if cur {
-			title = m.st.title
-		}
-		r.add(ui.Faint, fit(p.ID, 6)+" ").add(title, fit(m.title(p), titleW)+" ")
-		r.add(difficultyStyle(p.Difficulty), fit(difficultyLabel(p.Difficulty), 8)+" ")
-		r.add(ui.Faint, fit(strings.Join(p.Tags, " · "), tagsW))
+		m.problemCells(r, p, columns, cur)
 		b.WriteString(r.fill(m.width) + "\n")
 	}
 	used := max(len(m.visible)-m.offset, 1)

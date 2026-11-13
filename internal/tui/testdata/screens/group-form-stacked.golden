@@ -3,18 +3,18 @@ regression · Choose problems for your gr
 ────────────────────────────────────────
 Name                 Title
 review               需要复习
-
 ╭─ Available 50/50 ────────────────────╮
 │/ Search title, ID or tag             │
+│     #      TITLE             LEVEL   │
 ├──────────────────────────────────────┤
-│▌ [x] 1 Two Sum                       │
+│▌ 🟢 1      Two Sum           Easy    │
 ╰──────────────────────────────────────╯
 ╭─ Selected 2 ─────────────────────────╮
 │K/J reorder · x remove                │
+│     #      TITLE             LEVEL   │
 ├──────────────────────────────────────┤
-│  1 Two Sum                           │
+│  🟢 1      Two Sum           Easy    │
 ╰──────────────────────────────────────╯
-1 · Two Sum · Easy
+🟢 selected · 1 · Two Sum · Easy
 ────────────────────────────────────────
-Tab: switch · Ctrl+S: save · Esc: cancel
  ctrl+s save    ? help
