@@ -1,0 +1,30 @@
+ hc   TUI Guide · Workflows & commands
+:test  ·  30/30
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+── Commands ──────────────────│ │
+  :cases                      │ │   ## Usage
+    :cases add                │ │
+    :cases list               │ │   Command reference for test.
+  :clean                      │ │
+  :debug                      │ │
+  :docs                       │ │
+    :docs protocol            ┃ │
+  :env                        ┃ │
+    :env sync                 ┃ │
+  :fetch                      ┃ │
+  :fix                        ┃ │
+  :gen                        ┃ │
+  :group                      ┃ │
+    :group add                ┃ │
+    :group list               ┃ │
+  :history                    ┃ │
+    :history show             ┃ │
+  :pack                       ┃ │
+    :pack install             ┃ │
+    :pack list                ┃ │
+  :show                       ┃ │
+  :submit                     ┃ │
+▌ :test                       ┃ │
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ tab/⇧tab topic    j/k,↑↓ scroll    ctrl+d/u ½page    pgup/dn page    / search    ? keys    esc back

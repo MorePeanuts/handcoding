@@ -1,0 +1,20 @@
+ hc   TUI Guide · Workflows & commands
+/ command reference
+────────────────────────────────────────────────────────────
+── Commands ───────────────────────────────────────────────┃
+  :cases                                                   ┃
+▌   :cases add                                             ┃
+    :cases list                                            ┃
+  :clean                                                   ┃
+  :debug                                                   ┃
+  :docs                                                    ┃
+    :docs protocol                                         ┃
+  :env                                                     │
+    :env sync                                              │
+  :fetch                                                   │
+  :fix                                                     │
+  :gen                                                     │
+  :group                                                   │
+────────────────────────────────────────────────────────────
+
+ tab/⇧tab topic    enter read    esc clear
