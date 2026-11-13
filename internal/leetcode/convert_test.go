@@ -67,7 +67,7 @@ func TestConvertFunction(t *testing.T) {
 func TestConvertClassAndInPlace(t *testing.T) {
 	q := &Question{
 		QuestionFrontendID: "146", Title: "LRU Cache", TitleSlug: "lru-cache", Difficulty: "Medium",
-		Content: "<pre><strong>Input</strong>\n[...]\n<strong>Output</strong>\n[null, -1]\n</pre>",
+		Content: "<pre><strong>Input</strong>\n[\"LRUCache\",\"get\"]\n[[2],[1]]\n<strong>Output</strong>\n[null, -1]\n</pre>",
 		MetaData: `{"classname":"LRUCache","constructor":{"params":[{"type":"integer","name":"capacity"}]},
 			"methods":[{"params":[{"type":"integer","name":"key"}],"name":"get","return":{"type":"integer"}}],
 			"return":{"type":"boolean"},"systemdesign":true}`,
@@ -99,7 +99,7 @@ func TestConvertClassAndInPlace(t *testing.T) {
 func TestConvertSkipsLanguageOnlyParams(t *testing.T) {
 	q := &Question{
 		QuestionFrontendID: "703", Title: "Kth Largest Element in a Stream", TitleSlug: "kth-largest-element-in-a-stream", Difficulty: "Easy",
-		Content: "<pre><strong>Input</strong>\n[...]\n<strong>Output</strong>\n[null, 4]\n</pre>",
+		Content: "<pre><strong>Input</strong>\n[\"KthLargest\",\"add\"]\n[[3,[4,5,8,2]],[3]]\n<strong>Output</strong>\n[null, 4]\n</pre>",
 		MetaData: `{"classname":"KthLargest","constructor":{"params":[{"type":"integer","name":"k"},{"type":"integer[]","name":"nums"},
 			{"type":"integer","name":"numsSize","lang":"c","value":"size_2"}]},
 			"methods":[{"params":[{"type":"integer","name":"val"},{"type":"integer","name":"valSize","lang":"c"}],"name":"add","return":{"type":"integer"}}],

@@ -400,7 +400,7 @@ hc fetch --site cn "LCR 001"                                  # leetcode.cn IDs 
 hc gen 146                  # make it ready: test cases and the judge rule
 ```
 
-`hc fetch` downloads the statement and its images, the signature, the Go and Python starter code, and the examples. Expected outputs are included when they can be parsed from the statement.
+`hc fetch` downloads the statement and its images, the signature, the Go and Python starter code, and the examples. Inputs and expected outputs are kept together from each statement example when they can be parsed safely. If an example input cannot be verified, hc warns and keeps unmatched API inputs without expected outputs; it never pairs inputs and outputs merely by their order.
 
 It writes the statements in the locales of the pack it fetches into: `locales` in `hc.yaml` for your own problems (see [statements in several languages](#statements-in-several-languages)). Both sites have the English statement; only leetcode.cn has the Chinese one, and its title:
 

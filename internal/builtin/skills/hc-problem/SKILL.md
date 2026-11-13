@@ -271,6 +271,9 @@ not. Read them if you ran it. Then check:
    `instances` against the template's comment. Keep `judge.output` and
    `output_length`.
 4. **Examples.** Open `cases.jsonl`:
+   - check warnings about unparsed statement inputs against the statement;
+     keep each example input with its own output, never pair API inputs and
+     statement outputs by position;
    - fill the example outputs it left empty, in hc's encoding: outputs the
      statement writes in another form, such as a `returns_ref` output
      (142's `tail connects to node index 1` is `1`; 160's
