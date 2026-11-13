@@ -59,7 +59,14 @@ func (m *model) groupChoices() []int {
 
 func (m *model) updateGroupSearch(msg tea.Msg) (tea.Model, tea.Cmd) {
 	key, _ := msg.(tea.KeyPressMsg)
+	if moveSearch(key.String(), &m.groupCursor, len(m.groupChoices())) {
+		m.message = ""
+		return m, nil
+	}
 	switch key.String() {
+	case "ctrl+o":
+		m.chooseGroup()
+		return m, nil
 	case "esc":
 		m.groupSearch.SetValue("")
 		m.groupCursor = 0
@@ -70,8 +77,12 @@ func (m *model) updateGroupSearch(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	var cmd tea.Cmd
+	before := m.groupSearch.Value()
 	m.groupSearch, cmd = m.groupSearch.Update(msg)
-	m.groupCursor = 0
+	if m.groupSearch.Value() != before {
+		m.groupCursor = 0
+		m.message = ""
+	}
 	return m, cmd
 }
 
@@ -139,33 +150,48 @@ func (m *model) updateGroups(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			})
 		}
 	case "enter", "space":
-		if len(choices) == 0 {
-			break
-		}
-		if m.groupTarget != nil {
-			if g == nil || !g.User {
-				m.message = "Choose a personal group, or press n to create one"
-				break
-			}
-			if err := m.app.AddGroupProblems(m.pack, g.Key(), []string{m.groupTarget.Slug}); err != nil {
-				m.message = ui.Red.Render(err.Error())
-				break
-			}
-			m.groupTarget = nil
-			m.message = ""
-			if err := m.reload(); err != nil {
-				m.message = ui.Red.Render(err.Error())
-				break
-			}
-		}
-		m.picking = false
-		m.groups[m.pack] = ""
-		if g != nil {
-			m.groups[m.pack] = g.Key()
-		}
-		m.show()
+		m.chooseGroup()
 	}
 	return m, nil
+}
+
+// chooseGroup activates the highlighted, possibly filtered choice from
+// either browsing or search. Failed additions leave search active.
+func (m *model) chooseGroup() {
+	choices := m.groupChoices()
+	if m.groupCursor < 0 || m.groupCursor >= len(choices) {
+		return
+	}
+	var g *app.Group
+	if i := choices[m.groupCursor]; i >= 0 {
+		g = &m.tab().groups()[i]
+	}
+	if m.groupTarget != nil {
+		if g == nil || !g.User {
+			m.message = "Choose a personal group, or press n to create one"
+			if m.groupSearching {
+				m.message = "Choose a personal group; enter, then n creates one"
+			}
+			return
+		}
+		if err := m.app.AddGroupProblems(m.pack, g.Key(), []string{m.groupTarget.Slug}); err != nil {
+			m.message = ui.Red.Render(err.Error())
+			return
+		}
+		m.groupTarget = nil
+		m.message = ""
+		if err := m.reload(); err != nil {
+			m.message = ui.Red.Render(err.Error())
+			return
+		}
+	}
+	m.picking, m.groupSearching = false, false
+	m.groupSearch.Blur()
+	m.groups[m.pack] = ""
+	if g != nil {
+		m.groups[m.pack] = g.Key()
+	}
+	m.show()
 }
 
 // The two lists share one draft for create, edit and copy. Slugs identify
@@ -286,7 +312,14 @@ func (m *model) updateGroupForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch {
 		case f.searching:
-			if key.String() == "enter" {
+			if moveSearch(key.String(), &f.availableCursor, len(f.available)) {
+				return m, nil
+			}
+			switch key.String() {
+			case "ctrl+o":
+				m.updateGroupList("enter")
+				return m, nil
+			case "enter":
 				return m, f.setFocus(groupAvailable)
 			}
 		case f.focus == groupName || f.focus == groupTitle:
@@ -316,8 +349,11 @@ func (m *model) updateGroupForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch {
 	case f.searching:
+		before := f.search.Value()
 		f.search, cmd = f.search.Update(msg)
-		f.filterAvailable()
+		if f.search.Value() != before {
+			f.filterAvailable()
+		}
 	case f.focus == groupName:
 		f.name, cmd = f.name.Update(msg)
 	case f.focus == groupTitle:
@@ -413,12 +449,12 @@ func (m *model) saveGroupForm() {
 
 // groupFormKeys lists all list controls; the footer prioritizes the action
 // for the focused field. Text fields still treat ? as literal text.
-var groupFormKeys = []string{"ctrl+s save", "tab field/pane", "/ search", "space select/remove", "x remove", "K/J reorder", "←/→ pane", "↑↓ move", "pgup/pgdn page", "esc cancel"}
+var groupFormKeys = []string{"ctrl+s save", "tab field/pane", "/ search", "space select/remove", "x remove", "K/J reorder", "←/→ pane", "↑↓ move", "pgup/pgdn page", "esc cancel", "ctrl+n/p move in search", "ctrl+o select/remove in search"}
 
 func (m *model) groupKeys() []string {
 	f := m.groupForm
 	if f.searching {
-		return []string{"ctrl+s save", "enter browse", "esc clear", "tab selected"}
+		return append(searchKeys("select/remove"), "ctrl+s save", "tab selected")
 	}
 	switch f.focus {
 	case groupName, groupTitle:
@@ -522,7 +558,7 @@ func (m *model) groupPane(selected bool, width int) []string {
 	for rowIndex := range rows {
 		i := first + rowIndex
 		r := newRow(nil)
-		current := i < n && i == cursor && f.focus == focus && !f.searching
+		current := i < n && i == cursor && f.focus == focus
 		if current {
 			r = newRow(m.st.sel)
 		}

@@ -87,9 +87,20 @@ func (h *harness) view() string { return h.m.content() }
 
 // keyMsg is the key press whose String is s, as a terminal reports it.
 func keyMsg(s string) tea.KeyPressMsg {
+	if name, ok := strings.CutPrefix(s, "ctrl+"); ok && len([]rune(name)) == 1 {
+		return tea.KeyPressMsg{Code: []rune(name)[0], Mod: tea.ModCtrl}
+	}
 	switch s {
+	case "up":
+		return tea.KeyPressMsg{Code: tea.KeyUp}
 	case "down":
 		return tea.KeyPressMsg{Code: tea.KeyDown}
+	case "left":
+		return tea.KeyPressMsg{Code: tea.KeyLeft}
+	case "right":
+		return tea.KeyPressMsg{Code: tea.KeyRight}
+	case "backspace":
+		return tea.KeyPressMsg{Code: tea.KeyBackspace}
 	case "enter":
 		return tea.KeyPressMsg{Code: tea.KeyEnter}
 	case "esc":

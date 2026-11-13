@@ -9,6 +9,24 @@ import (
 
 const searchExamples = "id:707 | id:70* | id:700..800"
 
+// moveSearch moves the result highlight without taking focus from the
+// query. Other keys still belong to the text input, including spaces and j/k.
+func moveSearch(key string, cursor *int, count int) bool {
+	switch key {
+	case "up", "ctrl+p":
+		*cursor = max(*cursor-1, 0)
+	case "down", "ctrl+n":
+		*cursor = min(*cursor+1, max(count-1, 0))
+	default:
+		return false
+	}
+	return true
+}
+
+func searchKeys(action string) []string {
+	return []string{"↑↓ move", "ctrl+o " + action, "enter browse", "esc clear", "ctrl+n/p move"}
+}
+
 // parseSearch compiles a query once per edit. An incomplete or invalid ID
 // query returns a hint instead of a matcher, so it cannot select a problem.
 func parseSearch(q string) (func(*problem.Problem) bool, string) {

@@ -356,6 +356,12 @@ func TestGroupEditorScreens(t *testing.T) {
 	h.press("esc", "/")
 	h.m.Update(tea.PasteMsg{Content: "no matching title"})
 	golden(t, "group-form-search-empty", h.view())
+	h.press("esc", "/")
+	h.m.Update(tea.PasteMsg{Content: "id:1..150"})
+	h.press("down", "ctrl+o")
+	golden(t, "group-form-search-selected", h.view())
+	h.m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	golden(t, "group-form-search-selected-stacked", h.view())
 }
 
 // Selection belongs to the group, not to the problem's solved status. Keep

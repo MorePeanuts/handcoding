@@ -1,0 +1,30 @@
+ hc   Personal group
+Copy Design problems · regression
+────────────────────────────────────────────────────────────────────────────────────────────────────
+Name                                               Title
+design-copy                                        Design problems
+
+╭─ Available 19/50 ─────────────────────────────╮  ╭─ Selected 6 ──────────────────────────────────╮
+│/ id:1..150                                    │  │K/J reorder · x remove                         │
+│    #      TITLE                       LEVEL   │  │    #      TITLE                       LEVEL   │
+├───────────────────────────────────────────────┤  ├───────────────────────────────────────────────┤
+│  ● 1      Two Sum                     Easy    │  │  ● 297    Serialize and Deserialize … Hard    │
+│▌ ● 4      Median of Two Sorted Arrays Hard    │  │  ● 173    Binary Search Tree Iterator Medium  │
+│    5      Longest Palindromic Substr… Medium  │  │  ● 535    Encode and Decode TinyURL   Medium  │
+│    23     Merge k Sorted Lists        Hard    │  │  ● 341    Flatten Nested List Iterat… Medium  │
+│    27     Remove Element              Easy    │  │  ● 1      Two Sum                     Easy    │
+│    46     Permutations                Medium  │  │  ● 4      Median of Two Sorted Arrays Hard    │
+│    49     Group Anagrams              Medium  │  │                                               │
+│    95     Unique Binary Search Trees… Medium  │  │                                               │
+│    104    Maximum Depth of Binary Tr… Easy    │  │                                               │
+│    108    Convert Sorted Array to Bi… Easy    │  │                                               │
+│    114    Flatten Binary Tree to Lin… Medium  │  │                                               │
+│    117    Populating Next Right Poin… Medium  │  │                                               │
+│    130    Surrounded Regions          Medium  │  │                                               │
+│    133    Clone Graph                 Medium  │  │                                               │
+│    138    Copy List with Random Poin… Medium  │  │                                               │
+│    141    Linked List Cycle           Easy    │  │                                               │
+╰───────────────────────────────────────────────╯  ╰───────────────────────────────────────────────╯
+● selected · 4 · Median of Two Sorted Arrays · Hard
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ ↑↓ move    ctrl+o select/remove    enter browse    esc clear    ctrl+n/p move    ctrl+s save

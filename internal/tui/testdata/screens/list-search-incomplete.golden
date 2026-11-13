@@ -27,4 +27,4 @@
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 /id:100..
- ↑↓ move    enter open    v view    e edit    h history    m star    / search    ? help
+ ↑↓ move    ctrl+o open    enter browse    esc clear    ctrl+n/p move

@@ -9,7 +9,184 @@ import (
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/problem"
+	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
+
+func TestSearchNavigateAndOpen(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	h.press("/")
+	h.m.Update(tea.PasteMsg{Content: "id:1..150"})
+	for range 30 {
+		h.press("down")
+	}
+	if h.m.cursor != len(h.m.visible)-1 || !h.m.searching || !h.m.search.Focused() {
+		t.Fatal("navigation should stop at the last result and keep input focused")
+	}
+	h.m.Update(tea.WindowSizeMsg{Width: 100, Height: 12})
+	h.view()
+	if h.m.offset == 0 || h.m.cursor >= h.m.offset+h.m.listHeight() {
+		t.Fatal("highlighted search result is not in view")
+	}
+	h.press("up", "ctrl+p", "ctrl+n", "left", "right")
+	want, cursor, offset := h.m.selected().Ref(), h.m.cursor, h.m.offset
+	query := h.m.search.Value()
+	h.press("ctrl+o")
+	if h.m.top() != screenDetail || h.m.current.Ref() != want || h.m.viewing || !h.m.app.HasSolution(h.m.current, h.m.lang) {
+		t.Fatal("activation did not perform the normal open/start action")
+	}
+	// Detail and nested history actions must not be captured by the list's
+	// still-active search. Returning through the stack restores that search.
+	h.press("?", "esc", "h", "esc", "esc")
+	if h.m.top() != screenList || !h.m.searching || !h.m.search.Focused() || h.m.search.Value() != query || h.m.selected().Ref() != want || h.m.cursor != cursor || h.m.offset != offset {
+		t.Fatal("returning did not restore the active search and its position")
+	}
+	h.press("enter")
+	if h.m.searching || h.m.search.Focused() || h.m.cursor != cursor || h.m.offset != offset {
+		t.Fatal("Enter should browse from the highlighted search result")
+	}
+	h.press("/", "left", "right", "backspace")
+	if h.m.cursor != 0 || h.m.offset != 0 || h.m.search.Value() == query {
+		t.Fatal("editing the query should reset the results to the top")
+	}
+	h.press("esc")
+	if h.m.searching || h.m.search.Value() != "" {
+		t.Fatal("Esc did not clear and leave search")
+	}
+}
+
+func TestSearchEmptyAndLiteralInput(t *testing.T) {
+	t.Parallel()
+	for _, query := range []string{"id:100..", "no matching title"} {
+		h := newHarness(t)
+		h.press("/")
+		h.m.Update(tea.PasteMsg{Content: query})
+		h.press("up", "ctrl+p", "down", "ctrl+n", "ctrl+o")
+		if h.m.top() != screenList || h.m.cursor != 0 || h.m.selected() != nil || !h.m.search.Focused() {
+			t.Fatal("empty results must not activate or leave search")
+		}
+		h.press("j", "k", "space", "?")
+		if h.m.help || h.m.search.Value() != query+"jk ?" {
+			t.Fatal("ordinary list shortcuts must be search text")
+		}
+	}
+}
+
+func TestGroupSearchNavigateAndActivate(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	for _, name := range []string{"a-review", "b-review"} {
+		if err := h.m.app.CreateGroup("regression", name, "Review"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := h.m.reload(); err != nil {
+		t.Fatal(err)
+	}
+	problem := h.m.selected().Slug
+	h.press("a", "/")
+	// All problems is not a valid add destination. Keep the query field
+	// and the explanatory message visible so the user can refine the search.
+	for _, width := range []int{60, 100} {
+		h.m.Update(tea.WindowSizeMsg{Width: width, Height: 30})
+		h.press("ctrl+o")
+		if !h.m.picking || !h.m.groupSearching || !h.m.groupSearch.Focused() || !strings.Contains(h.view(), "Choose a personal group; enter, then n creates one") {
+			t.Fatal("invalid add destination should preserve search and show why")
+		}
+	}
+	h.m.Update(tea.PasteMsg{Content: "design"})
+	h.press("ctrl+o")
+	if !h.m.picking || !h.m.groupSearch.Focused() || !strings.Contains(h.view(), "Choose a personal group") {
+		t.Fatal("pack group must not accept additions")
+	}
+	h.press("esc", "/")
+	h.m.Update(tea.PasteMsg{Content: "review"})
+	h.press("down", "down", "up", "ctrl+n", "left", "right")
+	if h.m.groupCursor != 1 || !h.m.groupSearching {
+		t.Fatal("search navigation or text cursor movement lost the highlight")
+	}
+	h.press("ctrl+o")
+	g, err := h.m.app.ResolveGroup("regression", "user:b-review")
+	if err != nil || !slices.Equal(g.Problems, []string{problem}) || h.m.group().Key() != "user:b-review" || h.m.picking || h.m.groupSearching {
+		t.Fatalf("activated the wrong add destination: group %+v, error %v", g, err)
+	}
+	h.press("c", "/")
+	h.m.Update(tea.PasteMsg{Content: "review"})
+	h.press("ctrl+n", "ctrl+p", "enter")
+	if h.m.groupCursor != 0 || h.m.groupSearching {
+		t.Fatal("Enter should leave input with the current group highlighted")
+	}
+	h.press("/", "ctrl+o")
+	if h.m.group().Key() != "user:a-review" || h.m.picking {
+		t.Fatal("activation chose the wrong filtered group")
+	}
+	h.press("c", "/")
+	h.m.Update(tea.PasteMsg{Content: "not a group"})
+	h.press("down", "ctrl+o")
+	if !h.m.groupSearching || !h.m.picking || h.m.groupCursor != 0 {
+		t.Fatal("empty group results performed an action")
+	}
+}
+
+func TestGroupEditorSearchActivate(t *testing.T) {
+	t.Parallel()
+	for _, mode := range []string{"new", "edit", "copy"} {
+		t.Run(mode, func(t *testing.T) {
+			h := newHarness(t)
+			if err := h.m.app.SaveGroup("regression", "", workspace.UserGroup{Name: "review", Title: "Review"}); err != nil {
+				t.Fatal(err)
+			}
+			g, err := h.m.app.ResolveGroup("regression", "user:review")
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch mode {
+			case "new":
+				h.m.openGroupForm(nil, false)
+			case "edit":
+				h.m.openGroupForm(&g, false)
+			case "copy":
+				h.m.openGroupForm(&g, true)
+			}
+			f := h.m.groupForm
+			f.setFocus(groupAvailable)
+			h.press("/")
+			h.m.Update(tea.PasteMsg{Content: "id:1..150"})
+			h.press("down", "ctrl+n", "ctrl+p", "left", "right")
+			if f.availableCursor != 1 || !f.search.Focused() {
+				t.Fatal("search highlight changed while moving the text cursor")
+			}
+			first := f.available[1].Slug
+			h.press("ctrl+o", "down", "ctrl+o")
+			second := f.available[2].Slug
+			if !slices.Equal(f.selected, []string{first, second}) || !f.searching || !f.search.Focused() || f.availableCursor != 2 {
+				t.Fatal("continuous selection lost the search or changed its position")
+			}
+			h.press("ctrl+o")
+			if !slices.Equal(f.selected, []string{first}) {
+				t.Fatal("activation did not toggle draft membership")
+			}
+			g, err = h.m.app.ResolveGroup("regression", "user:review")
+			if err != nil || len(g.Problems) != 0 {
+				t.Fatal("search activation wrote the draft before saving")
+			}
+			h.press("enter")
+			if f.searching || f.availableCursor != 2 {
+				t.Fatal("Enter lost the selected result")
+			}
+			h.press("/", "esc", "/")
+			h.m.Update(tea.PasteMsg{Content: "id:100.."})
+			h.press("down", "ctrl+o")
+			if len(f.selected) != 1 || f.availableCursor != 0 || !f.search.Focused() {
+				t.Fatal("invalid query changed the draft or input focus")
+			}
+			h.press("esc", "esc")
+			if h.m.groupForm != nil {
+				t.Fatal("cancelling the draft did not close the editor")
+			}
+		})
+	}
+}
 
 func TestSearch(t *testing.T) {
 	t.Parallel()
