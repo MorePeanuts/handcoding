@@ -106,6 +106,11 @@ func pythonLanguage(ws *workspace.Workspace) python.Language {
 // when there is no Python to create it with (a *python.SetupError). With
 // python.interpreter set in hc.yaml it does nothing.
 func (a *App) SetUpPython(ctx context.Context, w io.Writer) error {
+	release, lockErr := a.WS.UseCaches()
+	if lockErr != nil {
+		return lockErr
+	}
+	defer release()
 	l, err := a.Langs.Get("python")
 	if err != nil {
 		return err
@@ -161,6 +166,11 @@ func needsPython(why string, err error) error {
 // SyncEnv creates the Python virtual environment again and returns the
 // toolchain it provides. Progress goes to w.
 func (a *App) SyncEnv(ctx context.Context, w io.Writer) (lang.Toolchain, error) {
+	release, lockErr := a.WS.UseCaches()
+	if lockErr != nil {
+		return lang.Toolchain{}, lockErr
+	}
+	defer release()
 	l, err := a.Langs.Get("python")
 	if err != nil {
 		return lang.Toolchain{}, err
@@ -273,6 +283,11 @@ func (a *App) HasSolution(p *problem.Problem, l lang.Language) bool {
 // exist yet, and (re)generates the driver so editors can resolve symbols.
 // The problem's pack must be solved in l (see CheckLang).
 func (a *App) Start(p *problem.Problem, l lang.Language) (path string, created bool, err error) {
+	release, lockErr := a.WS.UseCaches()
+	if lockErr != nil {
+		return "", false, lockErr
+	}
+	defer release()
 	if err := a.CheckLang(p, l); err != nil {
 		return "", false, err
 	}
@@ -430,6 +445,11 @@ type RunOptions struct {
 // Run runs the user's solution against the selected cases, building the
 // generated ones first (see Materialize).
 func (a *App) Run(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, o RunOptions) (*runner.Report, error) {
+	release, lockErr := a.WS.UseCaches()
+	if lockErr != nil {
+		return nil, lockErr
+	}
+	defer release()
 	if err := a.CheckLang(p, l); err != nil {
 		return nil, err
 	}
@@ -452,6 +472,11 @@ func (a *App) Run(ctx context.Context, p *problem.Problem, l lang.Language, sel 
 // .hc/scratch/. The file is copied into a directory of its own, so it must
 // not need files beside it.
 func (a *App) RunFile(ctx context.Context, p *problem.Problem, l lang.Language, file string, sel []runner.Selected, o RunOptions) (*runner.Report, error) {
+	release, lockErr := a.WS.UseCaches()
+	if lockErr != nil {
+		return nil, lockErr
+	}
+	defer release()
 	if err := a.CheckLang(p, l); err != nil {
 		return nil, err
 	}
@@ -669,6 +694,11 @@ func (a *App) RunReference(ctx context.Context, p *problem.Problem, langName str
 // of the generated cases as their expected outputs (see
 // runner.Options.ExpectGenerated).
 func (a *App) runReference(ctx context.Context, p *problem.Problem, langName string, sel []runner.Selected, o RunOptions, expectGenerated bool) (*runner.Report, lang.Language, error) {
+	release, lockErr := a.WS.UseCaches()
+	if lockErr != nil {
+		return nil, nil, lockErr
+	}
+	defer release()
 	l, path, err := a.ReferenceLang(p, langName)
 	if err != nil {
 		return nil, nil, err
@@ -727,6 +757,11 @@ type BuildResult struct {
 // changed (all with force) are cross-checked: every other reference is
 // judged against the outputs of the one that computes stored outputs.
 func (a *App) BuildCases(ctx context.Context, p *problem.Problem, langName string, force bool) (*BuildResult, error) {
+	release, lockErr := a.WS.UseCaches()
+	if lockErr != nil {
+		return nil, lockErr
+	}
+	defer release()
 	cases, err := p.LoadCases()
 	if err != nil {
 		return nil, err

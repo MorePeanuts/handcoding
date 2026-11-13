@@ -54,6 +54,11 @@ judge rule, or set judge.compare by hand.
 				return err
 			}
 			defer a.Close()
+			release, err := a.WS.UseCaches()
+			if err != nil {
+				return err
+			}
+			defer release()
 			if siteName == "" {
 				siteName = a.WS.Config.LeetCode.Site
 			}

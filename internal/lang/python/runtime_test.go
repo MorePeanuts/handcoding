@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
@@ -132,5 +133,53 @@ func TestVenvRuntimePath(t *testing.T) {
 		if data, _ := os.ReadFile(p); string(data) != "# mine\n" {
 			t.Errorf("%s rewritten: %q", filepath.Base(p), data)
 		}
+	}
+}
+
+// Cleanup can leave bytecode directories and user-owned files. Concurrent
+// callers repair only the generated sources, preserving those entries.
+func TestRuntimeRepair(t *testing.T) {
+	t.Parallel()
+	l := Language{Runtime: t.TempDir()}
+	dir := filepath.Join(l.Runtime, runtimeHash)
+	if err := os.MkdirAll(filepath.Join(dir, "__pycache__"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	note := filepath.Join(dir, "notes.txt")
+	if err := os.WriteFile(note, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			if _, err := l.runtimeDir(); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	for name, want := range map[string][]byte{runtimeFile: runtimeSrc, checkerFile: checkerSrc, genFile: generatorSrc} {
+		got, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil || string(got) != string(want) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if got, err := os.ReadFile(note); err != nil || string(got) != "keep" {
+		t.Errorf("user file: %q %v", got, err)
+	}
+}
+
+func TestRuntimeRepairRefusesSymlink(t *testing.T) {
+	t.Parallel()
+	l := Language{Runtime: t.TempDir()}
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(l.Runtime, runtimeHash)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.runtimeDir(); err == nil {
+		t.Fatal("repaired a symlinked runtime")
+	}
+	if entries, err := os.ReadDir(outside); err != nil || len(entries) != 0 {
+		t.Fatalf("wrote through symlink: %v %v", entries, err)
 	}
 }

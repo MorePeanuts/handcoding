@@ -319,6 +319,11 @@ func (a *App) userCasesKey(p *problem.Problem) string {
 // outputs for (not decided yet, or any_of): those cases run unjudged. The
 // first case the reference fails on is returned, as its verdict and error.
 func (a *App) expectUser(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, w io.Writer) (lang.Language, *ReferenceFailure, error) {
+	release, lockErr := a.WS.UseCaches()
+	if lockErr != nil {
+		return nil, nil, lockErr
+	}
+	defer release()
 	var todo []int
 	for i, s := range sel {
 		if s.Case.User && !s.Case.HasExpected() {

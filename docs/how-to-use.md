@@ -69,6 +69,26 @@ The oldest supported toolchains are Python 3.12 and Go 1.22 (the protocol's [lan
 
 Consider running `git init` in the workspace to keep a record of your practice. The `.gitignore` that `hc init` writes leaves out `.hc/`, the installed packs, which `hc pack install` reinstalls from `hc.yaml`, and the files hc writes next to your solutions before every run (`zz_hc_driver.go`, `go.mod`, `_hc_runner.py`, `__pycache__/`, and the `hc_runtime.py` that versions before v0.1.0-alpha.12 wrote there), so the repository holds only your own code. These rules are a block between `# hc:begin` and `# hc:end`, which a newer hc refreshes when it opens the workspace; add your own rules outside it. A `.gitignore` without the block, such as one written by an hc before v0.1.0-alpha.12, is yours and hc leaves it alone: to get the block, copy it from a new workspace (`hc init` in a temporary directory), and remove the generated files already committed with `git rm -r --cached solutions` followed by `git add solutions`.
 
+### Cleaning caches
+
+`hc clean` explicitly removes known, rebuildable cache files. It works in practice workspaces and pack checkouts, and follows the usual `-w`, `HC_WORKSPACE`, and current-directory workspace selection:
+
+```sh
+hc clean --dry-run                     # list eligible files, categories and sizes; writes nothing
+hc clean                               # remove known workspace caches
+hc clean leetcode/two-sum               # only this problem's cases, timings and last-run record
+hc clean --pack leetcode                # only this pack's problem caches, including orphaned ones
+hc clean --pack local                  # your own problems' caches
+```
+
+A scoped cleanup leaves shared caches alone. An unscoped cleanup also removes compiled Go programs, hc's Python runtime files, the LeetCode problem-number indexes, and the Go/uv tool caches used by agents. The next test, submission or debug rebuilds what it needs: compiling, generating large cases and timing references take time; rebuilding tool caches may need downloads. Cleanup does not change the existing Go program retention policy or agent-log retention, and never introduces scheduled or automatic eviction of generated cases.
+
+History, code snapshots, notes, stars, preferences, solutions, packs, personal cases, groups, configuration, `.hc/venv/`, logs, `.hc/scratch/` and lock files are preserved. Unknown entries are preserved too, except within `.hc/cache/go-build/` and `.hc/cache/uv/`: those are tool-owned cache namespaces, whose files, symlink entries and empty directories are removed together. Symlinks are never followed. A symlink at a tool-cache root or outside those namespaces is preserved, as are empty directories outside the tool caches. Use `hc env sync` to recreate the Python environment separately.
+
+Active hc builds, runs, debuggers and agents hold shared cache-use locks. Cleanup takes an exclusive lock and refuses while one is active; an idle TUI does not hold it. Locks are released by the operating system when a process ends. Dry-run takes only a shared, read-only lock and does not initialize `.hc/`, synchronize skills or create an environment. Finish processes started with older hc versions, which do not participate in this locking, before cleaning.
+
+Output reports sizes of eligible files in a dry-run, or successfully removed files after cleanup, with totals per category. These are file bytes, not an exact measurement of disk space reclaimed: hard links and filesystem compression can make those differ. Failed deletions are reported and the command exits non-zero; successfully removed files still count in the summary.
+
 ### Working on a pack
 
 To start a pack of your own, run `hc pack init`: it writes `pack.yaml`, a `.gitignore`, a CI workflow and the agent files, ready to commit. [Writing packs](packs.md) is the guide to creating, checking and publishing one.

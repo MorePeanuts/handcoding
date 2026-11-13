@@ -200,6 +200,11 @@ type validateItem struct {
 // the items, with their findings, to report in their order, from the
 // calling goroutine, up to an item's error, which it returns.
 func (a *App) validateItems(ctx context.Context, items []validateItem, o ValidateOptions, report func(validateItem)) error {
+	release, lockErr := a.WS.UseCaches()
+	if lockErr != nil {
+		return lockErr
+	}
+	defer release()
 	var todo []int
 	for i, it := range items {
 		if it.p != nil {
@@ -304,6 +309,12 @@ func lines(err error) []string { return strings.Split(err.Error(), "\n") }
 // every reference runs on every case, generated cases built afresh.
 func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*problem.Problem, name string, o ValidateOptions) Finding {
 	f := Finding{Name: name, Problem: p}
+	release, err := a.WS.UseCaches()
+	if err != nil {
+		f.Errors = []string{err.Error()}
+		return f
+	}
+	defer release()
 	var errs, warns []string
 	setup := &setupNote{}
 	if err := p.Validate(); err != nil {
