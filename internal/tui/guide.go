@@ -31,7 +31,7 @@ Browse a problem, read its statement, open a solution in your editor, then test,
 
 Esc goes back. :list returns to the problem list. :pack list opens the pack picker. :q exits the TUI.
 
-? shows the current page's shortcut reference. This guide explains the workflow. Use Tab to choose topics or read the page, / to search topic names and content, and Ctrl+n/p to change topics. :help search opens a topic directly.`},
+? shows the current page's shortcut reference. This guide explains the workflow. Use Tab / Shift+Tab to change topics, j/k or Up/Down to scroll, Ctrl+d/u to scroll half a page, Page Up/Down to scroll a full page, and / to search topic names and content. :help search opens a topic directly.`},
 		{"navigation", "Browse, view & open", `# Navigate with keys or commands
 
 - :list / :ls returns to the list and retains its valid search, filters and position.
@@ -57,7 +57,7 @@ Press / in the problem list, group picker or group editor. Results update while 
 
 A colon remains text in search fields, including id:707. Finish the search before opening command mode.
 
-In this guide, / searches topic titles and their full text. Up/Down chooses a matching topic; Enter reads it. Esc clears the search before returning to the previous page.`},
+In this guide, / searches topic titles and their full text. Tab / Shift+Tab chooses a matching topic; Enter reads it. Esc clears the search before returning to the previous page.`},
 		{"groups", "Personal & pack groups", `# Organize practice
 
 Press c in the problem list or run :group to choose a group. :group show user:practice opens that group's problems in stored order. Use --pack to disambiguate groups across packs.
@@ -117,16 +117,17 @@ Explicit --plain, --raw, --json and cases --expand request terminal output. Ordi
 }
 
 type guidePage struct {
-	topics                 []HelpTopic
-	choices                []int
-	index                  int
-	view                   viewport.Model
-	search                 textinput.Model
-	searching, topicsFocus bool
+	topics    []HelpTopic
+	choices   []int
+	index     int
+	view      viewport.Model
+	menu      viewport.Model
+	search    textinput.Model
+	searching bool
 }
 
 func (m *model) openGuide(topic HelpTopic) {
-	g := &guidePage{topics: GuideTopics(), view: viewport.New(), search: textinput.New()}
+	g := &guidePage{topics: GuideTopics(), view: viewport.New(), menu: viewport.New(), search: textinput.New()}
 	if m.opts.Commands != nil && m.opts.Commands.Topics != nil {
 		g.topics = m.opts.Commands.Topics()
 	}
@@ -147,27 +148,85 @@ func (m *model) openGuide(topic HelpTopic) {
 		g.choices = append(g.choices, g.index)
 	}
 	m.guide = g
+	m.message = ""
 	m.push(screenGuide)
 }
+
+const guideMenuWidth = 31 // includes the menu scrollbar; divider takes three more
 
 func (m *model) layoutGuide() {
 	g := m.guide
 	if g == nil {
 		return
 	}
-	width := max(m.width-1, 1)
+	width, menuWidth := max(m.width-1, 1), max(m.width-1, 1)
 	if m.width >= 90 {
-		width -= 29
+		width -= guideMenuWidth + 3
+		menuWidth = guideMenuWidth - 1
 	}
 	g.view.SetWidth(max(width, 1))
 	g.view.SetHeight(max(m.height-headerLines-footerLines, 3))
+	g.menu.SetWidth(menuWidth)
+	g.menu.SetHeight(g.view.Height())
 	g.search.SetWidth(max(m.width-3, 1))
 	text := "No matching topic. Edit the search or press Esc to clear it."
 	if len(g.choices) > 0 {
 		t := g.topics[g.choices[g.index]]
-		text = m.md.Render(t.Body, "", max(width-1, 1))
+		// Like the statement page, limit line length on large terminals.
+		text = m.md.Render(t.Body, "", min(max(width-1, 1), 100))
 	}
 	g.view.SetContent(text)
+	m.layoutGuideMenu()
+}
+
+// layoutGuideMenu uses the same cursor row as the other pickers. Group headers
+// are display rows, never selectable topics; keep the selected row in view.
+func (m *model) layoutGuideMenu() {
+	g := m.guide
+	var lines []string
+	group, selected := "", 0
+	for i, choice := range g.choices {
+		t := g.topics[choice]
+		section := "Guide"
+		command := strings.HasPrefix(t.Name, "command:")
+		if command {
+			section = "Commands"
+		}
+		if section != group {
+			if group != "" {
+				lines = append(lines, "")
+			}
+			lines = append(lines, titledRule(section, g.menu.Width()))
+			group = section
+		}
+		r := newRow(nil)
+		style := ui.Plain
+		label := t.Title
+		if command {
+			if strings.Contains(t.Title, " ") {
+				label = "  " + label
+			} else {
+				style = ui.Bold
+			}
+		}
+		if i == g.index {
+			selected = len(lines)
+			style = ui.Bold
+			r.bg = m.st.sel
+		}
+		m.cursorBar(r, i == g.index)
+		r.add(style, fit(label, g.menu.Width()-2))
+		lines = append(lines, r.fill(g.menu.Width()))
+	}
+	if len(lines) == 0 {
+		lines = append(lines, ui.Faint.Render("  No matching topics"))
+	}
+	g.menu.SetContent(strings.Join(lines, "\n"))
+	if selected < g.menu.YOffset() {
+		g.menu.SetYOffset(max(selected-1, 0))
+	} else if selected >= g.menu.YOffset()+g.menu.Height() {
+		g.menu.SetYOffset(selected - g.menu.Height() + 1)
+	}
 }
 
 func (m *model) filterGuide() {
@@ -181,6 +240,7 @@ func (m *model) filterGuide() {
 	}
 	g.index = 0
 	g.view.GotoTop()
+	g.menu.GotoTop()
 	m.layoutGuide()
 }
 
@@ -188,7 +248,10 @@ func (m *model) updateGuide(msg tea.Msg) (tea.Model, tea.Cmd) {
 	g := m.guide
 	key, _ := msg.(tea.KeyPressMsg)
 	move := func(delta int) {
-		g.index = min(max(g.index+delta, 0), max(len(g.choices)-1, 0))
+		if len(g.choices) < 2 {
+			return
+		}
+		g.index = (g.index + delta + len(g.choices)) % len(g.choices)
 		g.view.GotoTop()
 		m.layoutGuide()
 	}
@@ -203,14 +266,17 @@ func (m *model) updateGuide(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			g.searching = false
 			g.search.Blur()
-			g.topicsFocus = false
 			return m, nil
-		case "up", "ctrl+p":
+		case "shift+tab":
 			move(-1)
 			return m, nil
-		case "down", "ctrl+n":
+		case "tab":
 			move(1)
 			return m, nil
+		case "up", "down", "pgup", "pgdown", "ctrl+d", "ctrl+u":
+			var cmd tea.Cmd
+			g.view, cmd = g.view.Update(msg)
+			return m, cmd
 		}
 		before := g.search.Value()
 		var cmd tea.Cmd
@@ -232,35 +298,25 @@ func (m *model) updateGuide(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case "/":
 		g.searching = true
 		return m, g.search.Focus()
-	case "tab", "shift+tab":
-		g.topicsFocus = !g.topicsFocus
-		return m, nil
-	case "ctrl+n":
+	case "tab":
 		move(1)
 		return m, nil
-	case "ctrl+p":
+	case "shift+tab":
 		move(-1)
 		return m, nil
-	case "enter":
-		g.topicsFocus = false
+	case "g", "home":
+		g.view.GotoTop()
 		return m, nil
-	case "up", "k":
-		if g.topicsFocus {
-			move(-1)
-			return m, nil
-		}
-	case "down", "j":
-		if g.topicsFocus {
-			move(1)
-			return m, nil
-		}
+	case "G", "end":
+		g.view.GotoBottom()
+		return m, nil
 	}
 	var cmd tea.Cmd
 	g.view, cmd = g.view.Update(msg)
 	return m, cmd
 }
 
-var guideKeys = []string{"esc back", "/ search", "tab topics/page", "↑↓ scroll", "ctrl+n/p topic"}
+var guideKeys = []string{"tab/shift+tab next/previous topic", "j/k,↑↓ scroll", "ctrl+d/u scroll half a page", "pgup/pgdown scroll a page", "g/G top/bottom", "/ search", "esc back"}
 
 func (m *model) viewGuide() string {
 	g := m.guide
@@ -269,9 +325,6 @@ func (m *model) viewGuide() string {
 		t := g.topics[g.choices[g.index]]
 		subtitle = fmt.Sprintf("%s  ·  %d/%d", t.Title, g.index+1, len(g.choices))
 	}
-	if g.topicsFocus {
-		subtitle += "  ·  choosing topic"
-	}
 	if g.searching {
 		subtitle = g.search.View()
 	} else if g.search.Value() != "" {
@@ -279,29 +332,19 @@ func (m *model) viewGuide() string {
 	}
 	body := withScrollbar(g.view, m.st.accent)
 	if m.width >= 90 {
-		var menu []string
-		first := max(g.index-g.view.Height()+2, 0)
-		for i := first; i < min(first+g.view.Height(), len(g.choices)); i++ {
-			t := g.topics[g.choices[i]]
-			label := fit(t.Title, 25)
-			if i == g.index {
-				label = m.st.accent.Bold(true).Render("▌ " + label)
-			} else {
-				label = "  " + label
-			}
-			menu = append(menu, label)
-		}
-		for len(menu) < g.view.Height() {
-			menu = append(menu, strings.Repeat(" ", 27))
-		}
-		body = lipgloss.JoinHorizontal(lipgloss.Top, strings.Join(menu, "\n"), "  ", body)
+		divider := ui.Faint.Render(strings.TrimSuffix(strings.Repeat(" │ \n", g.view.Height()), "\n"))
+		body = lipgloss.JoinHorizontal(lipgloss.Top, withScrollbar(g.menu, m.st.accent), divider, body)
+	} else if g.searching {
+		body = withScrollbar(g.menu, m.st.accent)
 	}
-	keys := guideKeys
-	if m.width < 90 {
-		keys = []string{"esc back", "/ search", "tab topics", "↑↓ scroll", "ctrl+n/p topic"}
+	keys := []string{"tab/⇧tab topic", "j/k scroll", "/ search", "? keys"}
+	if m.width >= 90 {
+		keys = []string{"tab/⇧tab topic", "j/k,↑↓ scroll", "ctrl+d/u ½page", "pgup/dn page", "/ search", "? keys", "esc back"}
 	}
 	if g.searching {
-		keys = []string{"↑↓ topic", "enter read", "esc clear"}
+		keys = []string{"tab/⇧tab topic", "enter read", "esc clear"}
+	} else {
+		subtitle = padBetween(subtitle, ui.Faint.Render(scrollPosition(g.view)), m.width)
 	}
-	return m.frame(m.badge()+"  "+ui.Bold.Render("TUI Guide"), subtitle, body, scrollPosition(g.view), keys...)
+	return m.frame(m.badge()+"  "+ui.Bold.Render("TUI Guide")+ui.Faint.Render(" · Workflows & commands"), subtitle, body, "", keys...)
 }

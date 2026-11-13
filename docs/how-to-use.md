@@ -290,10 +290,14 @@ unavailable.
 `?` shows the current page's shortcut reference. `:help` opens a separate,
 scrollable guide covering navigation, search, groups, practice, history and
 command context, with examples. Wide terminals show a topic list beside the
-page; narrow terminals show the page at full width. Tab switches topics/page
-focus, arrows navigate or scroll, and Ctrl+n/p changes topics. `/` searches
-both titles and full content; Enter reads the selected match, and Esc clears
-a search before returning to the originating page.
+page, separated into workflows and command reference. Narrow terminals show
+the page at full width. Tab / Shift+Tab changes topics; `j/k` and Up/Down
+scroll the content, Ctrl+d/u scrolls half a page, and Page Up/Down scrolls
+a full page. Ctrl+n/p is not bound in the guide.
+There is no pane focus to switch. `/` searches both titles and full content;
+on narrow terminals the matches replace the page while typing. Enter reads
+the selected match (Tab / Shift+Tab chooses it), and Esc clears a search
+before returning to the originating page.
 
 Use `:help search` to open a workflow topic, or `:help submit` / `:submit --help`
 for command behavior and options derived from the actual command definitions.
