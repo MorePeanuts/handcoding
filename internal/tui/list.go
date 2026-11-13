@@ -129,15 +129,20 @@ func (m *model) progress(probs []*problem.Problem) string {
 }
 
 func (m *model) applyFilter() {
-	q := strings.ToLower(strings.TrimSpace(m.search.Value()))
+	match, hint := parseSearch(m.search.Value())
+	m.searchHint = hint
 	m.visible = m.visible[:0]
+	if hint != "" {
+		m.cursor, m.offset = 0, 0
+		return
+	}
 	for i, p := range m.probs {
 		st := m.statuses[p.Ref()]
 		if m.filter == filterTodo && st == app.StatusSolved || m.filter == filterSolved && st != app.StatusSolved ||
 			m.filter == filterStarred && !m.stars[p.Ref()] {
 			continue
 		}
-		if q != "" && !matches(p, q) {
+		if !match(p) {
 			continue
 		}
 		m.visible = append(m.visible, i)
@@ -518,6 +523,8 @@ func (m *model) viewProblems(b *strings.Builder, h int) {
 	}
 	used := max(len(m.visible)-m.offset, 1)
 	switch {
+	case m.searchHint != "":
+		b.WriteString(ui.Yellow.Render(clip("  "+m.searchHint, m.width)) + "\n")
 	case len(m.probs) == 0 && m.group() != nil:
 		b.WriteString(ui.Faint.Render("  the group has no problems\n"))
 	case len(m.probs) == 0:

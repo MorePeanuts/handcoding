@@ -116,6 +116,16 @@ Run `hc` (or `hc list`) to open the problem list. It works best with the termina
 - `hc --pack <name>` (or `hc list --pack <name>`) skips the picker and opens that pack, even an empty one, and `--group <name>` that group (a group name that only one pack uses needs no `--pack`). Each pack opens on the group you chose last.
 - `i` switches the statement language of a pack whose statements come in [several languages](#statements-in-several-languages): titles in the list, and the statement on the detail screen. The list header and the statement's title line show the one in use.
 
+Press `/` to search as you type. Ordinary text matches a title (in any language, ignoring case), slug or tag by substring, or an ID exactly: `70` does not match ID `707`. The whole input is one query, without splitting it into words. Use `id:` to search only IDs:
+
+| Query | Matches |
+|---|---|
+| `id:707` | Exactly ID `707` |
+| `id:70*` | IDs starting with `70`, including `70`, `700`, `707` and `7000` |
+| `id:700..800` | Numeric IDs from `700` through `800`, including both endpoints |
+
+Exact and prefix searches compare the ID's text (including leading zeros); they also work with nonnumeric IDs. Ranges accept non-negative decimal integers, compare numerically (`0707` is within `700..800`), and exclude nonnumeric or missing IDs. Search stays within the current pack and group and combines with the `f` status filter. `enter` finishes editing and keeps the search; `esc` clears it. An incomplete query such as `id:700..` prompts for the upper bound; a reversed range such as `id:800..700` or invalid syntax shows a correction hint instead of “no problems match.” The search placeholder and `?` help show examples.
+
 | Key | Action | Key | Action |
 |---|---|---|---|
 | `enter` | Open the problem (and copy the solution path) | `e` | Open the solution in your editor |

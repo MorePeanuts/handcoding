@@ -50,6 +50,20 @@ func TestScreens(t *testing.T) {
 	shot("list-narrow")
 	h.m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
+	h.press("/")
+	shot("list-search")
+	h.m.Update(tea.PasteMsg{Content: "id:100.."})
+	shot("list-search-incomplete")
+	h.m.Update(tea.PasteMsg{Content: "110"})
+	h.press("enter")
+	shot("list-search-range")
+	h.press("esc", "/")
+	h.m.Update(tea.PasteMsg{Content: "id:800..700"})
+	h.m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	shot("list-search-invalid-narrow")
+	h.press("esc")
+	h.m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+
 	h.press("enter")
 	shot("statement")
 	// The cases tab, on one of the user's own cases, and the form that
