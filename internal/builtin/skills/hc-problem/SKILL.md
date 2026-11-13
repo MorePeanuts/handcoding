@@ -171,7 +171,9 @@ The statement users read in the TUI with `hc show <slug>`. Use
 - Start with `# <id>. <title>` (`# <title>` without an id), then the
   statement, the examples and the constraints, as LeetCode shows them.
 - Images go in the problem's `assets/` directory and are linked by relative
-  path, `![](assets/example1.png)`. Never link remote images: hc works
+  path, `![](assets/example1.png)`. Keep diagrams in their explanatory
+  position, including those inside preformatted examples; put image links
+  outside Markdown code fences so they render. Never link remote images: hc works
   offline.
 - **Write an hc note wherever hc's format differs from the statement's**,
   so the user knows what their output is compared with. Put it after the

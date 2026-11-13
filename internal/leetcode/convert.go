@@ -6,10 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
-
-	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
 
 	"github.com/MorePeanuts/handcoding/internal/problem"
 )
@@ -355,15 +352,6 @@ func unsupportedType(p *problem.Problem) string {
 		}
 	}
 	return ""
-}
-
-var supRE = regexp.MustCompile(`<sup>(.*?)</sup>`)
-
-func toMarkdown(content string) (string, error) {
-	// html-to-markdown drops <sup>; keep exponents readable (10^4).
-	content = supRE.ReplaceAllString(content, "^$1")
-	content = strings.ReplaceAll(content, "&nbsp;", " ")
-	return htmltomarkdown.ConvertString(content)
 }
 
 // Save writes a converted problem into dir.
