@@ -115,7 +115,7 @@ func (m *model) popPage() bool {
 	m.opts.Pack = s.opts.Pack
 	m.cursor, m.offset = s.cursor, s.offset
 	m.picking, m.groupTarget, m.groupSearch, m.groupSearching, m.groupCursor = s.picking, s.groupTarget, s.groupSearch, s.groupSearching, s.groupCursor
-	m.packCursor = s.packCursor
+	m.packCursor, m.packOffset, m.groupOffset = s.packCursor, s.packOffset, s.groupOffset
 	m.detailTab, m.caseList = s.detailTab, s.caseList
 	m.histories, m.subs, m.subCursor, m.subOffset = s.histories, s.subs, s.subCursor, s.subOffset
 	m.sub, m.subRep, m.subCases, m.subBr = s.sub, s.subRep, s.subCases, s.subBr
@@ -130,6 +130,7 @@ func (m *model) popPage() bool {
 	}
 	if m.current != nil && m.top() == screenDetail {
 		m.caseList.verbose = s.caseList.verbose
+		m.caseList.scroll.manual, m.caseList.scroll.within, m.caseList.scroll.row = s.caseList.scroll.manual, s.caseList.scroll.within, s.caseList.scroll.row
 		if len(s.caseList.numbers) > 0 {
 			if selected, err := app.Select(m.caseList.cases, s.caseList.numbers, true); err == nil {
 				m.caseList.cases = nil

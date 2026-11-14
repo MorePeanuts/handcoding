@@ -179,7 +179,9 @@ func (m *model) updateList(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	m.message = ""
 	p := m.selected()
-	last := max(len(m.visible)-1, 0)
+	if scrollList(msg.String(), &m.cursor, &m.offset, len(m.visible), m.listHeight()) {
+		return m, nil
+	}
 	switch key := msg.String(); key {
 	case "q":
 		return m, tea.Quit
@@ -191,18 +193,6 @@ func (m *model) updateList(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case m.fromPicker():
 			m.backToPicker()
 		}
-	case "up", "k":
-		m.cursor = max(m.cursor-1, 0)
-	case "down", "j":
-		m.cursor = min(m.cursor+1, last)
-	case "pgup", "ctrl+u":
-		m.cursor = max(m.cursor-m.listHeight(), 0)
-	case "pgdown", "ctrl+d":
-		m.cursor = min(m.cursor+m.listHeight(), last)
-	case "home", "g":
-		m.cursor = 0
-	case "end", "G":
-		m.cursor = last
 	case "/":
 		m.searching = true
 		return m, m.search.Focus()
@@ -244,7 +234,7 @@ func (m *model) updateList(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // updateSearch handles a key or a paste while the search field has focus.
 func (m *model) updateSearch(msg tea.Msg) (tea.Model, tea.Cmd) {
 	key, _ := msg.(tea.KeyPressMsg)
-	if moveSearch(key.String(), &m.cursor, len(m.visible)) {
+	if searchPage(key.String(), &m.cursor, &m.offset, len(m.visible), m.listHeight()) || moveSearch(key.String(), &m.cursor, len(m.visible)) {
 		return m, nil
 	}
 	switch key.String() {
@@ -483,12 +473,7 @@ func (m *model) viewProblems(b *strings.Builder, h int) {
 	b.WriteString(columns.header(6) + "\n")
 	b.WriteString(m.rule() + "\n")
 
-	if m.cursor < m.offset {
-		m.offset = m.cursor
-	}
-	if m.cursor >= m.offset+h {
-		m.offset = m.cursor - h + 1
-	}
+	keepVisible(&m.cursor, &m.offset, len(m.visible), h)
 	for i := m.offset; i < min(m.offset+h, len(m.visible)); i++ {
 		p := m.probs[m.visible[i]]
 		cur := i == m.cursor
@@ -571,7 +556,8 @@ func (m *model) viewGroups(b *strings.Builder, h int) {
 	nameW := max(m.width-titleW-20, 0)
 	b.WriteString(ui.Faint.Render(fmt.Sprintf("  %s %7s  %-6s  %s", fit("GROUP", titleW), "SOLVED", "SOURCE", fit("NAME", nameW))) + "\n")
 	b.WriteString(m.rule() + "\n")
-	first := max(m.groupCursor-h+1, 0)
+	keepVisible(&m.groupCursor, &m.groupOffset, len(choices), h)
+	first := m.groupOffset
 	n := 0
 	for i := first; i < min(first+h, len(choices)); i++ {
 		title, probs, name, source := "All problems", t.probs, "", ""

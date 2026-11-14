@@ -28,7 +28,7 @@ func TestGuideTopicAndPageKeys(t *testing.T) {
 			case "ctrl+d":
 				want = g.view.Height() / 2
 			case "pgdown":
-				want = g.view.Height()
+				want = max(g.view.Height()-2, 1)
 			}
 			if g.index != 0 || g.view.YOffset() != want {
 				t.Fatalf("%s at width %d: topic %d, offset %d; want topic 0, offset %d", pair[0], size, g.index, g.view.YOffset(), want)

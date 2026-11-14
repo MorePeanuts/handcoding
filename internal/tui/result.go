@@ -174,7 +174,7 @@ func (m *model) renderResult() {
 		}
 		content, top, bottom := m.renderCases(m.current, r.report, ro, &m.resBr, nil, false, width)
 		m.result.SetContent(content)
-		follow(&m.result, top, bottom)
+		m.resBr.scroll.place(&m.result, m.resBr.cursor, top, bottom)
 	}
 }
 
@@ -193,6 +193,7 @@ func (m *model) updateResult(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "tab", "shift+tab":
 		if m.run != nil && !m.run.running {
 			m.resBr.tab = 1 - m.resBr.tab
+			m.resBr.scroll.manual = false
 			m.result.GotoTop()
 			m.renderResult()
 		}
@@ -227,8 +228,7 @@ func (m *model) updateResult(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	default:
 		if r := m.run; r != nil && r.report != nil && m.resBr.tab == tabCases {
-			if m.resBr.browseKey(key, r.report, max(m.result.Height()/2, 1)) {
-				m.renderResult()
+			if m.resBr.scroll.update(key, &m.resBr.cursor, &m.result, m.renderResult) {
 				return m, nil
 			}
 		}
@@ -237,6 +237,9 @@ func (m *model) updateResult(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	var cmd tea.Cmd
+	if scrollText(&m.result, msg.String()) {
+		return m, nil
+	}
 	m.result, cmd = m.result.Update(msg)
 	return m, cmd
 }

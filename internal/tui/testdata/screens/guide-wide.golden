@@ -1,5 +1,5 @@
  hc   TUI Guide · Workflows & commands
-Start here  ·  1/7                                                                    top · 28 lines
+Start here  ·  1/7                                                                    top · 30 lines
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 ── Guide ─────────────────────  │                                                                  ┃
 ▌ Start here                    │    Make progress without leaving the TUI                         ┃
@@ -20,11 +20,11 @@ Start here  ·  1/7                                                             
                                 │   ## Find your way                                               ┃
                                 │                                                                  ┃
                                 │   Esc goes back. :list returns to the problem list. :pack list   ┃
-                                │   opens the pack picker. :q exits the TUI.                       ┃
+                                │   opens the pack picker. :q exits the TUI.                       │
                                 │                                                                  │
-                                │   ? shows the current page's shortcut reference. This guide      │
-                                │   explains the workflow. Use Tab / Shift+Tab to change topics,   │
-                                │   j/k or Up/Down to scroll, Ctrl+d/u to scroll half a page,      │
+                                │   ? opens the current page's scrollable shortcut reference;      │
+                                │   q/Esc/? closes it. This guide explains the workflow. Use Tab   │
+                                │   / Shift+Tab to change topics, j/k or Up/Down to scroll,        │
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 
- tab/⇧tab topic    j/k,↑↓ scroll    ctrl+d/u ½page    pgup/dn page    / search    ? keys
+ tab/⇧tab topic    / search    q back    ? keys

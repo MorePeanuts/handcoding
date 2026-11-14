@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"slices"
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
@@ -117,7 +116,8 @@ type model struct {
 	stack         []screen
 	message       string
 	confirm       *confirmation
-	help          bool // the key help of the screen shown, in full
+	help          bool
+	helpView      viewport.Model // the key help of the screen shown, in full
 	resBr, subBr  browser
 
 	// list screen
@@ -146,6 +146,7 @@ type model struct {
 	// cursor into the filtered choices (All problems first without a query).
 	picking        bool
 	groupCursor    int
+	groupOffset    int
 	groupSearch    textinput.Model
 	groupSearching bool
 	groupTarget    *problem.Problem
@@ -156,6 +157,7 @@ type model struct {
 	guide          *guidePage
 	// packCursor is the cursor of the pack picker, an index into tabs.
 	packCursor int
+	packOffset int
 	// multiPack is set when the list has several tabs: the detail screen
 	// then names the problem's pack.
 	multiPack bool
@@ -249,6 +251,7 @@ func newModel(ctx context.Context, a *app.App, opts Options) (*model, error) {
 	m.search.Placeholder = "title, slug, tag; " + searchExamples
 	m.search.SetStyles(searchStyles())
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Dot))
+	m.helpView = viewport.New()
 	m.detail = viewport.New()
 	m.casesView = viewport.New()
 	m.result = viewport.New()
@@ -524,6 +527,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setTheme(ui.ThemeLight)
 		return m, nil
 	case tea.PasteMsg:
+		if m.help {
+			return m, nil
+		}
 		if m.top() == screenGuide && m.command == nil {
 			return m.updateGuide(msg)
 		}
@@ -551,6 +557,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
+		if m.help {
+			return m, m.updateHelp(msg)
+		}
 		if m.command != nil {
 			return m.updateCommand(msg)
 		}
@@ -559,10 +568,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.confirm != nil {
 			return m.updateConfirm(msg)
-		}
-		if m.help {
-			m.help = false
-			return m, nil
 		}
 		if m.top() == screenNoteForm {
 			return m.updateNoteForm(msg)
@@ -578,7 +583,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateGuide(msg)
 		}
 		if msg.String() == "?" && (m.top() != screenList || !m.searching && (!m.picking || !m.groupSearching)) {
-			m.help = true
+			m.openHelp()
 			return m, nil
 		}
 		switch m.top() {
@@ -719,36 +724,61 @@ func (m *model) screenKeys() (string, []string) {
 	return "problems", m.listKeys()
 }
 
-// viewHelp shows every key of the screen shown, with the global ones.
+// openHelp keeps full key help scrollable independently of its caller.
+func (m *model) openHelp() {
+	m.help = true
+	m.helpView.GotoTop()
+}
+
+func (m *model) updateHelp(msg tea.KeyPressMsg) tea.Cmd {
+	switch msg.String() {
+	case "q", "esc", "?":
+		m.help = false
+	default:
+		m.viewHelp() // reconcile dimensions/content before handling a key
+		scrollText(&m.helpView, msg.String())
+	}
+	return nil
+}
+
 func (m *model) viewHelp() string {
 	name, keys := m.screenKeys()
-	if m.top() != screenCaseForm && m.top() != screenNoteForm && m.top() != screenGroupForm {
-		keys = append(slices.Clone(keys), ": command")
-	}
-	keys = append(slices.Clone(keys), "? help", "ctrl+c quit")
-	keyW := 0
+	var all []string
 	for _, k := range keys {
+		if !navigationHint(k) {
+			all = append(all, k)
+		}
+	}
+	if m.top() != screenCaseForm && m.top() != screenNoteForm {
+		all = append(all, scrollKeys...)
+	}
+	if m.top() != screenCaseForm && m.top() != screenNoteForm && m.top() != screenGroupForm {
+		all = append(all, ": command")
+	}
+	all = append(all, "? help", "ctrl+c quit")
+	keyW := 0
+	for _, k := range all {
 		key, _, _ := strings.Cut(k, " ")
 		keyW = max(keyW, runewidth.StringWidth(key))
 	}
-	var b strings.Builder
-	b.WriteString(m.badge() + "  " + ui.Bold.Render("Keys") + ui.Faint.Render(" · "+name) + "\n")
-	b.WriteString(m.rule() + "\n")
-	lines := 2
-	for _, k := range keys {
+	var lines []string
+	for _, k := range all {
 		key, label, _ := strings.Cut(k, " ")
 		if name == "problems" && key == "/" {
 			label += "; " + searchExamples
 		}
-		b.WriteString("  " + m.st.key.Render(" "+runewidth.FillRight(key, keyW)+" ") + "  " + label + "\n")
-		lines++
+		// Stack descriptions on narrow screens instead of hiding their tails.
+		if m.width < keyW+28 {
+			lines = append(lines, "  "+m.st.key.Render(key), wrap("    "+label, max(m.width-1, 1)))
+		} else {
+			lines = append(lines, wrap("  "+m.st.key.Render(" "+runewidth.FillRight(key, keyW)+" ")+"  "+label, max(m.width-1, 1)))
+		}
 	}
-	for ; lines < m.height-2; lines++ {
-		b.WriteString("\n")
-	}
-	b.WriteString(m.rule() + "\n")
-	b.WriteString(ui.Faint.Render("press any key to close"))
-	return b.String()
+	m.helpView.SetWidth(max(m.width-1, 1))
+	m.helpView.SetHeight(max(m.height-4, 1))
+	m.helpView.SetContent(strings.Join(lines, "\n"))
+	return clip(m.badge()+"  "+ui.Bold.Render("Keys")+ui.Faint.Render(" · "+name), m.width) + "\n" + m.rule() + "\n" +
+		withScrollbar(m.helpView, m.st.accent) + "\n" + m.rule() + "\n" + clip(ui.Faint.Render("q / esc / ? close"), m.width)
 }
 
 // View draws the screen on top of the stack, in the alternate screen.

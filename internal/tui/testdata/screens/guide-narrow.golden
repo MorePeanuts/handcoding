@@ -1,5 +1,5 @@
  hc   TUI Guide · Workflows & commands
-Start here  ·  1/7                            top · 30 lines
+Start here  ·  1/7                            top · 31 lines
 ────────────────────────────────────────────────────────────
                                                            ┃
    Make progress without leaving the TUI                   ┃
@@ -17,4 +17,4 @@ Start here  ·  1/7                            top · 30 lines
   and record a submission.                                 │
 ────────────────────────────────────────────────────────────
 
- tab/⇧tab topic    j/k scroll    / search    q back
+ tab/⇧tab topic    / search    q back    ? keys

@@ -1,30 +1,30 @@
  hc   Keys · problems
 ────────────────────────────────────────────────────────────────────────────────────────────────────
-   ↑↓          move
-   enter       open
-   v           view
-   e           edit
-   h           history
-   m           star
-   /           search; id:707 | id:70* | id:700..800
-   f           filter
-   c           group
-   a           add-to-group
-   L           lang
-   i           locale
-   y           copy-path
-   r           reset
-   D           discard
-   pgup/pgdn   page
-   g/G         first/last
-   q           quit
-   ctrl+n/p    move in search
-   ctrl+o      open in search
-   :           command
-   ?           help
-   ctrl+c      quit
-
-
+   enter                  open
+   v                      view
+   e                      edit
+   h                      history
+   m                      star
+   /                      search; id:707 | id:70* | id:700..800
+   f                      filter
+   c                      group
+   a                      add-to-group
+   L                      lang
+   i                      locale
+   y                      copy-path
+   r                      reset
+   D                      discard
+   q                      quit
+   ctrl+n/p               move in search
+   ctrl+o                 open in search
+   j/k,↓/↑                next/previous item or text line
+   ctrl+e/y               scroll down/up one line
+   ctrl+d/u               half page (move selection with view)
+   ctrl+f/b,pgdown/pgup   page down/up (2-line overlap)
+   g/G,home/end           first/last
+   :                      command
+   ?                      help
+   ctrl+c                 quit
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
-press any key to close
+q / esc / ? close
