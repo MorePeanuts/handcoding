@@ -96,9 +96,14 @@ func (m *model) saveNote() tea.Cmd {
 		c.Note = note
 		c.EditNote = false
 		m.noteForm = nil
-		// Replace the draft with its result; the command's saved origin remains.
-		m.stack[len(m.stack)-1] = screenResult
-		return m.startCommandRun(c, m.current)
+		// Leave the draft before opening/replacing the result. Cancelling a
+		// draft keeps an existing result; saving it replaces that result.
+		m.pop()
+		cmd, err := m.nativeCommand(c)
+		if err != nil {
+			m.message = err.Error()
+		}
+		return cmd
 	}
 	if err == nil {
 		var st *store.Store

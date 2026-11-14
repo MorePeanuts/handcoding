@@ -126,9 +126,7 @@ func (m *model) applyFilter() {
 		return
 	}
 	for i, p := range m.probs {
-		st := m.statuses[p.Ref()]
-		if m.filter == filterTodo && st == app.StatusSolved || m.filter == filterSolved && st != app.StatusSolved ||
-			m.filter == filterStarred && !m.stars[p.Ref()] {
+		if !m.matchesFilter(p) {
 			continue
 		}
 		if !match(p) {
@@ -137,6 +135,20 @@ func (m *model) applyFilter() {
 		m.visible = append(m.visible, i)
 	}
 	m.cursor = min(m.cursor, max(len(m.visible)-1, 0))
+}
+
+func (m *model) matchesFilter(p *problem.Problem) bool {
+	st := m.statuses[p.Ref()]
+	switch m.filter {
+	case filterTodo:
+		return st != app.StatusSolved
+	case filterSolved:
+		return st == app.StatusSolved
+	case filterStarred:
+		return m.stars[p.Ref()]
+	default:
+		return true
+	}
 }
 
 func matches(p *problem.Problem, q string) bool {
