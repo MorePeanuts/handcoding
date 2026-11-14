@@ -296,27 +296,10 @@ func (m *model) historyKeys() []string {
 
 func (m *model) viewHistory() string {
 	all := m.historyAll()
-	// The problem column of the history of the workspace fits the longest
-	// name, leaving room for the other columns and a short comment.
-	qualify, probW := false, 0
-	if all {
-		qualify = m.qualifySubs()
-		probW = len("PROBLEM")
-		for _, s := range m.subs {
-			probW = max(probW, len(subName(s, qualify)))
-		}
-		if room := m.width - 90; room < probW {
-			probW = max(room, 12)
-		}
-	}
-	probCol := func(s string) string {
-		if !all {
-			return ""
-		}
-		return fit(s, probW) + " "
-	}
+	table := m.historyTable()
 	var b strings.Builder
-	b.WriteString(clip(ui.Faint.Render(fmt.Sprintf("  %-6s %s%-20s %-8s %-8s %-8s %-16s %s", "ID", probCol("PROBLEM"), "VERDICT", "LANG", "PASSED", "TIME", "SUBMITTED", "COMMENT")), m.width) + "\n")
+	b.WriteString(clip(ui.Faint.Render(table.header()), m.width) + "\n")
+
 	h := m.historyHeight()
 	if m.subCursor < m.subOffset {
 		m.subOffset = m.subCursor
@@ -333,13 +316,7 @@ func (m *model) viewHistory() string {
 			r = newRow(m.st.sel)
 		}
 		m.cursorBar(r, cur)
-		r.add(ui.Faint, fmt.Sprintf("%-6s ", fmt.Sprintf("#%d", s.ID))).plain(probCol(subName(s, qualify)))
-		r.add(ui.VerdictStyle(runner.Verdict(s.Verdict)), fit(s.Verdict, 20)+" ")
-		r.plain(fmt.Sprintf("%-8s %-8s %-8s ", s.Lang, fmt.Sprintf("%d/%d", s.Passed, s.Total), ui.SubmissionTime(s.ElapsedMs)))
-		r.add(ui.Faint, s.CreatedAt.Format("2006-01-02 15:04"))
-		if room := m.width - r.width - 1; room > 0 {
-			r.plain(" " + fit(s.Note.Comment, room))
-		}
+		table.render(r, s)
 		b.WriteString(clip(r.fill(m.width), m.width) + "\n")
 		rows++
 	}

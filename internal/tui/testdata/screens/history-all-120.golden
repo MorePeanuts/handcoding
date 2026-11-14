@@ -1,0 +1,20 @@
+ hc   /workspace
+ All submissions   6 submissions
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ID      PROBLEM                       VERDICT              LANG     PASSED   TIME     SUBMITTED        SUB #  COMMENT
+▌ 1       regression/two-sum            Wrong Answer         go       1/2      1ms      2026-11-14 12:00 #1     复习 no…
+  1       local/two-sum                 Wrong Answer         go       1/2      1ms      2026-11-14 11:00 #2     复习 no…
+  —       regression/lru-cache          Wrong Answer         go       1/2      1ms      2026-11-14 10:00 #3     复习 no…
+  LCR 001 regression/maximum-depth-of-… Wrong Answer         go       1/2      1ms      2026-11-14 09:00 #4     复习 no…
+  —       regression/中文题目           Wrong Answer         go       1/2      1ms      2026-11-14 08:00 #5     复习 no…
+  —       missing/two-sum               Wrong Answer         go       1/2      1ms      2026-11-14 07:00 #6     复习 no…
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ ↑↓ move    enter view    o problem    c note    r restore    d debug    x delete    esc back    : command    ? help

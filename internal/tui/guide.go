@@ -93,6 +93,8 @@ Debugging hands the terminal to the debugger. Local :submit and online :leetcode
 
 :history opens the entire workspace's history. :history two-sum limits it to that problem; bare :history never assumes the highlighted problem. h on a problem opens its own history.
 
+Workspace history starts with the problem ID and slug (pack/slug when needed); SUB # is the submission ID, after the submission time and before comments. A missing problem or ID shows —. Narrow terminals prioritize problem ID, problem and verdict. Single-problem history keeps SUB # first without repeating problem columns.
+
 Enter opens a submission, or use :history show 42 directly. Tab switches its report and saved code. Notes describe your approach; c edits a note. r restores historical code only after confirmation; x deletes a submission after confirmation.
 
 Viewing historical code does not execute or restore it. On history and submission screens, commands that run a solution require an explicit problem, and act on its current solution file. Submission IDs and destructive targets are always explicit.
