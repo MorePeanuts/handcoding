@@ -26,6 +26,7 @@ const (
 // cases followed by the user's own (app.Cases), and the selected one,
 // whose details open under it.
 type caseList struct {
+	scroll  caseScroll
 	numbers []int // original case numbers for command-filtered views
 	verbose bool
 	cases   []problem.Case
@@ -58,13 +59,6 @@ func (cl *caseList) number(i int) int {
 	return i + 1
 }
 
-// moveCase moves the cursor of the cases tab by delta cases.
-func (m *model) moveCase(delta int) {
-	if n := len(m.caseList.cases); n > 0 {
-		m.caseList.cursor = min(max(m.caseList.cursor+delta, 0), n-1)
-	}
-}
-
 // detailTabs draws the tabs of the detail screen.
 func (m *model) detailTabs() string {
 	cases := "Cases"
@@ -86,6 +80,7 @@ func (m *model) detailTabs() string {
 // selected case's details in a box under it.
 func (m *model) renderCaseList() {
 	p, cl := m.current, &m.caseList
+	cl.scroll.starts = nil
 	width := m.casesView.Width()
 	if cl.err != nil {
 		m.casesView.SetContent(wrap(ui.Red.Render(cl.err.Error()), width))
@@ -109,6 +104,7 @@ func (m *model) renderCaseList() {
 	l.add("")
 	top, bottom := 0, 0
 	for i, c := range cl.cases {
+		cl.scroll.starts = append(cl.scroll.starts, l.n)
 		cur := i == cl.cursor
 		r := newRow(nil)
 		if cur {
@@ -138,7 +134,7 @@ func (m *model) renderCaseList() {
 		}
 	}
 	m.casesView.SetContent(l.b.String())
-	follow(&m.casesView, top, bottom)
+	cl.scroll.place(&m.casesView, cl.cursor, top, bottom)
 }
 
 // caseDetails draws case index of p in a box: its input, or its generator
@@ -232,20 +228,10 @@ func truncateWith(s, more string) string {
 // updateCaseList handles the keys of the cases tab that are its own,
 // reporting whether key was one.
 func (m *model) updateCaseList(key string) (tea.Cmd, bool) {
-	page := max(m.casesView.Height()/2, 1)
+	if m.caseList.scroll.update(key, &m.caseList.cursor, &m.casesView, m.renderCaseList) {
+		return nil, true
+	}
 	switch key {
-	case "down", "j":
-		m.moveCase(1)
-	case "up", "k":
-		m.moveCase(-1)
-	case "pgdown", "ctrl+d":
-		m.moveCase(page)
-	case "pgup", "ctrl+u":
-		m.moveCase(-page)
-	case "end", "G":
-		m.moveCase(1 << 30)
-	case "home", "g":
-		m.moveCase(-(1 << 30))
 	case "x":
 		m.removeCase()
 	case "d":

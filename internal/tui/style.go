@@ -161,6 +161,9 @@ func (m *model) keyHelp(right string, keys ...string) string {
 	}
 	var b strings.Builder
 	for _, k := range keys {
+		if navigationHint(k) {
+			continue
+		}
 		p := part(k)
 		w := lipgloss.Width(p)
 		if m.width > 0 && used+w > m.width {

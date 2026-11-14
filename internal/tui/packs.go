@@ -32,21 +32,22 @@ func (m *model) fromPicker() bool { return m.stack[0] == screenPacks }
 
 func (m *model) updatePacks(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.message = ""
-	last := max(len(m.tabs)-1, 0)
+	key := msg.String()
+	switch key {
+	case "tab":
+		key = "down"
+	case "shift+tab":
+		key = "up"
+	}
+	if scrollList(key, &m.packCursor, &m.packOffset, len(m.tabs), m.packHeight()) {
+		return m, nil
+	}
 	switch msg.String() {
 	case "q", "esc":
 		return m, tea.Quit
-	case "up", "k", "shift+tab":
-		m.packCursor = max(m.packCursor-1, 0)
-	case "down", "j", "tab":
-		m.packCursor = min(m.packCursor+1, last)
-	case "home", "g":
-		m.packCursor = 0
-	case "end", "G":
-		m.packCursor = last
 	case "enter", "space":
 		if len(m.tabs) > 0 {
-			m.pack = m.tabs[min(m.packCursor, last)].pack.Name
+			m.pack = m.tabs[min(m.packCursor, len(m.tabs)-1)].pack.Name
 			m.show()
 			m.push(screenList)
 		}
@@ -60,6 +61,8 @@ func (m *model) backToPicker() {
 	m.packCursor = max(slices.IndexFunc(m.tabs, func(t packTab) bool { return t.pack.Name == m.pack }), 0)
 	m.pop()
 }
+
+func (m *model) packHeight() int { return max(m.height-7, 3) }
 
 var packKeys = []string{"↑↓ move", "enter open", "q quit"}
 
@@ -88,8 +91,9 @@ func (m *model) viewPacks() string {
 
 	// the header, a blank, the column names and a rule; a rule, the
 	// status line and the keys
-	h := max(m.height-7, 3)
-	first := max(m.packCursor-h+1, 0)
+	h := m.packHeight()
+	keepVisible(&m.packCursor, &m.packOffset, len(m.tabs), h)
+	first := m.packOffset
 	n := 0
 	for i := first; i < min(first+h, len(m.tabs)); i++ {
 		t := m.tabs[i]

@@ -135,19 +135,13 @@ func (m *model) selectedSub() *store.Submission {
 
 func (m *model) updateHistory(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.message = ""
-	last := max(len(m.subs)-1, 0)
 	s := m.selectedSub()
+	if scrollList(msg.String(), &m.subCursor, &m.subOffset, len(m.subs), m.historyHeight()) {
+		return m, nil
+	}
 	switch msg.String() {
 	case "esc", "q":
 		m.pop()
-	case "up", "k":
-		m.subCursor = max(m.subCursor-1, 0)
-	case "down", "j":
-		m.subCursor = min(m.subCursor+1, last)
-	case "home", "g":
-		m.subCursor = 0
-	case "end", "G":
-		m.subCursor = last
 	case "enter", "v", "space":
 		if s != nil {
 			m.subProblem(*s)
@@ -301,12 +295,7 @@ func (m *model) viewHistory() string {
 	b.WriteString(clip(ui.Faint.Render(table.header()), m.width) + "\n")
 
 	h := m.historyHeight()
-	if m.subCursor < m.subOffset {
-		m.subOffset = m.subCursor
-	}
-	if m.subCursor >= m.subOffset+h {
-		m.subOffset = m.subCursor - h + 1
-	}
+	keepVisible(&m.subCursor, &m.subOffset, len(m.subs), h)
 	rows := 0
 	for i := m.subOffset; i < min(m.subOffset+h, len(m.subs)); i++ {
 		s := m.subs[i]
@@ -379,7 +368,7 @@ func (m *model) renderSubmission() {
 	case m.subRep != nil && m.current != nil:
 		content, top, bottom := m.renderCases(m.current, m.subRep, ui.ReportOptions{Ref: m.app.WS.Ref(m.current)}, &m.subBr, m.subCases, true, width)
 		m.subView.SetContent(content)
-		follow(&m.subView, top, bottom)
+		m.subBr.scroll.place(&m.subView, m.subBr.cursor, top, bottom)
 	default:
 		note := "(per-case details were not recorded for this submission)"
 		if m.current == nil {
@@ -416,6 +405,7 @@ func (m *model) updateSubmission(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "tab", "shift+tab":
 		m.subBr.tab = 1 - m.subBr.tab
+		m.subBr.scroll.manual = false
 		m.subView.GotoTop()
 		m.renderSubmission()
 		return m, nil
@@ -423,11 +413,13 @@ func (m *model) updateSubmission(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.askDelete(*m.sub)
 		return m, nil
 	}
-	if m.subBr.tab == tabCases && m.subBr.browseKey(msg.String(), m.subRep, max(m.subView.Height()/2, 1)) {
-		m.renderSubmission()
+	if m.subBr.tab == tabCases && m.subBr.scroll.update(msg.String(), &m.subBr.cursor, &m.subView, m.renderSubmission) {
 		return m, nil
 	}
 	var cmd tea.Cmd
+	if scrollText(&m.subView, msg.String()) {
+		return m, nil
+	}
 	m.subView, cmd = m.subView.Update(msg)
 	return m, cmd
 }

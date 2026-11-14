@@ -27,4 +27,4 @@
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 search: id:100..110 (esc to clear)
- ↑↓ move    enter open    v view    e edit    h history    m star    : command    ? help
+ enter open    v view    e edit    h history    m star    / search    : command    ? help

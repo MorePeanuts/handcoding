@@ -27,4 +27,4 @@
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 
- ↑↓ case    tab statement    a add    x remove    : command    ? help                  case 10 of 10
+ tab statement    a add    x remove    d debug-case    : command    ? help             case 10 of 10

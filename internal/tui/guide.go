@@ -31,7 +31,7 @@ Browse a problem, read its statement, open a solution in your editor, then test,
 
 Esc goes back. :list returns to the problem list. :pack list opens the pack picker. :q exits the TUI.
 
-? shows the current page's shortcut reference. This guide explains the workflow. Use Tab / Shift+Tab to change topics, j/k or Up/Down to scroll, Ctrl+d/u to scroll half a page, Page Up/Down to scroll a full page, and / to search topic names and content. :help search opens a topic directly.`},
+? opens the current page's scrollable shortcut reference; q/Esc/? closes it. This guide explains the workflow. Use Tab / Shift+Tab to change topics, j/k or Up/Down to scroll, Ctrl+e/y for one line, Ctrl+d/u for half a page, Ctrl+f/b or Page Down/Up for a page with two lines of overlap, and / to search topic names and content. :help search opens a topic directly.`},
 		{"navigation", "Browse, view & open", `# Navigate with keys or commands
 
 - :list / :ls returns to the list and retains its valid search, filters and position.
@@ -42,6 +42,8 @@ Esc goes back. :list returns to the problem list. :pack list opens the pack pick
 - :pack list opens the pack picker; :group opens the current pack's groups.
 
 Use pack/slug when a problem name is ambiguous. :open and :show/:view replace the previous problem flow; q/Esc returns to the target pack's list, focused on that problem. Groups, search and filters stay unless they hide the target. Temporary results, history and help return to their caller; repeated runs, history scopes and help topics replace their page. :list and picker commands go to navigation roots.
+
+Scrolling keys stay out of the footer; ? lists them. In lists, j/k and Up/Down select items. Ctrl+e/y scrolls a line, keeping selection until it leaves the view. Ctrl+d/u moves both the view and selection half a page, preserving screen position where possible. Ctrl+f/b and Page Down/Up page with two lines of overlap. Cases use rendered lines, including long details, and select the case at the reading position.
 
 L changes solution language; i changes statement locale when translations exist. Switching language while only viewing a statement does not create a template.`},
 		{"search", "Search while browsing", `# Find a problem, then act on it
@@ -57,7 +59,9 @@ Press / in the problem list, group picker or group editor. Results update while 
 
 A colon remains text in search fields, including id:707. Finish the search before opening command mode.
 
-In this guide, / searches topic titles and their full text. Tab / Shift+Tab chooses a matching topic; Enter reads it. Esc clears the search before returning to the previous page. Outside search editing, q returns directly.`},
+While editing, Ctrl+e, Ctrl+f/b and Ctrl+u/d keep their text-editing meanings. Page Up/Down pages matching results without leaving search.
+
+In this guide, / searches topic titles and their full text. Tab / Shift+Tab or Up/Down chooses a matching topic; Page Up/Down pages the matches; Enter reads it. Esc clears the search before returning to the previous page. Outside search editing, q returns directly.`},
 		{"groups", "Personal & pack groups", `# Organize practice
 
 Press c in the problem list or run :group to choose a group. :group show user:practice opens that group's problems in stored order. Use --pack to disambiguate groups across packs.
@@ -119,13 +123,14 @@ Explicit --plain, --raw, --json and cases --expand request terminal output. Ordi
 }
 
 type guidePage struct {
-	topics    []HelpTopic
-	choices   []int
-	index     int
-	view      viewport.Model
-	menu      viewport.Model
-	search    textinput.Model
-	searching bool
+	topics     []HelpTopic
+	choices    []int
+	index      int
+	view       viewport.Model
+	menu       viewport.Model
+	menuScroll caseScroll
+	search     textinput.Model
+	searching  bool
 }
 
 func (m *model) openGuide(topic HelpTopic) {
@@ -186,6 +191,7 @@ func (m *model) layoutGuide() {
 func (m *model) layoutGuideMenu() {
 	g := m.guide
 	var lines []string
+	g.menuScroll.starts = nil
 	group, selected := "", 0
 	for i, choice := range g.choices {
 		t := g.topics[choice]
@@ -201,6 +207,7 @@ func (m *model) layoutGuideMenu() {
 			lines = append(lines, titledRule(section, g.menu.Width()))
 			group = section
 		}
+		g.menuScroll.starts = append(g.menuScroll.starts, len(lines))
 		r := newRow(nil)
 		style := ui.Plain
 		label := t.Title
@@ -224,11 +231,9 @@ func (m *model) layoutGuideMenu() {
 		lines = append(lines, ui.Faint.Render("  No matching topics"))
 	}
 	g.menu.SetContent(strings.Join(lines, "\n"))
-	if selected < g.menu.YOffset() {
-		g.menu.SetYOffset(max(selected-1, 0))
-	} else if selected >= g.menu.YOffset()+g.menu.Height() {
-		g.menu.SetYOffset(selected - g.menu.Height() + 1)
-	}
+	// Section headings are not selectable; anchor the topic row itself.
+	g.menuScroll.within = 0
+	g.menuScroll.place(&g.menu, g.index, selected, selected)
 }
 
 func (m *model) filterGuide() {
@@ -241,6 +246,7 @@ func (m *model) filterGuide() {
 		}
 	}
 	g.index = 0
+	g.menuScroll.manual = false
 	g.view.GotoTop()
 	g.menu.GotoTop()
 	m.layoutGuide()
@@ -254,6 +260,7 @@ func (m *model) updateGuide(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return
 		}
 		g.index = (g.index + delta + len(g.choices)) % len(g.choices)
+		g.menuScroll.manual = false
 		g.view.GotoTop()
 		m.layoutGuide()
 	}
@@ -275,10 +282,12 @@ func (m *model) updateGuide(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "tab":
 			move(1)
 			return m, nil
-		case "up", "down", "pgup", "pgdown", "ctrl+d", "ctrl+u":
-			var cmd tea.Cmd
-			g.view, cmd = g.view.Update(msg)
-			return m, cmd
+		case "up", "down", "pgup", "pgdown":
+			g.menuScroll.update(key.String(), &g.index, &g.menu, func() {
+				g.view.GotoTop()
+				m.layoutGuide()
+			})
+			return m, nil
 		}
 		before := g.search.Value()
 		var cmd tea.Cmd
@@ -317,6 +326,9 @@ func (m *model) updateGuide(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	var cmd tea.Cmd
+	if scrollText(&g.view, key.String()) {
+		return m, nil
+	}
 	g.view, cmd = g.view.Update(msg)
 	return m, cmd
 }
@@ -342,10 +354,7 @@ func (m *model) viewGuide() string {
 	} else if g.searching {
 		body = withScrollbar(g.menu, m.st.accent)
 	}
-	keys := []string{"tab/⇧tab topic", "j/k scroll", "/ search", "q back"}
-	if m.width >= 90 {
-		keys = []string{"tab/⇧tab topic", "j/k,↑↓ scroll", "ctrl+d/u ½page", "pgup/dn page", "/ search", "? keys", "q back"}
-	}
+	keys := []string{"tab/⇧tab topic", "/ search", "q back", "? keys"}
 	if g.searching {
 		keys = []string{"tab/⇧tab topic", "enter read", "esc clear"}
 	} else {

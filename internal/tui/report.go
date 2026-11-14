@@ -27,6 +27,7 @@ const (
 // its tab, and in the cases tab the selected case, whose details open
 // under it.
 type browser struct {
+	scroll  caseScroll
 	verbose bool
 	tab     int
 	cursor  int            // the selected case's position in the report
@@ -52,36 +53,6 @@ func (b *browser) reset(rep *runner.Report) {
 // failed reports whether a case's verdict is a failure.
 func failed(v runner.Verdict) bool {
 	return v != runner.Accepted && v != runner.NotRun && !v.Unjudged()
-}
-
-// move moves the cursor by delta cases, within rep's.
-func (b *browser) move(rep *runner.Report, delta int) {
-	if rep == nil || len(rep.Cases) == 0 {
-		return
-	}
-	b.cursor = min(max(b.cursor+delta, 0), len(rep.Cases)-1)
-}
-
-// browseKey handles the keys of the cases tab that move the cursor,
-// reporting whether key was one; page is how many cases a page moves.
-func (b *browser) browseKey(key string, rep *runner.Report, page int) bool {
-	switch key {
-	case "down", "j":
-		b.move(rep, 1)
-	case "up", "k":
-		b.move(rep, -1)
-	case "pgdown", "ctrl+d":
-		b.move(rep, page)
-	case "pgup", "ctrl+u":
-		b.move(rep, -page)
-	case "end", "G":
-		b.move(rep, 1<<30)
-	case "home", "g":
-		b.move(rep, -(1 << 30))
-	default:
-		return false
-	}
-	return true
 }
 
 // caseTabs draws the tabs of a browser: the cases with the run's tally, and
@@ -124,6 +95,7 @@ func (l *lines) add(s string) {
 // the selected case.
 func (m *model) renderCases(p *problem.Problem, rep *runner.Report, o ui.ReportOptions, b *browser, cases stored, stderr bool, width int) (string, int, int) {
 	var l lines
+	b.scroll.starts = nil
 	// An old toolchain explains compile and runtime errors that would
 	// otherwise look like bugs in the solution or in hc.
 	if rep.Toolchain.Version != "" {
@@ -161,6 +133,7 @@ func (m *model) renderCases(p *problem.Problem, rep *runner.Report, o ui.ReportO
 	}
 	top, bottom := 0, 0
 	for i, c := range rep.Cases {
+		b.scroll.starts = append(b.scroll.starts, l.n)
 		cur := i == b.cursor
 		r := newRow(nil)
 		if cur {

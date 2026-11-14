@@ -59,7 +59,7 @@ func (m *model) groupChoices() []int {
 
 func (m *model) updateGroupSearch(msg tea.Msg) (tea.Model, tea.Cmd) {
 	key, _ := msg.(tea.KeyPressMsg)
-	if moveSearch(key.String(), &m.groupCursor, len(m.groupChoices())) {
+	if searchPage(key.String(), &m.groupCursor, &m.groupOffset, len(m.groupChoices()), m.listHeight()) || moveSearch(key.String(), &m.groupCursor, len(m.groupChoices())) {
 		m.message = ""
 		return m, nil
 	}
@@ -91,10 +91,12 @@ func (m *model) updateGroups(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.updateGroupSearch(msg)
 	}
 	groups, choices := m.tab().groups(), m.groupChoices()
-	last := max(len(choices)-1, 0)
 	var g *app.Group
 	if m.groupCursor < len(choices) && choices[m.groupCursor] >= 0 {
 		g = &groups[choices[m.groupCursor]]
+	}
+	if scrollList(msg.String(), &m.groupCursor, &m.groupOffset, len(choices), m.listHeight()) {
+		return m, nil
 	}
 	switch msg.String() {
 	case "/":
@@ -111,18 +113,6 @@ func (m *model) updateGroups(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "q", "c":
 		m.picking = false
 		m.groupTarget = nil
-	case "up", "k":
-		m.groupCursor = max(m.groupCursor-1, 0)
-	case "down", "j":
-		m.groupCursor = min(m.groupCursor+1, last)
-	case "pgup", "ctrl+u":
-		m.groupCursor = max(m.groupCursor-m.listHeight(), 0)
-	case "pgdown", "ctrl+d":
-		m.groupCursor = min(m.groupCursor+m.listHeight(), last)
-	case "home", "g":
-		m.groupCursor = 0
-	case "end", "G":
-		m.groupCursor = last
 	case "n":
 		m.openGroupForm(nil, false)
 	case "e", "C":
@@ -216,6 +206,7 @@ type groupForm struct {
 	focus                           int
 	searching                       bool
 	availableCursor, selectedCursor int
+	availableOffset, selectedOffset int
 	searchHint, err                 string
 }
 
@@ -312,7 +303,7 @@ func (m *model) updateGroupForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch {
 		case f.searching:
-			if moveSearch(key.String(), &f.availableCursor, len(f.available)) {
+			if searchPage(key.String(), &f.availableCursor, &f.availableOffset, len(f.available), m.groupRows()) || moveSearch(key.String(), &f.availableCursor, len(f.available)) {
 				return m, nil
 			}
 			switch key.String() {
@@ -328,7 +319,7 @@ func (m *model) updateGroupForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		default:
 			if key.String() == "?" {
-				m.help = true
+				m.openHelp()
 				return m, nil
 			}
 			if key.String() == "/" {
@@ -364,24 +355,14 @@ func (m *model) updateGroupForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *model) updateGroupList(key string) {
 	f := m.groupForm
-	cursor, n := &f.availableCursor, len(f.available)
+	cursor, offset, n := &f.availableCursor, &f.availableOffset, len(f.available)
 	if f.focus == groupSelected {
-		cursor, n = &f.selectedCursor, len(f.selected)
+		cursor, offset, n = &f.selectedCursor, &f.selectedOffset, len(f.selected)
 	}
-	rows := m.groupRows()
+	if scrollList(key, cursor, offset, n, m.groupRows()) {
+		return
+	}
 	switch key {
-	case "up", "k":
-		*cursor = max(*cursor-1, 0)
-	case "down", "j":
-		*cursor = min(*cursor+1, max(n-1, 0))
-	case "home", "g":
-		*cursor = 0
-	case "end", "G":
-		*cursor = max(n-1, 0)
-	case "pgup", "ctrl+u":
-		*cursor = max(*cursor-rows, 0)
-	case "pgdown", "ctrl+d":
-		*cursor = min(*cursor+rows, max(n-1, 0))
 	case "enter", "space":
 		if f.focus == groupAvailable && n > 0 {
 			slug := f.available[*cursor].Slug
@@ -554,7 +535,12 @@ func (m *model) groupPane(selected bool, width int) []string {
 		edge("├", strings.Repeat("─", inner), "┤"),
 	}
 	rows := m.groupRows()
-	first := max(cursor-rows+1, 0)
+	offset := &f.availableOffset
+	if selected {
+		offset = &f.selectedOffset
+	}
+	keepVisible(&cursor, offset, n, rows)
+	first := *offset
 	for rowIndex := range rows {
 		i := first + rowIndex
 		r := newRow(nil)

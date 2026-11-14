@@ -164,10 +164,35 @@ Exact and prefix searches compare the ID's text (including leading zeros); they 
 | `v` | View the statement only | `o` | Open the statement's images (statement view); the submission's problem (workspace history) |
 | `i` | Switch the statement language | `esc` / `q` | Back (`esc` on the list: to the pack picker); `q` on the list quits |
 | `m` | Star or unstar the problem (`★` in the list) | `ctrl+c` | Quit |
-| `?` | Every key of the screen (the bottom line shows the common ones) | `tab` | Result and submission: switch between the cases and the program's output (result) or the code (submission) |
+| `?` | Every key of the screen (the bottom line prioritizes page actions) | `tab` | Result and submission: switch between the cases and the program's output (result) or the code (submission) |
 | `↑↓` / `j` `k` | Result and submission, cases tab: select a case, whose input, output and expected output show under it | `d` | Result and submission, cases tab: debug the selected case |
 | `tab` | Problem: switch between the statement and the cases | `a` | Problem: add a case (one of your own in an installed pack) |
 | `↑↓` / `j` `k` | Problem, cases tab: select a case | `x` / `d` | Problem, cases tab: remove the selected case (in an installed pack, only yours) / debug it |
+
+### Scrolling
+
+Browsing screens share these keys; the footer leaves them out to make room for
+page actions. `?` lists all keys in a scrollable view; q, Esc or `?` closes it.
+
+| Keys | Behavior |
+|---|---|
+| `j/k`, Down/Up | Select the next/previous item; on text pages, scroll one line. |
+| `Ctrl+e/y` | Scroll down/up one line, retaining the selected item until it would leave the view. |
+| `Ctrl+d/u` | Move the view and selection down/up half the visible height, preserving the selection's screen position where boundaries permit. |
+| `Ctrl+f/b`, Page Down/Up | Page down/up with two lines of overlap; keep the selection visible on the new page. |
+| `g/G`, Home/End | First/last item or top/bottom of text. |
+
+This includes problems, packs, history, groups and both group-editor panes.
+Case pages measure scrolling in rendered lines, including expanded details:
+half/page scrolling selects the case at the reading position, which can remain
+the same case while reading a long detail. Up/Down and j/k still select whole
+cases. Compiler errors and reports without cases scroll as text. Terminal
+resizing and the first/last page may limit movement.
+
+Text entry is an exception: j/k remain text; Ctrl+e, Ctrl+f/b and Ctrl+u/d retain
+their editing meanings. Page Up/Down can page problem/group search results and
+the guide's matching topics while input stays active. Multi-line notes retain
+the editor's own paging. External editors and debuggers keep their own controls.
 
 ### Personal groups
 
@@ -299,16 +324,17 @@ unavailable.
 
 ### TUI guide and quick help
 
-`?` shows the current page's shortcut reference. `:help` opens a separate,
+`?` shows the current page's scrollable shortcut reference; q, Esc or `?` closes it. `:help` opens a separate,
 scrollable guide covering navigation, search, groups, practice, history and
 command context, with examples. Wide terminals show a topic list beside the
 page, separated into workflows and command reference. Narrow terminals show
 the page at full width. Tab / Shift+Tab changes topics; `j/k` and Up/Down
-scroll the content, Ctrl+d/u scrolls half a page, and Page Up/Down scrolls
-a full page. Ctrl+n/p is not bound in the guide.
+scroll the content, Ctrl+e/y scrolls one line, Ctrl+d/u scrolls half a page,
+and Ctrl+f/b or Page Down/Up pages with two lines of overlap. Ctrl+n/p is not bound in the guide.
 There is no pane focus to switch. `/` searches both titles and full content;
 on narrow terminals the matches replace the page while typing. Enter reads
-the selected match (Tab / Shift+Tab chooses it), and Esc clears a search
+the selected match (Tab / Shift+Tab or Up/Down chooses it; Page Up/Down pages
+the matching topics), and Esc clears a search
 before returning to the originating page. Outside search editing, q returns
 directly even when a search is set.
 

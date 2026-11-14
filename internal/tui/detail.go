@@ -109,6 +109,9 @@ func (m *model) updateDetail(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.casesView, cmd = m.casesView.Update(msg)
 		return m, cmd
 	}
+	if scrollText(&m.detail, msg.String()) {
+		return m, nil
+	}
 	m.detail, cmd = m.detail.Update(msg)
 	return m, cmd
 }
