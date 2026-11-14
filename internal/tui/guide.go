@@ -41,7 +41,7 @@ Esc goes back. :list returns to the problem list. :pack list opens the pack pick
 - :cases list two-sum opens its cases; Tab switches between cases and statement.
 - :pack list opens the pack picker; :group opens the current pack's groups.
 
-Use pack/slug when a problem name is ambiguous. A command can open a different problem or pack; Esc returns to the original page, search and scroll position. :list and the picker commands go to navigation roots, so repeated use does not build a stack of identical lists.
+Use pack/slug when a problem name is ambiguous. :open and :show/:view replace the previous problem flow; q/Esc returns to the target pack's list, focused on that problem. Groups, search and filters stay unless they hide the target. Temporary results, history and help return to their caller; repeated runs, history scopes and help topics replace their page. :list and picker commands go to navigation roots.
 
 L changes solution language; i changes statement locale when translations exist. Switching language while only viewing a statement does not create a template.`},
 		{"search", "Search while browsing", `# Find a problem, then act on it
@@ -57,7 +57,7 @@ Press / in the problem list, group picker or group editor. Results update while 
 
 A colon remains text in search fields, including id:707. Finish the search before opening command mode.
 
-In this guide, / searches topic titles and their full text. Tab / Shift+Tab chooses a matching topic; Enter reads it. Esc clears the search before returning to the previous page.`},
+In this guide, / searches topic titles and their full text. Tab / Shift+Tab chooses a matching topic; Enter reads it. Esc clears the search before returning to the previous page. Outside search editing, q returns directly.`},
 		{"groups", "Personal & pack groups", `# Organize practice
 
 Press c in the problem list or run :group to choose a group. :group show user:practice opens that group's problems in stored order. Use --pack to disambiguate groups across packs.
@@ -287,7 +287,10 @@ func (m *model) updateGuide(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	switch key.String() {
-	case "esc", "q":
+	case "q":
+		m.pop()
+		return m, nil
+	case "esc":
 		if g.search.Value() != "" {
 			g.search.SetValue("")
 			m.filterGuide()
@@ -316,7 +319,7 @@ func (m *model) updateGuide(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-var guideKeys = []string{"tab/shift+tab next/previous topic", "j/k,↑↓ scroll", "ctrl+d/u scroll half a page", "pgup/pgdown scroll a page", "g/G top/bottom", "/ search", "esc back"}
+var guideKeys = []string{"tab/shift+tab next/previous topic", "j/k,↑↓ scroll", "ctrl+d/u scroll half a page", "pgup/pgdown scroll a page", "g/G top/bottom", "/ search", "q back (outside search editing)", "esc clear search / back"}
 
 func (m *model) viewGuide() string {
 	g := m.guide
@@ -337,9 +340,9 @@ func (m *model) viewGuide() string {
 	} else if g.searching {
 		body = withScrollbar(g.menu, m.st.accent)
 	}
-	keys := []string{"tab/⇧tab topic", "j/k scroll", "/ search", "? keys"}
+	keys := []string{"tab/⇧tab topic", "j/k scroll", "/ search", "q back"}
 	if m.width >= 90 {
-		keys = []string{"tab/⇧tab topic", "j/k,↑↓ scroll", "ctrl+d/u ½page", "pgup/dn page", "/ search", "? keys", "esc back"}
+		keys = []string{"tab/⇧tab topic", "j/k,↑↓ scroll", "ctrl+d/u ½page", "pgup/dn page", "/ search", "? keys", "q back"}
 	}
 	if g.searching {
 		keys = []string{"tab/⇧tab topic", "enter read", "esc clear"}

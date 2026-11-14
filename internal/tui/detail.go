@@ -20,28 +20,10 @@ import (
 // openInitialProblem keeps the remembered group if it contains p, otherwise
 // shows all problems, so returning to the list always selects p.
 func (m *model) openInitialProblem(p *problem.Problem) error {
-	selectProblem := func() *problem.Problem {
-		for i, idx := range m.visible {
-			if candidate := m.probs[idx]; candidate.Ref() == p.Ref() {
-				m.cursor = i
-				return candidate
-			}
-		}
-		return nil
-	}
-	selected := selectProblem()
-	if selected == nil && m.group() != nil {
-		m.groups[p.Pack] = ""
-		m.selectProblems()
-		selected = selectProblem()
-	}
-	if selected == nil {
-		return fmt.Errorf("problem %s is no longer in the pack", p.Ref())
-	}
-	if err := m.remember(); err != nil {
+	if err := m.focusProblem(p); err != nil {
 		return err
 	}
-	m.openDetail(selected, false)
+	m.openDetail(m.selected(), false)
 	return nil
 }
 

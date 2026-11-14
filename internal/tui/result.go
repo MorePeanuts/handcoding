@@ -62,7 +62,8 @@ func (m *model) startRun(kind runKind, p *problem.Problem) tea.Cmd {
 		m.message = "no " + m.lang.Name() + " solution yet — press enter or e first"
 		return nil
 	}
-	return m.runWith(kind, p, func(ctx context.Context, a *app.App, p *problem.Problem, l lang.Language, out io.Writer, note store.Note) (*runner.Report, *store.Submission, error) {
+	saved := m.childPage(screenResult)
+	cmd := m.runWith(kind, p, func(ctx context.Context, a *app.App, p *problem.Problem, l lang.Language, out io.Writer, note store.Note) (*runner.Report, *store.Submission, error) {
 		opts := app.RunOptions{Stdout: out, Stderr: out, Note: note}
 		if kind == runSubmit {
 			return a.Submit(ctx, p, l, opts)
@@ -70,6 +71,8 @@ func (m *model) startRun(kind runKind, p *problem.Problem) tea.Cmd {
 		rep, err := testExamples(ctx, a, p, l, opts)
 		return rep, nil, err
 	}, store.Note{}, false, "")
+	m.rememberPage(saved)
+	return cmd
 }
 
 func (m *model) runWith(kind runKind, p *problem.Problem, execute RunCommand, note store.Note, verbose bool, file string) tea.Cmd {
@@ -211,8 +214,8 @@ func (m *model) updateResult(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "v", "enter":
 		// Show the statement: go back if we came from it, otherwise open it.
 		back := len(m.stack) > 1 && m.stack[len(m.stack)-2] == screenDetail
-		if n := len(m.commandReturns); n > 0 && m.commandReturns[n-1].depth == len(m.stack) {
-			previous := m.commandReturns[n-1].saved.current
+		if n := len(m.pageReturns); n > 0 && m.pageReturns[n-1].depth == len(m.stack) {
+			previous := m.pageReturns[n-1].saved.current
 			back = back && previous != nil && previous.Ref() == m.current.Ref()
 		}
 		if back {

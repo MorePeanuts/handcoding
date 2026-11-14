@@ -25,19 +25,22 @@ type historyScope struct {
 // openHistory shows the submissions of p, or with p nil every submission
 // of the workspace.
 func (m *model) openHistory(p *problem.Problem) {
-	if m.top() == screenHistory {
-		return
+	saved := m.childPage(screenHistory)
+	if m.top() == screenHistory && len(m.histories) > 0 {
+		m.histories[len(m.histories)-1] = historyScope{p: p}
+	} else {
+		if n := len(m.histories); n > 0 {
+			m.histories[n-1].cursor, m.histories[n-1].offset = m.subCursor, m.subOffset
+		}
+		m.histories = append(m.histories, historyScope{p: p})
 	}
-	if n := len(m.histories); n > 0 {
-		m.histories[n-1].cursor, m.histories[n-1].offset = m.subCursor, m.subOffset
-	}
-	m.histories = append(m.histories, historyScope{p: p})
 	if p != nil {
 		m.current = p
 	}
 	m.subCursor, m.subOffset = 0, 0
 	m.loadHistory()
 	m.push(screenHistory)
+	m.rememberPage(saved)
 }
 
 // closeHistory forgets the history screen being popped, going back to the

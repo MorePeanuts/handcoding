@@ -152,7 +152,7 @@ type model struct {
 	groupForm      *groupForm
 	command        *commandInput
 	commandHistory []string
-	commandReturns []commandReturn
+	pageReturns    []pageReturn
 	guide          *guidePage
 	// packCursor is the cursor of the pack picker, an index into tabs.
 	packCursor int
@@ -348,7 +348,7 @@ func (m *model) push(s screen) {
 // pop goes back to the screen beneath. Back on a history screen, which may
 // list another scope than the one popped, it re-reads its submissions.
 func (m *model) pop() {
-	if m.popCommandPage() {
+	if m.popPage() {
 		return
 	}
 	if len(m.stack) > 1 {

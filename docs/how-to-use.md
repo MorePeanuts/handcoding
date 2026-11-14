@@ -241,10 +241,21 @@ command.
 viewing. `open` starts it; use `-l` to choose its language. Both accept the usual
 ID, slug or qualified `pack/slug`, and `--locale` for the statement. The standalone
 `hc show` remains read-only too; `view`, `open` and `quit` are command-mode names.
-Esc returns from a command-opened page to the previous page, restoring its
-search, selection, language and scroll position where still valid. `:list` and
-the picker commands return to navigation roots. Explicit `:list --pack` or
-`--group` chooses a new list and clears the old search/filter.
+`:open` and `:show`/`:view` replace the previous problem flow. From their detail
+page, q/Esc returns to the target pack's list with that problem selected and
+visible, even after several direct jumps. Groups, search queries and status
+filters stay when they include the target; only constraints hiding it are
+cleared. The returned list is in browsing mode, not search editing.
+
+Temporary pages return to their caller, restoring its selection, language and
+scroll position where still valid: results return to the originating detail or
+list, problem history returns to the detail, and submissions return to their
+history list. Viewing a problem from workspace history returns to that history.
+Repeated runs, history scope changes and help topics replace the current page,
+keeping its original return destination. Cancelling a submission note form
+keeps the previous result; saving replaces it. `:list` and the picker commands
+return to navigation roots. Explicit `:list --pack` or `--group` chooses a new
+list and clears the old search/filter. On the root problem list, q still quits.
 
 Enter executes; Esc dismisses the command input without changing its page.
 Tab/Shift+Tab cycle completions for commands, flags, relevant workspace names
@@ -297,7 +308,8 @@ a full page. Ctrl+n/p is not bound in the guide.
 There is no pane focus to switch. `/` searches both titles and full content;
 on narrow terminals the matches replace the page while typing. Enter reads
 the selected match (Tab / Shift+Tab chooses it), and Esc clears a search
-before returning to the originating page.
+before returning to the originating page. Outside search editing, q returns
+directly even when a search is set.
 
 Use `:help search` to open a workflow topic, or `:help submit` / `:submit --help`
 for command behavior and options derived from the actual command definitions.

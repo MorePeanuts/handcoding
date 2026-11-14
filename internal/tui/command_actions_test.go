@@ -36,7 +36,7 @@ func TestNativeViewOpenAndBack(t *testing.T) {
 	h.press("/")
 	m.Update(tea.PasteMsg{Content: "id:1..150"})
 	h.press("ctrl+n")
-	selected, query, offset := m.selected().Ref(), m.search.Value(), m.offset
+	query := m.search.Value()
 	h.native(Command{Action: "show", Problem: p.Ref(), Language: "go"})
 	if !m.viewing || m.app.HasSolution(p, m.lang) || len(h.copied) != 0 {
 		t.Fatal("show created a template or copied a path")
@@ -46,8 +46,8 @@ func TestNativeViewOpenAndBack(t *testing.T) {
 		t.Fatal("view language switch created a template")
 	}
 	h.press("esc")
-	if !m.searching || m.search.Value() != query || m.selected().Ref() != selected || m.offset != offset || m.lang.ID() != "go" {
-		t.Fatal("view did not restore active search, selection, offset and language")
+	if m.searching || m.search.Value() != query || m.selected().Ref() != p.Ref() || m.lang.ID() != "python" {
+		t.Fatal("view did not focus the target with compatible search and chosen language")
 	}
 	h.native(Command{Action: "open", Problem: p.Ref(), Language: "go"})
 	path := m.app.SolutionPath(p, m.lang)
@@ -62,9 +62,9 @@ func TestNativeViewOpenAndBack(t *testing.T) {
 	if err != nil || string(data) != "// keep my work\n" {
 		t.Fatal("open replaced existing code")
 	}
-	h.press("esc", "esc")
-	if m.top() != screenList || !m.searching {
-		t.Fatal("repeated opens lost their return location")
+	h.press("q")
+	if m.top() != screenList || m.searching || m.selected().Ref() != p.Ref() {
+		t.Fatal("repeated opens did not return directly to the selected problem")
 	}
 }
 
@@ -76,9 +76,10 @@ func TestNativeNavigationScopesAndCases(t *testing.T) {
 	h.native(Command{Action: "show", Problem: p.Ref()})
 	h.native(Command{Action: "show", Problem: "regression/maximum-depth-of-binary-tree"})
 	h.press("esc")
-	if m.current.Ref() != p.Ref() || m.top() != screenDetail {
-		t.Fatal("nested detail restored wrong problem")
+	if m.top() != screenList || m.selected().ID != "104" {
+		t.Fatal("direct navigation did not return to the target list")
 	}
+	h.native(Command{Action: "show", Problem: p.Ref()})
 	h.native(Command{Action: "cases list", Problem: p.Ref(), Cases: []int{2, 1}, Verbose: true})
 	if m.detailTab != tabProblemCases || len(m.caseList.cases) != 2 || !m.caseList.verbose {
 		t.Fatal("cases not filtered")
@@ -100,12 +101,12 @@ func TestNativeNavigationScopesAndCases(t *testing.T) {
 		t.Fatal("bare history narrowed to current problem")
 	}
 	h.press("esc")
-	if m.historyProblem() == nil || m.historyProblem().Ref() != p.Ref() {
-		t.Fatal("history scope not restored")
+	if m.top() != screenDetail || m.current.Ref() != p.Ref() || len(m.histories) != 0 {
+		t.Fatal("history scope replacement lost the originating detail")
 	}
 	h.native(Command{Action: "list"})
 	h.native(Command{Action: "list"})
-	if len(m.stack) != 1 || len(m.commandReturns) != 0 || len(m.histories) != 0 {
+	if len(m.stack) != 1 || len(m.pageReturns) != 0 || len(m.histories) != 0 {
 		t.Fatal("list did not reset navigation")
 	}
 	if err := m.app.CreateGroup("local", "empty", "Empty"); err != nil {
@@ -130,7 +131,7 @@ func TestNativeNavigationMissingTargetsIsAtomic(t *testing.T) {
 	h := newHarness(t)
 	m := h.m
 	for _, c := range []Command{{Action: "show", Problem: "missing"}, {Action: "list", Pack: "missing"}, {Action: "group show", Group: "missing"}, {Action: "history show", ID: 999}, {Action: "show", Problem: m.selected().Ref(), Locale: "missing"}} {
-		before := m.saveCommandPage()
+		before := m.savePage()
 		if _, err := m.nativeCommand(c); err == nil {
 			t.Fatalf("accepted %+v", c)
 		}
@@ -152,7 +153,7 @@ func TestNativeReturnAfterPackRemoval(t *testing.T) {
 	}
 	m.finishCommand(commandDoneMsg{})
 	h.press("esc")
-	if m.top() != screenList || m.current != nil || len(m.commandReturns) != 0 {
+	if m.top() != screenList || m.current != nil || len(m.pageReturns) != 0 {
 		t.Fatal("back revived a removed problem")
 	}
 }
@@ -290,21 +291,20 @@ func TestNativeCrossPackAndResultStatement(t *testing.T) {
 	h.press("/")
 	m.Update(tea.PasteMsg{Content: "id:1..150"})
 	h.press("ctrl+n")
-	ref := m.selected().Ref()
 	h.native(Command{Action: "show", Problem: "local/two-sum"})
 	if m.pack != "local" || m.current.Ref() != "local/two-sum" || m.app.HasSolution(m.current, m.lang) {
 		t.Fatal("cross-pack view not synchronized/read-only")
 	}
 	h.press("esc")
-	if m.pack != "regression" || m.selected().Ref() != ref || !m.searching {
-		t.Fatal("cross-pack back lost origin")
+	if m.pack != "local" || m.selected().Ref() != "local/two-sum" || m.searching {
+		t.Fatal("cross-pack back did not focus the destination")
 	}
 	st, err := m.app.Store()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if remembered, err := st.Pref(m.ctx, "", prefPack); err != nil || remembered != "regression" {
-		t.Fatal("cross-pack return did not persist restored navigation", remembered, err)
+	if remembered, err := st.Pref(m.ctx, "", prefPack); err != nil || remembered != "local" {
+		t.Fatal("cross-pack return did not persist destination navigation", remembered, err)
 	}
 
 	h.press("esc")
