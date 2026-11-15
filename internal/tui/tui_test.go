@@ -833,7 +833,7 @@ func TestHistoryOfEveryProblem(t *testing.T) {
 		t.Fatalf("h on the list: screen %v, %d subs", h.m.top(), len(h.m.subs))
 	}
 	view := h.view()
-	for _, want := range []string{"All submissions", "3 submissions", "PROBLEM", "regression/lru-cache", "local/two-sum", "o problem"} {
+	for _, want := range []string{"All submissions", "3 submissions", "PROBLEM", "regression/LRU Cache", "local/Two Sum", "o problem"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("history lacks %q:\n%s", want, view)
 		}

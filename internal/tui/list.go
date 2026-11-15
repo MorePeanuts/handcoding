@@ -599,7 +599,7 @@ func fit(s string, w int) string {
 		return ""
 	}
 	if runewidth.StringWidth(s) > w {
-		return runewidth.Truncate(s, w, "…")
+		s = runewidth.Truncate(s, w, "…")
 	}
 	return runewidth.FillRight(s, w)
 }

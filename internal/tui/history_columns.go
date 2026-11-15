@@ -20,10 +20,13 @@ type historyColumn struct {
 // historyTable uses the same column widths for headings and rows. Problem IDs
 // come from the loaded pack/slug identities, never from a submission ID or slug.
 type historyTable struct {
-	columns    []historyColumn
-	problemIDs map[string]string
-	qualify    bool
+	columns      []historyColumn
+	problemIDs   map[string]string
+	problemNames map[string]string
+	qualify      bool
 }
+
+const historyColumnGap = "  "
 
 func (m *model) historyTable() historyTable {
 	t := historyTable{columns: []historyColumn{
@@ -32,17 +35,23 @@ func (m *model) historyTable() historyTable {
 	if m.historyAll() {
 		t.qualify = m.qualifySubs()
 		t.problemIDs = make(map[string]string)
+		t.problemNames = make(map[string]string)
 		for _, tab := range m.tabs {
 			for _, p := range tab.probs {
+				name := m.title(p)
+				if t.qualify {
+					name = p.Pack + "/" + name
+				}
+				t.problemNames[p.Ref()] = name
 				if p.ID != "" {
 					t.problemIDs[p.Ref()] = p.ID
 				}
 			}
 		}
-		idW, probW, subW := 2, 12, 6
+		idW, probW, subW := 4, 12, 6
 		for _, s := range m.subs {
 			idW = max(idW, runewidth.StringWidth(t.problemID(s)))
-			probW = max(probW, runewidth.StringWidth(subName(s, t.qualify)))
+			probW = max(probW, runewidth.StringWidth(t.problemName(s)))
 			subW = max(subW, len(fmt.Sprintf("#%d", s.ID)))
 		}
 		t.columns = []historyColumn{
@@ -51,8 +60,9 @@ func (m *model) historyTable() historyTable {
 		}
 		// First shorten the problem name, leaving a little space for comments
 		// when possible. Then remove whole secondary columns, not clipped tails.
+		const commentSpace = len(historyColumnGap) + len("COMMENT")
 		desiredProblem := t.columns[1].width
-		t.columns[1].width = max(12, desiredProblem-max(t.width()+8-m.width, 0))
+		t.columns[1].width = max(12, desiredProblem-max(t.width()+commentSpace-m.width, 0))
 		for _, title := range []string{"TIME", "PASSED", "SUB #", "SUBMITTED", "LANG"} {
 			if t.width() <= m.width {
 				break
@@ -67,23 +77,30 @@ func (m *model) historyTable() historyTable {
 				t.columns[i].width = max(3, t.columns[i].width-extra)
 			}
 		}
-		if spare := m.width - t.width() - 8; spare > 0 {
+		if spare := m.width - t.width() - commentSpace; spare > 0 {
 			t.columns[1].width = min(desiredProblem, t.columns[1].width+spare)
 		}
 	}
-	if room := m.width - t.width(); room >= len("COMMENT") {
+	if room := m.width - t.width() - len(historyColumnGap); room >= len("COMMENT") {
 		t.columns = append(t.columns, historyColumn{"COMMENT", room})
 	}
 	return t
 }
 
-// width includes the cursor and each column's following separator.
+// width includes the cursor and separators between columns.
 func (t historyTable) width() int {
-	w := 2
+	w := 2 + max(len(t.columns)-1, 0)*len(historyColumnGap)
 	for _, c := range t.columns {
-		w += c.width + 1
+		w += c.width
 	}
 	return w
+}
+
+func (t historyTable) problemName(s store.Submission) string {
+	if name := t.problemNames[s.Ref()]; name != "" {
+		return name
+	}
+	return subName(s, t.qualify)
 }
 
 func (t historyTable) problemID(s store.Submission) string {
@@ -98,7 +115,7 @@ func (t historyTable) header() string {
 	b.WriteString("  ")
 	for i, c := range t.columns {
 		if i > 0 {
-			b.WriteByte(' ')
+			b.WriteString(historyColumnGap)
 		}
 		b.WriteString(fit(c.title, c.width))
 	}
@@ -108,7 +125,7 @@ func (t historyTable) header() string {
 func (t historyTable) render(r *row, s store.Submission) {
 	for i, c := range t.columns {
 		if i > 0 {
-			r.plain(" ")
+			r.plain(historyColumnGap)
 		}
 		var value string
 		style := ui.Plain
@@ -116,7 +133,7 @@ func (t historyTable) render(r *row, s store.Submission) {
 		case "ID":
 			value, style = t.problemID(s), ui.Faint
 		case "PROBLEM":
-			value = subName(s, t.qualify)
+			value = t.problemName(s)
 		case "SUB #":
 			value, style = fmt.Sprintf("#%d", s.ID), ui.Faint
 		case "VERDICT":
