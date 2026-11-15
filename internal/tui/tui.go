@@ -675,14 +675,19 @@ const (
 // frame lays out a screen: a two-line header, the body and a footer with the
 // status line and the key help, with right (a position) at its end.
 func (m *model) frame(title, subtitle, body, right string, keys ...string) string {
+	header := clip(title, m.width) + "\n" + clip(subtitle, m.width) + "\n" + m.rule() + "\n"
+	return m.frameWithHeader(header, body, right, keys...)
+}
+
+// frameWithHeader shares the status and footer with screens that arrange their
+// own heading, such as a table with its column names above the divider.
+func (m *model) frameWithHeader(header, body, right string, keys ...string) string {
 	status := m.message
 	if m.confirm != nil {
 		status = ui.Yellow.Render(m.confirm.prompt + " [y/N]")
 	}
 	var b strings.Builder
-	b.WriteString(clip(title, m.width) + "\n")
-	b.WriteString(clip(subtitle, m.width) + "\n")
-	b.WriteString(m.rule() + "\n")
+	b.WriteString(header)
 	b.WriteString(body)
 	b.WriteString("\n" + m.rule() + "\n")
 	b.WriteString(clip(status, m.width) + "\n")

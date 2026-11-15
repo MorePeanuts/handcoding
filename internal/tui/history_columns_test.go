@@ -23,6 +23,8 @@ func TestWorkspaceHistoryColumns(t *testing.T) {
 	for _, tab := range m.tabs {
 		for _, p := range tab.probs {
 			switch p.Ref() {
+			case "regression/two-sum":
+				p.Titles = map[string]string{"zh-CN": "两数之和"}
 			case "regression/lru-cache":
 				p.ID = ""
 			case "regression/maximum-depth-of-binary-tree":
@@ -30,6 +32,7 @@ func TestWorkspaceHistoryColumns(t *testing.T) {
 			}
 		}
 	}
+	m.locales["regression"] = &packLocale{locales: []string{"en", "zh-CN"}, current: "zh-CN"}
 	h.press("h")
 	at := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
 	elapsed := int64(1)
@@ -53,14 +56,24 @@ func TestWorkspaceHistoryColumns(t *testing.T) {
 				t.Fatalf("width %d: overflow: %q", width, line)
 			}
 		}
-		header := lines[3]
+		if lines[1] != "" || lines[3] != "" || !strings.HasPrefix(lines[5], "──") {
+			t.Fatalf("history header no longer matches the problem list: %q", lines[:6])
+		}
+		if width == 160 {
+			for i, name := range []string{"regression/两数之和", "local/Two Sum", "regression/LRU 缓存", "regression/二叉树的最大深度", "regression/中文题目", "missing/two-sum"} {
+				if !strings.Contains(lines[6+i], name) {
+					t.Fatalf("title or fallback missing: %q, want %q", lines[6+i], name)
+				}
+			}
+		}
+		header := lines[4]
 		probStart := strings.Index(header, "PROBLEM")
 		verdictStart := strings.Index(header, "VERDICT")
 		if !strings.HasPrefix(header, "  ID ") || probStart < 0 || verdictStart <= probStart {
 			t.Fatalf("width %d: missing primary columns: %s", width, header)
 		}
 		for i, want := range []string{"1", "1", "—", "LCR 001", "—", "—"} {
-			line := lines[4+i]
+			line := lines[6+i]
 			if got := strings.TrimSpace(ansi.Cut(line, 2, probStart)); got != want {
 				t.Fatalf("width %d, %s: ID %q, want %q", width, refs[i], got, want)
 			}
@@ -80,8 +93,8 @@ func TestWorkspaceHistoryColumns(t *testing.T) {
 			}
 			for i, ref := range refs {
 				pack, _, _ := strings.Cut(ref, "/")
-				if !strings.Contains(lines[4+i], pack+"/") || width == 160 && !strings.Contains(lines[4+i], ref) {
-					t.Fatalf("pack qualification lost: %s", lines[4+i])
+				if !strings.Contains(lines[6+i], pack+"/") {
+					t.Fatalf("pack qualification lost: %s", lines[6+i])
 				}
 			}
 		}
@@ -107,7 +120,7 @@ func TestSingleProblemHistoryColumns(t *testing.T) {
 	p := h.m.selected()
 	addSubs(t, h.m, "", p.Ref(), p.Ref())
 	h.press("v", "h")
-	header := strings.Split(h.view(), "\n")[3]
+	header := strings.Split(h.view(), "\n")[4]
 	if !strings.HasPrefix(header, "  SUB #") || strings.Contains(header, "PROBLEM") || strings.Contains(header, " ID ") {
 		t.Fatalf("single-problem history has redundant problem metadata: %s", header)
 	}
@@ -133,18 +146,18 @@ func TestHistoryColumnsRefreshAndEmpty(t *testing.T) {
 	addSubs(t, m, "", "regression/two-sum")
 	m.loadHistory()
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 20})
-	if !strings.HasPrefix(strings.Split(h.view(), "\n")[4], "▌ 1 ") {
+	if !strings.HasPrefix(strings.Split(h.view(), "\n")[6], "▌ 1 ") {
 		t.Fatal("problem ID missing")
 	}
 	p := m.commandProblem("regression/two-sum")
 	p.ID = "题 001"
-	if !strings.HasPrefix(strings.Split(h.view(), "\n")[4], "▌ 题 001 ") {
+	if !strings.HasPrefix(strings.Split(h.view(), "\n")[6], "▌ 题 001 ") {
 		t.Fatal("updated Unicode ID missing")
 	}
 	if err := m.reload(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(strings.Split(h.view(), "\n")[4], "▌ 1 ") {
+	if !strings.HasPrefix(strings.Split(h.view(), "\n")[6], "▌ 1 ") {
 		t.Fatal("ID not refreshed from problem metadata")
 	}
 }

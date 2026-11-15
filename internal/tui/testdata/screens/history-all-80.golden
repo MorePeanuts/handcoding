@@ -1,15 +1,15 @@
  hc   /workspace
+
  All submissions   6 submissions
+
+  ID       PROBLEM       VERDICT               LANG      SUBMITTED
 ────────────────────────────────────────────────────────────────────────────────
-  ID      PROBLEM      VERDICT              LANG     SUBMITTED        SUB #
-▌ 1       regression/… Wrong Answer         go       2026-11-14 12:00 #1
-  1       local/two-s… Wrong Answer         go       2026-11-14 11:00 #2
-  —       regression/… Wrong Answer         go       2026-11-14 10:00 #3
-  LCR 001 regression/… Wrong Answer         go       2026-11-14 09:00 #4
-  —       regression/… Wrong Answer         go       2026-11-14 08:00 #5
-  —       missing/two… Wrong Answer         go       2026-11-14 07:00 #6
-
-
+▌ 1        regression/…  Wrong Answer          go        2026-11-14 12:00
+  1        local/Two S…  Wrong Answer          go        2026-11-14 11:00
+  —        regression/…  Wrong Answer          go        2026-11-14 10:00
+  LCR 001  regression/…  Wrong Answer          go        2026-11-14 09:00
+  —        regression/…  Wrong Answer          go        2026-11-14 08:00
+  —        missing/two…  Wrong Answer          go        2026-11-14 07:00
 
 
 

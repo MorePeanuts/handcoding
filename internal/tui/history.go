@@ -255,7 +255,10 @@ func (m *model) askDelete(s store.Submission) {
 	})
 }
 
-func (m *model) historyHeight() int { return max(m.height-headerLines-footerLines-1, 3) }
+// Like the problem list: title, blank, summary, blank, columns, divider.
+const historyHeaderLines = 6
+
+func (m *model) historyHeight() int { return max(m.height-historyHeaderLines-footerLines, 3) }
 
 // subName is the problem of s as the history of the workspace shows it:
 // pack/slug when there are several packs to tell apart, else the slug.
@@ -292,7 +295,6 @@ func (m *model) viewHistory() string {
 	all := m.historyAll()
 	table := m.historyTable()
 	var b strings.Builder
-	b.WriteString(clip(ui.Faint.Render(table.header()), m.width) + "\n")
 
 	h := m.historyHeight()
 	keepVisible(&m.subCursor, &m.subOffset, len(m.subs), h)
@@ -326,11 +328,18 @@ func (m *model) viewHistory() string {
 	if len(m.subs) > h {
 		pos = fmt.Sprintf("%d–%d of %d", m.subOffset+1, min(m.subOffset+h, len(m.subs)), len(m.subs))
 	}
+	var title, label string
 	if all {
-		title := m.badge() + "  " + ui.Faint.Render(displayPath(m.app.WS.Root))
-		return m.frame(title, m.chip(m.st.accent.Bold(true), "All submissions")+"  "+count, body, pos, m.historyKeys()...)
+		title = m.badge() + "  " + ui.Faint.Render(displayPath(m.app.WS.Root))
+		label = "All submissions"
+	} else {
+		title = m.problemTitle(m.historyProblem())
+		label = "History"
 	}
-	return m.frame(m.problemTitle(m.historyProblem()), m.chip(m.st.accent.Bold(true), "History")+"  "+count, body, pos, m.historyKeys()...)
+	summary := m.chip(m.st.accent.Bold(true), label) + "  " + count
+	header := clip(title, m.width) + "\n\n" + clip(summary, m.width) + "\n\n" +
+		clip(ui.Faint.Render(table.header()), m.width) + "\n" + m.rule() + "\n"
+	return m.frameWithHeader(header, body, pos, m.historyKeys()...)
 }
 
 // openSubmission shows s, its problem m.current: its cases, the first
