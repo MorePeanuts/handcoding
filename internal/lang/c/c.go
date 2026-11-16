@@ -260,7 +260,11 @@ func (l Language) build(ctx context.Context, dir, binDir string, debug bool) err
 		return err
 	}
 	flags = append(flags, glib...)
-	flags = append(flags, "-I", l.environment(dir), "zz_hc_driver.c", filepath.Join(l.environment(dir), "yyjson.c"), "-o", filepath.Join(binDir, "prog"), "-lm")
+	object, err := l.dependencyObject(ctx, dir, flags)
+	if err != nil {
+		return err
+	}
+	flags = append(flags, "-I", l.environment(dir), "zz_hc_driver.c", object, "-o", filepath.Join(binDir, "prog"), "-lm")
 	flags = append(flags, libs...)
 	cmd := exec.CommandContext(ctx, l.compiler(), flags...)
 	cmd.Dir = dir

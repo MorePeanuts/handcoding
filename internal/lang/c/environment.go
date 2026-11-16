@@ -82,26 +82,11 @@ func (l Language) install(ctx context.Context, target string, w io.Writer, deps 
 	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 		return err
 	}
-	lock, err := os.OpenFile(target+".lock", os.O_CREATE|os.O_RDWR, 0600)
+	unlock, err := lockFile(ctx, target+".lock")
 	if err != nil {
 		return err
 	}
-	defer lock.Close()
-	for {
-		err = unix.Flock(int(lock.Fd()), unix.LOCK_EX|unix.LOCK_NB)
-		if err == nil {
-			break
-		}
-		if !errors.Is(err, unix.EWOULDBLOCK) && !errors.Is(err, unix.EINTR) {
-			return err
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(50 * time.Millisecond):
-		}
-	}
-	defer func() { _ = unix.Flock(int(lock.Fd()), unix.LOCK_UN) }()
+	defer unlock()
 	if ready(target, deps) {
 		return nil
 	}
@@ -157,6 +142,34 @@ func (l Language) install(ctx context.Context, target string, w io.Writer, deps 
 	}
 	return nil
 }
+
+// lockFile serializes publication across hc processes without ignoring cancellation.
+func lockFile(ctx context.Context, path string) (func(), error) {
+	lock, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		err = unix.Flock(int(lock.Fd()), unix.LOCK_EX|unix.LOCK_NB)
+		if err == nil {
+			return func() {
+				_ = unix.Flock(int(lock.Fd()), unix.LOCK_UN)
+				_ = lock.Close()
+			}, nil
+		}
+		if !errors.Is(err, unix.EWOULDBLOCK) && !errors.Is(err, unix.EINTR) {
+			_ = lock.Close()
+			return nil, err
+		}
+		select {
+		case <-ctx.Done():
+			_ = lock.Close()
+			return nil, ctx.Err()
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+}
+
 func (l Language) diagnoseEnvironment() []lang.Diagnostic {
 	if l.Environment == "" {
 		return nil
