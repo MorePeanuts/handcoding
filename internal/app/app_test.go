@@ -38,7 +38,6 @@ func newWorkspace(t *testing.T) *app.App {
 	// The python3 on PATH, rather than a virtual environment that may need
 	// the network.
 	ws.Config.Python.Interpreter = "python3"
-	ws.Config.Java.Release = 17
 	a := app.New(ws)
 	// Tests run in parallel, and a stall under load must not make a run
 	// that is not about time limits Time Limit Exceeded: a floor of 250ms
@@ -76,7 +75,7 @@ func requireTools(t *testing.T, tools ...string) {
 func TestRegressionReferences(t *testing.T) {
 	t.Parallel()
 	testenv.LookPath(t, cpp.DefaultCompiler())
-	if tc, err := (java.Language{Release: 17}).Toolchain(); err != nil {
+	if tc, err := (java.Language{}).Toolchain(); err != nil {
 		testenv.Skip(t, err)
 	} else if err = tc.Err(); err != nil {
 		testenv.Skip(t, err)
@@ -192,7 +191,7 @@ func TestValidateGoMinimumVersion(t *testing.T) {
 		switch {
 		case tt.err == "" && got != "":
 			t.Errorf("%s: unexpected errors\n%s", tt.loop, got)
-		case tt.err != "" && (!strings.Contains(got, "Go reference does not work on Go 1.22") || !strings.Contains(got, tt.err)):
+		case tt.err != "" && (!strings.Contains(got, "Go reference fails minimum-version compatibility") || !strings.Contains(got, tt.err)):
 			t.Errorf("%s: errors\n%s\nwant %q", tt.loop, got, tt.err)
 		}
 	}
@@ -349,7 +348,6 @@ func TestPythonEnvironment(t *testing.T) {
 	}
 
 	ws.Config.Python.Interpreter = "python3"
-	ws.Config.Java.Release = 17
 	a := app.New(ws)
 	if l, _ := a.Lang("python"); l.(python.Language).Venv != nil {
 		t.Fatal("venv despite python.interpreter")
@@ -413,5 +411,75 @@ func TestSubmissionCases(t *testing.T) {
 	}
 	if got := app.SubmissionCases(p, details); got != nil {
 		t.Errorf("cases changed: %d cases", len(got))
+	}
+}
+
+// Check both compilation and execution: a newer compiler in its default mode
+// must not hide a reference/runtime dependency on C++20 or C++23.
+func TestCPPMinimumVersion(t *testing.T) {
+	t.Parallel()
+	testenv.LookPath(t, cpp.DefaultCompiler())
+	requireTools(t, "python3")
+	a := newWorkspace(t)
+	a.WS.Config.CPP.Standard = cpp.MinStandard
+	a.Langs = app.Languages(a.WS)
+	probs, err := a.WS.Problems()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range probs {
+		t.Run(p.Slug, func(t *testing.T) {
+			t.Parallel()
+			l := cpp.Language{Standard: cpp.MinStandard}
+			file, ok := p.Reference(l.SolutionFile())
+			if !ok {
+				t.Fatal("missing C++ reference")
+			}
+			if err := l.CheckMinVersion(context.Background(), p, file); err != nil {
+				t.Fatal(err)
+			}
+			cases, err := p.LoadCases()
+			if err != nil {
+				t.Fatal(err)
+			}
+			sel, _ := app.Select(cases, nil, true)
+			if err := a.Materialize(context.Background(), p, mustLang(t, a, "python"), sel, app.RunOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			rep, _, err := a.RunReference(context.Background(), p, "cpp", sel, app.RunOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if rep.Verdict != runner.Accepted {
+				t.Fatalf("%s: %s", rep.Verdict, rep.CompileError)
+			}
+		})
+	}
+}
+
+func TestJavaMinimumVersion(t *testing.T) {
+	t.Parallel()
+	l := java.Language{}
+	if tc, err := l.Toolchain(); err != nil {
+		testenv.Skip(t, err)
+	} else if err = tc.Err(); err != nil {
+		testenv.Skip(t, err)
+	}
+	a := newWorkspace(t)
+	probs, err := a.WS.Problems()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range probs {
+		t.Run(p.Slug, func(t *testing.T) {
+			t.Parallel()
+			file, ok := p.Reference(l.SolutionFile())
+			if !ok {
+				t.Fatal("missing Java reference")
+			}
+			if err := l.CheckMinVersion(context.Background(), p, file); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

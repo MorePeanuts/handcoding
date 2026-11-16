@@ -29,7 +29,7 @@ func TestToolchainDiagnostics(t *testing.T) {
 	dir := t.TempDir()
 	compiler, debugger := filepath.Join(dir, "my compiler"), filepath.Join(dir, "my debugger")
 	for _, tt := range []struct{ version, minimum string }{
-		{"g++ (GCC) 13.2.0", "13"}, {"clang version 17.0.6", "17"}, {"Apple clang version 16.0.0 (clang-1600.0)", "16"},
+		{"g++ (GCC) 9.5.0", ""}, {"clang version 10.0.0", ""}, {"Apple clang version 16.0.0 (clang-1600.0)", ""},
 	} {
 		script(t, compiler, "echo '"+tt.version+"'\n")
 		script(t, debugger, "echo 'GNU gdb 15.1'\n")
@@ -39,7 +39,7 @@ func TestToolchainDiagnostics(t *testing.T) {
 			t.Fatalf("%+v %v", tc, err)
 		}
 		checks := l.Diagnose(context.Background(), lang.DiagnosticOptions{Debug: true})
-		if len(checks) != 2 || checks[0].Status != "ok" || checks[1].Status != "ok" {
+		if len(checks) != 2 || checks[0].Minimum != cpp.MinStandard || checks[0].Status != "ok" || checks[1].Status != "ok" {
 			t.Fatal(checks)
 		}
 		checks = l.Diagnose(context.Background(), lang.DiagnosticOptions{Debug: true, Headless: true})
@@ -54,14 +54,25 @@ func TestToolchainDiagnostics(t *testing.T) {
 	}
 	script(t, compiler, "echo 'g++ (GCC) 12.3.0'\n")
 	checks = (cpp.Language{Compiler: compiler}).Diagnose(context.Background(), lang.DiagnosticOptions{})
-	if checks[0].Status != "too_old" {
+	if checks[0].Status != "ok" {
+		t.Fatal(checks)
+	}
+	// A compiler capable of C++17 must be allowed, but an unsupported
+	// explicitly selected mode must fail rather than silently downgrade.
+	script(t, compiler, `if [ "$1" = --version ]; then echo 'g++ (GCC) 9.4.0'; elif [ "$1" = -std=c++17 ]; then exit 0; else echo 'unsupported standard' >&2; exit 1; fi`)
+	checks = (cpp.Language{Compiler: compiler, Standard: "c++17"}).Diagnose(context.Background(), lang.DiagnosticOptions{})
+	if checks[0].Status != "ok" {
+		t.Fatal(checks)
+	}
+	checks = (cpp.Language{Compiler: compiler}).Diagnose(context.Background(), lang.DiagnosticOptions{})
+	if checks[0].Status != "error" || !strings.Contains(checks[0].Message, "unsupported standard") {
 		t.Fatal(checks)
 	}
 	checks = (cpp.Language{Compiler: filepath.Join(dir, "missing")}).Diagnose(context.Background(), lang.DiagnosticOptions{})
 	if checks[0].Status != "missing" {
 		t.Fatal(checks)
 	}
-	for _, s := range []string{"c++11", "c++20", "gnu++23", "c++23 -include evil"} {
+	for _, s := range []string{"c++11", "c++14", "gnu++23", "c++23 -include evil"} {
 		if cpp.CheckStandard(s) == nil {
 			t.Errorf("accepted %q", s)
 		}
@@ -77,7 +88,7 @@ func TestEditorDatabaseAndLeetCodeSource(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "solution.cpp"), []byte(code), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	l := cpp.Language{}
+	l := cpp.Language{Standard: cpp.MinStandard}
 	if err := l.Prepare(dir, p); err != nil {
 		t.Fatal(err)
 	}
@@ -164,5 +175,33 @@ func TestExhaustedWorkerBudget(t *testing.T) {
 	data, err := os.ReadFile(out)
 	if err != nil || !strings.Contains(string(data), `"time_limit":true`) {
 		t.Fatalf("%s %v", data, err)
+	}
+}
+
+func TestMinimumStandard(t *testing.T) {
+	t.Parallel()
+	testenv.LookPath(t, cpp.DefaultCompiler())
+	for _, standard := range []string{"c++17", "c++20", "c++23", "c++26", "c++2c"} {
+		if err := cpp.CheckStandard(standard); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := t.TempDir()
+	file := filepath.Join(dir, "solution.cpp")
+	p := function(nil, "integer")
+	// This API exists in C++20, while the user's configured default is C++23.
+	code := `class Solution { public: int f(){set<int> s{1};return s.contains(1);} };`
+	if err := os.WriteFile(file, []byte(code), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	l := cpp.Language{}
+	if err := l.CheckMinVersion(context.Background(), p, file); err == nil || !strings.Contains(err.Error(), "contains") {
+		t.Fatalf("minimum API check: %v", err)
+	}
+	if err := l.Prepare(dir, p); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Build(context.Background(), dir, dir); err != nil {
+		t.Fatal(err)
 	}
 }

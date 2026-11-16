@@ -103,7 +103,7 @@ workspace's own problems; `hc validate <slug>` names a missing reference.
 
 - A C++ reference is `reference/solution.cpp`, using the native public
   `class Solution` method or design class (`hc docs protocol c`). Target
-  C++23; standard headers and judge-defined types are provided by hc. Do not
+  C++17; standard headers and judge-defined types are provided by hc. Do not
   write `main`, include hc runtime headers, or depend on state from another
   case: each case runs in its own process. Use `int` for `integer` and
   `long long` for `long`.

@@ -68,6 +68,31 @@ jobs:
           # instead of skipping them.
           HC_TEST_REQUIRE_TOOLS: "1"
 
+  cpp-minimum:
+    name: C++17 (${{ matrix.compiler }}, Ubuntu 20.04)
+    runs-on: ubuntu-latest
+    container: ubuntu:20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++-9, clang++-10]
+    steps:
+      - run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl git g++-9 clang-10
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: false
+      - run: |
+          mkdir -p /tmp/hc-tools
+          ln -s /usr/bin/${{ matrix.compiler }} /tmp/hc-tools/g++
+          echo /tmp/hc-tools >> "$GITHUB_PATH"
+      - run: uv run --locked go test ./internal/app -run '^TestCPPMinimumVersion$' -count=1 -parallel=4
+        env:
+          HC_TEST_REQUIRE_TOOLS: "1"
+
   lint:
     runs-on: ubuntu-latest
     steps:

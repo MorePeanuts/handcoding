@@ -24,12 +24,6 @@ func TestDiagnostics(t *testing.T) {
 			t.Fatalf("%+v", c)
 		}
 	}
-	l.Release = 999
-	checks = l.Diagnose(context.Background(), lang.DiagnosticOptions{})
-	if checks[1].Status != "error" || !strings.Contains(checks[1].Message, "java.release 999") {
-		t.Fatal(checks)
-	}
-	l.Release = 17
 	l.JVMArgs = []string{"--class-path"}
 	checks = l.Diagnose(context.Background(), lang.DiagnosticOptions{})
 	if checks[1].Status != "error" || !strings.Contains(checks[1].Message, "java.jvm_args") {
@@ -63,7 +57,7 @@ func TestDiagnostics(t *testing.T) {
 		}
 	}
 }
-func TestMinimumAPIAndDefaultRelease(t *testing.T) {
+func TestMinimumAPIAndLocalJDK(t *testing.T) {
 	t.Parallel()
 	l := jdk(t)
 	dir := t.TempDir()
@@ -77,16 +71,21 @@ func TestMinimumAPIAndDefaultRelease(t *testing.T) {
 		t.Fatalf("minimum API check: %v", err)
 	}
 	tc, _ := l.Toolchain()
-	if !lang.AtLeast(tc.Version, "25") {
-		t.Log("default-release compilation is exercised on the JDK 25 CI job")
-		return
-	}
-	l.Release = 0
 	if err := l.Prepare(dir, p); err != nil {
 		t.Fatal(err)
 	}
-	if err := l.Build(context.Background(), dir, t.TempDir()); err != nil {
-		t.Fatal(err)
+	err := l.Build(context.Background(), dir, t.TempDir())
+	if lang.AtLeast(tc.Version, "21") {
+		if err != nil {
+			t.Fatal(err)
+		}
+	} else if err == nil || !strings.Contains(err.Error(), "getFirst") {
+		t.Fatalf("local JDK must decide available APIs: %v", err)
+	}
+	prefs, _ := os.ReadFile(filepath.Join(dir, ".settings", "org.eclipse.jdt.core.prefs"))
+	level := strings.Split(tc.Version, ".")[0]
+	if !strings.Contains(string(prefs), "compiler.source="+level+"\n") || !strings.Contains(string(prefs), "compiler.release=disabled") {
+		t.Fatalf("editor does not follow JDK %s: %s", tc.Version, prefs)
 	}
 }
 func TestLeetCodeStarter(t *testing.T) {

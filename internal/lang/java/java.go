@@ -15,7 +15,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
@@ -23,14 +22,12 @@ import (
 )
 
 const MinVersion = "17"
-const DefaultRelease = 25
 
 //go:embed runtime/*
 var sources embed.FS
 
 type Language struct {
 	Home       string
-	Release    int
 	JVMArgs    []string
 	BuildCache string
 }
@@ -41,18 +38,6 @@ func (Language) Aliases() []string                      { return nil }
 func (Language) SolutionFile() string                   { return "Solution.java" }
 func (Language) OrderedBaseline() bool                  { return true }
 func (Language) Setup(context.Context, io.Writer) error { return nil }
-func (l Language) release() int {
-	if l.Release == 0 {
-		return DefaultRelease
-	}
-	return l.Release
-}
-func CheckRelease(n int) error {
-	if n < 17 {
-		return fmt.Errorf("java.release must be 17 or later")
-	}
-	return nil
-}
 
 // JVM launch structure belongs to hc. Limit custom options to VM tuning and
 // system properties, never a second entry point, class path, or argument file.
@@ -99,9 +84,6 @@ func toolVersion(ctx context.Context, path string) (string, error) {
 }
 func (l Language) Toolchain() (lang.Toolchain, error) { return l.toolchain(context.Background()) }
 func (l Language) toolchain(ctx context.Context) (lang.Toolchain, error) {
-	if err := CheckRelease(l.release()); err != nil {
-		return lang.Toolchain{}, err
-	}
 	if err := CheckArgs(l.JVMArgs); err != nil {
 		return lang.Toolchain{}, err
 	}
@@ -121,12 +103,9 @@ func (l Language) toolchain(ctx context.Context) (lang.Toolchain, error) {
 	if strings.Split(v, ".")[0] != strings.Split(cv, ".")[0] {
 		return lang.Toolchain{}, fmt.Errorf("JDK tools disagree: java %s, javac %s", v, cv)
 	}
-	if !lang.AtLeast(cv, strconv.Itoa(l.release())) {
-		return lang.Toolchain{}, fmt.Errorf("JDK %s cannot compile java.release %d; select a newer JDK or lower java.release (protocol minimum is 17)", cv, l.release())
-	}
 	// Do not execute configured VM options during discovery: diagnostic
 	// options such as -Xlog may write files even on a `java -version` probe.
-	flags := []string{"--release", strconv.Itoa(l.release()), "javac=" + cv}
+	flags := []string{"javac=" + cv}
 	flags = append(flags, l.JVMArgs...)
 	for _, name := range []string{"JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS", "JDK_JAVAC_OPTIONS"} {
 		flags = append(flags, name+"="+os.Getenv(name))
@@ -208,9 +187,6 @@ func write(path string, b []byte) error {
 	return os.WriteFile(path, b, 0o644)
 }
 func (l Language) Prepare(dir string, p *problem.Problem) error {
-	if err := CheckRelease(l.release()); err != nil {
-		return err
-	}
 	for _, name := range []string{"HCJson.java", "HCRuntime.java", "HCTypes.java", "Pair.java"} {
 		b, err := sources.ReadFile("runtime/" + name)
 		if err != nil {
@@ -249,10 +225,16 @@ func (l Language) Prepare(dir string, p *problem.Problem) error {
 	if err != nil {
 		return err
 	}
+	level := MinVersion
+	if home, e := l.home(context.Background()); e == nil {
+		if v, e := toolVersion(context.Background(), filepath.Join(home, "bin", "javac")); e == nil {
+			level = strings.Split(v, ".")[0]
+		}
+	}
 	sum := sha256.Sum256([]byte(abs))
 	project := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?><projectDescription><name>hc-java-%x</name><buildSpec><buildCommand><name>org.eclipse.jdt.core.javabuilder</name></buildCommand></buildSpec><natures><nature>org.eclipse.jdt.core.javanature</nature></natures></projectDescription>`, sum[:8])
-	classpath := `<?xml version="1.0" encoding="UTF-8"?><classpath><classpathentry kind="src" path="" excluding="_hc_java/|.hc-java-bin/"/><classpathentry kind="src" path="_hc_java"/><classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-` + strconv.Itoa(l.release()) + `"/><classpathentry kind="output" path=".hc-java-bin"/></classpath>`
-	prefs := fmt.Sprintf("eclipse.preferences.version=1\norg.eclipse.jdt.core.compiler.compliance=%d\norg.eclipse.jdt.core.compiler.source=%d\norg.eclipse.jdt.core.compiler.codegen.targetPlatform=%d\norg.eclipse.jdt.core.compiler.release=enabled\n", l.release(), l.release(), l.release())
+	classpath := `<?xml version="1.0" encoding="UTF-8"?><classpath><classpathentry kind="src" path="" excluding="_hc_java/|.hc-java-bin/"/><classpathentry kind="src" path="_hc_java"/><classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-` + level + `"/><classpathentry kind="output" path=".hc-java-bin"/></classpath>`
+	prefs := fmt.Sprintf("eclipse.preferences.version=1\norg.eclipse.jdt.core.compiler.compliance=%s\norg.eclipse.jdt.core.compiler.source=%s\norg.eclipse.jdt.core.compiler.codegen.targetPlatform=%s\norg.eclipse.jdt.core.compiler.release=disabled\n", level, level, level)
 	for file, data := range map[string]string{".project": project, ".classpath": classpath, ".settings/org.eclipse.jdt.core.prefs": prefs} {
 		if err = write(filepath.Join(dir, file), []byte(data+"\n")); err != nil {
 			return err
@@ -275,9 +257,17 @@ func javaSources(dir string) ([]string, error) {
 	return paths, err
 }
 func (l Language) Build(ctx context.Context, dir, work string) error {
+	return l.build(ctx, dir, work, "")
+}
+
+// release is only used by the reference compatibility check, never user settings.
+func (l Language) build(ctx context.Context, dir, work, release string) error {
 	tc, err := l.toolchain(ctx)
 	if err != nil {
 		return err
+	}
+	if release != "" {
+		tc.Flags = append(tc.Flags, "--release", release)
 	}
 	files, err := javaSources(dir)
 	if err != nil {
@@ -307,7 +297,10 @@ func (l Language) Build(ctx context.Context, dir, work string) error {
 			return e
 		}
 		defer os.RemoveAll(tmp)
-		args := []string{"--release", strconv.Itoa(l.release()), "-encoding", "UTF-8", "-g", "-proc:none", "-d", tmp}
+		args := []string{"-encoding", "UTF-8", "-g", "-proc:none", "-d", tmp}
+		if release != "" {
+			args = append(args, "--release", release)
+		}
 		args = append(args, files...)
 		cmd := exec.CommandContext(ctx, filepath.Join(filepath.Dir(tc.Path), "javac"), args...)
 		cmd.Dir = dir
@@ -360,12 +353,11 @@ func (l Language) CheckMinVersion(ctx context.Context, p *problem.Problem, file 
 	if err = write(filepath.Join(dir, "Solution.java"), b); err != nil {
 		return err
 	}
-	l.Release = 17
 	l.BuildCache = ""
 	if err = l.Prepare(dir, p); err != nil {
 		return err
 	}
-	return l.Build(ctx, dir, dir)
+	return l.build(ctx, dir, dir, MinVersion)
 }
 func (Language) LeetCode(_ *problem.Problem, src string) (string, string, error) {
 	return "java", src, nil

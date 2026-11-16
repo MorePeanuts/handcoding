@@ -210,7 +210,7 @@ func TestDoctorCPPConfiguredTools(t *testing.T) {
 
 func TestDoctorConfiguredJavaJDK(t *testing.T) {
 	dir := t.TempDir()
-	config := "language: java\njava:\n  home: tools/jdk\n  release: 17\n  jvm_args: [-Xss16m]\npython:\n  interpreter: tools/python\n"
+	config := "language: java\njava:\n  home: tools/jdk\n  jvm_args: [-Xss16m]\npython:\n  interpreter: tools/python\n"
 	if err := os.WriteFile(filepath.Join(dir, "hc.yaml"), []byte(config), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -15,7 +15,7 @@ func TestPreferenceEditing(t *testing.T) {
 	a := practice(t)
 	path := filepath.Join(a.WS.Root, workspace.ConfigFile)
 	original, _ := os.ReadFile(path)
-	for _, bad := range []struct{ key, value string }{{"java.release", "16"}, {"java.release", "25.0"}, {"timeout", "0s"}, {"timeout", "tomorrow"}, {"theme", "blue"}, {"execution.backend", "docker"}, {"language", "rust"}, {"locale", "en_GB"}, {"go.command", ""}, {"cpp.command", ""}, {"cpp.standard", "c++20"}, {"cpp.sanitizers", "bogus"}, {"packs", "[]"}, {"agent.command", "sh -c echo"}} {
+	for _, bad := range []struct{ key, value string }{{"java.release", "16"}, {"java.release", "25.0"}, {"timeout", "0s"}, {"timeout", "tomorrow"}, {"theme", "blue"}, {"execution.backend", "docker"}, {"language", "rust"}, {"locale", "en_GB"}, {"go.command", ""}, {"cpp.command", ""}, {"cpp.standard", "c++14"}, {"cpp.sanitizers", "bogus"}, {"packs", "[]"}, {"agent.command", "sh -c echo"}} {
 		if _, err := a.SavePreference("", bad.key, bad.value, false); err == nil {
 			t.Errorf("accepted %s=%s", bad.key, bad.value)
 		}
@@ -23,18 +23,6 @@ func TestPreferenceEditing(t *testing.T) {
 		if string(after) != string(original) {
 			t.Fatal("invalid edit wrote settings")
 		}
-	}
-	if _, err := a.SavePreference("", "java.release", "17", false); err != nil {
-		t.Fatal(err)
-	}
-	if a.WS.Config.Java.Release != 17 {
-		t.Fatal("release did not round trip as YAML integer")
-	}
-	if _, err := a.SavePreference("", "java.release", "", true); err != nil {
-		t.Fatal(err)
-	}
-	if a.WS.Config.Java.Release != 25 {
-		t.Fatal("reset did not restore release 25")
 	}
 	if _, err := a.SavePreference("", "java.jvm_args", "", true); err != nil {
 		t.Fatal(err)

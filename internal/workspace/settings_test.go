@@ -36,7 +36,7 @@ pack_settings:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Config.Java.Release != 25 || got.Config.Java.Home != "" || strings.Join(got.Config.Java.JVMArgs, " ") != "-Xss16m" || got.Config.Language != "python" || got.Config.Go.Command != "./tools/go" || got.Config.Go.Debugger != "dlv" || got.Config.Execution.Backend != "local" || got.Config.Python.Interpreter != "" {
+	if got.Config.Java.Home != "" || strings.Join(got.Config.Java.JVMArgs, " ") != "-Xss16m" || got.Config.Language != "python" || got.Config.Go.Command != "./tools/go" || got.Config.Go.Debugger != "dlv" || got.Config.Execution.Backend != "local" || got.Config.Python.Interpreter != "" {
 		t.Fatalf("settings: %+v", got.Config)
 	}
 	if got.Config.PackSettings["demo"].Locale != "en" || got.Config.PackSettings["other"].Locale != "zh-CN" {
@@ -203,5 +203,29 @@ func TestResetLastPackSetting(t *testing.T) {
 	data, _ := os.ReadFile(path)
 	if !strings.Contains(string(data), "# personal choices") || !strings.Contains(string(data), "# keep note") {
 		t.Fatalf("lost comments:\n%s", data)
+	}
+}
+
+func TestRemoveJavaRelease(t *testing.T) {
+	t.Parallel()
+	for _, input := range []string{
+		"java:\n  release: 25\n  home: tools/jdk # keep JDK\n  jvm_args: [-ea]\n  future: true\n",
+		"java: {release: 17, home: tools/jdk, jvm_args: [-ea], future: true}\n",
+	} {
+		w := newWorkspace(t)
+		path := filepath.Join(w.Root, ConfigFile)
+		writeFile(t, path, input)
+		for range 2 {
+			if err := w.SyncSettings(nil); err != nil {
+				t.Fatal(err)
+			}
+			b, _ := os.ReadFile(path)
+			if strings.Contains(string(b), "release:") || !strings.Contains(string(b), "future: true") || w.Config.Java.Home != "tools/jdk" || strings.Join(w.Config.Java.JVMArgs, " ") != "-ea" {
+				t.Fatalf("migration lost settings: %s", b)
+			}
+			if strings.Contains(input, "# keep JDK") && !strings.Contains(string(b), "# keep JDK") {
+				t.Fatal("lost comment")
+			}
+		}
 	}
 }
