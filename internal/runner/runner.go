@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/MorePeanuts/handcoding/internal/judge"
@@ -143,27 +142,7 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 		}
 		return nil, fmt.Errorf("build: %w", err)
 	}
-	casesPath, outPath, err := WriteCases(work, cases)
-	if err != nil {
-		return nil, err
-	}
-
-	runCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
-	defer cancel()
-	cmd := l.Command(runCtx, dir, work)
-	cmd.Env = append(envOrDefault(cmd.Env), lang.EnvCases+"="+casesPath, lang.EnvOut+"="+outPath)
-	if opts.TimeLimit > 0 {
-		cmd.Env = append(cmd.Env, lang.EnvTimeLimit+"="+strconv.FormatInt(opts.TimeLimit.Nanoseconds(), 10))
-	}
-	cmd.Stdin = nil
-	cmd.Stdout = orDiscard(opts.Stdout)
-	stderr := &tailBuffer{max: 16 << 10}
-	cmd.Stderr = io.MultiWriter(orDiscard(opts.Stderr), stderr)
-	cmd.WaitDelay = time.Second
-	runErr := cmd.Run()
-	timedOut := errors.Is(runCtx.Err(), context.DeadlineExceeded)
-
-	results, err := readResults(outPath)
+	results, runErr, timedOut, stderr, err := execute(ctx, l, dir, work, cases, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -370,6 +349,9 @@ func orDiscard(w io.Writer) io.Writer {
 // Run it validates (see Validate). The returned cleanup removes temporary
 // files.
 func DebugCommand(l lang.Language, p *problem.Problem, dir string, cases []Selected, opts lang.DebugOptions) (*exec.Cmd, func(), error) {
+	if isolate, ok := l.(lang.CaseIsolator); ok && isolate.IsolatedCases() && len(cases) != 1 {
+		return nil, nil, fmt.Errorf("%s debugging requires exactly one case", l.Name())
+	}
 	if err := Validate(p, cases); err != nil {
 		return nil, nil, err
 	}

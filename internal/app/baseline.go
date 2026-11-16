@@ -156,6 +156,9 @@ func (a *App) baselineKey(p *problem.Problem, l lang.Language) (string, error) {
 	part(h, []byte(version.String()))
 	part(h, []byte(tc.Name+" "+tc.Version))
 	part(h, []byte(tc.Path))
+	for _, flag := range tc.Flags {
+		part(h, []byte(flag))
+	}
 	for _, path := range []string{filepath.Join(p.Dir, problem.MetaFile), ref} {
 		data, err := os.ReadFile(path)
 		if err != nil {

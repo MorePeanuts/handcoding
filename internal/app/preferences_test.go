@@ -15,7 +15,7 @@ func TestPreferenceEditing(t *testing.T) {
 	a := practice(t)
 	path := filepath.Join(a.WS.Root, workspace.ConfigFile)
 	original, _ := os.ReadFile(path)
-	for _, bad := range []struct{ key, value string }{{"timeout", "0s"}, {"timeout", "tomorrow"}, {"theme", "blue"}, {"execution.backend", "docker"}, {"language", "rust"}, {"locale", "en_GB"}, {"go.command", ""}, {"packs", "[]"}, {"agent.command", "sh -c echo"}} {
+	for _, bad := range []struct{ key, value string }{{"timeout", "0s"}, {"timeout", "tomorrow"}, {"theme", "blue"}, {"execution.backend", "docker"}, {"language", "rust"}, {"locale", "en_GB"}, {"go.command", ""}, {"cpp.command", ""}, {"cpp.standard", "c++20"}, {"cpp.sanitizers", "bogus"}, {"packs", "[]"}, {"agent.command", "sh -c echo"}} {
 		if _, err := a.SavePreference("", bad.key, bad.value, false); err == nil {
 			t.Errorf("accepted %s=%s", bad.key, bad.value)
 		}

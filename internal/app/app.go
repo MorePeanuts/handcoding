@@ -16,6 +16,7 @@ import (
 
 	"github.com/MorePeanuts/handcoding/internal/judge"
 	"github.com/MorePeanuts/handcoding/internal/lang"
+	"github.com/MorePeanuts/handcoding/internal/lang/cpp"
 	"github.com/MorePeanuts/handcoding/internal/lang/golang"
 	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -54,6 +55,7 @@ func Languages(ws *workspace.Workspace) *lang.Registry {
 	return lang.NewRegistry(
 		goLanguage(ws),
 		pythonLanguage(ws),
+		cpp.Language{Compiler: lang.ExecutableName(ws.Root, ws.Config.CPP.Command), Debugger: lang.ExecutableName(ws.Root, ws.Config.CPP.Debugger), Standard: ws.Config.CPP.Standard, Sanitizers: ws.Config.CPP.Sanitizers},
 	)
 }
 

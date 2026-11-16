@@ -24,6 +24,8 @@ const settingsHeader = `# handcoding workspace settings
 # theme: auto | dark | light; images: auto | kitty | blocks | none
 # execution.backend: local (Docker is not implemented)
 # go.command / go.debugger: executable names or workspace-relative paths
+# cpp.command / cpp.debugger: platform C++ compiler and terminal debugger
+# cpp.standard: c++23 or newer; cpp.sanitizers: none | address | undefined | address,undefined
 # python.interpreter: empty keeps hc's managed .hc/venv; a path selects an external Python
 # agent.name: claude | codex; agent.command: [] uses that preset
 # leetcode.site: com | cn

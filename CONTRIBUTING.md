@@ -8,7 +8,7 @@ Open an issue before starting on anything non-trivial. Use the bug report or fea
 
 ## Development
 
-You need Go (see `go.mod` for the version), git and [uv](https://docs.astral.sh/uv/getting-started/installation/). The integration tests compile and run real solutions in both languages, with the `python3` on PATH, never the virtual environment hc manages for users. Solutions, references and drivers must keep working on the oldest versions hc supports (Python 3.12, Go 1.22; see the protocol's [language versions](docs/protocol.md#language-versions)), so the repository is a minimal uv project (`pyproject.toml`, no dependencies) pinned to Python 3.12 by `.python-version`, and `make test` runs the tests with `uv run`, which puts its `.venv` first on PATH (uv downloads Python 3.12 the first time if you have none). `make test PY=3.13` tests another version, in `.venv-3.13`, and `make test PY=system` the `python3` on PATH as it is. CI runs them on Python 3.12 (Linux) and the latest release (macOS), and `TestGoMinimumVersion` builds the Go side at Go 1.22.
+You need Go (see `go.mod` for the version), a C++23 compiler (`g++` on Linux, `clang++` on macOS), git and [uv](https://docs.astral.sh/uv/getting-started/installation/). The integration tests compile and run real solutions in all three languages, with the `python3` on PATH, never the virtual environment hc manages for users. Solutions, references and drivers must keep working on the oldest versions hc supports (Python 3.12, Go 1.22, C++23; see the protocol's [language versions](docs/protocol.md#language-versions)), so the repository is a minimal uv project (`pyproject.toml`, no dependencies) pinned to Python 3.12 by `.python-version`, and `make test` runs the tests with `uv run`, which puts its `.venv` first on PATH (uv downloads Python 3.12 the first time if you have none). `make test PY=3.13` tests another version, in `.venv-3.13`, and `make test PY=system` the `python3` on PATH as it is. CI runs them on Python 3.12 (Linux) and the latest release (macOS), and `TestGoMinimumVersion` builds the Go side at Go 1.22.
 
 `uv sync` creates the same `.venv`, which pyright (configured in `pyproject.toml`) and editors that detect `.venv` use for hc's Python (`internal/lang/python/*.py`) and the regression set's references, checkers and generators, so they check them against Python 3.12.
 
@@ -45,7 +45,7 @@ internal/app        use cases shared by the CLI and the TUI, including validatio
 internal/problem    problem protocol: problem.yaml, cases.jsonl, types
 internal/pack       packs: pack.yaml, a pack's problems and their identity
 internal/workspace  the workspace (practice, or a pack checkout): its packs, solutions, pack/slug lookup
-internal/lang       language interface; golang/ and python/ drivers
+internal/lang       language interface; golang/, python/ and cpp/ drivers
 internal/git        runs the git executable to install and update packs
 internal/runner     build, run the driver, collect results
 internal/judge      output comparison
@@ -84,6 +84,8 @@ A driver only **decodes the inputs, calls the user's code and encodes the result
 - The user's stdout and stderr go straight to the terminal, so print debugging works.
 - Cases run in order. The first case without a result line is Runtime Error, or Time Limit Exceeded when the run timed out, and the cases after it, like the cases after one that exceeded the time limit, are Not Run (`runner.Run`).
 - Checkers (`judge.compare: checker`) are not the driver's business either: they are Python for every solution language, run through `lang.Checker`, which the Python language implements, and `judge.Checked` turns their results into verdicts. Nor are generated cases: `runner.Generate` runs the problem's `generator.py` through `lang.Generator` (Python again) before the driver starts, and the driver gets their inputs like any other.
+
+`internal/lang/cpp` provides native C++ signatures, bundled nlohmann/json (MIT, pinned in vendor), generated editor compile commands, and a watchdog. It implements `lang.CaseIsolator`: runner builds once and launches one worker per case, with a per-worker wall timeout and the remaining cumulative algorithm budget. Compiler flags participate in baseline identity.
 
 The existing drivers are good references: `internal/lang/golang` (generated code plus a static runtime) and `internal/lang/python` (a static runtime with the signature embedded as JSON).
 

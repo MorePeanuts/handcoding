@@ -176,6 +176,8 @@ func Convert(q *Question, site Site) (*Converted, error) {
 	conv := &Converted{Problem: p, Templates: map[string]string{}}
 	for _, s := range q.CodeSnippets {
 		switch s.LangSlug {
+		case "cpp":
+			conv.Templates["solution.cpp"] = s.Code
 		case "golang":
 			conv.Templates["solution.go"] = s.Code
 		case "python3":

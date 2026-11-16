@@ -450,7 +450,7 @@ func newDebugCmd(root *rootOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "debug <problem>",
 		Aliases: []string{"d"},
-		Short:   "Run a case under the debugger (Delve / pdb / DAP)",
+		Short:   "Run a case under the debugger (Delve / pdb / GDB / LLDB)",
 		Long: `Start a debugger on your solution with one or more cases as input.
 
 Without --case or --input it debugs the first case your code fails: that
@@ -458,8 +458,9 @@ of your last test or submission while the code and the problem are
 unchanged since, else of a run of every case that it makes first (case 1
 when every case passes).
 
-Interactive mode (default) launches Delve (Go) or pdb (Python) in the
-terminal with a breakpoint at your function. Headless mode starts a debug
+Interactive mode (default) launches Delve (Go), pdb (Python), or GDB/LLDB
+(C++) in the terminal with a breakpoint at your function. C++ debugging
+accepts one case at a time and is terminal-only. Headless mode starts a debug
 server for your editor to attach to:
 
   Go:     dlv headless server (nvim-dap: type "go", request "attach", mode "remote")

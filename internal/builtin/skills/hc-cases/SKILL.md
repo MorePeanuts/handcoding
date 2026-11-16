@@ -101,6 +101,13 @@ workspace's own problems; `hc validate <slug>` names a missing reference.
   library functions (`slices.Sorted`, `maps.Keys`, range over a function).
   `hc validate --run` checks this and names what is too new.
 
+- A C++ reference is `reference/solution.cpp`, using the native public
+  `class Solution` method or design class (`hc docs protocol c`). Target
+  C++23; standard headers and judge-defined types are provided by hc. Do not
+  write `main`, include hc runtime headers, or depend on state from another
+  case: each case runs in its own process. Use `int` for `integer` and
+  `long long` for `long`.
+
 **Prove the rule with the second reference.** When more than one output is
 acceptable, write `reference/solution.go` so that it returns a
 *different* valid answer than the Python one wherever the rule allows:
@@ -300,7 +307,8 @@ the cases decide whether a solution of a worse complexity fails.
 2. [Decide the judge rule](#decide-the-judge-rule) and write it to
    problem.yaml.
 3. Write `reference/solution.py`, then a reference in every other
-   language the pack is solved in, `reference/solution.go`
+   language the pack is solved in (`reference/solution.go`,
+   `reference/solution.cpp`)
    ([Reference solutions](#reference-solutions)). If more than one output
    is acceptable, make the Go one return a different valid answer.
 4. For `checker`, write `checker.py` ([Checkers](#checkers)).
