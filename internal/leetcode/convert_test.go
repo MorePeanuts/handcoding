@@ -36,6 +36,11 @@ func TestConvertFunction(t *testing.T) {
 		LangSlug string `json:"langSlug"`
 		Code     string `json:"code"`
 	}{"golang", "func twoSum(nums []int, target int) []int {\n\n}"})
+	cppTemplate := "class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n\n    }\n};"
+	q.CodeSnippets = append(q.CodeSnippets, struct {
+		LangSlug string `json:"langSlug"`
+		Code     string `json:"code"`
+	}{"cpp", cppTemplate})
 
 	c, err := Convert(q, SiteCom)
 	if err != nil {
@@ -61,6 +66,9 @@ func TestConvertFunction(t *testing.T) {
 	}
 	if _, ok := c.Templates["solution.go"]; !ok {
 		t.Error("go template missing")
+	}
+	if c.Templates["solution.cpp"] != cppTemplate {
+		t.Error("native C++ template was lost or modified")
 	}
 }
 

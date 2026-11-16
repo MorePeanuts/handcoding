@@ -83,6 +83,10 @@ type Language interface {
 	Setup(ctx context.Context, w io.Writer) error
 }
 
+// CaseIsolator requests one fresh process per case, with a per-process wall
+// timeout and the remaining cumulative algorithm budget. Build still runs once.
+type CaseIsolator interface{ IsolatedCases() bool }
+
 // MinVersionChecker is a Language that can check, with any supported
 // toolchain, that code works on the oldest one (the Toolchain's Min).
 type MinVersionChecker interface {
@@ -123,9 +127,10 @@ type LeetCoder interface {
 
 // Toolchain is the compiler or interpreter a language runs solutions with.
 type Toolchain struct {
-	Name    string // e.g. "Python"
-	Version string // e.g. "3.12.9"
-	Path    string // resolved executable, when available; part of timing identity
+	Flags   []string // compiler options that distinguish timing baselines
+	Name    string   // e.g. "Python"
+	Version string   // e.g. "3.12.9"
+	Path    string   // resolved executable, when available; part of timing identity
 	// Min is the oldest version the problem protocol supports: the code hc
 	// generates and the code packs ship must work with it.
 	Min string

@@ -215,14 +215,16 @@ the default locale; every other locale has `description.<locale>.md` and
 
 ## Templates
 
-`templates/solution.go` and `templates/solution.py` are optional: without
+`templates/solution.go`, `templates/solution.py`, and `templates/solution.cpp` are optional: without
 them hc generates the starter from the signature. When the problem is on
 LeetCode, use LeetCode's templates.
 
 - A template must keep the signature exactly (names, parameter order,
   types), because the driver calls it.
 - LeetCode's templates can be copied as they are: hc adds `package main` to
-  a Go template that lacks it, and its import header to a Python one.
+  a Go template that lacks it, and its import header to a Python one. C++
+  templates keep their native class signatures; hc provides headers and
+  judge-defined types without changing the solution source.
 - Do not declare types hc predefines (`ListNode`, `TreeNode`, `Node`,
   `NestedInteger`, `Employee`); keep LeetCode's comment that shows them.
   Read `hc docs protocol solution-abi` for what each language provides.

@@ -73,6 +73,13 @@ Python 在 hc 管理的虚拟环境 `.hc/venv` 中运行：包括 Python 解答�
 
 hc 使用你的本地开发工具。`hc.yaml` 的 `go.command` 和 `go.debugger` 分别指定 Go 编译器命令和 Delve 可执行文件，默认使用 PATH 中的 `go` 和 `dlv`。Python 保留现有托管方式，设置 `python.interpreter` 时使用指定的解释器。这些配置都接受命令名或可执行文件路径；包含 `/` 的相对路径以工作区根目录为基准，不以解答目录为基准。配置值是可执行文件，不是 shell 命令行；hc 不展开 `~` 或环境变量。显式指定的工具不可用时直接报错，不回退到其他工具。hc 不安装 Go 或 Delve。
 
+C++ 使用 `solution.cpp`，保持 LeetCode 的 `class Solution` / 设计类签名。`cpp.command` 和 `cpp.debugger` 指向本地工具，Linux 默认 `g++` / `gdb`，macOS 默认 `clang++` / `lldb`。`cpp.standard` 默认为 `c++23`，显式选择更新标准时要求编译器支持。`cpp.sanitizers` 可为 `none`、`address`、`undefined` 或 `address,undefined`，参考解使用相同选项，时间基线也按选项区分。hc 不安装这些工具。`hc doctor -l cpp --debug` 检查编译器、标准与头文件可用性、终端调试器和 Python 基础环境。C++ 暂不支持编辑器调试（`--headless`），Go/Python 的现有支持保留。
+
+打开 C++ 解答时，会在旁边生成 `hc_types.hpp`、驱动及运行时头文件和 `compile_commands.json`。编辑器中的 clangd（或兼容语言服务器）读取这份编译数据库，就能识别相同的标准、头文件和评测器定义类型。解答不需要 hc 专用导入或 `main`，提交到 LeetCode 时保留源码。题目包需要声明 `cpp` 并提供 C++ 参考解，才能判定 C++ 解答；更新 hc 不会自动给现有题包增加参考解。
+
+每个 C++ 用例使用独立进程；类题同一用例的全部操作共享对象。一次运行只编译一次。累计算法时限只统计调用，不包含启动、退出和编解码；配置的墙钟超时分别约束每个 C++ 工作进程。正常构建使用 `-O2`，`hc debug -l cpp` 使用 `-O0 -g`，在 GDB/LLDB 中停在解答入口。进程退出回收节点分配的内存，因此关闭 sanitizer 的泄漏报告，仍可诊断非法访问及未定义行为。
+
+
 Go 版本检测、模块准备、编译、最低版本检查和调试都使用指定的编译器。调试时先关闭优化编译出程序，再由指定的 Delve 通过 `exec` 启动，避免 Delve 从 PATH 选择另一个 Go。编译缓存和参考解计时的标识包含编译器路径。`execution.backend` 默认是 `local`，目前也只实现了 `local`；设置 `docker` 或其他值会报错，不会悄悄在本地执行。
 
 ```sh
@@ -460,7 +467,7 @@ hc fetch --site cn "LCR 001"                                  # leetcode.cn 的 
 hc gen 146                  # 让题目就绪：生成测试用例并决定判题规则
 ```
 
-`hc fetch` 会下载题面及其图片（包括预格式化示例中的示意图）、函数签名、Go 和 Python 的初始代码，以及示例用例。能安全解析时，会成对保留同一题面示例的输入和期望输出。若无法确认示例输入，hc 会给出警告，并保留未匹配的 API 输入但不写入期望输出；不会仅按顺序拼接输入和输出。
+`hc fetch` 会下载题面及其图片（包括预格式化示例中的示意图）、函数签名、Go、Python 和 C++ 的初始代码，以及示例用例。能安全解析时，会成对保留同一题面示例的输入和期望输出。若无法确认示例输入，hc 会给出警告，并保留未匹配的 API 输入但不写入期望输出；不会仅按顺序拼接输入和输出。
 
 它按目标题目包的语言区域写入题面：你自己的题目由 `packs/local/pack.yaml` 中的 `locales` 决定（见[多语言题面](#多语言题面)）。两个站点都有英文题面；只有 leetcode.cn 有中文题面和中文标题：
 
@@ -551,7 +558,7 @@ def distinct(rng, n):
 {"generate":{"name":"distinct","args":{"n":100000},"seed":7}}
 ```
 
-- `hc cases build` 重新运行生成器，并写入每个用例的 `digest`，即它构造出的输入的哈希。对摘要新增或改变了的用例（`--force` 时为全部），它以所运行的那份参考解的输出为期望输出评判其他每份参考解，所以 Go 和 Python 的参考解必须一致。生成用例不存储期望输出。
+- `hc cases build` 重新运行生成器，并写入每个用例的 `digest`，即它构造出的输入的哈希。对摘要新增或改变了的用例（`--force` 时为全部），它以所运行的那份参考解的输出为期望输出评判其他每份参考解，所以各语言的参考解必须一致。生成用例不存储期望输出。
 - `hc test`、`hc submit` 和 `hc debug` 会构造它们要运行的生成用例：无论你用什么语言解题，生成器都由 Python 运行；期望输出由你所用语言的参考解（没有时用另一份）计算，然后照常评判。结果保存在 `.hc/cache/cases/<pack>/<problem>/<language>.json`，当 hc、`problem.yaml`、`generator.py`、参考解或生成用例改变时会重新构造。
 - 生成器失败、构造出的输入与摘要不符或不合法，以及参考解在生成的输入上失败，都是题目的错误，而不是对你的解答的判题结果：运行会停止，并指出文件和用例。`hc validate --run` 和 `hc pack check` 总是重新构造这些用例，从不读缓存，以便发现不确定的生成器。
 - `hc test --generate <name> --args '{…}' --seed N` 用 `generator.py` 中的函数构造一个自定义输入，像 `-i` 那样运行，但不会往 `cases.jsonl` 添加用例，也不改动缓存；期望输出由参考解计算。用这种方式分别在 `n` 和 `n/2` 上计时，可以看出解答的用时如何增长。
@@ -601,7 +608,7 @@ hc 只修改这个列表，`hc.yaml` 的其余部分保留原有的注释和顺�
 
 ### 检查题目包
 
-`hc pack check` 是题目包的 CI 在发布前运行的检查。在题目包的检出目录中运行它（见[编写题目包](#编写题目包)），或者传入它的目录：`hc pack check ./my-pack`。它检查 `pack.yaml` 合法且协议版本受支持，分组中列出的都是本包的题目，并且每道题都能加载、合法、目录名规范、slug 和 ID 唯一、已就绪（设置了 `judge.compare`）、有用例且每个用例都有期望输出（生成用例则有摘要）、没有超过 100 KB 的用例、对题目包 `languages` 中的每种语言都有参考解，并通过 `hc validate --run`：每个参考解都通过每个用例，生成用例重新构造。因此它需要 Go 和 Python 3.12+，无法运行的参考解也算错误。它为每道题输出一行，最后输出汇总，任何一项失败都以非零状态退出。
+`hc pack check` 是题目包的 CI 在发布前运行的检查。在题目包的检出目录中运行它（见[编写题目包](#编写题目包)），或者传入它的目录：`hc pack check ./my-pack`。它检查 `pack.yaml` 合法且协议版本受支持，分组中列出的都是本包的题目，并且每道题都能加载、合法、目录名规范、slug 和 ID 唯一、已就绪（设置了 `judge.compare`）、有用例且每个用例都有期望输出（生成用例则有摘要）、没有超过 100 KB 的用例、对题目包 `languages` 中的每种语言都有参考解，并通过 `hc validate --run`：每个参考解都通过每个用例，生成用例重新构造。因此它需要 Python 3.12+ 及题目包声明语言的工具链，无法运行的参考解也算错误。它为每道题输出一行，最后输出汇总，任何一项失败都以非零状态退出。
 
 `hc pack check` 和 `hc validate` 会同时检查多道题：同时检查 `--jobs`（`-j`）道，默认每个 CPU 一道，最多 4 道。各行的顺序与逐道检查时相同，每道题和它之前的题都检查完后立即输出它的一行，题目的参考解运行时的输出紧接在它这一行之前。同时进行的参考解运行不用于[时间限制](#时间限制)的计时，因为它们在争用机器；`-j 1` 逐道检查，并像以前一样计时。
 
@@ -730,7 +737,7 @@ hc leetcode login --port 8765         # 在服务器上
 工作区根目录下的 `hc.yaml` 保存个人设置与已安装题目包清单。新工作区会显式写出所有全局默认值：
 
 ```yaml
-language: go          # 首选解题语言：go | python
+language: go          # 首选解题语言：go | python | cpp
 locale: en            # 首选题面语言
 editor: ""           # 空值依次使用 $VISUAL、$EDITOR、vi
 theme: auto           # auto | dark | light
@@ -741,6 +748,11 @@ execution:
 go:
   command: go         # 可执行文件名或相对于工作区的路径
   debugger: dlv       # 仅调试时需要
+cpp:
+  command: g++        # macOS: clang++
+  debugger: gdb       # macOS: lldb
+  standard: c++23
+  sanitizers: none
 python:
   interpreter: ""    # 空值保留 hc 管理的 .hc/venv；填写后使用外部解释器
 agent:

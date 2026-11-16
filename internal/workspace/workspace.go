@@ -43,6 +43,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 
+	"github.com/MorePeanuts/handcoding/internal/lang/cpp"
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 )
@@ -88,7 +89,8 @@ type Config struct {
 	// Execution selects the backend; only local is implemented.
 	Execution ExecutionConfig `yaml:"execution"`
 	// Go selects user-provided compiler and debugger executables.
-	Go GoConfig `yaml:"go"`
+	Go  GoConfig  `yaml:"go"`
+	CPP CPPConfig `yaml:"cpp"`
 	// Python configures the Python language.
 	Python PythonConfig `yaml:"python"`
 	// Agent configures the coding agent used to generate and fix test cases.
@@ -144,6 +146,13 @@ type GoConfig struct {
 	Debugger string `yaml:"debugger"`
 }
 
+type CPPConfig struct {
+	Command    string `yaml:"command"`
+	Debugger   string `yaml:"debugger"`
+	Standard   string `yaml:"standard"`
+	Sanitizers string `yaml:"sanitizers"`
+}
+
 // PythonConfig configures Python.
 type PythonConfig struct {
 	// Interpreter is the Python to run solutions with. Unset, hc manages a
@@ -173,6 +182,7 @@ func DefaultConfig() Config {
 		Locale:       "en",
 		Execution:    ExecutionConfig{Backend: "local"},
 		Go:           GoConfig{Command: "go", Debugger: "dlv"},
+		CPP:          CPPConfig{Command: cpp.DefaultCompiler(), Debugger: cpp.DefaultDebugger(), Standard: "c++23", Sanitizers: "none"},
 		PackSettings: map[string]PackSettings{},
 		Packs:        []PackSource{},
 		Theme:        "auto",

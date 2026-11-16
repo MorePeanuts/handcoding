@@ -25,7 +25,7 @@ A version is a draft until it is final, and final once a stable release of hc im
 
 | Version | Final with | Changes |
 |---|---|---|
-| 1 | hc v0.1.0 (not yet released: a draft) | The initial protocol: packs and `pack.yaml`, problem directories, `problem.yaml`, types, signatures, cases, judging, checkers and the solution ABI, with Go and Python as the solution languages. |
+| 1 | hc v0.1.0 (not yet released: a draft) | The initial protocol: packs and `pack.yaml`, problem directories, `problem.yaml`, types, signatures, cases, judging, checkers and the solution ABI, with Go, Python and C++ as the solution languages. |
 
 ### Out of scope
 
@@ -34,7 +34,7 @@ Protocol 1 does not define the following. Each would be a later, additive change
 - interactive problems, whose solution talks to a judge (issue #7);
 - `tests` problems, judged by test code instead of cases (issue #31);
 - judging memory, or time otherwise than by the [time limit](#time-limit);
-- solution languages other than Go and Python.
+- solution languages other than Go, Python and C++.
 
 ## Packs
 
@@ -83,6 +83,7 @@ The language ids:
 |---|---|---|
 | `go` | Go | 1 |
 | `python` | Python | 1 |
+| `cpp` | C++ | 1 |
 
 A pack.yaml with every field:
 
@@ -204,21 +205,21 @@ Type names are LeetCode's `metaData` names. A type is a base type followed by ze
 
 Every value in a case, an expected output and a solution's output is JSON. This section defines, for each type, its JSON encoding and its binding in each solution language. The encodings are the same for inputs (`input` in a case) and outputs (`expected`, and what a solution's result is encoded to), except where a type says otherwise.
 
-| Type | JSON | Go | Python | Since |
-|---|---|---|---|---|
-| `integer` | integer | `int` | `int` | 1 |
-| `long` | integer | `int64` | `int` | 1 |
-| `double` | number | `float64` | `float` | 1 |
-| `boolean` | `true` or `false` | `bool` | `bool` | 1 |
-| `string` | string | `string` | `str` | 1 |
-| `character` | string of one byte | `byte` | `str` | 1 |
-| `ListNode` | see [ListNode and TreeNode](#listnode-and-treenode) | `*ListNode` | `ListNode \| None` | 1 |
-| `TreeNode` | see [ListNode and TreeNode](#listnode-and-treenode) | `*TreeNode` | `TreeNode \| None` | 1 |
-| `GraphNode`, `NaryNode`, `RandomListNode`, `NextTreeNode`, `QuadNode`, `MultilevelNode` | see [LeetCode's Node types](#leetcodes-node-types) | `*Node` | `Node \| None` | 1 |
-| `NestedInteger` | see [NestedInteger and Employee](#nestedinteger-and-employee) | `*NestedInteger` | `NestedInteger` | 1 |
-| `Employee` | see [NestedInteger and Employee](#nestedinteger-and-employee) | `*Employee` | `Employee` | 1 |
-| `T[]` | see [Arrays](#arrays) | `[]T` | `list[T]` | 1 |
-| `void` | none; return types only | no result | `None` | 1 |
+| Type | JSON | Go | Python | C++ | Since |
+|---|---|---|---|---|---|
+| `integer` | integer | `int` | `int` | `int` | 1 |
+| `long` | integer | `int64` | `int` | `long long` | 1 |
+| `double` | number | `float64` | `float` | `double` | 1 |
+| `boolean` | `true` or `false` | `bool` | `bool` | `bool` | 1 |
+| `string` | string | `string` | `str` | `std::string` | 1 |
+| `character` | string of one byte | `byte` | `str` | `char` | 1 |
+| `ListNode` | see [ListNode and TreeNode](#listnode-and-treenode) | `*ListNode` | `ListNode \| None` | `ListNode*` | 1 |
+| `TreeNode` | see [ListNode and TreeNode](#listnode-and-treenode) | `*TreeNode` | `TreeNode \| None` | `TreeNode*` | 1 |
+| `GraphNode`, `NaryNode`, `RandomListNode`, `NextTreeNode`, `QuadNode`, `MultilevelNode` | see [LeetCode's Node types](#leetcodes-node-types) | `*Node` | `Node \| None` | `Node*` | 1 |
+| `NestedInteger` | see [NestedInteger and Employee](#nestedinteger-and-employee) | `*NestedInteger` | `NestedInteger` | `NestedInteger` | 1 |
+| `Employee` | see [NestedInteger and Employee](#nestedinteger-and-employee) | `*Employee` | `Employee` | `Employee*` | 1 |
+| `T[]` | see [Arrays](#arrays) | `[]T` | `list[T]` | `std::vector<T>` | 1 |
+| `void` | none; return types only | no result | `None` | `void` | 1 |
 
 ### Scalars
 
@@ -245,9 +246,9 @@ Go: `type ListNode struct { Val int; Next *ListNode }` and `type TreeNode struct
 
 ### LeetCode's Node types
 
-LeetCode calls six different structures `Node`. The protocol gives each its own type name. In solution code each is a type (Go) or class (Python) named `Node` with LeetCode's field names, so a problem MUST NOT use more than one of them.
+LeetCode calls six different structures `Node`. The protocol gives each its own type name. In solution code each is a type (Go) or class (Python/C++) named `Node` with LeetCode's field names, so a problem MUST NOT use more than one of them.
 
-| Type | Fields (Go; Python uses the same names starting with a lower-case letter) | JSON | LeetCode problems |
+| Type | Fields (Go; Python/C++ use the same names starting with a lower-case letter) | JSON | LeetCode problems |
 |---|---|---|---|
 | `GraphNode` | `Val int`, `Neighbors []*Node` | Adjacency list of a graph whose nodes have the values 1 to n: entry i (0-based) lists, by value, the neighbors of the node with value i+1, and the value of the type is the node with value 1. `[[2,4],[1,3],[2,4],[1,3]]`; `[[]]` is a single node, `[]` no node. Every neighbor MUST be between 1 and n | 133 |
 | `NaryNode` | `Val int`, `Children []*Node` | Level order: the root's value, `null`, then the children of each node in level order, each group followed by `null`, trailing `null`s removed: `[1,null,3,2,4,null,5,6]`. `[]` is no tree. There MUST NOT be more groups than nodes | 429, 559, 589, 590 |
@@ -605,13 +606,13 @@ A solution's speed is judged against the problem's reference solution in the sam
 
 ### Run limit
 
-A run of a solution over the cases selected for it has a wall-clock limit for the whole run, not for each case. It guards against hangs, such as a solution blocked outside the timed calls; it does not judge complexity, which the [time limit](#time-limit) does. The limit belongs to the judge, not to the problem: hc's is `timeout` in the workspace's `hc.yaml`, 10s unless configured. When it expires the run is stopped: the first case without a result is Time Limit Exceeded, the cases after it are Not Run, and cases that finished keep their verdicts. A checker run and a generator run each get their own limit of the same duration, and so does a reference computing the expected outputs of generated cases.
+A run of a solution over the cases selected for it has a wall-clock limit. For Go/Python it covers the whole run; for C++ it applies separately to each case’s worker process, including startup and teardown. It guards against hangs, such as a solution blocked outside the timed calls; it does not judge complexity, which the [time limit](#time-limit) does. The limit belongs to the judge, not to the problem: hc's is `timeout` in the workspace's `hc.yaml`, 10s unless configured. When it expires the run is stopped: the current unfinished case is Time Limit Exceeded, the cases after it are Not Run, and cases that finished keep their verdicts. A checker run and a generator run each get their own limit of the same duration, and so does a reference computing the expected outputs of generated cases.
 
 ### Readiness
 
 A problem is **ready** when it has `judge.compare`. `judge.compare` has no default, and MUST be written out even for `exact`. A problem that is not ready is valid, but its judge rule is undecided.
 
-A problem is **ready for a language** when it is ready and has a reference solution in that language (`reference/solution.py`, `reference/solution.go`), which solutions in that language are timed against ([Time limit](#time-limit)). The cases of a solution in a language the problem is not ready for are not judged (Not Judged), and such a solution cannot be submitted. A problem SHOULD be ready for every language of its pack's `languages`.
+A problem is **ready for a language** when it is ready and has a reference solution in that language (`reference/solution.py`, `reference/solution.go`, `reference/solution.cpp`), which solutions in that language are timed against ([Time limit](#time-limit)). The cases of a solution in a language the problem is not ready for are not judged (Not Judged), and such a solution cannot be submitted. A problem SHOULD be ready for every language of its pack's `languages`.
 
 ### Verdicts
 
@@ -619,9 +620,9 @@ A run of a solution has one of these outcomes for each case:
 
 | Verdict | When |
 |---|---|
-| Compile Error | The solution does not build: a Go compile error, a Python syntax error. This is the outcome of the whole run, and no case runs |
+| Compile Error | The solution does not build: a Go or C++ compile error, a Python syntax error. This is the outcome of the whole run, and no case runs |
 | Runtime Error | The case raised an error (an exception, a panic, an input the driver cannot decode, or a result the encoding cannot express), or the program exited while the case ran |
-| Time Limit Exceeded | The run spent the [time limit](#time-limit) during the case, or the [run limit](#run-limit) expired before the case produced its result |
+| Time Limit Exceeded | The run spent the [time limit](#time-limit) during the case, or the [run limit](#run-limit) expired before the case completed (including C++ worker teardown) |
 | Not Run | The run stopped before the case, at an earlier case that was Time Limit Exceeded or after which the program exited |
 | No Expected Output | The case ran, but has no `expected` |
 | Not Judged | The case ran, but the problem is not [ready](#readiness) for the solution's language |
@@ -726,12 +727,22 @@ The solution is `solution.go`, in `package main`.
 - A panic is a Runtime Error; a build failure is a Compile Error.
 - A template without a `package` clause gets `package main` put in front of it.
 
+### C++
+
+- Language id: `cpp`; solution file: `solution.cpp`. Function problems use a public method of `class Solution`; class problems use their declared class, constructor and method names. No user `main` is needed. LeetCode C++ templates are preserved, and submissions use the solution source unchanged.
+- Bindings: `integer` → `int`, `long` → `long long`, `double` → `double`, `boolean` → `bool`, `character` → ASCII `char`, `string` → UTF-8 `std::string`, `T[]` → `std::vector<T>`. hc requires 32-bit `int` and 64-bit `long long`. Arrays and strings in generated starters use non-const references; drivers also accept compatible by-value and const-reference methods. Integer ranges apply at the protocol boundary; C++ arithmetic and undefined behavior remain C++'s.
+- `ListNode`, `TreeNode`, the selected `Node` variant, `NestedInteger`, and `Employee` are provided with LeetCode-style public fields and constructors. Node bindings are raw pointers; `NestedInteger` is a value type, with `isInteger`, `getInteger`, `setInteger`, `add`, and `getList`. `Employee[]` binds to `vector<Employee*>`. Do not redefine provided types. Standard headers and `using namespace std` are supplied; additional standard headers can be included by the solution. GNU-only headers and extensions are not guaranteed on macOS.
+- Every case runs in a fresh local process. A class case's constructor and all operations share that process and object; round trips retain the declared instance semantics. Globals/statics reset between cases. User allocations, including nodes, are reclaimed by the OS when the case process exits; hc does not traverse and delete user-owned pointers. User code may `new`/`delete` normally, but dangling pointers and double deletion remain errors.
+- The binary is compiled once per run and reused for its cases. Algorithm time counts calls only (constructor and methods for class problems), excluding process startup, codecs and shutdown. The cumulative algorithm limit is shared across workers. The wall-clock run limit applies to each worker, including its startup and shutdown, so the total may exceed that limit across many cases. Fatal exits stop subsequent cases; caught exceptions report a Runtime Error for their case.
+- C++23 is the default. Newer compiler-supported modes can be selected explicitly; there is no silent downgrade. Normal builds use `-O2`; terminal debug builds use `-O0 -g`. Optional address/undefined sanitizers apply equally to solutions and references; their settings distinguish timing baselines. Leak reporting is disabled because memory is reclaimed per process.
+
 ### Language versions
 
 | Language | Oldest supported version |
 |---|---|
 | Python | 3.12 |
 | Go | 1.22 |
+| C++ | C++23; GCC 13 / Clang 17 / Apple Clang 16 |
 
 Reference solutions, templates, checkers and generators MUST work on these versions, language and standard library: a reference's expected outputs are only computed, and it is only checked, on a supported toolchain. User solutions MAY use anything their toolchain supports. To check Go code against Go 1.22, give its module `go 1.22` and run `go vet`, whose `stdversion` check reports newer standard library symbols.
 

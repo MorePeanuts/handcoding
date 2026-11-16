@@ -45,6 +45,8 @@ const largestCases = `{"input":{"nums":[1,2]},"expected":2,"example":true}
 // languages.
 func largest(t *testing.T, a *app.App) *problem.Problem {
 	t.Helper()
+	// This fixture exercises cross-checking between its Go and Python references.
+	writeFile(t, filepath.Join(a.WS.Root, "packs", "local", "pack.yaml"), "protocol: 1\nname: local\nlanguages: [go, python]\nlocales: [en]\n")
 	p := addProblem(t, a, "largest", largestYAML, largestCases)
 	writeFile(t, p.GeneratorPath(), largestGenerator)
 	writeFile(t, filepath.Join(p.Dir, problem.ReferenceDir, "solution.py"), "class Solution:\n    def largest(self, nums):\n        return max(nums)\n")

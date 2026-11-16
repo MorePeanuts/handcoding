@@ -31,8 +31,9 @@ HC_WORKSPACE must name a valid workspace.
 
 Returns nonzero when a requested tool is missing, fails its probe or is
 older than hc supports. This does not change test/submit/debug's existing
-policy of warning about an old toolchain. Probes do not compile a sample
-program or prove that a debugger can attach.`,
+policy of warning about an old toolchain. C++ also checks the selected
+standard and standard headers without producing an executable. These
+checks do not prove that a debugger can attach.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// openApp synchronizes skills; diagnostics must not use it.

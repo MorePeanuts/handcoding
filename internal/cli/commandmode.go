@@ -263,7 +263,7 @@ func completionValueFlag(cmd *cobra.Command, rest []string) string {
 func commandFlagValues(name string, ctx tui.CommandContext) []string {
 	switch name {
 	case "lang":
-		return []string{"go", "python"}
+		return []string{"go", "python", "cpp"}
 	case "pack":
 		return ctx.Packs
 	case "group":

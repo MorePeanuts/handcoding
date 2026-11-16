@@ -13,6 +13,7 @@ import (
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/lang"
+	"github.com/MorePeanuts/handcoding/internal/lang/cpp"
 	"github.com/MorePeanuts/handcoding/internal/lang/golang"
 	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/pack"
@@ -67,11 +68,12 @@ func requireTools(t *testing.T, tools ...string) {
 }
 
 // TestRegressionReferences checks every problem of the regression set end to
-// end: its expected outputs must be reproduced by both the Python and the Go
-// reference solutions, which exercises both drivers on every supported shape,
+// end: its expected outputs must be reproduced by Python, Go and C++
+// reference solutions, exercising all drivers on every supported shape,
 // and the inputs of its generated cases must match their digests.
 func TestRegressionReferences(t *testing.T) {
 	t.Parallel()
+	testenv.LookPath(t, cpp.DefaultCompiler())
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	probs, err := a.WS.Problems()
@@ -114,7 +116,7 @@ func TestRegressionReferences(t *testing.T) {
 			if err := runner.Validate(p, sel); err != nil {
 				t.Fatal(err)
 			}
-			for _, langID := range []string{"python", "go"} {
+			for _, langID := range []string{"python", "go", "cpp"} {
 				rep, _, err := a.RunReference(ctx, p, langID, sel, app.RunOptions{})
 				if err != nil {
 					t.Fatalf("%s: %v", langID, err)

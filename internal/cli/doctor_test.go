@@ -178,3 +178,32 @@ func TestDoctorRealPythonDoesNotWrite(t *testing.T) {
 		t.Fatal("Python probe wrote files")
 	}
 }
+
+func TestDoctorCPPConfiguredTools(t *testing.T) {
+	dir := t.TempDir()
+	config := "language: cpp\ncpp:\n  command: tools/compiler\n  debugger: tools/debugger\n  standard: c++26\n  sanitizers: undefined\npython:\n  interpreter: tools/python\n"
+	if err := os.WriteFile(filepath.Join(dir, "hc.yaml"), []byte(config), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	doctorScript(t, filepath.Join(dir, "tools/compiler"), `if [ "$1" = --version ]; then echo 'clang version 17.0.6'; else [ "$1" = -std=c++26 ] || exit 7; fi`)
+	doctorScript(t, filepath.Join(dir, "tools/debugger"), "echo 'lldb-1700'")
+	doctorScript(t, filepath.Join(dir, "tools/python"), "echo 3.12.9")
+	before := doctorSnapshot(t, dir)
+	rep, err := doctorReport(t, dir, "--debug")
+	if err != nil || !rep.OK || len(rep.Checks) != 3 {
+		t.Fatalf("%+v %v", rep, err)
+	}
+	if c := rep.Checks[0]; c.Path != filepath.Join(dir, "tools/compiler") || c.Source != "hc.yaml: cpp.command" {
+		t.Fatal(c)
+	}
+	if c := rep.Checks[1]; c.Path != filepath.Join(dir, "tools/debugger") || c.Source != "hc.yaml: cpp.debugger" {
+		t.Fatal(c)
+	}
+	rep, err = doctorReport(t, dir, "--debug", "--headless")
+	if err == nil || rep.OK || rep.Checks[1].Status != "unsupported" {
+		t.Fatalf("%+v %v", rep, err)
+	}
+	if after := doctorSnapshot(t, dir); !reflect.DeepEqual(before, after) {
+		t.Fatal("C++ doctor changed the workspace")
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
+	"github.com/MorePeanuts/handcoding/internal/lang/cpp"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
@@ -31,6 +32,10 @@ func Settings() []Setting {
 		{Key: "execution.backend", Label: "Execution backend", Category: "Execution & tools", Description: "Code runs locally. Docker is not implemented.", Choices: []string{"local"}},
 		{Key: "go.command", Label: "Go compiler", Category: "Execution & tools", Description: "Executable name or workspace-relative path. Used by the next build; hc does not install Go."},
 		{Key: "go.debugger", Label: "Go debugger", Category: "Execution & tools", Description: "Delve executable name or workspace-relative path. Used by the next debugging session."},
+		{Key: "cpp.command", Label: "C++ compiler", Category: "Execution & tools", Description: "Local g++ on Linux or clang++ on macOS. Executable name or workspace-relative path."},
+		{Key: "cpp.debugger", Label: "C++ debugger", Category: "Execution & tools", Description: "Terminal GDB or LLDB executable. Editor debugging is not supported for C++."},
+		{Key: "cpp.standard", Label: "C++ standard", Category: "Execution & tools", Description: "C++23 by default; newer standard modes require support from the selected compiler."},
+		{Key: "cpp.sanitizers", Label: "C++ sanitizers", Category: "Execution & tools", Description: "Optional address/undefined behavior diagnostics. References use the same options; leak reporting is disabled because each case owns its process.", Choices: []string{"none", "address", "undefined", "address,undefined"}},
 		{Key: "python.interpreter", Label: "Python interpreter", Category: "Execution & tools", Description: "Empty keeps hc's managed .hc/venv. A command or path selects an external Python and bypasses management. Editing never sets up an environment."},
 		{Key: "agent.name", Label: "Coding agent", Category: "Coding agent", Description: "Preset for the next generation or repair. A nonempty agent.command overrides this preset.", Choices: []string{"claude", "codex"}},
 		{Key: "agent.command", Label: "Custom agent command", Category: "Coding agent", Description: "An argv array, not a shell command. Edit hc.yaml for custom arguments; reset to [] to use the preset.", YAMLOnly: true},
@@ -54,6 +59,7 @@ func settingValues(c workspace.Config) map[string]string {
 	return map[string]string{
 		"language": c.Language, "locale": c.Locale, "editor": c.Editor, "theme": c.Theme, "images": c.Images, "timeout": c.Timeout,
 		"execution.backend": c.Execution.Backend, "go.command": c.Go.Command, "go.debugger": c.Go.Debugger,
+		"cpp.command": c.CPP.Command, "cpp.debugger": c.CPP.Debugger, "cpp.standard": c.CPP.Standard, "cpp.sanitizers": c.CPP.Sanitizers,
 		"python.interpreter": c.Python.Interpreter, "agent.name": c.Agent.Name, "agent.command": string(argv), "leetcode.site": c.LeetCode.Site,
 	}
 }
@@ -186,7 +192,11 @@ func (a *App) SavePreference(scope, key, value string, reset bool) (warning stri
 		if err != nil || duration <= 0 {
 			return "", fmt.Errorf("timeout must be a positive duration, such as 10s")
 		}
-	case "go.command", "go.debugger":
+	case "cpp.standard":
+		if err := cpp.CheckStandard(value); err != nil {
+			return "", err
+		}
+	case "go.command", "go.debugger", "cpp.command", "cpp.debugger":
 		if strings.TrimSpace(value) == "" {
 			return "", fmt.Errorf("%s must name an executable", key)
 		}
@@ -194,7 +204,7 @@ func (a *App) SavePreference(scope, key, value string, reset bool) (warning stri
 	if err := a.WS.SaveGlobalSetting(key, value); err != nil {
 		return "", err
 	}
-	if key == "go.command" || key == "go.debugger" || key == "python.interpreter" && value != "" {
+	if key == "cpp.command" || key == "cpp.debugger" || key == "go.command" || key == "go.debugger" || key == "python.interpreter" && value != "" {
 		if _, err := lang.ResolveExecutable(lang.ExecutableName(a.WS.Root, value)); err != nil {
 			return "Saved; executable not found or not executable. Run doctor to inspect the environment.", nil
 		}

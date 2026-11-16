@@ -30,14 +30,15 @@ const (
 const (
 	LangGo     = "go"
 	LangPython = "python"
+	LangCPP    = "cpp"
 )
 
 // Languages returns the solution languages of the given protocol version, in
 // a fixed order, or nil for a version hc does not implement. Protocol 1 has
-// Go and Python.
+// Go, Python and C++.
 func Languages(protocol int) []string {
 	if protocol < MinProtocol || protocol > Protocol {
 		return nil
 	}
-	return []string{LangGo, LangPython}
+	return []string{LangGo, LangPython, LangCPP}
 }

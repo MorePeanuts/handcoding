@@ -73,6 +73,13 @@ Consider running `git init` in the workspace to keep a record of your practice. 
 
 hc uses your local development tools. `go.command` and `go.debugger` in `hc.yaml` select the Go compiler command and Delve executable; they default to `go` and `dlv` on PATH. Python keeps its existing managed environment unless `python.interpreter` is set. Each setting accepts a command name or an executable path. Relative paths containing `/` are resolved from the workspace root, not the solution directory. Values are executables, not shell command lines; hc does not expand `~` or environment variables. An unavailable configured tool is an error, with no fallback to another executable. hc does not install Go or Delve.
 
+C++ uses `solution.cpp` with LeetCode's `class Solution` / design-class signatures. Set `cpp.command` and `cpp.debugger` to local executables (defaults: `g++` / `gdb` on Linux, `clang++` / `lldb` on macOS). `cpp.standard` defaults to `c++23`; explicitly selected newer modes must be supported by your compiler. `cpp.sanitizers` is `none`, `address`, `undefined`, or `address,undefined`; the same options apply to reference solutions and distinguish time baselines. hc installs none of these tools. `hc doctor -l cpp --debug` checks the compiler, standard/header availability, terminal debugger and Python infrastructure. C++ editor debugging (`--headless`) is not supported; Go/Python keep theirs.
+
+Opening a C++ solution generates `hc_types.hpp`, the driver/runtime headers and `compile_commands.json` beside it. Point your editor's clangd (or compatible language server) at this compilation database so it sees the same standard, headers and judge-defined types. C++ solutions need no hc-specific imports or `main`; LeetCode submissions preserve the source. A pack must declare `cpp` and supply C++ references before its C++ solutions can be judged. Installing a new hc does not add C++ references to existing packs.
+
+Each C++ case gets its own process; one class case keeps its object across all operations. The executable is built once per run. Only calls count towards the cumulative algorithm limit; process startup/exit and codecs do not. The configured wall-clock timeout applies separately to each C++ worker. Normal builds use `-O2`, `hc debug -l cpp` uses `-O0 -g` and stops at the solution entry point in GDB/LLDB. Process exit reclaims node allocations; sanitizer leak detection is disabled, while invalid accesses and undefined behavior can still be diagnosed.
+
+
 Go's version detection, module preparation, builds, minimum-version checks and debugging use the selected compiler. Debugging builds a binary with optimizations disabled, then starts the selected Delve with `exec`, so Delve cannot pick a different Go from PATH. Build-cache and reference-timing identities include the compiler path. `execution.backend` defaults to `local`; only `local` is implemented. `docker` and other values are rejected rather than silently running locally.
 
 ```sh
@@ -485,7 +492,7 @@ hc fetch --site cn "LCR 001"                                  # leetcode.cn IDs 
 hc gen 146                  # make it ready: test cases and the judge rule
 ```
 
-`hc fetch` downloads the statement and its images, including diagrams inside preformatted examples, the signature, the Go and Python starter code, and the examples. Inputs and expected outputs are kept together from each statement example when they can be parsed safely. If an example input cannot be verified, hc warns and keeps unmatched API inputs without expected outputs; it never pairs inputs and outputs merely by their order.
+`hc fetch` downloads the statement and its images, including diagrams inside preformatted examples, the signature, the Go, Python and C++ starter code, and the examples. Inputs and expected outputs are kept together from each statement example when they can be parsed safely. If an example input cannot be verified, hc warns and keeps unmatched API inputs without expected outputs; it never pairs inputs and outputs merely by their order.
 
 It writes the statements in the locales of the pack it fetches into: `locales` in `packs/local/pack.yaml` for your own problems (see [statements in several languages](#statements-in-several-languages)). Both sites have the English statement; only leetcode.cn has the Chinese one, and its title:
 
@@ -626,7 +633,7 @@ To **reproduce a workspace** elsewhere, copy its `hc.yaml` into a new workspace 
 
 ### Checking a pack
 
-`hc pack check` is what a pack's CI runs before publishing. Run it in a pack checkout ([working on a pack](#working-on-a-pack)), or pass its directory: `hc pack check ./my-pack`. It checks that `pack.yaml` is valid and of a supported protocol, that its groups name problems of the pack, and that every problem loads, is valid, has a canonical directory name and a unique slug and ID, is ready (`judge.compare` is set), has cases that all have an expected output (or, generated, a digest) and none over 100 KB, a reference solution in every language of the pack's `languages`, and passes `hc validate --run`: every reference solution passes every case, generated ones built afresh. So it needs Go and Python 3.12+, and a reference that cannot be run is an error. It prints one line per problem and a summary, and exits non-zero on any failure.
+`hc pack check` is what a pack's CI runs before publishing. Run it in a pack checkout ([working on a pack](#working-on-a-pack)), or pass its directory: `hc pack check ./my-pack`. It checks that `pack.yaml` is valid and of a supported protocol, that its groups name problems of the pack, and that every problem loads, is valid, has a canonical directory name and a unique slug and ID, is ready (`judge.compare` is set), has cases that all have an expected output (or, generated, a digest) and none over 100 KB, a reference solution in every language of the pack's `languages`, and passes `hc validate --run`: every reference solution passes every case, generated ones built afresh. It needs Python 3.12+ and the toolchains for the pack’s declared languages; a reference that cannot be run is an error. It prints one line per problem and a summary, and exits non-zero on any failure.
 
 `hc pack check` and `hc validate` check several problems at once: `--jobs` (`-j`) of them, by default one per CPU and at most 4. The lines come in the same order as one at a time, each as soon as its problem and those before it are done, and the output of a problem's reference runs comes just before its line. Reference runs made at once are not timed for [time limits](#time-limit), since they compete for the machine; `-j 1` checks one problem after another and times them as before.
 
@@ -755,7 +762,7 @@ Either way, hc checks the session with LeetCode and saves the single login, read
 `hc.yaml` at the workspace root holds personal settings and the installed-pack inventory. New workspaces write all global defaults explicitly:
 
 ```yaml
-language: go          # preferred solution language: go | python
+language: go          # preferred solution language: go | python | cpp
 locale: en            # preferred statement language
 editor: ""           # empty: $VISUAL, $EDITOR, then vi
 theme: auto           # auto | dark | light
@@ -766,6 +773,11 @@ execution:
 go:
   command: go         # executable name or workspace-relative path
   debugger: dlv       # used only for debugging
+cpp:
+  command: g++        # macOS: clang++
+  debugger: gdb       # macOS: lldb
+  standard: c++23
+  sanitizers: none
 python:
   interpreter: ""    # empty keeps hc's managed .hc/venv; a value selects an external Python
 agent:

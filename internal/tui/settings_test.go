@@ -71,7 +71,7 @@ func TestPackLanguageFallbackAndExplicitOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 	// An updated pack drops Python; the preference should survive.
-	data = []byte(strings.Replace(string(data), "languages: [go, python]", "languages: [go]", 1))
+	data = []byte(strings.Replace(string(data), "languages: [go, python, cpp]", "languages: [go]", 1))
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
