@@ -59,7 +59,9 @@ func Probe(ctx context.Context, path string, env []string, args ...string) ([]by
 	defer cancel()
 	cmd := exec.CommandContext(ctx, path, args...)
 	cmd.Env = env
-	cmd.WaitDelay = 100 * time.Millisecond
+	// Process exit can be observed before the output copier gets scheduled
+	// under load. Allow it to drain, while still bounding inherited pipes.
+	cmd.WaitDelay = time.Second
 	out, err := cmd.CombinedOutput()
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("probe: %w", ctx.Err())
