@@ -158,6 +158,37 @@ func TestNodeCodecs(t *testing.T) {
 	})
 }
 
+func TestNestedIntegerTransitions(t *testing.T) {
+	t.Parallel()
+	l := language(t)
+	l.Sanitizers = "address,undefined"
+	source := `struct NestedInteger*f(int x){
+    struct NestedInteger*n=NestedIntegerInit();
+    assert(!NestedIntegerIsInteger(n) && NestedIntegerGetListSize(n)==0);
+    NestedIntegerSetInteger(n,99);
+    assert(NestedIntegerIsInteger(n) && NestedIntegerGetInteger(n)==99);
+    struct NestedInteger*child=NestedIntegerInit();
+    NestedIntegerSetInteger(child,x);
+    NestedIntegerAdd(n,child);
+    assert(!NestedIntegerIsInteger(n) && NestedIntegerGetListSize(n)==1);
+    assert(NestedIntegerGetList(n)[0]==child);
+    NestedIntegerAdd(n,child);
+    NestedIntegerSetInteger(n,123);
+    assert(NestedIntegerIsInteger(n) && NestedIntegerGetInteger(n)==123);
+    NestedIntegerAdd(n,child);
+    assert(!NestedIntegerIsInteger(n) && NestedIntegerGetListSize(n)==1);
+    NestedIntegerSetInteger(child,x+1);
+    struct NestedInteger*other=NestedIntegerInit();
+    NestedIntegerSetInteger(other,x+2);
+    NestedIntegerAdd(n,other);
+    return n;
+}`
+	rep := run(t, l, function("integer", "NestedInteger"), source, `{"input":{"x":7},"expected":[8,9]}`, runner.Options{})
+	if rep.Verdict != runner.Accepted {
+		t.Fatalf("%+v", rep)
+	}
+}
+
 func TestStructureBindings(t *testing.T) {
 	t.Parallel()
 	l := language(t)
