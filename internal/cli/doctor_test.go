@@ -199,7 +199,7 @@ func TestDoctorCPPConfiguredTools(t *testing.T) {
 	doctorScript(t, filepath.Join(dir, "tools/python"), "echo 3.12.9")
 	before := doctorSnapshot(t, dir)
 	rep, err := doctorReport(t, dir, "--debug")
-	if err != nil || !rep.OK || len(rep.Checks) != 3 {
+	if err == nil || rep.OK || len(rep.Checks) != 4 || rep.Checks[2].Role != "dependencies" || rep.Checks[2].Status != "uninitialized" {
 		t.Fatalf("%+v %v", rep, err)
 	}
 	if c := rep.Checks[0]; c.Path != filepath.Join(dir, "tools/compiler") || c.Source != "hc.yaml: cpp.command" {

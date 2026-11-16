@@ -188,7 +188,7 @@ func (m *model) edit(p *problem.Problem) tea.Cmd {
 	}
 	cmd.Dir = filepath.Dir(path)
 	handoff := m.handOff(cmd, false)
-	if m.lang.ID() == "javascript" || m.lang.ID() == "typescript" {
+	if m.lang.ID() == "cpp" || m.lang.ID() == "javascript" || m.lang.ID() == "typescript" {
 		l := m.lang
 		handoff.before = func(w io.Writer) error { return l.Setup(context.Background(), w) }
 	}
