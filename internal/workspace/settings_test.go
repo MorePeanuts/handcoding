@@ -184,3 +184,24 @@ func TestSettingsPreserveComments(t *testing.T) {
 		t.Fatalf("lost comment:\n%s", data)
 	}
 }
+
+func TestResetLastPackSetting(t *testing.T) {
+	t.Parallel()
+	w := newWorkspace(t)
+	path := filepath.Join(w.Root, ConfigFile)
+	writeFile(t, path, "# personal choices\npack_settings:\n  # keep note\n  local:\n    language: python # preferred\n")
+	if err := w.ResetPackSetting("local", "language"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Open(w.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Config.PackSettings) != 0 {
+		t.Fatal(got.Config.PackSettings)
+	}
+	data, _ := os.ReadFile(path)
+	if !strings.Contains(string(data), "# personal choices") || !strings.Contains(string(data), "# keep note") {
+		t.Fatalf("lost comments:\n%s", data)
+	}
+}

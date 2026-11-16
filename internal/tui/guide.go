@@ -62,6 +62,20 @@ A colon remains text in search fields, including id:707. Finish the search befor
 While editing, Ctrl+e, Ctrl+f/b and Ctrl+u/d keep their text-editing meanings. Page Up/Down pages matching results without leaving search.
 
 In this guide, / searches topic titles and their full text. Tab / Shift+Tab or Up/Down chooses a matching topic; Page Up/Down pages the matches; Enter reads it. Esc clears the search before returning to the previous page. Outside search editing, q returns directly.`},
+		{"settings", "Workspace & pack settings", `# Change settings without leaving the TUI
+
+Press , on a browsing page, or run :settings. :settings --pack regression opens that pack's preferences directly. Esc returns to your previous page and position.
+
+- s chooses Workspace or a pack. Pack scope exposes only solution language and statement locale; both can inherit workspace preferences.
+- Tab / Shift+Tab changes category. / searches names, YAML keys, categories and descriptions across all categories. Enter finishes searching; Esc clears the query.
+- Enter edits one setting. Choose a value or type it, then Enter saves immediately. Esc cancels an unfinished edit.
+- r restores the built-in default in workspace scope, or removes the override in pack scope. Saved and effective values show when a pack needs a fallback or a command has a temporary override.
+- e opens hc.yaml in your configured editor. Return to reload it; invalid YAML leaves the last working settings active and displays an error.
+- d runs read-only doctor checks in the background. Choose runtime, terminal debugger or editor debugger; Esc cancels or closes the report. Workspace scope checks the preferred language and Python; pack scope uses that pack's effective saved language.
+
+Theme and image changes apply immediately. Tool paths, editor, agent and timeout apply to the next operation. A missing executable can be saved with a warning; hc does not install it. An empty Python interpreter keeps the existing managed environment behavior. Editing settings or running doctor does not create or synchronize Python environments.
+
+Custom agent.command is an argv array: edit it in YAML, or use r to reset it. execution.backend currently supports local only. Installed-pack sources and pack.yaml content are not editable settings.`},
 		{"groups", "Personal & pack groups", `# Organize practice
 
 Press c in the problem list or run :group to choose a group. :group show user:practice opens that group's problems in stored order. Use --pack to disambiguate groups across packs.

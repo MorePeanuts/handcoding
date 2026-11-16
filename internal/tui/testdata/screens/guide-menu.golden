@@ -1,30 +1,30 @@
  hc   TUI Guide · Workflows & commands
-Start here  ·  1/30                                                                             top · 28 lines
+Start here  ·  1/31                                                                             top · 28 lines
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ── Guide ─────────────────────┃ │                                                                            ┃
 ▌ Start here                  ┃ │    Make progress without leaving the TUI                                   ┃
   Browse, view & open         ┃ │                                                                            ┃
   Search while browsing       ┃ │   Browse a problem, read its statement, open a solution in your editor,    ┃
-  Personal & pack groups      ┃ │   then test, submit and review.                                            ┃
-  Test, submit & debug        ┃ │                                                                            ┃
-  Review past submissions     ┃ │   ## A first session                                                       ┃
-  Command mode & context      ┃ │                                                                            ┃
-                              ┃ │   1. Choose a pack and highlight a problem.                                ┃
-── Commands ──────────────────┃ │   2. Press v to read it without creating files, or Enter to create a       ┃
-  :cases                      ┃ │   missing solution template and copy its path.                             ┃
-    :cases add                ┃ │   3. Press e to edit, t to test examples, and s to judge and record a      ┃
-    :cases list               ┃ │   submission.                                                              ┃
-  :clean                      ┃ │   4. Inspect Cases and Output with Tab. Use h for submission history.      ┃
-  :debug                      ┃ │                                                                            ┃
-  :docs                       ┃ │   ## Find your way                                                         ┃
-    :docs protocol            ┃ │                                                                            ┃
-  :env                        │ │   Esc goes back. :list returns to the problem list. :pack list opens the   ┃
-    :env sync                 │ │   pack picker. :q exits the TUI.                                           ┃
-  :fetch                      │ │                                                                            ┃
-  :fix                        │ │   ? opens the current page's scrollable shortcut reference; q/Esc/?        │
-  :gen                        │ │   closes it. This guide explains the workflow. Use Tab / Shift+Tab to      │
-  :group                      │ │   change topics, j/k or Up/Down to scroll, Ctrl+e/y for one line,          │
-    :group add                │ │   Ctrl+d/u for half a page, Ctrl+f/b or Page Down/Up for a page with two   │
+  Workspace & pack settings   ┃ │   then test, submit and review.                                            ┃
+  Personal & pack groups      ┃ │                                                                            ┃
+  Test, submit & debug        ┃ │   ## A first session                                                       ┃
+  Review past submissions     ┃ │                                                                            ┃
+  Command mode & context      ┃ │   1. Choose a pack and highlight a problem.                                ┃
+                              ┃ │   2. Press v to read it without creating files, or Enter to create a       ┃
+── Commands ──────────────────┃ │   missing solution template and copy its path.                             ┃
+  :cases                      ┃ │   3. Press e to edit, t to test examples, and s to judge and record a      ┃
+    :cases add                ┃ │   submission.                                                              ┃
+    :cases list               ┃ │   4. Inspect Cases and Output with Tab. Use h for submission history.      ┃
+  :clean                      ┃ │                                                                            ┃
+  :debug                      ┃ │   ## Find your way                                                         ┃
+  :docs                       │ │                                                                            ┃
+    :docs protocol            │ │   Esc goes back. :list returns to the problem list. :pack list opens the   ┃
+  :env                        │ │   pack picker. :q exits the TUI.                                           ┃
+    :env sync                 │ │                                                                            ┃
+  :fetch                      │ │   ? opens the current page's scrollable shortcut reference; q/Esc/?        │
+  :fix                        │ │   closes it. This guide explains the workflow. Use Tab / Shift+Tab to      │
+  :gen                        │ │   change topics, j/k or Up/Down to scroll, Ctrl+e/y for one line,          │
+  :group                      │ │   Ctrl+d/u for half a page, Ctrl+f/b or Page Down/Up for a page with two   │
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
  tab/⇧tab topic    / search    q back    ? keys

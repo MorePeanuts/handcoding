@@ -1,0 +1,26 @@
+ hc   Settings · Workspace
+All · s scope · Tab category · e YAML · d doctor
+────────────────────────────────────────────────────────────────────────────────────────────────────
+> All               │ > Solution language  go
+  General           │   language · Workspace
+  Display           │   Statement locale  en
+  Execution & tools │   locale · Workspace
+  Coding agent      │   Editor  Automatic (VISUAL / EDITOR / vi)
+  LeetCode          │   editor · Workspace
+                    │   Theme  auto
+                    │   theme · Workspace
+                    │   Statement images  auto
+                    │   images · Workspace
+                    │   Run timeout  10s
+                    │   timeout · Workspace
+                    │   Execution backend  local
+                    │   execution.backend · Workspace
+                    │   Go compiler  go
+                    │   go.command · Workspace
+────────────────────────────────────────────────────────────────────────────────────────────────────
+Effective: go · Source: Workspace
+Saved: "go"
+Preferred solution language. Unavailable preferences fall back without changing the saved value.
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ enter edit    r reset    / search    esc back    ? help

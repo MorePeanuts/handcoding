@@ -358,3 +358,64 @@ func (w *Workspace) ensureLocalManifest() error {
 	}
 	return writeAtomic(path, []byte(strings.TrimRight(string(data), "\n")+"\n"))
 }
+
+// SaveGlobalSetting changes one scalar setting (or agent.command's argv),
+// preserving unrelated fields written by editors or another hc process.
+func (w *Workspace) SaveGlobalSetting(key string, value any) error {
+	return w.editSettings(func(m *ast.MappingNode) error {
+		data, err := settingsDefaults(DefaultConfig(), w.Kind)
+		if err != nil {
+			return err
+		}
+		defaults, err := settingsMapping(data)
+		if err != nil {
+			return err
+		}
+		if err := fillSettings(m, defaults); err != nil {
+			return err
+		}
+		parts := strings.Split(key, ".")
+		parent, err := settingMap(m, parts[:len(parts)-1]...)
+		if err != nil {
+			return err
+		}
+		return putSetting(parent, parts[len(parts)-1], value)
+	})
+}
+
+// ResetPackSetting removes a personal override so future workspace changes
+// are inherited, rather than copying today's workspace value into the pack.
+func (w *Workspace) ResetPackSetting(name, key string) error {
+	if err := checkSettingsPack(name); err != nil {
+		return err
+	}
+	if key != "language" && key != "locale" {
+		return fmt.Errorf("unknown pack setting %q", key)
+	}
+	return w.editSettings(func(m *ast.MappingNode) error {
+		root := setting(m, "pack_settings")
+		if root == nil {
+			return nil
+		}
+		packs, ok := root.Value.(*ast.MappingNode)
+		if !ok {
+			return errors.New("pack_settings must be a mapping")
+		}
+		entry := setting(packs, name)
+		if entry == nil {
+			return nil
+		}
+		prefs, ok := entry.Value.(*ast.MappingNode)
+		if !ok {
+			return fmt.Errorf("pack_settings.%s must be a mapping", name)
+		}
+		removeSetting(prefs, key)
+		if len(prefs.Values) == 0 {
+			removeSetting(packs, name)
+		}
+		if len(packs.Values) == 0 {
+			return putSetting(m, "pack_settings", map[string]any{})
+		}
+		return nil
+	})
+}

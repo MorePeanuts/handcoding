@@ -94,6 +94,7 @@ const (
 	screenNoteForm
 	screenGroupForm
 	screenGuide
+	screenSettings
 )
 
 type confirmation struct {
@@ -102,6 +103,9 @@ type confirmation struct {
 }
 
 type model struct {
+	settings      *settingsPage
+	terminalTheme string
+
 	languageOverrides map[string]string
 	localeOverrides   map[string]string
 
@@ -219,7 +223,10 @@ func Run(ctx context.Context, a *app.App, opts Options) error {
 		return err
 	}
 	_, err = tea.NewProgram(m, programOptions(ctx)...).Run()
-	if opts.FollowTheme {
+	if m.settings != nil && m.settings.cancel != nil {
+		m.settings.cancel()
+	}
+	if m.opts.FollowTheme {
 		// bubbletea restores only the modes it knows.
 		fmt.Fprint(os.Stdout, ansi.ResetModeLightDark)
 	}
@@ -245,6 +252,7 @@ func newModel(ctx context.Context, a *app.App, opts Options) (*model, error) {
 		app:               a,
 		opts:              opts,
 		lang:              opts.Lang,
+		terminalTheme:     opts.Theme,
 		languageOverrides: map[string]string{},
 		localeOverrides:   map[string]string{},
 		md:                ui.NewMarkdown(opts.Theme, opts.Images),
@@ -499,6 +507,18 @@ type execDoneMsg struct{ err error }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case settingsDoctorMsg:
+		m.finishSettingsDoctor(msg)
+		return m, nil
+	case settingsEditorMsg:
+		cmd := m.refreshSettings()
+		if cmd == nil {
+			cmd = m.themeReports()
+		}
+		if msg.err != nil {
+			m.message = ui.Red.Render(msg.err.Error())
+		}
+		return m, cmd
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.layout()
@@ -530,6 +550,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case commandDoneMsg:
 		return m, m.finishCommand(msg)
 	case tea.FocusMsg:
+		if m.top() == screenSettings && m.settings != nil && !m.settings.editing && !m.settings.searching && m.settings.picker == "" && !m.settings.showReport {
+			return m, m.refreshSettings()
+		}
 		// Another tmux client may have attached, without the images (see
 		// termimg.Renderer.Detachable).
 		if m.opts.Images.Detachable() {
@@ -540,9 +563,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case uv.DarkColorSchemeEvent:
+		m.terminalTheme = ui.ThemeDark
 		m.setTheme(ui.ThemeDark)
 		return m, nil
 	case uv.LightColorSchemeEvent:
+		m.terminalTheme = ui.ThemeLight
 		m.setTheme(ui.ThemeLight)
 		return m, nil
 	case tea.PasteMsg:
@@ -554,6 +579,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.command != nil {
 			return m.updateCommand(msg)
+		}
+		if m.top() == screenSettings {
+			return m.updateSettings(msg)
 		}
 		// Pasted text goes to the search field and the form's fields;
 		// elsewhere, as when it arrived as keys, it does nothing.
@@ -574,6 +602,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
+			if m.settings != nil && m.settings.cancel != nil {
+				m.settings.cancel()
+			}
 			return m, tea.Quit
 		}
 		if m.help {
@@ -581,6 +612,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.command != nil {
 			return m.updateCommand(msg)
+		}
+		if msg.String() == "," && m.canCommand() && m.top() != screenSettings {
+			if err := m.openSettings(""); err != nil {
+				m.message = ui.Red.Render(err.Error())
+			}
+			return m, nil
 		}
 		if msg.String() == ":" && m.canCommand() {
 			return m, m.openCommand()
@@ -598,6 +635,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Every other key is text.
 			return m.updateCaseForm(msg)
 		}
+		if m.top() == screenSettings && (m.settings.editing || m.settings.searching) {
+			return m.updateSettings(msg)
+		}
 		if m.top() == screenGuide && m.guide.searching {
 			return m.updateGuide(msg)
 		}
@@ -606,6 +646,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		switch m.top() {
+		case screenSettings:
+			return m.updateSettings(msg)
 		case screenGuide:
 			return m.updateGuide(msg)
 		case screenList:
@@ -671,6 +713,8 @@ func (m *model) layout() {
 		m.command.input.SetWidth(max(m.width-2, 1))
 	}
 	switch m.top() {
+	case screenSettings:
+		m.layoutSettings()
 	case screenGuide:
 		m.layoutGuide()
 	case screenDetail:
@@ -720,6 +764,8 @@ func (m *model) badge() string { return m.st.badge.Render(" hc ") }
 // screenKeys are the keys of the screen shown, for its full key help.
 func (m *model) screenKeys() (string, []string) {
 	switch m.top() {
+	case screenSettings:
+		return "settings", settingsKeys
 	case screenGuide:
 		return "guide", guideKeys
 	case screenPacks:
@@ -777,7 +823,7 @@ func (m *model) viewHelp() string {
 		all = append(all, scrollKeys...)
 	}
 	if m.top() != screenCaseForm && m.top() != screenNoteForm && m.top() != screenGroupForm {
-		all = append(all, ": command")
+		all = append(all, ": command", ", settings")
 	}
 	all = append(all, "? help", "ctrl+c quit")
 	keyW := 0
@@ -809,7 +855,7 @@ func (m *model) viewHelp() string {
 func (m *model) View() tea.View {
 	v := tea.NewView(m.content())
 	v.AltScreen = true
-	v.ReportFocus = m.opts.Images.Detachable()
+	v.ReportFocus = m.opts.Images.Detachable() || m.top() == screenSettings
 	return v
 }
 
@@ -824,6 +870,8 @@ func (m *model) content() (content string) {
 		return m.viewHelp()
 	}
 	switch m.top() {
+	case screenSettings:
+		return m.viewSettings()
 	case screenGuide:
 		return m.viewGuide()
 	case screenDetail:

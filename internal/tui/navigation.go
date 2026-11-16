@@ -123,6 +123,7 @@ func (m *model) popPage() bool {
 		m.run, m.resBr = s.run, s.resBr
 	}
 	m.guide = s.guide
+	m.settings = s.settings
 	// Reconcile saved identities with data refreshed by a command above them.
 	if err := m.reloadCommand(); err != nil {
 		m.commandFallback()

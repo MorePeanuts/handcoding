@@ -280,6 +280,7 @@ command.
 | `:history show 42` | View that submission's report, saved code and notes. |
 | `:test` / `:submit` | Run locally in the existing TUI result page. |
 | `:q` / `:quit` | Exit the TUI. |
+| `:settings [--pack <name>]` | Edit workspace or pack settings. |
 | `:help` | Open the full TUI guide. |
 
 `show`/`view` only reads a problem, including when you switch languages while
@@ -340,6 +341,28 @@ and Enter returns. Configuration, packs, problems, groups and history reload
 even after failure. Missing targets fall back to a valid list. No command opens
 a nested TUI. `init`, `pack init`, workspace switching and `--pause` remain
 unavailable.
+
+### Settings page
+
+Press `,` on a browsing page or use `:settings`. Use `:settings --pack <name>` to start with one pack. `esc` returns to your previous page and position.
+
+| Key | Action |
+|---|---|
+| `s` | Choose Workspace or a pack, including `local` and authoring checkouts. |
+| `tab` / `shift+tab` | Switch category. |
+| `/` | Search labels, YAML keys, categories and descriptions across categories. `enter` finishes typing; `esc` clears the query. |
+| `enter` | Edit the selected setting; choose a value or type one, then press `enter` to save. `esc` cancels an unfinished edit. |
+| `r` | Restore the built-in workspace default, or remove a pack override to inherit the workspace preference. |
+| `e` | Open `hc.yaml` in your configured editor and reload it when the editor exits. |
+| `d` | Run doctor: runtime checks, terminal debugger checks or editor debugger checks. `esc` cancels or closes the report. |
+
+Workspace scope exposes general, display, execution/toolchain, coding-agent and LeetCode settings. Pack scope exposes only solution language and statement locale. The detail area separates the saved value, effective value and its source, including unsupported preferences that fall back and temporary command overrides. Editing or resetting a language/locale preference clears its temporary override. Installed-pack inventory and `pack.yaml` declarations remain outside this page; change a writable pack's available translations in its own `pack.yaml`.
+
+Each successful edit saves immediately to `hc.yaml`, preserving unrelated fields and comments. Invalid input stays open for correction. Theme and images apply immediately; editor, tool paths, agent and timeout apply to the next operation. The custom `agent.command` argv array is edited in YAML, with `r` available to reset it to `[]`. Execution is currently `local` only.
+
+The page reloads external changes when opened, after the editor exits, and when the terminal regains focus while browsing settings. An unfinished edit is retained on focus; invalid YAML reports an error and retains the last working settings. Missing tool executables can be saved with a warning. An empty `python.interpreter` keeps the existing managed Python behavior; changing settings does not set up an environment.
+
+Doctor runs in the background against a fresh settings snapshot and never installs tools or initializes Python. Workspace scope checks the preferred language plus Python infrastructure; pack scope uses the pack's effective saved language. The report shows status, command, resolved path, source and version. `:doctor` remains available with CLI options. See `:help settings` for the built-in guide.
 
 ### TUI guide and quick help
 
