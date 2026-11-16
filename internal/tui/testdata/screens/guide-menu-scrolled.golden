@@ -1,5 +1,5 @@
  hc   TUI Guide · Workflows & commands
-:test  ·  30/30
+:test  ·  31/31
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ── Commands ──────────────────│ │
   :cases                      │ │   ## Usage
@@ -8,7 +8,7 @@
   :clean                      │ │
   :debug                      │ │
   :docs                       │ │
-    :docs protocol            ┃ │
+    :docs protocol            │ │
   :env                        ┃ │
     :env sync                 ┃ │
   :fetch                      ┃ │

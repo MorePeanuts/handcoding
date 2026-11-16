@@ -55,7 +55,7 @@ func planTUICommand(line string, ctx tui.CommandContext) (tui.Command, error) {
 		c.Problem = pos[0]
 	}
 	switch path {
-	case "quit", "list", "show", "open", "group", "group list", "group show", "pack list", "history", "history show", "cases list", "test", "submit":
+	case "settings", "quit", "list", "show", "open", "group", "group list", "group show", "pack list", "history", "history show", "cases list", "test", "submit":
 		c.Action = path
 	default:
 		return c, nil
@@ -165,6 +165,8 @@ func commandHelp(cmd *cobra.Command) tui.HelpTopic {
 
 func nativeDescription(name string) string {
 	switch name {
+	case "settings":
+		return "Edit personal settings with immediate per-field saves. Use s for scope, Tab for category, / to search, r to reset or inherit, e to edit hc.yaml and d for read-only diagnostics. Esc returns to the previous page."
 	case "show":
 		return "View a problem's statement and cases without creating solution files or copying a path. `:view` is an alias. Use `:open` to start solving. Esc returns to your previous page and position. --raw explicitly prints Markdown in the terminal."
 	case "open":

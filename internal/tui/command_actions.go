@@ -83,6 +83,8 @@ func (m *model) nativeProblem(c Command) (*problem.Problem, lang.Language, error
 
 func (m *model) nativeCommand(c Command) (tea.Cmd, error) {
 	switch c.Action {
+	case "settings":
+		return nil, m.openSettings(c.Pack)
 	case "quit":
 		return tea.Quit, nil
 	case "help":

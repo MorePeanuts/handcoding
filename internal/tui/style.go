@@ -146,7 +146,7 @@ func (m *model) keyHelp(right string, keys ...string) string {
 		return m.st.key.Render(" "+key+" ") + ui.Faint.Render(label+"   ")
 	}
 	help := part("? help")
-	if m.canCommand() {
+	if m.canCommand() && m.top() != screenSettings {
 		help = part(": command") + help
 	}
 	if m.top() == screenGuide {
@@ -154,6 +154,9 @@ func (m *model) keyHelp(right string, keys ...string) string {
 	}
 	if m.top() == screenList && (m.searching || m.picking && m.groupSearching) || m.top() == screenCaseForm || m.top() == screenNoteForm || m.top() == screenGroupForm && (m.groupForm.focus <= groupTitle || m.groupForm.searching) {
 		help = "" // ? is text there
+	}
+	if m.top() == screenSettings && (m.settings.editing || m.settings.searching) {
+		help = ""
 	}
 	used := lipgloss.Width(help)
 	if right != "" {

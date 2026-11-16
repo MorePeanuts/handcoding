@@ -135,3 +135,23 @@ func TestNativeCommandExecution(t *testing.T) {
 		t.Fatal("tests recorded submissions")
 	}
 }
+
+func TestSettingsCommandPlan(t *testing.T) {
+	ctx := tui.CommandContext{Workspace: "/tmp/ws", Packs: []string{"local", "regression"}}
+	for _, line := range []string{"settings", "settings --pack regression"} {
+		c, err := planTUICommand(line, ctx)
+		if err != nil || c.Action != "settings" {
+			t.Fatalf("%s: %+v %v", line, c, err)
+		}
+		if strings.Contains(line, "--pack") && c.Pack != "regression" {
+			t.Fatal(c)
+		}
+	}
+	if _, err := planTUICommand("settings unexpected", ctx); err == nil {
+		t.Fatal("settings accepted a positional argument")
+	}
+	completions := completeTUICommand("sett", ctx)
+	if len(completions) == 0 || !strings.Contains(completions[0], "settings") {
+		t.Fatal(completions)
+	}
+}

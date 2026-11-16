@@ -23,8 +23,8 @@
    ctrl+f/b,pgdown/pgup   page down/up (2-line overlap)
    g/G,home/end           first/last
    :                      command
+   ,                      settings
    ?                      help
    ctrl+c                 quit
-
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 q / esc / ? close

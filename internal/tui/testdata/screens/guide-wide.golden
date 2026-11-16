@@ -1,15 +1,15 @@
  hc   TUI Guide · Workflows & commands
-Start here  ·  1/7                                                                    top · 30 lines
+Start here  ·  1/8                                                                    top · 30 lines
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 ── Guide ─────────────────────  │                                                                  ┃
 ▌ Start here                    │    Make progress without leaving the TUI                         ┃
   Browse, view & open           │                                                                  ┃
   Search while browsing         │   Browse a problem, read its statement, open a solution in       ┃
-  Personal & pack groups        │   your editor, then test, submit and review.                     ┃
-  Test, submit & debug          │                                                                  ┃
-  Review past submissions       │   ## A first session                                             ┃
-  Command mode & context        │                                                                  ┃
-                                │   1. Choose a pack and highlight a problem.                      ┃
+  Workspace & pack settings     │   your editor, then test, submit and review.                     ┃
+  Personal & pack groups        │                                                                  ┃
+  Test, submit & debug          │   ## A first session                                             ┃
+  Review past submissions       │                                                                  ┃
+  Command mode & context        │   1. Choose a pack and highlight a problem.                      ┃
                                 │   2. Press v to read it without creating files, or Enter to      ┃
                                 │   create a missing solution template and copy its path.          ┃
                                 │   3. Press e to edit, t to test examples, and s to judge and     ┃

@@ -30,7 +30,7 @@ func supportedTUICommand(cmd *cobra.Command) bool {
 		return true
 	case "pack":
 		return len(parts) == 2 || parts[2] != "init"
-	case "list", "show", "open", "quit", "test", "submit", "debug", "fetch", "validate", "gen", "fix", "clean", "doctor":
+	case "settings", "list", "show", "open", "quit", "test", "submit", "debug", "fetch", "validate", "gen", "fix", "clean", "doctor":
 		return len(parts) == 2
 	}
 	return false
@@ -53,6 +53,9 @@ func commandRoot() *cobra.Command {
 	open.Flags().StringP("lang", "l", "", "solution language")
 	open.Flags().String("locale", "", "statement locale")
 	root.AddCommand(open, &cobra.Command{Use: "quit", Aliases: []string{"q"}, Short: "Exit the TUI", Args: cobra.NoArgs})
+	settings := &cobra.Command{Use: "settings", Short: "Edit workspace and per-pack personal settings", Args: cobra.NoArgs}
+	settings.Flags().String("pack", "", "initial pack scope (default: workspace)")
+	root.AddCommand(settings)
 	root.SetOut(io.Discard)
 	root.SetErr(io.Discard)
 	return root
