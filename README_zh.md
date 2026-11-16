@@ -60,6 +60,8 @@ hc 支持 Linux 和 macOS，不支持 Windows：在 Windows 上请在 [WSL](http
 - [Delve](https://github.com/go-delve/delve)：调试 Go；
 - `claude` 或 `codex`：生成测试用例。
 
+用 `hc doctor` 检查所选语言和 Python，加上 `--debug` 检查调试器。可以在 `hc.yaml` 中用 `go.command` 和 `go.debugger` 指定自己安装的 Go 工具，详见[工具链配置与环境诊断](docs/how-to-use_zh.md#工具链配置与环境诊断)。
+
 ## 快速开始
 
 ```sh

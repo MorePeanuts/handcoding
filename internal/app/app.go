@@ -60,10 +60,14 @@ func Languages(ws *workspace.Workspace) *lang.Registry {
 // goLanguage keeps the programs it builds in the workspace's cache, so that
 // a run of unchanged code needs no new program.
 func goLanguage(ws *workspace.Workspace) golang.Language {
-	if ws.Root == "" {
-		return golang.Language{}
+	l := golang.Language{
+		GoCommand: lang.ExecutableName(ws.Root, ws.Config.Go.Command),
+		Debugger:  lang.ExecutableName(ws.Root, ws.Config.Go.Debugger),
 	}
-	return golang.Language{BuildCache: filepath.Join(ws.StatePath(), "cache", "build", "go")}
+	if ws.Root != "" {
+		l.BuildCache = filepath.Join(ws.StatePath(), "cache", "build", "go")
+	}
+	return l
 }
 
 // LanguageID resolves a language ID or alias (e.g. "py") to the ID stored in
@@ -86,7 +90,7 @@ func pythonLanguage(ws *workspace.Workspace) python.Language {
 		rt = ws.RuntimePath("python")
 	}
 	if ws.Config.Python.Interpreter != "" {
-		return python.Language{Interpreter: ws.Config.Python.Interpreter, Runtime: rt}
+		return python.Language{Interpreter: lang.ExecutableName(ws.Root, ws.Config.Python.Interpreter), Runtime: rt}
 	}
 	v := &python.Venv{
 		Dir:     ws.VenvPath(),

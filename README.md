@@ -60,6 +60,8 @@ You need Go 1.22+ to solve in Go, and Python 3.12+ in any language: besides Pyth
 - [Delve](https://github.com/go-delve/delve) for debugging Go;
 - `claude` or `codex` for generating test cases.
 
+Run `hc doctor` to check the selected language and Python, or add `--debug` to check its debugger. Select Go tools with `go.command` and `go.debugger` in `hc.yaml`; hc uses tools you provide. See [toolchain configuration and diagnostics](docs/how-to-use.md#toolchains-and-environment-diagnostics).
+
 ## Quick start
 
 ```sh

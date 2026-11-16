@@ -59,7 +59,11 @@ func (l Language) Build(ctx context.Context, dir, binDir string) error {
 	}
 	tmp.Close()
 	defer os.Remove(tmp.Name())
-	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", tmp.Name(), ".")
+	compiler, err := l.compiler()
+	if err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, compiler, "build", "-trimpath", "-o", tmp.Name(), ".")
 	cmd.Dir = dir
 	cmd.Env = localToolchain()
 	out, err := cmd.CombinedOutput()
@@ -120,7 +124,7 @@ func (l Language) program(dir, binDir string) (string, error) {
 	if l.BuildCache == "" {
 		return filepath.Join(binDir, binName), nil
 	}
-	key, err := buildKey(dir)
+	key, err := l.buildKey(dir)
 	if err != nil {
 		return "", err
 	}
@@ -129,8 +133,12 @@ func (l Language) program(dir, binDir string) (string, error) {
 
 // buildKey hashes what a build of the module in dir depends on: the
 // toolchain's settings and the module's Go files, go.mod and go.sum.
-func buildKey(dir string) (string, error) {
-	env, err := goEnv()
+func (l Language) buildKey(dir string) (string, error) {
+	compiler, err := l.compiler()
+	if err != nil {
+		return "", err
+	}
+	env, err := goEnv(compiler)
 	if err != nil {
 		return "", err
 	}
@@ -139,6 +147,7 @@ func buildKey(dir string) (string, error) {
 		return "", err
 	}
 	h := sha256.New()
+	fmt.Fprintf(h, "%d:%s", len(compiler), compiler)
 	fmt.Fprintf(h, "%d:%s", len(env), env)
 	for _, e := range entries {
 		name := e.Name()

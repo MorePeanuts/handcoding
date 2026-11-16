@@ -60,6 +60,7 @@ func TestResolveTUICommand(t *testing.T) {
 		{"leetcode submit leetcode/two-sum", []string{"leetcode", "submit", "--lang", "go", "leetcode/two-sum"}},
 		{"pack update", []string{"pack", "update"}},
 		{"validate", []string{"validate"}},
+		{"doctor --lang python --debug", []string{"doctor", "--lang", "python", "--debug"}},
 		{"clean --dry-run", []string{"clean", "--dry-run"}},
 		{"clean --pack leetcode", []string{"clean", "--pack", "leetcode"}},
 		{"clean leetcode/two-sum", []string{"clean", "leetcode/two-sum"}},
