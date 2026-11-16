@@ -69,12 +69,13 @@ func requireTools(t *testing.T, tools ...string) {
 }
 
 // TestRegressionReferences checks every problem of the regression set end to
-// end: its expected outputs must be reproduced by Python, Go, C++ and Java
+// end: its expected outputs must be reproduced by Python, Go and Java
 // reference solutions, exercising all drivers on every supported shape,
 // and the inputs of its generated cases must match their digests.
+// C++ runs the same corpus in TestCPPMinimumVersion; the driver tests cover
+// the default C++23 mode without compiling all 50 references a second time.
 func TestRegressionReferences(t *testing.T) {
 	t.Parallel()
-	testenv.LookPath(t, cpp.DefaultCompiler())
 	if tc, err := (java.Language{}).Toolchain(); err != nil {
 		testenv.Skip(t, err)
 	} else if err = tc.Err(); err != nil {
@@ -122,7 +123,7 @@ func TestRegressionReferences(t *testing.T) {
 			if err := runner.Validate(p, sel); err != nil {
 				t.Fatal(err)
 			}
-			for _, langID := range []string{"python", "go", "cpp", "java"} {
+			for _, langID := range []string{"python", "go", "java"} {
 				rep, _, err := a.RunReference(ctx, p, langID, sel, app.RunOptions{})
 				if err != nil {
 					t.Fatalf("%s: %v", langID, err)
