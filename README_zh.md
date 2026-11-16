@@ -55,7 +55,7 @@ Linux 和 macOS 的预编译二进制文件见 [Releases 页面](https://github.
 
 hc 支持 Linux 和 macOS，不支持 Windows：在 Windows 上请在 [WSL](https://learn.microsoft.com/windows/wsl/install) 中安装和使用 hc，用法与 Linux 相同。
 
-用 Go 答题需要 Go 1.22+；无论用哪种语言答题都需要 Python 3.12+：除了运行 Python 解答，大多数题目带有的生成器和判题程序也用 Python 运行。最简单的办法是安装 [uv](https://docs.astral.sh/uv/getting-started/installation/)（推荐；`brew install uv`，或 `curl -LsSf https://astral.sh/uv/install.sh | sh`），即使系统自带的 Python 太旧（macOS 自带 3.9），它也会下载一个新版本；PATH 上的 Python 3.12+ 也可以。`hc init` 会在工作区中为它创建虚拟环境，两者都找不到时会说明如何安装。C++ 解答还需要支持所选标准的本地编译器和标准库（最低 C++17，默认 C++23），终端调试使用 GDB（Linux）或 LLDB（macOS）。Java 解答需要本地 JDK 17 或更高版本，终端调试使用 jdb。JavaScript/TypeScript 使用本地 Node.js 22+；TypeScript 还需要本地 `tsc` 5.7+。JS/TS 初始化或首次使用时，由本地 npm 按锁文件把 LeetCode 库安装到工作区 `.hc/node`，准备完成后可离线使用。hc 不安装 Node、npm 或 TypeScript，仓库和 hc 二进制也不包含这些第三方库。以下为可选依赖：
+用 Go 答题需要 Go 1.22+；无论用哪种语言答题都需要 Python 3.12+：除了运行 Python 解答，大多数题目带有的生成器和判题程序也用 Python 运行。最简单的办法是安装 [uv](https://docs.astral.sh/uv/getting-started/installation/)（推荐；`brew install uv`，或 `curl -LsSf https://astral.sh/uv/install.sh | sh`），即使系统自带的 Python 太旧（macOS 自带 3.9），它也会下载一个新版本；PATH 上的 Python 3.12+ 也可以。`hc init` 会在工作区中为它创建虚拟环境，两者都找不到时会说明如何安装。C++ 解答还需要支持所选标准的本地编译器和标准库（最低 C++17，默认 C++23），终端调试使用 GDB（Linux）或 LLDB（macOS）。C++ 初始化或首次使用时，hc 会将经过校验的 JSON 头文件下载到 `.hc/cpp`，后续离线复用，无需 C++ 包管理器。Java 解答需要本地 JDK 17 或更高版本，终端调试使用 jdb。JavaScript/TypeScript 使用本地 Node.js 22+；TypeScript 还需要本地 `tsc` 5.7+。JS/TS 初始化或首次使用时，由本地 npm 按锁文件把 LeetCode 库安装到工作区 `.hc/node`，准备完成后可离线使用。hc 不安装 Node、npm 或 TypeScript，仓库和 hc 二进制也不包含这些第三方库。以下为可选依赖：
 
 - [Delve](https://github.com/go-delve/delve)：调试 Go；
 - `claude` 或 `codex`：生成测试用例。

@@ -57,11 +57,19 @@ func Languages(ws *workspace.Workspace) *lang.Registry {
 	return lang.NewRegistry(
 		goLanguage(ws),
 		pythonLanguage(ws),
-		cpp.Language{Compiler: lang.ExecutableName(ws.Root, ws.Config.CPP.Command), Debugger: lang.ExecutableName(ws.Root, ws.Config.CPP.Debugger), Standard: ws.Config.CPP.Standard, Sanitizers: ws.Config.CPP.Sanitizers},
+		cppLanguage(ws),
 		javaLanguage(ws),
 		javascriptLanguage(ws, false),
 		javascriptLanguage(ws, true),
 	)
+}
+
+func cppLanguage(ws *workspace.Workspace) cpp.Language {
+	environment := ""
+	if ws.Root != "" {
+		environment = filepath.Join(ws.StatePath(), "cpp")
+	}
+	return cpp.Language{Environment: environment, Compiler: lang.ExecutableName(ws.Root, ws.Config.CPP.Command), Debugger: lang.ExecutableName(ws.Root, ws.Config.CPP.Debugger), Standard: ws.Config.CPP.Standard, Sanitizers: ws.Config.CPP.Sanitizers}
 }
 
 func javascriptLanguage(ws *workspace.Workspace, ts bool) javascript.Language {
@@ -149,7 +157,7 @@ func (a *App) SetUpPython(ctx context.Context, w io.Writer) error {
 	return l.Setup(ctx, w)
 }
 
-// SetUpInitial prepares Python infrastructure and the selected JS/TS environment.
+// SetUpInitial prepares Python infrastructure and the selected C++ or JS/TS environment.
 func (a *App) SetUpInitial(ctx context.Context, w io.Writer) error {
 	if err := a.SetUpPython(ctx, w); err != nil {
 		return err
@@ -158,14 +166,14 @@ func (a *App) SetUpInitial(ctx context.Context, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if l.ID() == "javascript" || l.ID() == "typescript" {
+	if l.ID() == "cpp" || l.ID() == "javascript" || l.ID() == "typescript" {
 		return l.Setup(ctx, w)
 	}
 	return nil
 }
 
-// SyncJavaScriptEnv repairs the shared JS/TS dependencies, leaving Python alone.
-func (a *App) SyncJavaScriptEnv(ctx context.Context, name string, w io.Writer) (lang.Toolchain, error) {
+// SyncLanguageEnv repairs C++ or shared JS/TS dependencies, leaving Python alone.
+func (a *App) SyncLanguageEnv(ctx context.Context, name string, w io.Writer) (lang.Toolchain, error) {
 	release, err := a.WS.UseCaches()
 	if err != nil {
 		return lang.Toolchain{}, err
@@ -175,14 +183,16 @@ func (a *App) SyncJavaScriptEnv(ctx context.Context, name string, w io.Writer) (
 	if err != nil {
 		return lang.Toolchain{}, err
 	}
-	js, ok := l.(javascript.Language)
+	environment, ok := l.(interface {
+		SyncEnvironment(context.Context, io.Writer) error
+	})
 	if !ok {
-		return lang.Toolchain{}, fmt.Errorf("environment sync supports python, javascript and typescript")
+		return lang.Toolchain{}, fmt.Errorf("environment sync supports python, cpp, javascript and typescript")
 	}
-	if err := js.SyncEnvironment(ctx, w); err != nil {
+	if err := environment.SyncEnvironment(ctx, w); err != nil {
 		return lang.Toolchain{}, err
 	}
-	return js.Toolchain()
+	return l.Toolchain()
 }
 
 // SetUpEnv prepares l's environment (see lang.Language.Setup), writing

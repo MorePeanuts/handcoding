@@ -75,7 +75,9 @@ hc 使用你的本地开发工具。`hc.yaml` 的 `go.command` 和 `go.debugger`
 
 C++ 使用 `solution.cpp`，保持 LeetCode 的 `class Solution` / 设计类签名。`cpp.command` 和 `cpp.debugger` 指向本地工具，Linux 默认 `g++` / `gdb`，macOS 默认 `clang++` / `lldb`。`cpp.standard` 默认为 `c++23`，也接受 `c++17`、`c++20` 和更新标准。编译器和标准库必须支持所选标准，hc 不会静默降级。`cpp.sanitizers` 可为 `none`、`address`、`undefined` 或 `address,undefined`，参考解使用相同选项，时间基线也按选项区分。hc 不安装这些工具。`hc doctor -l cpp --debug` 检查编译器、标准与头文件可用性、终端调试器和 Python 基础环境。C++ 暂不支持编辑器调试（`--headless`），Go/Python 的现有支持保留。
 
-打开 C++ 解答时，会在旁边生成 `hc_types.hpp`、驱动及运行时头文件和 `compile_commands.json`。编辑器中的 clangd（或兼容语言服务器）读取这份编译数据库，就能识别相同的标准、头文件和评测器定义类型。解答不需要 hc 专用导入或 `main`，提交到 LeetCode 时保留源码。题目包需要声明 `cpp` 并提供 C++ 参考解，才能判定 C++ 解答；更新 hc 不会自动给现有题包增加参考解。
+执行 `hc init --lang cpp`、首次使用 C++ 或运行 `hc env sync --lang cpp` 时，hc 会通过 HTTPS 将固定版本的 nlohmann/json 头文件下载到 `.hc/cpp/json-<版本>-<摘要>/include/nlohmann/json.hpp`，不需要 C++ 包管理器。下载经过 SHA-256 校验后原子写入，并发命令共用同一次安装。本地文件完整时直接离线复用，环境同步也不必重新下载；缺失或损坏时自动下载修复，下载失败会保留已有文件并提示重试方式。`hc doctor -l cpp` 只读检查，`hc clean` 保留该环境。Python 的环境机制不变。
+
+`hc_json.hpp` 仅保留很小的 include 引用，JSON 库本体留在 `.hc/cpp`，编译命令与编辑器数据库共用其 include 路径。打开 C++ 解答时，会在旁边生成 `hc_types.hpp`、驱动及运行时头文件和 `compile_commands.json`。编辑器中的 clangd（或兼容语言服务器）读取这份编译数据库，就能识别相同的标准、头文件和评测器定义类型。解答不需要 hc 专用导入或 `main`，提交到 LeetCode 时保留源码。题目包需要声明 `cpp` 并提供 C++ 参考解，才能判定 C++ 解答；更新 hc 不会自动给现有题包增加参考解。
 
 每个 C++ 用例使用独立进程；类题同一用例的全部操作共享对象。一次运行只编译一次。累计算法时限只统计调用，不包含启动、退出和编解码；配置的墙钟超时分别约束每个 C++ 工作进程。正常构建使用 `-O2`，`hc debug -l cpp` 使用 `-O0 -g`，在 GDB/LLDB 中停在解答入口。进程退出回收节点分配的内存，因此关闭 sanitizer 的泄漏报告，仍可诊断非法访问及未定义行为。
 

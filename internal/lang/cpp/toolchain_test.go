@@ -84,11 +84,15 @@ func TestEditorDatabaseAndLeetCodeSource(t *testing.T) {
 	testenv.LookPath(t, cpp.DefaultCompiler())
 	dir := t.TempDir()
 	p := function([]problem.Param{{Name: "root", Type: "TreeNode"}}, "TreeNode")
-	code := `class Solution {public: TreeNode* f(TreeNode* root) { vector<int> nums{1}; return root ? root : new TreeNode(nums[0]); }};`
+	code := `#include <nlohmann/json.hpp>
+class Solution {public: TreeNode* f(TreeNode* root) { vector<int> nums{1}; return root ? root : new TreeNode(nums[0]); }};`
 	if err := os.WriteFile(filepath.Join(dir, "solution.cpp"), []byte(code), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	l := cpp.Language{Standard: cpp.MinStandard}
+	l := cpp.Language{Standard: cpp.MinStandard, Environment: filepath.Join(t.TempDir(), "C++ environment with spaces")}
+	if err := l.Setup(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
 	if err := l.Prepare(dir, p); err != nil {
 		t.Fatal(err)
 	}

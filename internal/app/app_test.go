@@ -430,7 +430,7 @@ func TestCPPMinimumVersion(t *testing.T) {
 	for _, p := range probs {
 		t.Run(p.Slug, func(t *testing.T) {
 			t.Parallel()
-			l := cpp.Language{Standard: cpp.MinStandard}
+			l := mustLang(t, a, "cpp").(cpp.Language)
 			file, ok := p.Reference(l.SolutionFile())
 			if !ok {
 				t.Fatal("missing C++ reference")

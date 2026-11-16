@@ -19,6 +19,11 @@ func newEnvCmd(root *rootOptions) *cobra.Command {
 as it is. Python 3.12 or later runs Python solutions, and the generators and
 checkers that most problems have, whatever your solution's language.
 
+For C++, hc downloads a pinned, SHA-256-verified JSON header into .hc/cpp
+at C++ initialization or first use. No package manager is needed. Ready
+environments work offline; hc env sync --lang cpp repairs missing or
+corrupt files. Compilers and debuggers remain user-provided.
+
 For JavaScript/TypeScript, hc uses local npm to install locked libraries
 into .hc/node at JS/TS initialization or first use. Ready environments run
 offline without npm. Use hc env sync --lang javascript (or typescript) to
@@ -47,6 +52,10 @@ uv or Python when hc could not create it, after installing a newer Python,
 or when debugpy is missing. Installing debugpy, and downloading Python with
 uv, need network access.
 
+With --lang cpp, verify the JSON header in .hc/cpp and download it when
+missing or corrupt. This needs network only when the header is not ready.
+Python is unchanged.
+
 With --lang javascript (or typescript), repair locked libraries in .hc/node
 using local npm instead. Both languages share one environment. Python is
 unchanged. Node, npm and tsc are user-provided tools; hc installs no tools.`,
@@ -61,7 +70,7 @@ unchanged. Node, npm and tsc are user-provided tools; hc installs no tools.`,
 			if language == "python" || language == "py" || language == "python3" {
 				tc, err = a.SyncEnv(cmd.Context(), os.Stderr)
 			} else {
-				tc, err = a.SyncJavaScriptEnv(cmd.Context(), language, os.Stderr)
+				tc, err = a.SyncLanguageEnv(cmd.Context(), language, os.Stderr)
 			}
 			if err != nil {
 				return err
@@ -73,7 +82,7 @@ unchanged. Node, npm and tsc are user-provided tools; hc installs no tools.`,
 			return nil
 		},
 	}
-	sync.Flags().StringVarP(&language, "lang", "l", "python", "environment to repair: python, javascript, typescript")
+	sync.Flags().StringVarP(&language, "lang", "l", "python", "environment to repair: python, cpp, javascript, typescript")
 	cmd.AddCommand(sync)
 	return cmd
 }
