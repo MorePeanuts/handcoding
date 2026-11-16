@@ -749,6 +749,9 @@ func (m *model) frameWithHeader(header, body, right string, keys ...string) stri
 	if m.confirm != nil {
 		status = ui.Yellow.Render(m.confirm.prompt + " [y/N]")
 	}
+	// The footer reserves exactly one status line, including YAML errors
+	// whose parser diagnostics contain embedded newlines.
+	status = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(status)
 	var b strings.Builder
 	b.WriteString(header)
 	b.WriteString(body)

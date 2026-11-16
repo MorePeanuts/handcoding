@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/ui"
@@ -240,6 +242,13 @@ func TestSettingsScreens(t *testing.T) {
 	h.m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	h.press(",")
 	golden(t, "settings-workspace", h.view())
+	h.m.Update(tea.WindowSizeMsg{Width: 180, Height: 50})
+	h.press("j", "j", "j", "j", "j", "j", "j", "j")
+	golden(t, "settings-large", h.view())
+	h.m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	h.press("right", "right")
+	golden(t, "settings-display", h.view())
+	h.press("left", "left")
 	h.press("s")
 	golden(t, "settings-scopes", h.view())
 	h.press("down", "enter")
@@ -253,4 +262,64 @@ func TestSettingsScreens(t *testing.T) {
 	selectSetting(t, h.m, "timeout")
 	h.press("enter")
 	golden(t, "settings-edit", h.view())
+}
+
+func TestSettingsFooterStaysAtBottom(t *testing.T) {
+	t.Parallel()
+	for _, size := range [][2]int{{200, 52}, {100, 30}, {80, 24}, {60, 20}, {40, 16}} {
+		t.Run(fmt.Sprintf("%dx%d", size[0], size[1]), func(t *testing.T) {
+			t.Parallel()
+			h := newHarness(t)
+			m := h.m
+			m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
+			h.press(",")
+			check := func(state string) {
+				t.Helper()
+				lines := strings.Split(ansi.Strip(m.viewSettings()), "\n")
+				if len(lines) != size[1] {
+					t.Fatalf("%s: got %d rows, want %d", state, len(lines), size[1])
+				}
+				if !strings.Contains(lines[size[1]-3], "───") || !strings.Contains(lines[size[1]-1], "esc") {
+					t.Fatalf("%s: footer moved: %q", state, lines[size[1]-3:])
+				}
+				for i, line := range lines {
+					if ansi.StringWidth(line) > size[0] {
+						t.Fatalf("%s row %d exceeds terminal width", state, i)
+					}
+				}
+			}
+			for _, pref := range m.settings.rows {
+				selectSetting(t, m, pref.Key)
+				check(pref.Key)
+			}
+			m.message = "Cannot reload hc.yaml:\n  invalid YAML\r\n  at line 2"
+			check("multiline error")
+			m.message = ""
+			h.press("right")
+			check("category")
+			m.settings.search.SetValue("no matching setting")
+			m.filterSettings()
+			check("empty search")
+			m.settings.search.SetValue("")
+			m.filterSettings()
+			h.press("s")
+			check("scope picker")
+			h.press("esc")
+			selectSetting(t, m, "timeout")
+			h.press("enter")
+			check("text edit")
+			h.press("esc")
+			selectSetting(t, m, "theme")
+			h.press("enter")
+			check("value picker")
+			h.press("esc", "d")
+			check("doctor picker")
+			h.press("esc")
+			m.settings.showReport = true
+			m.settings.reportText = "Checking local tools…"
+			check("doctor pending")
+			m.settings.reportText = strings.Repeat("A diagnostic result\n", 100)
+			check("doctor report")
+		})
+	}
 }

@@ -349,12 +349,14 @@ Press `,` on a browsing page or use `:settings`. Use `:settings --pack <name>` t
 | Key | Action |
 |---|---|
 | `s` | Choose Workspace or a pack, including `local` and authoring checkouts. |
-| `tab` / `shift+tab` | Switch category. |
+| `←` / `→` or `tab` / `shift+tab` | Switch category tabs. |
 | `/` | Search labels, YAML keys, categories and descriptions across categories. `enter` finishes typing; `esc` clears the query. |
 | `enter` | Edit the selected setting; choose a value or type one, then press `enter` to save. `esc` cancels an unfinished edit. |
 | `r` | Restore the built-in workspace default, or remove a pack override to inherit the workspace preference. |
 | `e` | Open `hc.yaml` in your configured editor and reload it when the editor exits. |
 | `d` | Run doctor: runtime checks, terminal debugger checks or editor debugger checks. `esc` cancels or closes the report. |
+
+Category tabs sit above an aligned list of setting names and values. The selected row is highlighted; its explanation and saved/effective values occupy a fixed area below the list. The shortcut bar stays on the last terminal row during search, editing, selection menus and diagnostics.
 
 Workspace scope exposes general, display, execution/toolchain, coding-agent and LeetCode settings. Pack scope exposes only solution language and statement locale. The detail area separates the saved value, effective value and its source, including unsupported preferences that fall back and temporary command overrides. Editing or resetting a language/locale preference clears its temporary override. Installed-pack inventory and `pack.yaml` declarations remain outside this page; change a writable pack's available translations in its own `pack.yaml`.
 

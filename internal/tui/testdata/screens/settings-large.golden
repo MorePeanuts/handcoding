@@ -1,0 +1,50 @@
+ hc   Settings · Workspace                                                                                                                               s scope · e YAML · d doctor
+ All   General   Display   Tools   Agent   LeetCode
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Solution language           go
+  Statement locale            en
+  Editor                      Automatic
+  Theme                       auto
+  Statement images            auto
+  Run timeout                 10s
+  Execution backend           local
+  Go compiler                 go
+▌ Go debugger                 dlv
+  Python interpreter          Managed (.hc/venv)
+  Coding agent                claude
+  Custom agent command        []
+  LeetCode site               com
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Go debugger · go.debugger
+  Delve executable name or workspace-relative path. Used by the next debugging session.
+
+
+  Saved: "dlv"
+  Effective: dlv · Source: Workspace
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ enter edit    esc back    / search    r reset    ←/→ category    ? help                                                                                                 13 settings

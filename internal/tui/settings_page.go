@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -148,7 +147,10 @@ func (m *model) selectedSetting() *app.SettingValue {
 	return &s.rows[s.visible[min(s.cursor, len(s.visible)-1)]]
 }
 
-func (m *model) settingsListHeight() int { return max((m.height-14)/2, 1) }
+// Reserve a stable inspector below a one-line-per-setting list.
+func (m *model) settingsListHeight() int {
+	return max(m.settingsBodyHeight()-m.settingsDetailHeight()-1, 1)
+}
 
 func (m *model) settingsPick(kind string, choices []settingChoice, current string) {
 	s := m.settings
@@ -457,7 +459,7 @@ func (m *model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if s.picker != "" {
-		if scrollList(k, &s.choice, &s.choiceOffset, len(s.choices), max(m.height-10, 1)) {
+		if scrollList(k, &s.choice, &s.choiceOffset, len(s.choices), m.settingsBodyHeight()) {
 			return m, nil
 		}
 		switch k {
@@ -503,9 +505,9 @@ func (m *model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case "/":
 		s.searching = true
 		return m, s.search.Focus()
-	case "tab", "shift+tab":
+	case "tab", "shift+tab", "left", "right":
 		step := 1
-		if k == "shift+tab" {
+		if k == "shift+tab" || k == "left" {
 			step = -1
 		}
 		s.category = (s.category + step + len(s.categories)) % len(s.categories)
@@ -531,139 +533,3 @@ func (m *model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
-
-func (m *model) layoutSettings() {
-	s := m.settings
-	if s == nil {
-		return
-	}
-	s.search.SetWidth(max(m.width-4, 1))
-	s.input.SetWidth(max(m.width-4, 1))
-	s.report.SetWidth(max(m.width-1, 1))
-	s.report.SetHeight(max(m.height-6, 1))
-	s.report.SetContent(wrap(s.reportText, max(m.width-2, 1)))
-	keepVisible(&s.cursor, &s.offset, len(s.visible), m.settingsListHeight())
-}
-
-func settingDisplay(key, value string) string {
-	if value != "" {
-		return value
-	}
-	switch key {
-	case "editor":
-		return "Automatic (VISUAL / EDITOR / vi)"
-	case "python.interpreter":
-		return "hc managed (.hc/venv)"
-	}
-	return "(none)"
-}
-
-func (m *model) viewSettings() string {
-	s := m.settings
-	scope := "Workspace"
-	if s.scope != "" {
-		scope = "Pack: " + s.scope
-	}
-	title := m.badge() + "  Settings · " + scope
-	subtitle := s.categories[s.category] + " · s scope · Tab category · e YAML · d doctor"
-	if s.search.Value() != "" || s.searching {
-		subtitle = s.search.View()
-	}
-	if s.showReport {
-		m.layoutSettings()
-		return m.frame(title, "Doctor · read-only diagnostics", withScrollbar(s.report, m.st.accent), "", "esc back / cancel")
-	}
-	if s.picker != "" {
-		labels := map[string]string{"scope": "Choose scope", "value": "Choose " + s.key, "doctor": "Choose diagnostic checks"}
-		keepVisible(&s.choice, &s.choiceOffset, len(s.choices), max(m.height-10, 1))
-		var lines []string
-		for i := s.choiceOffset; i < min(len(s.choices), s.choiceOffset+max(m.height-10, 1)); i++ {
-			prefix := "  "
-			if i == s.choice {
-				prefix = "> "
-			}
-			lines = append(lines, clip(prefix+s.choices[i].label, m.width))
-		}
-		if len(lines) == 0 {
-			lines = []string{"No choices available"}
-		}
-		return m.frame(title, labels[s.picker], strings.Join(lines, "\n"), "", "enter choose", "esc cancel")
-	}
-	m.layoutSettings()
-	var body []string
-	h := m.settingsListHeight()
-	for i := s.offset; i < min(len(s.visible), s.offset+h); i++ {
-		r := s.rows[s.visible[i]]
-		prefix := "  "
-		if i == s.cursor {
-			prefix = "> "
-		}
-		value := settingDisplay(r.Key, r.Saved)
-		if r.Inherited {
-			value = "Inherit workspace"
-		}
-		body = append(body, prefix+r.Label+"  "+value, "  "+r.Key+" · "+r.Source)
-	}
-	if len(s.visible) == 0 {
-		body = append(body, "No matching settings")
-	}
-	for len(body) < h*2 {
-		body = append(body, "")
-	}
-	contentWidth := m.width
-	sidebar := m.width >= 100
-	if sidebar {
-		contentWidth -= 22
-	}
-	for i := range body {
-		body[i] = clip(body[i], max(contentWidth, 1))
-	}
-	if sidebar {
-		for i := range body {
-			category := ""
-			if i < len(s.categories) {
-				category = "  " + s.categories[i]
-				if i == s.category {
-					category = "> " + s.categories[i]
-				}
-			}
-			body[i] = fit(category, 20) + "│ " + body[i]
-		}
-	}
-	if r := m.selectedSetting(); r != nil {
-		body = append(body, m.rule(), "Effective: "+settingDisplay(r.Key, r.Effective)+" · Source: "+r.Source)
-		saved := strconv.Quote(r.Saved)
-		if r.Inherited {
-			saved = "inherit workspace"
-		}
-		body = append(body, "Saved: "+saved)
-		desc := r.Description
-		if r.Note != "" {
-			desc = r.Note + " " + desc
-		}
-		detail := strings.Split(wrap(desc, max(m.width-2, 1)), "\n")
-		body = append(body, detail[:min(len(detail), 3)]...)
-	}
-	if s.editing {
-		body = append(body, s.input.View())
-	}
-	// Keep the footer and edit input visible in short terminals.
-	available := max(m.height-headerLines-footerLines, 1)
-	if len(body) > available {
-		if s.editing {
-			body = append(body[:max(available-1, 0)], s.input.View())
-		} else {
-			body = body[:available]
-		}
-	}
-	for i := range body {
-		body[i] = clip(body[i], max(m.width, 1))
-	}
-	keys := []string{"enter edit", "r reset", "/ search", "esc back"}
-	if s.editing {
-		keys = []string{"enter save", "esc cancel"}
-	}
-	return m.frame(title, subtitle, strings.Join(body, "\n"), "", keys...)
-}
-
-var settingsKeys = []string{"enter edit / confirm one setting", "r restore default / inherit workspace", "s choose workspace or pack", "tab/shift+tab next/previous category", "/ search settings in all categories", "e open hc.yaml in your editor", "d run doctor", "esc cancel edit / back", "q back (outside text editing)"}
