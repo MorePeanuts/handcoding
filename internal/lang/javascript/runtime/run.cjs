@@ -221,17 +221,19 @@ function run(options) {
       for (const n of nodes(f.returns, result, false))
         check(!before.has(n), "returned copy shares a node with input");
     if (spec.judge.output) {
-      const p = byName[spec.judge.output],
-        out = encode(p.type, values[p.name]);
+      const p = byName[spec.judge.output];
+      let out = values[p.name];
       if (spec.judge.output_length) {
         const k = scalar("long", result);
+        check(Array.isArray(out), "expected array result");
         check(
           k >= 0 && k <= out.length,
           "returned length outside output array",
         );
-        return out.slice(0, k);
+        // Only the prefix belongs to the output; its tail may not be encodable.
+        out = out.slice(0, k);
       }
-      return out;
+      return encode(p.type, out);
     }
     if (f.returns_ref) {
       if (result === null) return null;

@@ -733,14 +733,21 @@ final class HCRuntime {
           check(!before.contains(n), "returned copy shares a node with input");
       String output = str(judge, "output");
       if (!output.isEmpty()) {
-        Object encoded = codecs.get(output).write(values.get(output));
+        Object value = values.get(output);
         if (!str(judge, "output_length").isEmpty()) {
           int k = integer(result);
-          List<Object> a = list(encoded);
-          check(k >= 0 && k <= a.size(), "returned length outside output array");
-          return new ArrayList<>(a.subList(0, k));
+          int size = value instanceof List<?> ? ((List<?>) value).size() : Array.getLength(value);
+          check(k >= 0 && k <= size, "returned length outside output array");
+          // Slice the native value before codecs can inspect the ignored tail.
+          if (value instanceof List<?>) {
+            value = ((List<?>) value).subList(0, k);
+          } else {
+            Object prefix = Array.newInstance(value.getClass().getComponentType(), k);
+            System.arraycopy(value, 0, prefix, 0, k);
+            value = prefix;
+          }
         }
-        return encoded;
+        return codecs.get(output).write(value);
       }
       if (fn.containsKey("returns_ref"))
         return identity(result, original.get(fn.get("returns_ref")));
