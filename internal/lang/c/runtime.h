@@ -98,8 +98,10 @@ void NestedIntegerSetInteger(struct NestedInteger* n, int v) {
     n->size = 0;
 }
 void NestedIntegerAdd(struct NestedInteger* n, struct NestedInteger* v) {
-    hc_check(n && !n->integer && n->size >= 0 && n->size < INT_MAX,
-             "NestedInteger is not a list");
+    hc_check(n && n->size >= 0 && n->size < INT_MAX,
+             "invalid NestedInteger");
+    // SetInteger clears the list size; Add changes an integer back into a list.
+    n->integer = false;
     n->list = hc_resize(n->list, (size_t)n->size + 1, sizeof(*n->list));
     n->list[n->size++] = v;
 }
