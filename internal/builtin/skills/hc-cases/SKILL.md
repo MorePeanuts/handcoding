@@ -101,6 +101,18 @@ workspace's own problems; `hc validate <slug>` names a missing reference.
   library functions (`slices.Sorted`, `maps.Keys`, range over a function).
   `hc validate --run` checks this and names what is too new.
 
+- A C reference is `reference/solution.c` (`hc docs protocol c-language`).
+  Target C11, preserving the native top-level functions, array size arguments
+  and output size pointers. Follow any explicit `c` symbol bindings in
+  `problem.yaml`; never infer conversions from edited solution code. hc
+  supplies standard headers, judge structures and uthash. Do not write
+  `main` or redefine those structures. Use `int` for `integer`, `long long`
+  for `long`, and no embedded NUL in `string` values. Each case is a fresh
+  process. Use hc extensions only where the C ABI specifies them; local
+  support does not mean LeetCode offers a C template. Declare `c.libraries: [glib]`
+  if the reference needs locally installed GLib. Dependencies are
+  workspace-managed; never vendor them into the pack or solution.
+
 - A C++ reference is `reference/solution.cpp`, using the native public
   `class Solution` method or design class (`hc docs protocol c`). Target
   C++17; standard headers and judge-defined types are provided by hc. Do not

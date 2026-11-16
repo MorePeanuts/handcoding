@@ -24,6 +24,9 @@ const settingsHeader = `# handcoding workspace settings
 # theme: auto | dark | light; images: auto | kitty | blocks | none
 # execution.backend: local (Docker is not implemented)
 # go.command / go.debugger: executable names or workspace-relative paths
+# c.command / c.debugger: local C compiler and terminal debugger
+# c.standard: C11 or newer, default gnu11; c.sanitizers: none | address | undefined | address,undefined
+# c.pkg_config: local pkg-config; c.glib: auto | required | disabled
 # cpp.command / cpp.debugger: platform C++ compiler and terminal debugger
 # cpp.standard: c++17 or newer (default c++23); cpp.sanitizers: none | address | undefined | address,undefined
 # javascript.command: Node.js 22+ for JavaScript and TypeScript

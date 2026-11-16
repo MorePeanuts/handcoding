@@ -13,6 +13,12 @@
   Execution backend           local                             Code runs locally. Docker is not implemented.
   Go compiler                 go                                Executable name or workspace-relative path. Used by the next build; hc does not install Go.
 ▌ Go debugger                 dlv                               Delve executable name or workspace-relative path. Used by the next debugging session.
+  C compiler                  clang                             Local gcc on Linux or clang on macOS. Executable name or workspace-relative path.
+  C debugger                  lldb                              Terminal GDB or LLDB executable.
+  C standard                  gnu11                             C11 minimum, gnu11 default. The compiler must support the requested mode.
+  C sanitizers                none                              Address/undefined behavior checks; process exit owns node memory, so leak reporting is disabled.
+  C pkg-config                pkg-config                        Local pkg-config used to locate GLib development headers and libraries.
+  C GLib                      auto                              Auto uses local GLib when available; required reports missing development files; disabled omits GLib.
   C++ compiler                clang++                           Local g++ on Linux or clang++ on macOS. Executable name or workspace-relative path.
   C++ debugger                lldb                              Terminal GDB or LLDB executable. Editor debugging is not supported for C++.
   C++ standard                c++23                             C++17 minimum, C++23 default. The selected compiler must support the requested standard.
@@ -26,12 +32,6 @@
   Coding agent                claude                            Preset for the next generation or repair. A nonempty agent.command overrides this preset.
   Custom agent command        []                                An argv array, not a shell command. Edit hc.yaml for custom arguments; reset to [] to use the preset.
   LeetCode site               com                               Default for fetch and login. Online submissions use the currently signed-in account.
-
-
-
-
-
-
 
 
 

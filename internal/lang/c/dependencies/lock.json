@@ -1,0 +1,17 @@
+[
+  {
+    "name": "yyjson.h",
+    "url": "https://raw.githubusercontent.com/ibireme/yyjson/0.10.0/src/yyjson.h",
+    "sha256": "adce02aef5dfd868f7c0b632bd23bc0e79fa710b70d93bfe334c2bd15b21a41d"
+  },
+  {
+    "name": "yyjson.c",
+    "url": "https://raw.githubusercontent.com/ibireme/yyjson/0.10.0/src/yyjson.c",
+    "sha256": "98489c068ab65298320710e5be4c1090af1b5676e41301a3525b2e732641aace"
+  },
+  {
+    "name": "uthash.h",
+    "url": "https://raw.githubusercontent.com/troydhanson/uthash/v2.3.0/src/uthash.h",
+    "sha256": "344175d0ae3d0d7651887f932fc224f6d133559f0fc83ee73fe641697d77211a"
+  }
+]

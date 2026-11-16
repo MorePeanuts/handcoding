@@ -36,7 +36,7 @@ func newStartCmd(root *rootOptions) *cobra.Command {
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return root.withProblem(args[0], langName, func(a *app.App, p *problem.Problem, l lang.Language) error {
-				if l.ID() == "cpp" || l.ID() == "javascript" || l.ID() == "typescript" {
+				if l.ID() == "c" || l.ID() == "cpp" || l.ID() == "javascript" || l.ID() == "typescript" {
 					if err := l.Setup(cmd.Context(), os.Stderr); err != nil {
 						return err
 					}
@@ -71,7 +71,7 @@ func newEditCmd(root *rootOptions) *cobra.Command {
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return root.withProblem(args[0], langName, func(a *app.App, p *problem.Problem, l lang.Language) error {
-				if l.ID() == "cpp" || l.ID() == "javascript" || l.ID() == "typescript" {
+				if l.ID() == "c" || l.ID() == "cpp" || l.ID() == "javascript" || l.ID() == "typescript" {
 					if err := l.Setup(cmd.Context(), os.Stderr); err != nil {
 						return err
 					}

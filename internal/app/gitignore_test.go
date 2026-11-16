@@ -31,6 +31,11 @@ func TestGitignoreCoversGenerated(t *testing.T) {
 	var generated, solutions []string
 	for _, l := range a.Langs.All() {
 		for _, p := range problems {
+			if l.ID() == "c" {
+				local := *p
+				local.Pack = "local"
+				p = &local
+			}
 			path, _, err := a.Start(p, l)
 			if err != nil {
 				t.Fatal(err)

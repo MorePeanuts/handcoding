@@ -326,6 +326,18 @@ func (a *App) leetCodeCode(ctx context.Context, c *leetcode.Client, p *problem.P
 	if err != nil {
 		return leetcode.Code{}, nil, err
 	}
+	if langSlug == "c" {
+		available := false
+		for _, snippet := range q.CodeSnippets {
+			if snippet.LangSlug == "c" {
+				available = true
+				break
+			}
+		}
+		if !available {
+			return leetcode.Code{}, nil, fmt.Errorf("LeetCode did not provide a C template for %s on this site; C submission is unavailable or could not be verified", q.TitleSlug)
+		}
+	}
 	return leetcode.Code{Slug: q.TitleSlug, QuestionID: q.QuestionID, Lang: langSlug, Code: code}, q, nil
 }
 

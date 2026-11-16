@@ -144,7 +144,7 @@ func TestValidate(t *testing.T) {
 		{"leading zero", func(m *Manifest) { m.Version = "1.02.0" }, "must be a SemVer version"},
 		{"languages", func(m *Manifest) { m.Languages = []string{"python"} }, ""},
 		{"empty languages", func(m *Manifest) { m.Languages = []string{} }, "languages must not be empty"},
-		{"unknown language", func(m *Manifest) { m.Languages = []string{"go", "rust"} }, `languages: unknown language "rust" (protocol 1 has go, python, cpp, java, javascript and typescript)`},
+		{"unknown language", func(m *Manifest) { m.Languages = []string{"go", "rust"} }, `languages: unknown language "rust" (protocol 1 has go, python, c, cpp, java, javascript and typescript)`},
 		{"language alias", func(m *Manifest) { m.Languages = []string{"py"} }, `unknown language "py"`},
 		{"duplicate language", func(m *Manifest) { m.Languages = []string{"go", "go"} }, `languages: duplicate language "go"`},
 		{"languages of an unknown protocol", func(m *Manifest) { m.Protocol = 7; m.Languages = []string{"rust"} }, "upgrade hc"},
@@ -221,7 +221,7 @@ func TestValidateProblems(t *testing.T) {
 
 func TestSolutionLanguages(t *testing.T) {
 	m := &Manifest{Protocol: 1, Name: "x"}
-	if got := m.SolutionLanguages(); !slices.Equal(got, []string{problem.LangGo, problem.LangPython, problem.LangCPP, problem.LangJava, problem.LangJavaScript, problem.LangTypeScript}) {
+	if got := m.SolutionLanguages(); !slices.Equal(got, []string{problem.LangGo, problem.LangPython, problem.LangC, problem.LangCPP, problem.LangJava, problem.LangJavaScript, problem.LangTypeScript}) {
 		t.Errorf("absent languages = %v, want every language of protocol 1", got)
 	}
 	m.Languages = []string{"python"}

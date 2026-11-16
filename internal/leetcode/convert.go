@@ -182,6 +182,8 @@ func Convert(q *Question, site Site) (*Converted, error) {
 			conv.Templates["solution.ts"] = s.Code
 		case "java":
 			conv.Templates["Solution.java"] = s.Code
+		case "c":
+			conv.Templates["solution.c"] = s.Code
 		case "cpp":
 			conv.Templates["solution.cpp"] = s.Code
 		case "golang":
@@ -302,6 +304,9 @@ func Convert(q *Question, site Site) (*Converted, error) {
 	conv.Cases, warn = checkExamples(p, cases)
 	if warn != "" {
 		conv.Warnings = append(conv.Warnings, warn)
+	}
+	if err := cBindings(p, conv.Templates["solution.c"]); err != nil {
+		return nil, err
 	}
 	return conv, nil
 }

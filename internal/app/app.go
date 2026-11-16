@@ -16,6 +16,7 @@ import (
 
 	"github.com/MorePeanuts/handcoding/internal/judge"
 	"github.com/MorePeanuts/handcoding/internal/lang"
+	clang "github.com/MorePeanuts/handcoding/internal/lang/c"
 	"github.com/MorePeanuts/handcoding/internal/lang/cpp"
 	"github.com/MorePeanuts/handcoding/internal/lang/golang"
 	"github.com/MorePeanuts/handcoding/internal/lang/java"
@@ -57,11 +58,20 @@ func Languages(ws *workspace.Workspace) *lang.Registry {
 	return lang.NewRegistry(
 		goLanguage(ws),
 		pythonLanguage(ws),
+		cLanguage(ws),
 		cppLanguage(ws),
 		javaLanguage(ws),
 		javascriptLanguage(ws, false),
 		javascriptLanguage(ws, true),
 	)
+}
+
+func cLanguage(ws *workspace.Workspace) clang.Language {
+	environment := ""
+	if ws.Root != "" {
+		environment = filepath.Join(ws.StatePath(), "c")
+	}
+	return clang.Language{Environment: environment, Compiler: lang.ExecutableName(ws.Root, ws.Config.C.Command), Debugger: lang.ExecutableName(ws.Root, ws.Config.C.Debugger), Standard: ws.Config.C.Standard, Sanitizers: ws.Config.C.Sanitizers, PkgConfig: lang.ExecutableName(ws.Root, ws.Config.C.PkgConfig), GLib: ws.Config.C.GLib}
 }
 
 func cppLanguage(ws *workspace.Workspace) cpp.Language {
@@ -157,7 +167,7 @@ func (a *App) SetUpPython(ctx context.Context, w io.Writer) error {
 	return l.Setup(ctx, w)
 }
 
-// SetUpInitial prepares Python infrastructure and the selected C++ or JS/TS environment.
+// SetUpInitial prepares Python infrastructure and the selected C/C++ or JS/TS environment.
 func (a *App) SetUpInitial(ctx context.Context, w io.Writer) error {
 	if err := a.SetUpPython(ctx, w); err != nil {
 		return err
@@ -166,13 +176,13 @@ func (a *App) SetUpInitial(ctx context.Context, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if l.ID() == "cpp" || l.ID() == "javascript" || l.ID() == "typescript" {
+	if l.ID() == "c" || l.ID() == "cpp" || l.ID() == "javascript" || l.ID() == "typescript" {
 		return l.Setup(ctx, w)
 	}
 	return nil
 }
 
-// SyncLanguageEnv repairs C++ or shared JS/TS dependencies, leaving Python alone.
+// SyncLanguageEnv repairs C/C++ or shared JS/TS dependencies, leaving Python alone.
 func (a *App) SyncLanguageEnv(ctx context.Context, name string, w io.Writer) (lang.Toolchain, error) {
 	release, err := a.WS.UseCaches()
 	if err != nil {
@@ -187,7 +197,7 @@ func (a *App) SyncLanguageEnv(ctx context.Context, name string, w io.Writer) (la
 		SyncEnvironment(context.Context, io.Writer) error
 	})
 	if !ok {
-		return lang.Toolchain{}, fmt.Errorf("environment sync supports python, cpp, javascript and typescript")
+		return lang.Toolchain{}, fmt.Errorf("environment sync supports python, c, cpp, javascript and typescript")
 	}
 	if err := environment.SyncEnvironment(ctx, w); err != nil {
 		return lang.Toolchain{}, err

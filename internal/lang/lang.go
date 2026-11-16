@@ -83,6 +83,11 @@ type Language interface {
 	Setup(ctx context.Context, w io.Writer) error
 }
 
+// CaseValidator checks language-specific representation limits after cases are materialized.
+type CaseValidator interface {
+	ValidateCase(*problem.Problem, problem.Case) error
+}
+
 // CaseIsolator requests one fresh process per case, with a per-process wall
 // timeout and the remaining cumulative algorithm budget. Build still runs once.
 type CaseIsolator interface{ IsolatedCases() bool }

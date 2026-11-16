@@ -52,7 +52,7 @@ var tinyProblems = []string{"0001-two-sum", "0027-remove-element", "2469-convert
 // writeTinyPack writes a pack called tiny into dir, holding tinyProblems.
 func writeTinyPack(t *testing.T, dir string) {
 	t.Helper()
-	manifest := "protocol: 1\nname: tiny\nversion: 1.0.0\ntitle: Tiny\nlocales: [en, zh-CN]\ngroups:\n  - name: easy\n    problems: [two-sum, remove-element]\n"
+	manifest := "protocol: 1\nname: tiny\nversion: 1.0.0\ntitle: Tiny\nlanguages: [go, python, cpp, java, javascript, typescript]\nlocales: [en, zh-CN]\ngroups:\n  - name: easy\n    problems: [two-sum, remove-element]\n"
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}

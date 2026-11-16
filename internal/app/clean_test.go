@@ -32,6 +32,7 @@ func TestCleanInventory(t *testing.T) {
 		"cache/go-build/ab/tool-cache", "cache/uv/archive-v0/pkg/code.py", "leetcode-com-problems.json",
 	}
 	kept := []string{
+		"c/0123456789abcdef0123/yyjson.c", "c/0123456789abcdef0123/uthash.h",
 		"cpp/json-3.12.0-aaf127c04cb31c40/include/nlohmann/json.hpp",
 		"cache/build/java/0123456789abcdef0123456789abcdef/notes.txt",
 		"cache/build/java/unknown/Solution.class",

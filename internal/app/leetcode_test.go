@@ -627,3 +627,63 @@ func TestLeetCodeBrowserCancelPreservesAccount(t *testing.T) {
 		t.Fatal("cancelled browser authorization replaced the current account")
 	}
 }
+
+func TestLeetCodeCAvailability(t *testing.T) {
+	t.Parallel()
+	for _, available := range []bool{false, true} {
+		t.Run(fmt.Sprint(available), func(t *testing.T) {
+			t.Parallel()
+			a := newWorkspace(t)
+			p, e := a.WS.Problem("regression/two-sum")
+			if e != nil {
+				t.Fatal(e)
+			}
+			l := mustLang(t, a, "c")
+			src := "int*twoSum(int*nums,int n,int target,int*size){*size=0;return NULL;}\n"
+			file := a.SolutionPath(p, l)
+			if e = os.MkdirAll(filepath.Dir(file), 0755); e != nil {
+				t.Fatal(e)
+			}
+			if e = os.WriteFile(file, []byte(src), 0644); e != nil {
+				t.Fatal(e)
+			}
+			submitted := ""
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/graphql/":
+					snippets := []map[string]string{}
+					if available {
+						snippets = append(snippets, map[string]string{"langSlug": "c", "code": src})
+					}
+					_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"question": map[string]any{"questionId": "1", "questionFrontendId": "1", "titleSlug": "two-sum", "codeSnippets": snippets}}})
+				case "/problems/two-sum/submit/":
+					var req map[string]any
+					if e := json.NewDecoder(r.Body).Decode(&req); e != nil {
+						t.Error(e)
+					}
+					submitted, _ = req["typed_code"].(string)
+					if req["lang"] != "c" {
+						t.Error(req)
+					}
+					fmt.Fprint(w, `{"submission_id":7}`)
+				case "/submissions/detail/7/check/":
+					fmt.Fprint(w, `{"state":"SUCCESS","status_code":10,"run_success":true}`)
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			defer srv.Close()
+			client := leetcode.NewClient(leetcode.Site{Name: leetcode.SiteCom.Name, Base: srv.URL}, "")
+			client.Session = &leetcode.Session{Token: "fake"}
+			client.PollInterval = time.Millisecond
+			_, e = a.LeetCodeSubmit(context.Background(), client, p, l)
+			if available {
+				if e != nil || submitted != src {
+					t.Fatalf("%q %v", submitted, e)
+				}
+			} else if e == nil || !strings.Contains(e.Error(), "C template") || submitted != "" {
+				t.Fatalf("%q %v", submitted, e)
+			}
+		})
+	}
+}
