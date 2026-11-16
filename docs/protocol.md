@@ -222,7 +222,9 @@ Every value in a case, an expected output and a solution's output is JSON. This 
 
 ### Scalars
 
-- `integer` and `long`: a JSON number written without fraction or exponent (`3`, not `3.0` or `3e0`), in the signed 64-bit range. The protocol does not limit `integer` to 32 bits.
+- `integer`: a JSON number written without fraction or exponent (`3`, not `3.0` or `3e0`), in the signed 32-bit range, −2147483648 to 2147483647.
+- `long`: the same JSON encoding, in the signed 64-bit range, −9223372036854775808 to 9223372036854775807.
+- These ranges apply to inputs, expected outputs and solution outputs, including array elements and integer fields of judge-defined types. Out-of-range solution outputs are runtime errors, including with a custom checker. Values are never truncated or wrapped. Go keeps `int` / `int64`, and Python keeps `int` for both types; intermediate arithmetic follows the solution language's rules.
 - `double`: any JSON number. Integers are valid doubles (`2`, `2.0`).
 - `boolean`: `true` or `false`.
 - `string`: a JSON string, holding any Unicode text.
@@ -236,7 +238,7 @@ Every value in a case, an expected output and a solution's output is JSON. This 
 
 ### ListNode and TreeNode
 
-Go: `type ListNode struct { Val int; Next *ListNode }` and `type TreeNode struct { Val int; Left, Right *TreeNode }`. Python: `ListNode(val=0, next=None)` and `TreeNode(val=0, left=None, right=None)`, with attributes `val`, `next`, `left`, `right`. Node values are integers.
+Go: `type ListNode struct { Val int; Next *ListNode }` and `type TreeNode struct { Val int; Left, Right *TreeNode }`. Python: `ListNode(val=0, next=None)` and `TreeNode(val=0, left=None, right=None)`, with attributes `val`, `next`, `left`, `right`. Node values are signed 32-bit `integer` values.
 
 - `ListNode`: the array of the values from the head on, `[1,2,3]`. `[]` is the empty list. In inputs, `null` also means the empty list.
 - `TreeNode`: the level-order array, `null` for a missing child: `[3,9,20,null,null,15,7]`. The first element is the root's value, and each next pair of elements gives the children of the next node (not `null`) in level order. Outputs have trailing `null`s removed. `[]` is the empty tree; in inputs, `null` and `[null]` also mean the empty tree. An array listing children for more nodes than it has is invalid, such as `[1,null,null,2]` or `[null,1]`.

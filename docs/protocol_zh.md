@@ -224,7 +224,9 @@ judge:
 
 ### 标量
 
-- `integer` 和 `long`：不带小数部分或指数的 JSON 数字（`3`，而不是 `3.0` 或 `3e0`），在有符号 64 位范围内。协议不把 `integer` 限制为 32 位。
+- `integer`：不带小数部分或指数的 JSON 数字（`3`，而不是 `3.0` 或 `3e0`），在有符号 32 位范围内，即 −2147483648 到 2147483647。
+- `long`：使用相同的 JSON 编码，在有符号 64 位范围内，即 −9223372036854775808 到 9223372036854775807。
+- 这些范围适用于输入、预期输出和解法输出，包括数组元素和评测器定义类型中的整数字段。解法输出越界属于运行错误，使用自定义 checker 时也一样。数值不会被截断或回绕。Go 仍使用 `int` / `int64`，Python 对两种类型都使用 `int`；中间计算遵循解法语言自身的规则。
 - `double`：任意 JSON 数字。整数也是合法的 double（`2`、`2.0`）。
 - `boolean`：`true` 或 `false`。
 - `string`：JSON 字符串，可以包含任意 Unicode 文本。
@@ -238,7 +240,7 @@ judge:
 
 ### ListNode 和 TreeNode
 
-Go：`type ListNode struct { Val int; Next *ListNode }` 和 `type TreeNode struct { Val int; Left, Right *TreeNode }`。Python：`ListNode(val=0, next=None)` 和 `TreeNode(val=0, left=None, right=None)`，属性为 `val`、`next`、`left`、`right`。节点的值是整数。
+Go：`type ListNode struct { Val int; Next *ListNode }` 和 `type TreeNode struct { Val int; Left, Right *TreeNode }`。Python：`ListNode(val=0, next=None)` 和 `TreeNode(val=0, left=None, right=None)`，属性为 `val`、`next`、`left`、`right`。节点的值是有符号 32 位的 `integer`。
 
 - `ListNode`：从头节点开始的值组成的数组，`[1,2,3]`。`[]` 是空链表。在输入中，`null` 也表示空链表。
 - `TreeNode`：层序数组，缺失的子节点为 `null`：`[3,9,20,null,null,15,7]`。第一个元素是根的值，之后每两个元素依次给出层序中下一个（非 `null`）节点的左右子节点。输出会去掉末尾的 `null`。`[]` 是空树；在输入中，`null` 和 `[null]` 也表示空树。为多于实际节点数的节点列出子节点的数组是不合法的，如 `[1,null,null,2]` 或 `[null,1]`。

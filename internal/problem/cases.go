@@ -436,7 +436,25 @@ func (p *Problem) ValidateExpected(c Case) error {
 	if err != nil {
 		return err
 	}
-	return validateClassExpected(c, sigs)
+	return validateClassOutput(c.Expected, sigs, "expected")
+}
+
+// ValidateOutput checks a solution's result before it is judged, including
+// checker and unjudged runs. Unlike expected, any_of has just one answer.
+// The case's input must already be valid.
+func (p *Problem) ValidateOutput(c Case, output json.RawMessage) error {
+	if _, _, ok := p.RoundTripMethods(); ok || p.Kind != KindClass {
+		return p.validateFunctionOutput(output, false, "output")
+	}
+	ops, err := classOps(c)
+	if err != nil {
+		return err
+	}
+	sigs, err := p.classSigs(ops)
+	if err != nil {
+		return err
+	}
+	return validateClassOutput(output, sigs, "output")
 }
 
 // validateExpected checks the shape of a function or round-trip problem's
@@ -445,18 +463,22 @@ func (p *Problem) validateExpected(c Case) error {
 	if !c.HasExpected() {
 		return nil
 	}
+	return p.validateFunctionOutput(c.Expected, p.Judge.Compare == CompareAnyOf, "expected")
+}
+
+func (p *Problem) validateFunctionOutput(raw json.RawMessage, alternatives bool, label string) error {
 	want := outputForm(p.judgedType())
-	if p.Judge.Compare == CompareAnyOf {
+	if alternatives {
 		want += "[]"
 	}
 	if p.Function != nil && p.Function.ReturnsRef != "" {
 		want = typeNodeRef + strings.TrimPrefix(want, TypeInteger)
 	}
-	if err := checkOutput(want, c.Expected); err != nil {
-		if p.Judge.Compare == CompareAnyOf {
-			return fmt.Errorf("expected (any_of: an array of acceptable answers): %w", err)
+	if err := checkOutput(want, raw); err != nil {
+		if alternatives {
+			return fmt.Errorf("%s (any_of: an array of acceptable answers): %w", label, err)
 		}
-		return fmt.Errorf("expected: %w", err)
+		return fmt.Errorf("%s: %w", label, err)
 	}
 	return nil
 }
@@ -493,7 +515,10 @@ func (p *Problem) validateClassCase(c Case) error {
 			}
 		}
 	}
-	return validateClassExpected(c, sigs)
+	if !c.HasExpected() {
+		return nil
+	}
+	return validateClassOutput(c.Expected, sigs, "expected")
 }
 
 // classOps decodes a class case's ops.
@@ -527,25 +552,21 @@ func (p *Problem) classSigs(ops []string) ([]Method, error) {
 	return sigs, nil
 }
 
-// validateClassExpected checks a class case's expected output, if it has
-// one, against the signatures of its ops.
-func validateClassExpected(c Case, sigs []Method) error {
-	if !c.HasExpected() {
-		return nil
-	}
-	expected, ok := arrayElements(c.Expected)
+// validateClassOutput checks one result per operation against its signature.
+func validateClassOutput(raw json.RawMessage, sigs []Method, label string) error {
+	expected, ok := arrayElements(raw)
 	if !ok {
-		if err := json.Unmarshal(c.Expected, &expected); err != nil {
-			return errors.New("expected: must be an array with one return value per op")
+		if err := json.Unmarshal(raw, &expected); err != nil {
+			return fmt.Errorf("%s: must be an array with one return value per op", label)
 		}
 	}
 	if len(expected) != len(sigs) {
-		return fmt.Errorf("expected has %d entries but there are %d ops", len(expected), len(sigs))
+		return fmt.Errorf("%s has %d entries but there are %d ops", label, len(expected), len(sigs))
 	}
 	for i, m := range sigs {
 		if m.Returns == TypeVoid {
 			if string(bytes.TrimSpace(expected[i])) != "null" {
-				return fmt.Errorf("expected[%d] (%s): must be null for the constructor and void methods", i, m.Name)
+				return fmt.Errorf("%s[%d] (%s): must be null for the constructor and void methods", label, i, m.Name)
 			}
 			continue
 		}
@@ -555,7 +576,7 @@ func validateClassExpected(c Case, sigs []Method) error {
 			continue
 		}
 		if err := checkOutput(t, expected[i]); err != nil {
-			return fmt.Errorf("expected[%d] (%s): %w", i, m.Name, err)
+			return fmt.Errorf("%s[%d] (%s): %w", label, i, m.Name, err)
 		}
 	}
 	return nil

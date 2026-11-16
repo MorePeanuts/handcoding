@@ -3,7 +3,10 @@ package problem
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 )
 
@@ -145,8 +148,8 @@ func checkOutput(t string, raw json.RawMessage) error {
 
 // scalarOK reports whether raw, a value of a JSON text known to be valid,
 // is plainly of the scalar type t, which CheckValue would accept, without
-// decoding it; false means CheckValue has to tell. An integer of up to 18
-// digits fits an int64; a longer one is left to CheckValue.
+// decoding it; false means CheckValue has to tell. Long values with up to
+// 18 digits fit int64; integer values must also fit int32.
 func scalarOK(t string, raw []byte) bool {
 	if len(raw) == 0 {
 		return false
@@ -164,6 +167,13 @@ func scalarOK(t string, raw []byte) bool {
 			if b < '0' || b > '9' {
 				return false
 			}
+		}
+		if t == TypeInteger {
+			limit := "2147483647"
+			if raw[0] == '-' {
+				limit = "2147483648"
+			}
+			return len(digits) < len(limit) || len(digits) == len(limit) && string(digits) <= limit
 		}
 		return true
 	case TypeDouble:
@@ -333,8 +343,18 @@ func checkValue(t string, v any, path string) error {
 		if !ok {
 			return fail(base)
 		}
-		if _, err := n.Int64(); err != nil {
+		i, err := n.Int64()
+		if errors.Is(err, strconv.ErrRange) {
+			if base == TypeInteger {
+				return fail("integer in [-2147483648, 2147483647]; use long for 64-bit values")
+			}
+			return fail("long in [-9223372036854775808, 9223372036854775807]")
+		}
+		if err != nil {
 			return fail("a whole number (" + base + ")")
+		}
+		if base == TypeInteger && (i < math.MinInt32 || i > math.MaxInt32) {
+			return fail("integer in [-2147483648, 2147483647]; use long for 64-bit values")
 		}
 	case TypeDouble:
 		if _, ok := v.(json.Number); !ok {
