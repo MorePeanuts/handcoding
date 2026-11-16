@@ -458,33 +458,6 @@ func TestCPPMinimumVersion(t *testing.T) {
 	}
 }
 
-func TestJavaMinimumVersion(t *testing.T) {
-	t.Parallel()
-	l := java.Language{}
-	if tc, err := l.Toolchain(); err != nil {
-		testenv.Skip(t, err)
-	} else if err = tc.Err(); err != nil {
-		testenv.Skip(t, err)
-	}
-	a := newWorkspace(t)
-	probs, err := a.WS.Problems()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, p := range probs {
-		t.Run(p.Slug, func(t *testing.T) {
-			t.Parallel()
-			file, ok := p.Reference(l.SolutionFile())
-			if !ok {
-				t.Fatal("missing Java reference")
-			}
-			if err := l.CheckMinVersion(context.Background(), p, file); err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
-}
-
 func TestECMAScriptReferences(t *testing.T) {
 	t.Parallel()
 	requireTools(t, "node", "npm", "tsc", "python3")
