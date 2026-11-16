@@ -31,8 +31,8 @@ problems (packs/local/problems/, or problems/ in a pack checkout): statement
 examples (with expected outputs when they can be parsed from the statement).
 Premium problems are not available.
 
-The statements written are those of the pack's locales (locales in hc.yaml
-for your own problems, [en] unless set; in pack.yaml in a pack checkout).
+The statements written are those of the pack's locales in pack.yaml
+(packs/local/pack.yaml for your own problems, initially [en]).
 Both sites have the English statement; only leetcode.cn has the Chinese one
 (zh-CN), so a pack whose default locale is zh-CN fetches from leetcode.cn.
 Fetching a problem again from the other site adds the locales it lacks.

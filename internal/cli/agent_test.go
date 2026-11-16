@@ -28,7 +28,7 @@ func TestAgentEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	agent := "agent:\n  command: [/bin/sh, -c, '" + script + "']\n"
-	data = []byte(strings.Replace(string(data), "agent:\n  name: claude\n", agent, 1))
+	data = []byte(strings.Replace(string(data), "agent:\n  name: claude\n  command: []\n", agent, 1))
 	if err := os.WriteFile(cfg, data, 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -119,6 +119,10 @@ func (o *rootOptions) openApp() (*app.App, error) {
 		return nil, err
 	}
 	a := app.New(ws)
+	if err := a.SyncSettings(context.Background()); err != nil {
+		a.Close()
+		return nil, err
+	}
 	syncWorkspace(a)
 	return a, nil
 }

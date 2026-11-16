@@ -10,29 +10,38 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
-// localePref is the preference that remembers, per pack, the locale its
-// statements are shown in.
+// localePref is the legacy database key, migrated to hc.yaml on open.
 const localePref = "locale"
 
 // Locale returns the locale to show the statements and titles of pack k in:
-// the one remembered for it (SetLocale) while k still declares it, else k's
-// default. It is "" when k declares no locales.
+// its pack preference, else the workspace preference, when available; else
+// the pack default. It is "" when k declares no locales.
 func (a *App) Locale(ctx context.Context, k *workspace.Pack) (string, error) {
 	if k.Manifest == nil || len(k.Manifest.Locales) == 0 {
 		return "", nil
 	}
-	st, err := a.Store()
-	if err != nil {
-		return "", err
-	}
-	v, err := st.Pref(ctx, k.Name, localePref)
-	if err != nil {
-		return "", err
-	}
+	v := a.preferredLocale(k)
 	if slices.Contains(k.Manifest.Locales, v) {
 		return v, nil
 	}
 	return k.Manifest.DefaultLocale(), nil
+}
+
+func (a *App) preferredLocale(k *workspace.Pack) string {
+	if v := a.WS.Config.PackSettings[k.Name].Locale; v != "" {
+		return v
+	}
+	return a.WS.Config.Locale
+}
+
+// LocaleFallback explains an unavailable inherited preference. Explicit locale
+// arguments are validated separately and never use this fallback.
+func (a *App) LocaleFallback(k *workspace.Pack, current string) string {
+	preferred := a.preferredLocale(k)
+	if preferred != "" && current != "" && preferred != current {
+		return fmt.Sprintf("pack %s has no locale %s, using %s", k.Name, preferred, current)
+	}
+	return ""
 }
 
 // SetLocale remembers locale, one of the locales of pack k, as the one to
@@ -41,11 +50,7 @@ func (a *App) SetLocale(ctx context.Context, k *workspace.Pack, locale string) e
 	if err := CheckLocale(k, locale); err != nil {
 		return err
 	}
-	st, err := a.Store()
-	if err != nil {
-		return err
-	}
-	return st.SetPref(ctx, k.Name, localePref, locale)
+	return a.WS.SavePackSetting(k.Name, "locale", locale)
 }
 
 // CheckLocale returns an error unless pack k declares locale.

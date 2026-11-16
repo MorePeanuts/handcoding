@@ -204,7 +204,7 @@ func TestCommandRefreshConfigurationAndSelection(t *testing.T) {
 	if m.app.WS.Config.Python.Interpreter != "another-python" || m.app.WS.Config.Language != "python" {
 		t.Fatal("configuration was not reopened")
 	}
-	if m.lang.ID() != "go" || m.selected().Ref() != selected || m.search.Value() != "tree" || m.offset != offset {
+	if m.lang.ID() != "python" || m.selected().Ref() != selected || m.search.Value() != "tree" || m.offset != offset {
 		t.Fatal("view context was not preserved")
 	}
 	st, err := m.app.Store()

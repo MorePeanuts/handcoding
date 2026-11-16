@@ -82,7 +82,7 @@ func TestUserCasesCommands(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(config, append(data, "python:\n  interpreter: python3\n"...), 0o644); err != nil {
+	if err := os.WriteFile(config, []byte(strings.Replace(string(data), `interpreter: ""`, "interpreter: python3", 1)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	ref := "regression/two-sum"

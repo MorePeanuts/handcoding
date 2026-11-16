@@ -32,15 +32,23 @@ func (m *model) loadLocales(packs []*workspace.Pack) error {
 		if err != nil {
 			return err
 		}
-		if pl := previous[k.Name]; pl != nil {
-			if slices.Contains(k.Manifest.Locales, pl.current) {
-				cur = pl.current
+		override := m.localeOverrides[k.Name]
+		if override == "" && m.opts.Problem != nil && m.opts.Problem.Pack == k.Name {
+			override = m.opts.Locale
+		}
+		if override != "" {
+			if err := app.CheckLocale(k, override); err != nil {
+				if previous[k.Name] == nil {
+					return err
+				}
+				// An updated pack may no longer offer a session override.
+				delete(m.localeOverrides, k.Name)
+				if m.opts.Problem != nil && m.opts.Problem.Pack == k.Name {
+					m.opts.Locale = ""
+				}
+			} else {
+				cur = override
 			}
-		} else if m.opts.Problem != nil && m.opts.Problem.Pack == k.Name && m.opts.Locale != "" {
-			if err := app.CheckLocale(k, m.opts.Locale); err != nil {
-				return err
-			}
-			cur = m.opts.Locale
 		}
 		m.locales[k.Name] = &packLocale{locales: k.Manifest.Locales, current: cur}
 	}
@@ -99,6 +107,10 @@ func (m *model) switchLocale(name string) {
 	if err != nil {
 		m.message = ui.Red.Render(err.Error())
 		return
+	}
+	delete(m.localeOverrides, name)
+	if m.opts.Problem != nil && m.opts.Problem.Pack == name {
+		m.opts.Locale = ""
 	}
 	pl.current = next
 	m.message = "locale: " + next

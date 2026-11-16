@@ -42,6 +42,9 @@ func (m *model) commandPack(name string) error {
 		}
 	}
 	m.pack = name
+	if err := m.loadPackLanguage(); err != nil {
+		return err
+	}
 	return m.loadGroup(name)
 }
 
@@ -57,7 +60,11 @@ func (m *model) nativeProblem(c Command) (*problem.Problem, lang.Language, error
 			err = m.app.CheckLang(p, l)
 		}
 	} else {
-		l, _, err = m.app.SolutionLang(p, c.Language)
+		name := c.Language
+		if name == "" {
+			name = m.languageOverrides[p.Pack]
+		}
+		l, _, err = m.app.SolutionLang(p, name)
 	}
 	if err != nil {
 		return nil, nil, err
@@ -95,8 +102,15 @@ func (m *model) nativeCommand(c Command) (tea.Cmd, error) {
 		}
 		var l lang.Language
 		if c.Language != "" {
-			var err error
-			l, err = m.app.Lang(c.Language)
+			name := packName
+			if name == "" {
+				name = m.pack
+			}
+			k, err := m.app.WS.Pack(name)
+			if err != nil {
+				return nil, err
+			}
+			l, _, err = m.app.PackLanguage(k, c.Language)
 			if err != nil {
 				return nil, err
 			}
@@ -106,6 +120,9 @@ func (m *model) nativeCommand(c Command) (tea.Cmd, error) {
 		}
 		if l != nil {
 			m.lang = l
+			if c.Language != "" {
+				m.languageOverrides[m.pack] = l.ID()
+			}
 		}
 		if packName != "" || groupName != "" {
 			if groupName != "" {
@@ -202,8 +219,12 @@ func (m *model) nativeCommand(c Command) (tea.Cmd, error) {
 			}
 			m.problemRoot()
 			m.lang = l
+			if c.Language != "" {
+				m.languageOverrides[m.pack] = l.ID()
+			}
 			if c.Locale != "" {
 				m.locales[p.Pack].current = c.Locale
+				m.localeOverrides[p.Pack] = c.Locale
 			}
 			m.openDetail(p, c.Action == "open")
 			return nil, nil
@@ -225,8 +246,12 @@ func (m *model) nativeCommand(c Command) (tea.Cmd, error) {
 			m.show()
 		}
 		m.lang = l
+		if c.Language != "" {
+			m.languageOverrides[m.pack] = l.ID()
+		}
 		if c.Locale != "" {
 			m.locales[p.Pack].current = c.Locale
+			m.localeOverrides[p.Pack] = c.Locale
 		}
 		m.current = p
 		var cmd tea.Cmd

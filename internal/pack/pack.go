@@ -246,7 +246,17 @@ func Copy(src, dst string) error {
 
 // Validate checks the manifest on its own. ValidateProblems checks it
 // against the pack's problems.
-func (m *Manifest) Validate() error {
+func (m *Manifest) Validate() error { return m.validate(false) }
+
+// ValidateLocal checks a workspace's own pack; only here is "local" allowed.
+func (m *Manifest) ValidateLocal() error {
+	if m.Name != LocalName {
+		return fmt.Errorf("name must be %s for the workspace's own pack", LocalName)
+	}
+	return m.validate(true)
+}
+
+func (m *Manifest) validate(local bool) error {
 	var errs []error
 	// A missing protocol decodes as 0.
 	protoErr := checkProtocol(m.Protocol)
@@ -256,7 +266,7 @@ func (m *Manifest) Validate() error {
 	if protoErr != nil {
 		errs = append(errs, protoErr)
 	}
-	if err := CheckName(m.Name); err != nil {
+	if err := CheckName(m.Name); err != nil && !local {
 		errs = append(errs, err)
 	}
 	if m.Version != "" && !semverRE.MatchString(m.Version) {

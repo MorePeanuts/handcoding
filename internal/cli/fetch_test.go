@@ -70,12 +70,7 @@ func localesWorkspace(t *testing.T, locales string) string {
 	if err := runHC(t, "init", dir); err != nil {
 		t.Fatal(err)
 	}
-	f, err := os.OpenFile(filepath.Join(dir, workspace.ConfigFile), os.O_APPEND|os.O_WRONLY, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	if _, err := f.WriteString("locales: " + locales + "\n"); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "packs", "local", "pack.yaml"), []byte("protocol: 1\nname: local\nlocales: "+locales+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return dir

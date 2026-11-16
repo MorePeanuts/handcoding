@@ -59,6 +59,8 @@ type Options struct {
 	Commands *Commands
 	// Lang is the initial language.
 	Lang lang.Language
+	// Language is an explicit CLI override for the initially selected pack.
+	Language string
 	// Theme is "dark" or "light"; empty means detect from the terminal.
 	Theme string
 	// FollowTheme switches Theme when the terminal reports a switch
@@ -100,6 +102,9 @@ type confirmation struct {
 }
 
 type model struct {
+	languageOverrides map[string]string
+	localeOverrides   map[string]string
+
 	ctx  context.Context
 	app  *app.App
 	opts Options
@@ -236,15 +241,17 @@ func programOptions(ctx context.Context) []tea.ProgramOption {
 
 func newModel(ctx context.Context, a *app.App, opts Options) (*model, error) {
 	m := &model{
-		ctx:   ctx,
-		app:   a,
-		opts:  opts,
-		lang:  opts.Lang,
-		md:    ui.NewMarkdown(opts.Theme, opts.Images),
-		st:    newStyles(opts.Theme),
-		stack: []screen{screenList},
-		copy:  clipboard.WriteAll,
-		open:  openFiles,
+		ctx:               ctx,
+		app:               a,
+		opts:              opts,
+		lang:              opts.Lang,
+		languageOverrides: map[string]string{},
+		localeOverrides:   map[string]string{},
+		md:                ui.NewMarkdown(opts.Theme, opts.Images),
+		st:                newStyles(opts.Theme),
+		stack:             []screen{screenList},
+		copy:              clipboard.WriteAll,
+		open:              openFiles,
 	}
 	m.search = textinput.New()
 	m.search.Prompt = "/"
@@ -261,6 +268,12 @@ func newModel(ctx context.Context, a *app.App, opts Options) (*model, error) {
 	}
 	if err := m.reload(); err != nil {
 		return nil, err
+	}
+	if opts.Language != "" {
+		m.languageOverrides[m.pack] = opts.Language
+		if err := m.loadPackLanguage(); err != nil {
+			return nil, err
+		}
 	}
 	if opts.Problem != nil {
 		if err := m.openInitialProblem(opts.Problem); err != nil {
@@ -363,6 +376,9 @@ func (m *model) pop() {
 	if m.top() == screenHistory {
 		m.loadHistory()
 	}
+	if err := m.loadActiveLanguage(); err != nil {
+		m.message = ui.Red.Render(err.Error())
+	}
 	m.layout()
 }
 
@@ -430,6 +446,9 @@ func (m *model) reload() error {
 	var current string
 	if p := m.selected(); p != nil {
 		current = p.Ref()
+	}
+	if err := m.loadActiveLanguage(); err != nil {
+		return err
 	}
 	m.selectProblems()
 	for i, idx := range m.visible {

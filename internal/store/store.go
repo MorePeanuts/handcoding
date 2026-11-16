@@ -379,6 +379,25 @@ func (s *Store) SetPref(ctx context.Context, pack, key, value string) error {
 	return err
 }
 
+// Prefs returns all stored values of a key, indexed by pack. Used to migrate
+// settings out of the database without losing preferences for absent packs.
+func (s *Store) Prefs(ctx context.Context, key string) (map[string]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT pack, value FROM prefs WHERE key = ?`, key)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := map[string]string{}
+	for rows.Next() {
+		var pack, value string
+		if err := rows.Scan(&pack, &value); err != nil {
+			return nil, err
+		}
+		result[pack] = value
+	}
+	return result, rows.Err()
+}
+
 // Status summarizes the best result per problem.
 type Status struct {
 	Attempts int

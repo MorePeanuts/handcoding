@@ -169,8 +169,8 @@ func TestPackCheckout(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "problems", "0001-two-sum", "problem.yaml")); err != nil {
 		t.Errorf("import onto itself deleted the problem: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "hc.yaml")); err == nil {
-		t.Error("hc wrote hc.yaml into the checkout")
+	if _, err := os.Stat(filepath.Join(dir, "hc.yaml")); err != nil {
+		t.Error("hc did not materialize personal settings in the checkout")
 	}
 
 	// A pack.yaml of a newer protocol is reported by validate.
