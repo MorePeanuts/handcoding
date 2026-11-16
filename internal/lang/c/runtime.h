@@ -256,9 +256,13 @@ static void hc_check_copy(void* ptr, int kind, hc_nodes before) {
     }
 }
 static void hc_trim(yyjson_mut_val* a) {
-    while (yyjson_mut_arr_size(a) &&
-           yyjson_mut_is_null(yyjson_mut_arr_get_last(a)))
-        yyjson_mut_arr_remove_last(a);
+    // Mutable arrays are linked lists: removing each tail separately is quadratic.
+    size_t i, len, keep = 0;
+    yyjson_mut_val* v;
+    yyjson_mut_arr_foreach(a, i, len, v) {
+        if (!yyjson_mut_is_null(v)) keep = i + 1;
+    }
+    if (keep < len) yyjson_mut_arr_remove_range(a, keep, len - keep);
 }
 static hc_value hc_decode(yyjson_val*, int, int);
 static yyjson_mut_val* hc_encode(hc_value, int, int);
@@ -334,8 +338,9 @@ static void* hc_decode_node(yyjson_val* v, int kind) {
         nodes[i] = hc_alloc(1, sizeof(**nodes));
         nodes[i]->val = (int)i + 1;
     }
-    for (size_t i = 0; i < len; i++) {
-        yyjson_val* a = yyjson_arr_get(v, i);
+    size_t i, count;
+    yyjson_val* a;
+    yyjson_arr_foreach(v, i, count, a) {
         nodes[i]->numNeighbors = hc_size(yyjson_arr_size(a));
         nodes[i]->neighbors = hc_alloc(yyjson_arr_size(a), sizeof(*nodes));
         for (int j = 0; j < nodes[i]->numNeighbors; j++) {
@@ -369,13 +374,15 @@ static void* hc_decode_node(yyjson_val* v, int kind) {
 #ifdef HC_RANDOM
     size_t len = yyjson_arr_size(v);
     struct Node** nodes = hc_alloc(len, sizeof(*nodes));
-    for (size_t i = 0; i < len; i++) {
+    size_t i, count;
+    yyjson_val* row;
+    yyjson_arr_foreach(v, i, count, row) {
         nodes[i] = hc_alloc(1, sizeof(**nodes));
-        nodes[i]->val = yyjson_get_int(yyjson_arr_get(yyjson_arr_get(v, i), 0));
+        nodes[i]->val = yyjson_get_int(yyjson_arr_get(row, 0));
         if (i) nodes[i - 1]->next = nodes[i];
     }
-    for (size_t i = 0; i < len; i++) {
-        yyjson_val* r = yyjson_arr_get(yyjson_arr_get(v, i), 1);
+    yyjson_arr_foreach(v, i, count, row) {
+        yyjson_val* r = yyjson_arr_get(row, 1);
         if (!yyjson_is_null(r)) {
             int j = yyjson_get_int(r);
             hc_check(j >= 0 && (size_t)j < len, "invalid random pointer");
@@ -385,18 +392,19 @@ static void* hc_decode_node(yyjson_val* v, int kind) {
     return nodes[0];
 #endif
 #if defined(HC_NEXT) || defined(HC_QUAD)
-    if (yyjson_is_null(yyjson_arr_get(v, 0))) return NULL;
+    yyjson_arr_iter iter = yyjson_arr_iter_with(v);
+    yyjson_val* first = yyjson_arr_iter_next(&iter);
+    if (yyjson_is_null(first)) return NULL;
     hc_nodes q = {0};
     struct Node* root = hc_alloc(1, sizeof(*root));
     hc_push(&q, root);
-    size_t pos = 1;
 #ifdef HC_NEXT
-    root->val = yyjson_get_int(yyjson_arr_get(v, 0));
+    root->val = yyjson_get_int(first);
 #else
-    root->isLeaf = yyjson_get_int(yyjson_arr_get(yyjson_arr_get(v, 0), 0)) != 0;
-    root->val = yyjson_get_int(yyjson_arr_get(yyjson_arr_get(v, 0), 1)) != 0;
+    root->isLeaf = yyjson_get_int(yyjson_arr_get(first, 0)) != 0;
+    root->val = yyjson_get_int(yyjson_arr_get(first, 1)) != 0;
 #endif
-    for (size_t i = 0; i < q.size && pos < yyjson_arr_size(v); i++) {
+    for (size_t i = 0; i < q.size && yyjson_arr_iter_has_next(&iter); i++) {
         struct Node* n = q.items[i];
 #ifdef HC_NEXT
         struct Node** links[] = {&n->left, &n->right};
@@ -405,9 +413,9 @@ static void* hc_decode_node(yyjson_val* v, int kind) {
                                  &n->bottomRight};
 #endif
         for (size_t k = 0;
-             k < sizeof(links) / sizeof(*links) && pos < yyjson_arr_size(v);
-             k++, pos++) {
-            yyjson_val* x = yyjson_arr_get(v, pos);
+             k < sizeof(links) / sizeof(*links) && yyjson_arr_iter_has_next(&iter);
+             k++) {
+            yyjson_val* x = yyjson_arr_iter_next(&iter);
             if (yyjson_is_null(x)) continue;
             struct Node* c = hc_alloc(1, sizeof(*c));
 #ifdef HC_NEXT
@@ -640,8 +648,11 @@ static hc_value hc_decode(yyjson_val* v, int kind, int depth) {
                      depth > 1 ? sizeof(void*) : hc_width(kind));
         if (depth > 1) out.rows = hc_alloc(out.size, sizeof(int));
         if (depth > 2) out.cols = hc_alloc(out.size, sizeof(int*));
-        for (int i = 0; i < out.size; i++) {
-            hc_value child = hc_decode(yyjson_arr_get(v, i), kind, depth - 1);
+        // Nested JSON elements have variable width; indexed lookup scans them.
+        size_t i, count;
+        yyjson_val* element;
+        yyjson_arr_foreach(v, i, count, element) {
+            hc_value child = hc_decode(element, kind, depth - 1);
             if (depth > 1) {
                 ((void**)out.data)[i] = child.data;
                 out.rows[i] = child.size;

@@ -248,12 +248,12 @@ func Driver(p *problem.Problem) (string, error) {
 		}
 		s.WriteString("return out;\n")
 	} else if p.Kind == problem.KindClass {
-		s.WriteString("yyjson_val *ops=yyjson_obj_get(input,\"ops\"), *args=yyjson_obj_get(input,\"args\"); yyjson_mut_val *out=hc_arr();\n")
-		a := emitArgs(&s, p.Class.Constructor, "yyjson_arr_get(args,0)", "ctor")
+		s.WriteString("yyjson_val *ops=yyjson_obj_get(input,\"ops\"), *args=yyjson_obj_get(input,\"args\"); yyjson_mut_val *out=hc_arr();\nyyjson_arr_iter op_iter=yyjson_arr_iter_with(ops), arg_iter=yyjson_arr_iter_with(args);\nyyjson_arr_iter_next(&op_iter); yyjson_val *ctor_args=yyjson_arr_iter_next(&arg_iter);\n")
+		a := emitArgs(&s, p.Class.Constructor, "ctor_args", "ctor")
 		if b.Object != "none" {
 			fmt.Fprintf(&s, "hc_start(); %s obj=%s(%s); hc_stop();\n", objectType(b), b.Constructor, strings.Join(a, ","))
 		}
-		s.WriteString("hc_add(out,hc_null()); for(size_t i=1;i<yyjson_arr_size(ops);i++){yyjson_val *a=yyjson_arr_get(args,i); const char *op=yyjson_get_str(yyjson_arr_get(ops,i));\n")
+		s.WriteString("hc_add(out,hc_null()); while(yyjson_arr_iter_has_next(&op_iter)){yyjson_val *a=yyjson_arr_iter_next(&arg_iter); const char *op=yyjson_get_str(yyjson_arr_iter_next(&op_iter));\n")
 		for i, m := range p.Class.Methods {
 			prefix := ""
 			if i > 0 {
