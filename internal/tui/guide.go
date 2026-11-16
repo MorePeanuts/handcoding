@@ -66,9 +66,10 @@ In this guide, / searches topic titles and their full text. Tab / Shift+Tab or U
 
 Press , on a browsing page, or run :settings. :settings --pack regression opens that pack's preferences directly. Esc returns to your previous page and position.
 
+- The footer lists every action and wraps on narrow terminals.
 - s chooses Workspace or a pack. Pack scope exposes only solution language and statement locale; both can inherit workspace preferences.
 - Left/Right or Tab / Shift+Tab changes category tabs. / searches names, YAML keys, categories and descriptions across all categories. Enter finishes searching; Esc clears the query.
-- Enter edits one setting. Choose a value or type it, then Enter saves immediately. Esc cancels an unfinished edit.
+- Enter expands a setting in place. Choose a value or type it directly below the row; Enter saves and collapses, Esc cancels and collapses. The third column previews the description; expansion shows it in full. Page Up/Down scrolls long descriptions without moving the control.
 - r restores the built-in default in workspace scope, or removes the override in pack scope. Saved and effective values show when a pack needs a fallback or a command has a temporary override.
 - e opens hc.yaml in your configured editor. Return to reload it; invalid YAML leaves the last working settings active and displays an error.
 - d runs read-only doctor checks in the background. Choose runtime, terminal debugger or editor debugger; Esc cancels or closes the report. Workspace scope checks the preferred language and Python; pack scope uses that pack's effective saved language.

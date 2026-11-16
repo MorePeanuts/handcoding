@@ -32,6 +32,8 @@ type settingsPage struct {
 	cursor, offset         int
 	search, input          textinput.Model
 	searching, editing     bool
+	inspecting             bool
+	detailOffset           int
 	key                    string
 	picker                 string
 	choices                []settingChoice
@@ -147,9 +149,9 @@ func (m *model) selectedSetting() *app.SettingValue {
 	return &s.rows[s.visible[min(s.cursor, len(s.visible)-1)]]
 }
 
-// Reserve a stable inspector below a one-line-per-setting list.
+// The table uses the full body; editing inserts a panel below its selected row.
 func (m *model) settingsListHeight() int {
-	return max(m.settingsBodyHeight()-m.settingsDetailHeight()-1, 1)
+	return m.settingsBodyHeight()
 }
 
 func (m *model) settingsPick(kind string, choices []settingChoice, current string) {
@@ -196,12 +198,15 @@ func (m *model) editSetting() tea.Cmd {
 		return nil
 	}
 	s.key = r.Key
+	s.detailOffset = 0
 	if r.YAMLOnly {
+		s.inspecting = true
 		m.message = "Use e to edit the argv array in hc.yaml, or r to reset it."
 		return nil
 	}
 	if r.Key == "execution.backend" {
-		m.message = r.Description
+		s.inspecting = true
+		m.message = ""
 		return nil
 	}
 	var choices []settingChoice
@@ -239,6 +244,7 @@ func (m *model) saveSetting(value string, reset bool) tea.Cmd {
 		return nil
 	}
 	s.editing = false
+	s.inspecting = false
 	s.picker = ""
 	s.input.Blur()
 	// A deliberate preference change supersedes temporary command overrides.
@@ -405,6 +411,26 @@ func (m *model) finishSettingsDoctor(msg settingsDoctorMsg) {
 func (m *model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 	s := m.settings
 	key, pressed := msg.(tea.KeyPressMsg)
+	if pressed && s.expanded() && (key.String() == "pgdown" || key.String() == "pgup") {
+		step := max(m.settingsBodyHeight()/2, 1)
+		if key.String() == "pgup" {
+			step = -step
+		}
+		s.detailOffset = max(s.detailOffset+step, 0)
+		return m, nil
+	}
+	if s.inspecting && pressed {
+		switch key.String() {
+		case "esc", "q", "enter":
+			s.inspecting = false
+			m.message = ""
+		case "e":
+			return m, m.editSettingsYAML()
+		case "r":
+			return m, m.saveSetting("", true)
+		}
+		return m, nil
+	}
 	if s.editing || s.searching {
 		if pressed {
 			switch key.String() {
@@ -459,7 +485,7 @@ func (m *model) updateSettings(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if s.picker != "" {
-		if scrollList(k, &s.choice, &s.choiceOffset, len(s.choices), m.settingsBodyHeight()) {
+		if scrollList(k, &s.choice, &s.choiceOffset, len(s.choices), m.settingsChoiceHeight()) {
 			return m, nil
 		}
 		switch k {

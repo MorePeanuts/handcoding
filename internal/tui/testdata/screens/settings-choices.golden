@@ -1,20 +1,20 @@
- hc   Settings · regression
-  Choose language
+ hc   Settings · Pack: regression
+
+ All   General
+
+  SETTING               VALUE            DESCRIPTION
 ────────────────────────────────────────────────────────────
-▌ Inherit workspace
-  go
-  python
-
-
-
-
-
-
-
-
-
-
+▌ Solution language     go · inherited   Preferred solution…
+    › Inherit workspace
+      go
+      python
+    Preferred solution language. Unavailable preferences
+    fall back without changing the saved value.
+    language · Saved: inherit workspace
+    Effective: go · Source: Workspace
+  Statement locale      en · inherited   Preferred statemen…
 
 ────────────────────────────────────────────────────────────
 
- enter choose    esc cancel    ? help
+
+ enter save   pgup/pgdown description   esc cancel

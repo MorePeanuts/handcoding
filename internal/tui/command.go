@@ -36,7 +36,7 @@ func (m *model) canCommand() bool {
 	}
 	switch m.top() {
 	case screenSettings:
-		return m.settings != nil && !m.settings.editing && !m.settings.searching && m.settings.picker == "" && !m.settings.showReport
+		return m.settings != nil && !m.settings.editing && !m.settings.inspecting && !m.settings.searching && m.settings.picker == "" && !m.settings.showReport
 	case screenGuide:
 		return m.guide != nil && !m.guide.searching
 	case screenCaseForm, screenNoteForm, screenGroupForm:

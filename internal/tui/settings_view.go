@@ -10,17 +10,48 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/ui"
 )
 
+const settingsHeaderLines = 6 // title, blank, categories, blank, columns, rule
+
+var settingsBrowseKeys = []string{"enter edit", "s scope", "e YAML", "d doctor", "r reset", "/ search", "tab category", "? help", "esc back"}
+
+func (s *settingsPage) expanded() bool { return s.editing || s.picker == "value" || s.inspecting }
+
+// Wrap complete key hints instead of silently dropping actions that do not fit.
+func (m *model) settingsKeyLines(keys []string) []string {
+	lines := []string{""}
+	for _, hint := range keys {
+		key, label, _ := strings.Cut(hint, " ")
+		part := m.st.key.Render(" "+key+" ") + ui.Faint.Render(label)
+		last := len(lines) - 1
+		gap := "  "
+		if lines[last] == "" {
+			gap = ""
+		}
+		if lipgloss.Width(lines[last]+gap+part) > m.width && lines[last] != "" {
+			lines = append(lines, part)
+		} else {
+			lines[last] += gap + part
+		}
+	}
+	return lines
+}
+
+func (m *model) settingsFooterHeight() int {
+	return 2 + len(m.settingsKeyLines(settingsBrowseKeys))
+}
+
 func (m *model) settingsBodyHeight() int {
-	return max(m.height-headerLines-footerLines, 1)
+	return max(m.height-settingsHeaderLines-m.settingsFooterHeight(), 1)
 }
 
-func (m *model) settingsDetailHeight() int {
-	return min(6, max(m.settingsBodyHeight()-3, 0))
+func (m *model) settingsChoiceHeight() int {
+	if m.settings.picker == "value" {
+		return max((m.settingsBodyHeight()-1)/3, 1)
+	}
+	return m.settingsBodyHeight()
 }
 
-// Every settings mode occupies the same body rectangle. Description wrapping,
-// filtered lists and pickers must never move the shared footer off its row.
-func (m *model) settingsFrame(title, subtitle string, lines []string, right string, keys ...string) string {
+func (m *model) settingsFrame(title, subtitle, columns string, lines []string, keys []string) string {
 	h := m.settingsBodyHeight()
 	lines = append([]string(nil), lines[:min(len(lines), h)]...)
 	for len(lines) < h {
@@ -29,7 +60,17 @@ func (m *model) settingsFrame(title, subtitle string, lines []string, right stri
 	for i := range lines {
 		lines[i] = clip(lines[i], m.width)
 	}
-	return m.frame(title, subtitle, strings.Join(lines, "\n"), right, keys...)
+	help := m.settingsKeyLines(keys)
+	for len(help) < m.settingsFooterHeight()-2 {
+		help = append([]string{""}, help...)
+	}
+	status := m.message
+	if m.confirm != nil {
+		status = ui.Yellow.Render(m.confirm.prompt + " [y/N]")
+	}
+	status = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(status)
+	header := clip(title, m.width) + "\n\n" + clip(subtitle, m.width) + "\n\n" + clip(columns, m.width) + "\n" + m.rule()
+	return header + "\n" + strings.Join(lines, "\n") + "\n" + m.rule() + "\n" + clip(status, m.width) + "\n" + strings.Join(help, "\n")
 }
 
 func (m *model) layoutSettings() {
@@ -38,7 +79,7 @@ func (m *model) layoutSettings() {
 		return
 	}
 	s.search.SetWidth(max(m.width-4, 1))
-	s.input.SetWidth(max(m.width-4, 1))
+	s.input.SetWidth(max(m.width-6, 1))
 	s.report.SetWidth(max(m.width-1, 1))
 	s.report.SetHeight(m.settingsBodyHeight())
 	s.report.SetContent(wrap(s.reportText, max(m.width-2, 1)))
@@ -68,13 +109,11 @@ func (m *model) settingsTabs() string {
 		case "Coding agent":
 			category = "Agent"
 		}
-		label := " " + category + " "
-		labels[i] = m.st.tab.Render(label)
+		labels[i] = m.st.tab.Render(" " + category + " ")
 		if i == s.category {
-			labels[i] = m.st.badge.Render(label)
+			labels[i] = m.chip(m.st.accent.Bold(true), category)
 		}
 	}
-	// Keep the active tab visible at narrow widths, with overflow indicators.
 	first, last := 0, len(labels)
 	for last-first > 1 && lipgloss.Width(strings.Join(labels[first:last], " "))+4 > m.width {
 		if last-1 > s.category {
@@ -93,36 +132,57 @@ func (m *model) settingsTabs() string {
 	return bar
 }
 
-func (m *model) settingsDetails() []string {
-	h := m.settingsDetailHeight()
-	lines := make([]string, h)
-	if h == 0 {
-		return lines
+func (m *model) settingsColumns() (name, value, description int) {
+	name = min(26, max(m.width/3, 1))
+	value = min(32, max(m.width/4, 1))
+	description = max(m.width-name-value-6, 1)
+	return
+}
+
+// Inline controls always remain next to the selected row. Long explanations
+// scroll independently with Page Up/Down, so the input never leaves the view.
+func (m *model) settingsExpansion() []string {
+	s := m.settings
+	pref := m.selectedSetting()
+	if pref == nil {
+		return nil
 	}
-	r := m.selectedSetting()
-	if r == nil {
-		lines[0] = ui.Faint.Render("  No matching settings. Esc clears the search.")
-		return lines
-	}
-	lines[0] = "  " + ui.Bold.Render(r.Label) + ui.Faint.Render(" · "+r.Key)
-	description := r.Description
-	if r.Note != "" {
-		description = r.Note + " " + description
-	}
-	wrapped := strings.Split(wrap(description, max(m.width-4, 1)), "\n")
-	for i := 0; i < min(len(wrapped), max(h-3, 0)); i++ {
-		lines[i+1] = "  " + ui.Faint.Render(wrapped[i])
-	}
-	if h >= 3 {
-		saved := strconv.Quote(r.Saved)
-		if r.Inherited {
-			saved = "inherit workspace"
+	h := max(m.settingsBodyHeight()-1, 1)
+	var lines []string
+	if s.editing {
+		lines = append(lines, "    "+s.input.View())
+	} else if s.picker == "value" {
+		count := min(len(s.choices), m.settingsChoiceHeight())
+		keepVisible(&s.choice, &s.choiceOffset, len(s.choices), count)
+		for i := s.choiceOffset; i < min(s.choiceOffset+count, len(s.choices)); i++ {
+			style, mark := ui.Faint, "  "
+			if i == s.choice {
+				style, mark = m.st.accent.Bold(true), "› "
+			}
+			lines = append(lines, "    "+style.Render(mark+fit(s.choices[i].label, max(m.width-6, 1))))
 		}
-		lines[h-2] = "  " + ui.Faint.Render("Saved: "+saved)
-		lines[h-1] = "  " + ui.Faint.Render("Effective: "+settingDisplay(r.Key, r.Effective)+" · Source: "+r.Source)
 	}
-	if m.settings.editing {
-		lines[h-1] = "  " + m.settings.input.View()
+	saved := strconv.Quote(pref.Saved)
+	if pref.Inherited {
+		saved = "inherit workspace"
+	}
+	description := pref.Description
+	if pref.Note != "" {
+		description += "\n" + pref.Note
+	}
+	description += "\n" + pref.Key + " · Saved: " + saved + "\nEffective: " + settingDisplay(pref.Key, pref.Effective) + " · Source: " + pref.Source
+	detail := strings.Split(wrap(description, max(m.width-6, 1)), "\n")
+	room := max(h-len(lines), 1)
+	overflow := len(detail) > room
+	if overflow && room > 1 {
+		room--
+	}
+	s.detailOffset = bound(s.detailOffset, 0, len(detail)-room)
+	for _, line := range detail[s.detailOffset:min(s.detailOffset+room, len(detail))] {
+		lines = append(lines, "    "+ui.Faint.Render(line))
+	}
+	if overflow && len(lines) < h {
+		lines = append(lines, "    "+ui.Faint.Render(fmt.Sprintf("pgup/pgdown · description %d–%d/%d", s.detailOffset+1, min(s.detailOffset+room, len(detail)), len(detail))))
 	}
 	return lines
 }
@@ -133,46 +193,46 @@ func (m *model) viewSettings() string {
 	scope := "Workspace"
 	if s.scope != "" {
 		scope = "Pack: " + s.scope
-		if m.width < 80 {
-			scope = s.scope
-		}
 	}
-	actions := "s scope · e YAML · d doctor"
-	if s.picker != "" || s.showReport || s.editing || s.searching {
-		actions = ""
-	}
-	title := padBetween(m.badge()+"  Settings · "+scope, ui.Faint.Render(actions), m.width)
+	title := m.badge() + "  " + ui.Faint.Render("Settings · "+scope)
 	if s.showReport {
-		return m.settingsFrame(title, ui.Faint.Render("  Doctor · read-only diagnostics"), strings.Split(withScrollbar(s.report, m.st.accent), "\n"), "", "esc back / cancel")
+		return m.settingsFrame(title, m.chip(m.st.accent.Bold(true), "Doctor"), ui.Faint.Render("  Read-only diagnostics"), strings.Split(withScrollbar(s.report, m.st.accent), "\n"), []string{"? help", "esc back / cancel"})
 	}
-	if s.picker != "" {
-		labels := map[string]string{"scope": "Choose scope", "value": "Choose " + s.key, "doctor": "Choose diagnostic checks"}
+	if s.picker != "" && s.picker != "value" {
+		label := "Choose scope"
+		if s.picker == "doctor" {
+			label = "Choose diagnostic checks"
+		}
 		h := m.settingsBodyHeight()
 		keepVisible(&s.choice, &s.choiceOffset, len(s.choices), h)
 		var lines []string
 		for i := s.choiceOffset; i < min(len(s.choices), s.choiceOffset+h); i++ {
 			r := newRow(nil)
-			selected := i == s.choice
 			style := ui.Plain
-			if selected {
-				r.bg = m.st.sel
-				style = m.st.accent
+			if i == s.choice {
+				r.bg, style = m.st.sel, m.st.accent
 			}
-			m.cursorBar(r, selected)
+			m.cursorBar(r, i == s.choice)
 			r.add(style, fit(s.choices[i].label, max(m.width-2, 1)))
 			lines = append(lines, r.fill(m.width))
 		}
-		return m.settingsFrame(title, "  "+ui.Bold.Render(labels[s.picker]), lines, "", "enter choose", "esc cancel")
+		return m.settingsFrame(title, m.chip(m.st.accent.Bold(true), label), "", lines, []string{"enter choose", "? help", "esc cancel"})
 	}
 	subtitle := m.settingsTabs()
 	if s.searching || s.search.Value() != "" {
 		subtitle = "  " + s.search.View()
 	}
-	h := m.settingsListHeight()
-	lines := make([]string, h)
-	labelWidth := min(26, max((m.width-6)/2, 1))
-	valueWidth := max(m.width-labelWidth-6, 1)
-	for i := s.offset; i < min(len(s.visible), s.offset+h); i++ {
+	nameW, valueW, descW := m.settingsColumns()
+	columns := ui.Faint.Render("  " + fit("SETTING", nameW) + "  " + fit("VALUE", valueW) + "  " + fit("DESCRIPTION", descW))
+	var expansion []string
+	if s.expanded() {
+		expansion = m.settingsExpansion()
+		// Make space below the selected row without moving focus to a
+		// separate screen or a distant bottom panel.
+		s.offset = max(s.offset, s.cursor+1+len(expansion)-m.settingsBodyHeight())
+	}
+	var lines []string
+	for i := s.offset; i < len(s.visible) && len(lines) < m.settingsBodyHeight(); i++ {
 		pref := s.rows[s.visible[i]]
 		value := settingDisplay(pref.Key, pref.Saved)
 		if pref.Inherited {
@@ -186,35 +246,25 @@ func (m *model) viewSettings() string {
 			labelStyle, valueStyle = m.st.accent.Bold(true), m.st.accent
 		}
 		m.cursorBar(r, selected)
-		r.add(labelStyle, fit(pref.Label, labelWidth)).plain("  ").add(valueStyle, fit(value, valueWidth))
-		line := r.fill(max(m.width-1, 1))
-		if len(s.visible) > h {
-			thumb := max(h*h/len(s.visible), 1)
-			start := s.offset * (h - thumb) / (len(s.visible) - h)
-			if i-s.offset >= start && i-s.offset < start+thumb {
-				line += m.st.accent.Render("┃")
-			} else {
-				line += ui.Faint.Render("│")
-			}
+		r.add(labelStyle, fit(pref.Label, nameW)).plain("  ").add(valueStyle, fit(value, valueW)).plain("  ").add(ui.Faint, fit(pref.Description, descW))
+		lines = append(lines, r.fill(m.width))
+		if selected {
+			lines = append(lines, expansion...)
 		}
-		lines[i-s.offset] = line
 	}
 	if len(s.visible) == 0 {
-		lines[0] = ui.Faint.Render("  No matching settings")
+		lines = append(lines, ui.Faint.Render("  No matching settings"))
 	}
-	lines = append(lines, m.rule())
-	lines = append(lines, m.settingsDetails()...)
-	keys := []string{"enter edit", "esc back", "/ search", "r reset", "←/→ category"}
-	right := ""
-	if m.width >= 100 {
-		right = fmt.Sprintf("%d settings", len(s.visible))
-	}
-	if s.editing {
-		keys, right = []string{"enter save", "esc cancel"}, ""
-	} else if s.searching {
+	keys := settingsBrowseKeys
+	switch {
+	case s.editing || s.picker == "value":
+		keys = []string{"enter save", "pgup/pgdown description", "esc cancel"}
+	case s.inspecting:
+		keys = []string{"e YAML", "r reset", "pgup/pgdown description", "esc collapse"}
+	case s.searching:
 		keys = []string{"enter browse", "esc clear"}
 	}
-	return m.settingsFrame(title, subtitle, lines, right, keys...)
+	return m.settingsFrame(title, subtitle, columns, lines, keys)
 }
 
-var settingsKeys = []string{"enter edit / confirm one setting", "r restore default / inherit workspace", "s choose workspace or pack", "left/right or tab/shift+tab next/previous category", "/ search settings in all categories", "e open hc.yaml in your editor", "d run doctor", "esc cancel edit / back", "q back (outside text editing)"}
+var settingsKeys = []string{"enter expand / edit / confirm one setting", "r restore default / inherit workspace", "s choose workspace or pack", "left/right or tab/shift+tab next/previous category", "/ search settings in all categories", "e open hc.yaml in your editor", "d run doctor", "pgup/pgdown scroll expanded description", "esc cancel edit / back", "q back (outside text editing)"}

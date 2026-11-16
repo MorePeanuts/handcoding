@@ -1,8 +1,15 @@
- hc   Settings · Pack: regression                                        s scope · e YAML · d doctor
+ hc   Settings · Pack: regression
+
  All   General
+
+  SETTING                     VALUE                      DESCRIPTION
 ────────────────────────────────────────────────────────────────────────────────────────────────────
-▌ Solution language           go · inherited
-  Statement locale            en · inherited
+▌ Solution language           go · inherited             Preferred solution language. Unavailable p…
+  Statement locale            en · inherited             Preferred statement language (for example …
+
+
+
+
 
 
 
@@ -19,12 +26,5 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
-  Solution language · language
-  Preferred solution language. Unavailable preferences fall back without changing the saved value.
 
-
-  Saved: inherit workspace
-  Effective: go · Source: Workspace
-────────────────────────────────────────────────────────────────────────────────────────────────────
-
- enter edit    esc back    / search    r reset    ←/→ category    ? help                  2 settings
+ enter edit   s scope   e YAML   d doctor   r reset   / search   tab category   ? help   esc back

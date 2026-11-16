@@ -550,7 +550,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case commandDoneMsg:
 		return m, m.finishCommand(msg)
 	case tea.FocusMsg:
-		if m.top() == screenSettings && m.settings != nil && !m.settings.editing && !m.settings.searching && m.settings.picker == "" && !m.settings.showReport {
+		if m.top() == screenSettings && m.settings != nil && !m.settings.editing && !m.settings.inspecting && !m.settings.searching && m.settings.picker == "" && !m.settings.showReport {
 			return m, m.refreshSettings()
 		}
 		// Another tmux client may have attached, without the images (see
