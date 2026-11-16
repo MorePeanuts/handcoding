@@ -36,6 +36,9 @@ func Settings() []Setting {
 		{Key: "cpp.debugger", Label: "C++ debugger", Category: "Execution & tools", Description: "Terminal GDB or LLDB executable. Editor debugging is not supported for C++."},
 		{Key: "cpp.standard", Label: "C++ standard", Category: "Execution & tools", Description: "C++17 minimum, C++23 default. The selected compiler must support the requested standard."},
 		{Key: "cpp.sanitizers", Label: "C++ sanitizers", Category: "Execution & tools", Description: "Optional address/undefined behavior diagnostics. References use the same options; leak reporting is disabled because each case owns its process.", Choices: []string{"none", "address", "undefined", "address,undefined"}},
+		{Key: "javascript.command", Label: "Node.js", Category: "Execution & tools", Description: "Local Node.js 22 or later, shared by JavaScript and TypeScript. Executable name or workspace-relative path."},
+		{Key: "javascript.npm", Label: "npm", Category: "Execution & tools", Description: "Local npm executable. Installs locked JS/TS libraries into .hc/node on first use; no global packages or install scripts."},
+		{Key: "typescript.command", Label: "TypeScript compiler", Category: "Execution & tools", Description: "Local tsc 5.7 or later. Compiles and type-checks TypeScript; hc does not install the compiler."},
 		{Key: "java.home", Label: "Java JDK", Category: "Execution & tools", Description: "JDK directory, relative to the workspace or absolute. Empty uses JAVA_HOME, then the JDK selected on PATH. hc never installs a JDK."},
 		{Key: "java.jvm_args", Label: "Java VM options", Category: "Execution & tools", Description: "VM tuning and system properties for solutions and references. Edit the argument array in YAML. Default: a 16 MB thread stack.", YAMLOnly: true},
 		{Key: "python.interpreter", Label: "Python interpreter", Category: "Execution & tools", Description: "Empty keeps hc's managed .hc/venv. A command or path selects an external Python and bypasses management. Editing never sets up an environment."},
@@ -60,6 +63,7 @@ func settingValues(c workspace.Config) map[string]string {
 	argv, _ := json.Marshal(command)
 	vmargs, _ := json.Marshal(c.Java.JVMArgs)
 	return map[string]string{
+		"javascript.command": c.JavaScript.Command, "javascript.npm": c.JavaScript.NPM, "typescript.command": c.TypeScript.Command,
 		"java.home": c.Java.Home, "java.jvm_args": string(vmargs),
 		"language": c.Language, "locale": c.Locale, "editor": c.Editor, "theme": c.Theme, "images": c.Images, "timeout": c.Timeout,
 		"execution.backend": c.Execution.Backend, "go.command": c.Go.Command, "go.debugger": c.Go.Debugger,
@@ -203,7 +207,7 @@ func (a *App) SavePreference(scope, key, value string, reset bool) (warning stri
 		if err := cpp.CheckStandard(value); err != nil {
 			return "", err
 		}
-	case "go.command", "go.debugger", "cpp.command", "cpp.debugger":
+	case "go.command", "go.debugger", "cpp.command", "cpp.debugger", "javascript.command", "javascript.npm", "typescript.command":
 		if strings.TrimSpace(value) == "" {
 			return "", fmt.Errorf("%s must name an executable", key)
 		}
@@ -211,7 +215,7 @@ func (a *App) SavePreference(scope, key, value string, reset bool) (warning stri
 	if err := a.WS.SaveGlobalSetting(key, value); err != nil {
 		return "", err
 	}
-	if key == "cpp.command" || key == "cpp.debugger" || key == "go.command" || key == "go.debugger" || key == "python.interpreter" && value != "" {
+	if key == "javascript.npm" || key == "javascript.command" || key == "typescript.command" || key == "cpp.command" || key == "cpp.debugger" || key == "go.command" || key == "go.debugger" || key == "python.interpreter" && value != "" {
 		if _, err := lang.ResolveExecutable(lang.ExecutableName(a.WS.Root, value)); err != nil {
 			return "Saved; executable not found or not executable. Run doctor to inspect the environment.", nil
 		}

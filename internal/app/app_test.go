@@ -483,3 +483,40 @@ func TestJavaMinimumVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestECMAScriptReferences(t *testing.T) {
+	t.Parallel()
+	requireTools(t, "node", "npm", "tsc", "python3")
+	a := newWorkspace(t)
+	probs, err := a.WS.Problems()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range probs {
+		t.Run(p.Slug, func(t *testing.T) {
+			t.Parallel()
+			cases, err := p.LoadCases()
+			if err != nil {
+				t.Fatal(err)
+			}
+			sel, _ := app.Select(cases, nil, true)
+			if err = a.Materialize(context.Background(), p, mustLang(t, a, "python"), sel, app.RunOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			for _, id := range []string{"javascript", "typescript"} {
+				rep, _, err := a.RunReference(context.Background(), p, id, sel, app.RunOptions{})
+				if err != nil {
+					t.Fatalf("%s: %v", id, err)
+				}
+				if rep.Verdict != runner.Accepted {
+					t.Errorf("%s: %s %s", id, rep.Verdict, rep.CompileError)
+					for _, c := range rep.Cases {
+						if c.Verdict != runner.Accepted {
+							t.Logf("case %d: %s %s", c.Index, c.Error, c.Output)
+						}
+					}
+				}
+			}
+		})
+	}
+}

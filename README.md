@@ -35,7 +35,7 @@ Command-line clients bring your editor back, but they still send your code to th
 
 ## Features
 
-- **Local judge.** Supports Go, Python, C++ and Java, plus design problems (`LRUCache`), in-place problems, linked lists, binary trees, character grids, floating-point tolerance, any-order answers, and checkers for problems with many valid answers or random output, encoders judged by decoding (Serialize and Deserialize Binary Tree), and large inputs built by generators rather than stored. No network needed.
+- **Local judge.** Supports Go, Python, C++, Java, JavaScript and TypeScript, plus design problems (`LRUCache`), in-place problems, linked lists, binary trees, character grids, floating-point tolerance, any-order answers, and checkers for problems with many valid answers or random output, encoders judged by decoding (Serialize and Deserialize Binary Tree), and large inputs built by generators rather than stored. No network needed.
 - **Real debuggers.** `hc debug` starts Delve or pdb stopped at your function. `--headless` serves DAP for nvim-dap or VS Code.
 - **Interactive TUI.** A problem list in the style of rustlings, a tab per pack with its progress, and the statement, its images, test results and submission history in one place. Your editor stays in the next pane.
 - **Personal groups.** Keep ordered review lists and study plans alongside a pack's groups, through `hc group` or the TUI. Pack updates preserve your lists. See [personal groups](docs/how-to-use.md#personal-groups).
@@ -55,7 +55,7 @@ Prebuilt binaries for Linux and macOS are on the [releases page](https://github.
 
 hc runs on Linux and macOS. Windows is not supported: on Windows, install and use hc inside [WSL](https://learn.microsoft.com/windows/wsl/install), where it works as on Linux.
 
-You need Go 1.22+ to solve in Go, and Python 3.12+ in any language: besides Python solutions, Python runs the generators and checkers that most problems have. The easiest way to get it is [uv](https://docs.astral.sh/uv/getting-started/installation/) (recommended; `brew install uv`, or `curl -LsSf https://astral.sh/uv/install.sh | sh`), which downloads a Python even where the system one is too old (macOS ships 3.9); a Python 3.12+ on PATH works too. `hc init` sets up a virtual environment for it in the workspace, and says how to get uv or Python if it finds neither. C++ solutions additionally need a local compiler and standard library supporting the selected C++ standard (minimum C++17, default C++23); use GDB (Linux) or LLDB (macOS) for terminal debugging. Java solutions need a local JDK 17 or later, with jdb for terminal debugging. Optional extras:
+You need Go 1.22+ to solve in Go, and Python 3.12+ in any language: besides Python solutions, Python runs the generators and checkers that most problems have. The easiest way to get it is [uv](https://docs.astral.sh/uv/getting-started/installation/) (recommended; `brew install uv`, or `curl -LsSf https://astral.sh/uv/install.sh | sh`), which downloads a Python even where the system one is too old (macOS ships 3.9); a Python 3.12+ on PATH works too. `hc init` sets up a virtual environment for it in the workspace, and says how to get uv or Python if it finds neither. C++ solutions additionally need a local compiler and standard library supporting the selected C++ standard (minimum C++17, default C++23); use GDB (Linux) or LLDB (macOS) for terminal debugging. Java solutions need a local JDK 17 or later, with jdb for terminal debugging. JavaScript/TypeScript use local Node.js 22+; TypeScript also needs a local `tsc` 5.7+. Local npm prepares the locked LeetCode libraries under the workspace’s `.hc/node` on JS/TS initialization or first use; after setup they work offline. hc installs neither Node, npm nor TypeScript. Neither the repository nor the hc binary contains these third-party libraries. Optional extras:
 
 - [Delve](https://github.com/go-delve/delve) for debugging Go;
 - `claude` or `codex` for generating test cases.
@@ -101,7 +101,7 @@ hc debug two-sum        # debug the first failing case (-c 4: case 4)
 
 Planned:
 
-- more languages: C, Rust, JavaScript, TypeScript;
+- more languages: C, Rust;
 - problem packs with an official LeetCode bank;
 - notes, and AI hints that never give away the answer;
 - an open problem store.

@@ -47,12 +47,26 @@ func TestConvertFunction(t *testing.T) {
 		Code     string `json:"code"`
 	}{"java", javaTemplate})
 
+	jsTemplates := map[string]string{"javascript": "/** @param {number[]} nums */\nvar twoSum = function(nums, target) {};", "typescript": "function twoSum(nums: number[], target: number): number[] { return []; };"}
+	for id, code := range jsTemplates {
+		q.CodeSnippets = append(q.CodeSnippets, struct {
+			LangSlug string `json:"langSlug"`
+			Code     string `json:"code"`
+		}{id, code})
+	}
+
 	c, err := Convert(q, SiteCom)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if c.Templates["Solution.java"] != javaTemplate {
 		t.Fatal("Java template not preserved")
+	}
+
+	for id, file := range map[string]string{"javascript": "solution.js", "typescript": "solution.ts"} {
+		if c.Templates[file] != jsTemplates[id] {
+			t.Errorf("%s template changed", id)
+		}
 	}
 	p := c.Problem
 	// The judge rule is left for hc gen even though the statement says

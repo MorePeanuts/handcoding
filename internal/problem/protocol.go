@@ -28,18 +28,20 @@ const (
 // Language ids of the protocol, as used in pack.yaml's languages and for
 // solution directories.
 const (
-	LangGo     = "go"
-	LangPython = "python"
-	LangCPP    = "cpp"
-	LangJava   = "java"
+	LangGo         = "go"
+	LangPython     = "python"
+	LangCPP        = "cpp"
+	LangJava       = "java"
+	LangJavaScript = "javascript"
+	LangTypeScript = "typescript"
 )
 
 // Languages returns the solution languages of the given protocol version, in
 // a fixed order, or nil for a version hc does not implement. Protocol 1 has
-// Go, Python, C++ and Java.
+// Go, Python, C++, Java, JavaScript and TypeScript.
 func Languages(protocol int) []string {
 	if protocol < MinProtocol || protocol > Protocol {
 		return nil
 	}
-	return []string{LangGo, LangPython, LangCPP, LangJava}
+	return []string{LangGo, LangPython, LangCPP, LangJava, LangJavaScript, LangTypeScript}
 }

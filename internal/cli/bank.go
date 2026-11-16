@@ -40,6 +40,7 @@ A pack checkout (a directory with pack.yaml) needs no init: hc opens it as a
 workspace as it is, so init refuses a directory in one.
 
 --lang sets the default solution language (language in hc.yaml).
+For JS/TS it also installs locked libraries into .hc/node using local npm.
 
 init also creates the workspace's Python virtual environment, .hc/venv,
 whatever the language: Python runs Python solutions, and the generators and
@@ -73,7 +74,7 @@ error; run ` + "`hc env sync`" + ` in the workspace afterwards.`,
 			}
 			a := app.New(ws)
 			defer a.Close()
-			envErr := a.SetUpPython(cmd.Context(), os.Stderr)
+			envErr := a.SetUpInitial(cmd.Context(), os.Stderr)
 			fmt.Printf("%s workspace at %s\n\n", ui.Green.Render("Created"), ws.Root)
 			fmt.Println("It has no problems yet. Install the official LeetCode pack:")
 			fmt.Println("  hc pack install " + app.OfficialPack)
@@ -89,12 +90,12 @@ error; run ` + "`hc env sync`" + ` in the workspace afterwards.`,
 			fmt.Println("\nTip: version your progress with `git init` in the workspace.")
 			if envErr != nil {
 				fmt.Println()
-				return fmt.Errorf("the workspace at %s is created, but not its Python environment: %w", ws.Root, envErr)
+				return fmt.Errorf("the workspace at %s is created, but its language environment is not ready: %w", ws.Root, envErr)
 			}
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&langName, "lang", "l", workspace.DefaultConfig().Language, "default solution language (go, python, cpp, java)")
+	cmd.Flags().StringVarP(&langName, "lang", "l", workspace.DefaultConfig().Language, "default solution language (go, python, cpp, java, javascript, typescript)")
 	return cmd
 }
 
@@ -552,7 +553,7 @@ outputs of the one that runs.`,
 		},
 	}
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "recompute every expected output")
-	cmd.Flags().StringVarP(&langName, "lang", "l", "", "reference to run (go, python, cpp, java); default: the first one found, Go, then Python, then C++, then Java")
+	cmd.Flags().StringVarP(&langName, "lang", "l", "", "reference to run (go, python, cpp, java, javascript, typescript); default: the first one found, Go, then Python, then C++, Java, JavaScript, then TypeScript")
 	return cmd
 }
 

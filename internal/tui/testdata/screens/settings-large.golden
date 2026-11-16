@@ -17,15 +17,15 @@
   C++ debugger                lldb                              Terminal GDB or LLDB executable. Editor debugging is not supported for C++.
   C++ standard                c++23                             C++17 minimum, C++23 default. The selected compiler must support the requested standard.
   C++ sanitizers              none                              Optional address/undefined behavior diagnostics. References use the same options; leak reporting is disabled becaus…
+  Node.js                     node                              Local Node.js 22 or later, shared by JavaScript and TypeScript. Executable name or workspace-relative path.
+  npm                         npm                               Local npm executable. Installs locked JS/TS libraries into .hc/node on first use; no global packages or install scr…
+  TypeScript compiler         tsc                               Local tsc 5.7 or later. Compiles and type-checks TypeScript; hc does not install the compiler.
   Java JDK                    Automatic (local JDK)             JDK directory, relative to the workspace or absolute. Empty uses JAVA_HOME, then the JDK selected on PATH. hc never…
   Java VM options             ["-Xss16m"]                       VM tuning and system properties for solutions and references. Edit the argument array in YAML. Default: a 16 MB thr…
   Python interpreter          Managed (.hc/venv)                Empty keeps hc's managed .hc/venv. A command or path selects an external Python and bypasses management. Editing ne…
   Coding agent                claude                            Preset for the next generation or repair. A nonempty agent.command overrides this preset.
   Custom agent command        []                                An argv array, not a shell command. Edit hc.yaml for custom arguments; reset to [] to use the preset.
   LeetCode site               com                               Default for fetch and login. Online submissions use the currently signed-in account.
-
-
-
 
 
 

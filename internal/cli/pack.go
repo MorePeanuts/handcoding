@@ -126,7 +126,7 @@ func setUpPackPython(cmd *cobra.Command, root string) error {
 	if err := a.SyncSettings(cmd.Context()); err != nil {
 		return err
 	}
-	return a.SetUpPython(cmd.Context(), os.Stderr)
+	return a.SetUpInitial(cmd.Context(), os.Stderr)
 }
 
 // shellQuote quotes s for a shell when it needs it.

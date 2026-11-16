@@ -25,7 +25,7 @@ A version is a draft until it is final, and final once a stable release of hc im
 
 | Version | Final with | Changes |
 |---|---|---|
-| 1 | hc v0.1.0 (not yet released: a draft) | The initial protocol: packs and `pack.yaml`, problem directories, `problem.yaml`, types, signatures, cases, judging, checkers and the solution ABI, with Go, Python, C++ and Java as the solution languages. |
+| 1 | hc v0.1.0 (not yet released: a draft) | The initial protocol: packs and `pack.yaml`, problem directories, `problem.yaml`, types, signatures, cases, judging, checkers and the solution ABI, with Go, Python, C++, Java, JavaScript and TypeScript as the solution languages. |
 
 ### Out of scope
 
@@ -34,7 +34,7 @@ Protocol 1 does not define the following. Each would be a later, additive change
 - interactive problems, whose solution talks to a judge (issue #7);
 - `tests` problems, judged by test code instead of cases (issue #31);
 - judging memory, or time otherwise than by the [time limit](#time-limit);
-- solution languages other than Go, Python, C++ and Java.
+- solution languages other than Go, Python, C++, Java, JavaScript and TypeScript.
 
 ## Packs
 
@@ -84,6 +84,9 @@ The language ids:
 | `go` | Go | 1 |
 | `python` | Python | 1 |
 | `cpp` | C++ | 1 |
+| `java` | Java | 1 |
+| `javascript` | JavaScript | 1 |
+| `typescript` | TypeScript | 1 |
 
 A pack.yaml with every field:
 
@@ -205,21 +208,21 @@ Type names are LeetCode's `metaData` names. A type is a base type followed by ze
 
 Every value in a case, an expected output and a solution's output is JSON. This section defines, for each type, its JSON encoding and its binding in each solution language. The encodings are the same for inputs (`input` in a case) and outputs (`expected`, and what a solution's result is encoded to), except where a type says otherwise.
 
-| Type | JSON | Go | Python | C++ | Java | Since |
-|---|---|---|---|---|---|---|
-| `integer` | integer | `int` | `int` | `int` | `int` | 1 |
-| `long` | integer | `int64` | `int` | `long long` | `long` | 1 |
-| `double` | number | `float64` | `float` | `double` | `double` | 1 |
-| `boolean` | `true` or `false` | `bool` | `bool` | `bool` | `boolean` | 1 |
-| `string` | string | `string` | `str` | `std::string` | `String` | 1 |
-| `character` | string of one byte | `byte` | `str` | `char` | `char` | 1 |
-| `ListNode` | see [ListNode and TreeNode](#listnode-and-treenode) | `*ListNode` | `ListNode \| None` | `ListNode*` | `ListNode` | 1 |
-| `TreeNode` | see [ListNode and TreeNode](#listnode-and-treenode) | `*TreeNode` | `TreeNode \| None` | `TreeNode*` | `TreeNode` | 1 |
-| `GraphNode`, `NaryNode`, `RandomListNode`, `NextTreeNode`, `QuadNode`, `MultilevelNode` | see [LeetCode's Node types](#leetcodes-node-types) | `*Node` | `Node \| None` | `Node*` | `Node` | 1 |
-| `NestedInteger` | see [NestedInteger and Employee](#nestedinteger-and-employee) | `*NestedInteger` | `NestedInteger` | `NestedInteger` | `NestedInteger` | 1 |
-| `Employee` | see [NestedInteger and Employee](#nestedinteger-and-employee) | `*Employee` | `Employee` | `Employee*` | `Employee` | 1 |
-| `T[]` | see [Arrays](#arrays) | `[]T` | `list[T]` | `std::vector<T>` | `T[] / List<T>` | 1 |
-| `void` | none; return types only | no result | `None` | `void` | `void` | 1 |
+| Type | JSON | Go | Python | C++ | Java | JS / TS | Since |
+|---|---|---|---|---|---|---|---|
+| `integer` | integer | `int` | `int` | `int` | `int` | `number` | 1 |
+| `long` | integer | `int64` | `int` | `long long` | `long` | `number` (safe integer) | 1 |
+| `double` | number | `float64` | `float` | `double` | `double` | `number` | 1 |
+| `boolean` | `true` or `false` | `bool` | `bool` | `bool` | `boolean` | `boolean` | 1 |
+| `string` | string | `string` | `str` | `std::string` | `String` | `string` | 1 |
+| `character` | string of one byte | `byte` | `str` | `char` | `char` | `string` | 1 |
+| `ListNode` | see [ListNode and TreeNode](#listnode-and-treenode) | `*ListNode` | `ListNode \| None` | `ListNode*` | `ListNode` | `ListNode \| null` | 1 |
+| `TreeNode` | see [ListNode and TreeNode](#listnode-and-treenode) | `*TreeNode` | `TreeNode \| None` | `TreeNode*` | `TreeNode` | `TreeNode \| null` | 1 |
+| `GraphNode`, `NaryNode`, `RandomListNode`, `NextTreeNode`, `QuadNode`, `MultilevelNode` | see [LeetCode's Node types](#leetcodes-node-types) | `*Node` | `Node \| None` | `Node*` | `Node` | `Node / _Node \| null` | 1 |
+| `NestedInteger` | see [NestedInteger and Employee](#nestedinteger-and-employee) | `*NestedInteger` | `NestedInteger` | `NestedInteger` | `NestedInteger` | `NestedInteger` | 1 |
+| `Employee` | see [NestedInteger and Employee](#nestedinteger-and-employee) | `*Employee` | `Employee` | `Employee*` | `Employee` | `Employee` | 1 |
+| `T[]` | see [Arrays](#arrays) | `[]T` | `list[T]` | `std::vector<T>` | `T[] / List<T>` | `T[]` | 1 |
+| `void` | none; return types only | no result | `None` | `void` | `void` | `void` | 1 |
 
 ### Scalars
 
@@ -230,6 +233,8 @@ Every value in a case, an expected output and a solution's output is JSON. This 
 - `boolean`: `true` or `false`.
 - `string`: a JSON string, holding any Unicode text.
 - `character`: a JSON string of exactly one byte, so an ASCII character: `"a"`.
+
+JS/TS bind both `integer` and `long` to `number`. The `long` binding additionally restricts values to safe integers, **−9007199254740991 through 9007199254740991**, including nested arrays; the protocol itself remains signed 64-bit. Drivers check the original JSON token before conversion. Unsafe inputs or outputs are Runtime Error, never silently rounded or automatically converted to `bigint`. Packs declaring these languages MUST keep inputs and expected results within this range; solution authors remain responsible for intermediate arithmetic precision.
 
 ### Arrays
 
@@ -246,9 +251,9 @@ Go: `type ListNode struct { Val int; Next *ListNode }` and `type TreeNode struct
 
 ### LeetCode's Node types
 
-LeetCode calls six different structures `Node`. The protocol gives each its own type name. In solution code each is a type (Go) or class (Python/C++/Java) named `Node` with LeetCode's field names, so a problem MUST NOT use more than one of them.
+LeetCode calls six different structures `Node`. The protocol gives each its own type name. In solution code each is a type (Go) or class (Python/C++/Java/JS/TS) named `Node` with LeetCode's field names, so a problem MUST NOT use more than one of them.
 
-| Type | Fields (Go; Python/C++/Java use the same names starting with a lower-case letter) | JSON | LeetCode problems |
+| Type | Fields (Go; Python/C++/Java/JS/TS use the same names starting with a lower-case letter) | JSON | LeetCode problems |
 |---|---|---|---|
 | `GraphNode` | `Val int`, `Neighbors []*Node` | Adjacency list of a graph whose nodes have the values 1 to n: entry i (0-based) lists, by value, the neighbors of the node with value i+1, and the value of the type is the node with value 1. `[[2,4],[1,3],[2,4],[1,3]]`; `[[]]` is a single node, `[]` no node. Every neighbor MUST be between 1 and n | 133 |
 | `NaryNode` | `Val int`, `Children []*Node` | Level order: the root's value, `null`, then the children of each node in level order, each group followed by `null`, trailing `null`s removed: `[1,null,3,2,4,null,5,6]`. `[]` is no tree. There MUST NOT be more groups than nodes | 429, 559, 589, 590 |
@@ -606,13 +611,13 @@ A solution's speed is judged against the problem's reference solution in the sam
 
 ### Run limit
 
-A run of a solution over the cases selected for it has a wall-clock limit. For Go/Python/Java it covers the whole run; for C++ it applies separately to each case’s worker process, including startup and teardown. It guards against hangs, such as a solution blocked outside the timed calls; it does not judge complexity, which the [time limit](#time-limit) does. The limit belongs to the judge, not to the problem: hc's is `timeout` in the workspace's `hc.yaml`, 10s unless configured. When it expires the run is stopped: the current unfinished case is Time Limit Exceeded, the cases after it are Not Run, and cases that finished keep their verdicts. A checker run and a generator run each get their own limit of the same duration, and so does a reference computing the expected outputs of generated cases.
+A run of a solution over the cases selected for it has a wall-clock limit. For Go/Python/Java/JavaScript/TypeScript it covers the whole run; for C++ it applies separately to each case’s worker process, including startup and teardown. It guards against hangs, such as a solution blocked outside the timed calls; it does not judge complexity, which the [time limit](#time-limit) does. The limit belongs to the judge, not to the problem: hc's is `timeout` in the workspace's `hc.yaml`, 10s unless configured. When it expires the run is stopped: the current unfinished case is Time Limit Exceeded, the cases after it are Not Run, and cases that finished keep their verdicts. A checker run and a generator run each get their own limit of the same duration, and so does a reference computing the expected outputs of generated cases.
 
 ### Readiness
 
 A problem is **ready** when it has `judge.compare`. `judge.compare` has no default, and MUST be written out even for `exact`. A problem that is not ready is valid, but its judge rule is undecided.
 
-A problem is **ready for a language** when it is ready and has a reference solution in that language (`reference/solution.py`, `reference/solution.go`, `reference/solution.cpp`), which solutions in that language are timed against ([Time limit](#time-limit)). The cases of a solution in a language the problem is not ready for are not judged (Not Judged), and such a solution cannot be submitted. A problem SHOULD be ready for every language of its pack's `languages`.
+A problem is **ready for a language** when it is ready and has a reference solution in that language (`reference/solution.py`, `reference/solution.go`, `reference/solution.cpp`, `reference/Solution.java`, `reference/solution.js`, `reference/solution.ts`), which solutions in that language are timed against ([Time limit](#time-limit)). The cases of a solution in a language the problem is not ready for are not judged (Not Judged), and such a solution cannot be submitted. A problem SHOULD be ready for every language of its pack's `languages`.
 
 ### Verdicts
 
@@ -620,7 +625,7 @@ A run of a solution has one of these outcomes for each case:
 
 | Verdict | When |
 |---|---|
-| Compile Error | The solution does not build: a Go or C++ compile error, a Python syntax error. This is the outcome of the whole run, and no case runs |
+| Compile Error | The solution does not build: a compiled-language error (including TS type errors), or a Python/JavaScript syntax error. This is the outcome of the whole run, and no case runs |
 | Runtime Error | The case raised an error (an exception, a panic, an input the driver cannot decode, or a result the encoding cannot express), or the program exited while the case ran |
 | Time Limit Exceeded | The run spent the [time limit](#time-limit) during the case, or the [run limit](#run-limit) expired before the case completed (including C++ worker teardown) |
 | Not Run | The run stopped before the case, at an earlier case that was Time Limit Exceeded or after which the program exited |
@@ -695,7 +700,7 @@ def distinct(rng, n):
 
 ## Solution ABI
 
-What a solution must look like for the drivers to call it. User solutions, reference solutions (`reference/solution.*` / `reference/Solution.java`) and templates (`templates/solution.*` / `templates/Solution.java`) are all solutions. References and templates MUST follow this section and use only the standard library; templates MUST keep the signature, with the function, class and method names, parameter order and types given here. A solution receives the parameters in the order of `function.params` (or of the constructor and method parameters), without hidden inputs, bound as in [Types](#types).
+What a solution must look like for the drivers to call it. User solutions, reference solutions (`reference/solution.*` / `reference/Solution.java`) and templates (`templates/solution.*` / `templates/Solution.java`) are all solutions. References and templates MUST follow this section and use only the standard library and the explicitly provided judge helpers/libraries; templates MUST keep the signature, with the function, class and method names, parameter order and types given here. A solution receives the parameters in the order of `function.params` (or of the constructor and method parameters), without hidden inputs, bound as in [Types](#types).
 
 ### Python
 
@@ -746,6 +751,14 @@ The solution is `solution.go`, in `package main`.
 - Compilation failures are Compile Error. Ordinary uncaught exceptions and assertion failures report Runtime Error for that case and allow later cases to run. Fatal VM errors, explicit process exits and timeouts stop subsequent cases. `stdout`/`stderr` remain available for user prints. Algorithm time counts solution calls (constructors and methods for design problems), including JIT/GC pauses during those calls, excluding startup and codecs. The wall timeout covers the entire JVM run. Java references are timed on the same **ordered batch, including duplicates**, using the minimum total of three fresh JVM runs; individual case minima MUST NOT be recombined across batches.
 - Java 17 is the protocol minimum for generated code, references and templates. hc uses the selected local JDK directly for normal compilation, without a fixed release target or preview mode. `--release 17` checks reference syntax, standard APIs and bytecode compatibility; runtime checks on Java 17 remain necessary.
 
+### JavaScript / TypeScript
+
+- Language ids: `javascript` and `typescript`; files: `solution.js` and `solution.ts`. Use LeetCode's top-level function, constructor/prototype, or class declarations. No exports or user main are required. Templates and submitted source are preserved. Round-trip problems also accept the native top-level encoder/decoder pair (`serialize`/`deserialize`, `encode`/`decode`) named by the protocol methods, without a `Codec` wrapper.
+- Scalars bind as in the type table; arrays use native arrays. `long` uses safe-integer `number`, not `bigint`. hc provides `ListNode`, `TreeNode`, the selected `Node` (also `_Node` for TS templates), `NestedInteger` and `Employee`. Node fields and constructors follow LeetCode. Structure inputs, reference identity, deep-copy checks, in-place outputs and output-length truncation follow the common protocol.
+- One Node process executes the entire ordered batch. Each case gets fresh decoded inputs and design instances; module globals and JIT state are shared. Solution calls are synchronous; Promise results are rejected. Ordinary exceptions are Runtime Error for that case; fatal exits and timeouts stop later cases. stdout/stderr remain available. Algorithm time includes only solution calls (constructors and methods included), excluding compilation, startup and codecs. The wall timeout covers the complete batch. Baselines use the minimum total of three fresh Node processes on the same ordered batch, including duplicates, as Java does. An independent watchdog can interrupt synchronous infinite loops.
+- Node.js 22 is the runtime minimum for both languages. TypeScript requires a local `tsc` 5.7 or later, typechecks before execution, and targets ES2022 with Node/CommonJS module semantics. References and templates MUST use APIs supported by Node 22 and syntax supported by TS 5.7. User solutions may use newer features supported by their installed compiler/runtime. Bun, Deno and asynchronous problem signatures are not supported.
+- hc provides a workspace-managed, version-locked environment for LeetCode's libraries: `@datastructures-js/priority-queue` 6.3.5, `heap` 4.3.7, `queue` 4.3.0, `deque` 1.0.8, `stack` 3.1.6, `linked-list` 6.1.4, `set` 4.2.2, `binary-search-tree` 5.4.0, `graph` 5.3.1, `trie` 4.2.3, and `lodash` 4.17.21. These are exceptions to the standard-library-only rule. Global `PriorityQueue`, `MinPriorityQueue`, `MaxPriorityQueue`, `Heap`, `MinHeap`, `MaxHeap`, `Queue`, `Deque`, `Stack`, linked-list classes, `EnhancedSet` and `_` are available. All listed packages can also be loaded with JS `require` or TS imports. Versions and integrity hashes are pinned in hc’s lockfile. Local npm installs the packages, including licenses, under `.hc/node` during environment preparation; installation scripts are disabled. Ready environments run offline without npm. Package installation is outside solution execution and timing; neither hc’s source repository nor binary includes third-party package contents.
+
 ### Language versions
 
 | Language | Oldest supported version |
@@ -754,6 +767,8 @@ The solution is `solution.go`, in `package main`.
 | Go | 1.22 |
 | C++ | C++17 (compiler and standard library); default compilation mode C++23 |
 | Java | 17 |
+| JavaScript | Node.js 22 |
+| TypeScript | Node.js 22 + TypeScript 5.7; ES2022 |
 
 Reference solutions, templates, checkers and generators MUST work on these versions, language and standard library: a reference's expected outputs are only computed, and it is only checked, on a supported toolchain. User solutions MAY use anything their toolchain supports. To check Go code against Go 1.22, give its module `go 1.22` and run `go vet`, whose `stdversion` check reports newer standard library symbols.
 

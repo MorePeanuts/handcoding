@@ -151,6 +151,15 @@ func TestDoctorNoWorkspace(t *testing.T) {
 	if err != nil || !strings.Contains(out, `"ok": true`) {
 		t.Fatalf("%s: %v", out, err)
 	}
+	doctorScript(t, filepath.Join(dir, "node"), "echo v22.0.0")
+	doctorScript(t, filepath.Join(dir, "tsc"), "echo 'Version 5.7.3'")
+	out, err = capture(t, "doctor", "--lang", "ts", "--json")
+	if err != nil || !strings.Contains(out, `"ok": true`) || strings.Contains(out, `"dependencies"`) {
+		t.Fatalf("PATH-only JS diagnosis: %s %v", out, err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".hc")); !os.IsNotExist(err) {
+		t.Fatal("doctor created workspace state")
+	}
 	if _, err := capture(t, "-w", filepath.Join(dir, "missing"), "doctor"); err == nil {
 		t.Fatal("explicit missing workspace ignored")
 	}
@@ -230,5 +239,48 @@ func TestDoctorConfiguredJavaJDK(t *testing.T) {
 	}
 	if after := doctorSnapshot(t, dir); !reflect.DeepEqual(before, after) {
 		t.Fatal("doctor modified workspace")
+	}
+}
+
+func TestDoctorJavaScriptToolsReadOnly(t *testing.T) {
+	dir := t.TempDir()
+	config := "language: typescript\njavascript: {command: tools/node, npm: tools/npm}\ntypescript: {command: tools/tsc}\npython: {interpreter: tools/python}\n"
+	if err := os.WriteFile(filepath.Join(dir, "hc.yaml"), []byte(config), 0644); err != nil {
+		t.Fatal(err)
+	}
+	node := filepath.Join(dir, "tools/node")
+	tsc := filepath.Join(dir, "tools/tsc")
+	doctorScript(t, node, "case \"$1\" in --version) echo v22.0.0;; -e) exit 0;; *) exit 9;; esac")
+	doctorScript(t, tsc, "echo 'Version 5.7.3'")
+	doctorScript(t, filepath.Join(dir, "tools/npm"), "[ \"$1\" = --version ] || { touch \"$0.called\"; exit 1; }; echo 10.0.0")
+	doctorScript(t, filepath.Join(dir, "tools/python"), "echo 3.12.0")
+	before := doctorSnapshot(t, dir)
+	rep, err := doctorReport(t, dir, "--lang", "ts", "--debug")
+	if err == nil || rep.OK || len(rep.Checks) != 6 || rep.Checks[3].Status != "uninitialized" {
+		t.Fatalf("%+v, %v", rep, err)
+	}
+	if rep.Checks[0].Path != node || rep.Checks[1].Path != tsc || rep.Checks[2].Role != "debugger" {
+		t.Fatal(rep.Checks)
+	}
+	if !reflect.DeepEqual(before, doctorSnapshot(t, dir)) {
+		t.Fatal("doctor wrote workspace files")
+	}
+	doctorScript(t, node, "echo v20.19.0")
+	rep, err = doctorReport(t, dir, "--lang", "js")
+	if err == nil || rep.OK || rep.Checks[0].Status != "too_old" {
+		t.Fatalf("old Node: %+v, %v", rep, err)
+	}
+	doctorScript(t, node, "echo v22.0.0")
+	doctorScript(t, tsc, "echo 'Version 5.6.3'")
+	rep, err = doctorReport(t, dir, "--lang", "ts")
+	if err == nil || rep.OK || rep.Checks[1].Status != "too_old" {
+		t.Fatalf("old TS: %+v, %v", rep, err)
+	}
+	if err := os.Remove(tsc); err != nil {
+		t.Fatal(err)
+	}
+	rep, err = doctorReport(t, dir, "--lang", "ts")
+	if err == nil || rep.Checks[1].Status != "missing" {
+		t.Fatalf("missing TS: %+v, %v", rep, err)
 	}
 }

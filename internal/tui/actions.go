@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -186,7 +187,12 @@ func (m *model) edit(p *problem.Problem) tea.Cmd {
 		return nil
 	}
 	cmd.Dir = filepath.Dir(path)
-	return tea.Exec(m.handOff(cmd, false), func(err error) tea.Msg { return execDoneMsg{err} })
+	handoff := m.handOff(cmd, false)
+	if m.lang.ID() == "javascript" || m.lang.ID() == "typescript" {
+		l := m.lang
+		handoff.before = func(w io.Writer) error { return l.Setup(context.Background(), w) }
+	}
+	return tea.Exec(handoff, func(err error) tea.Msg { return execDoneMsg{err} })
 }
 
 // runKeys are the keys of problemKey that run the solution, which the
@@ -228,6 +234,7 @@ func (m *model) handOff(cmd *exec.Cmd, clear bool) *handOffCmd {
 type handOffCmd struct {
 	*exec.Cmd
 	clear, themeReports bool
+	before              func(io.Writer) error
 }
 
 func (c *handOffCmd) Run() error {
@@ -240,6 +247,11 @@ func (c *handOffCmd) Run() error {
 			seq += "\x1b[H\x1b[2J\x1b[3J"
 		}
 		fmt.Fprint(c.Stdout, seq)
+	}
+	if c.before != nil {
+		if err := c.before(c.Stderr); err != nil {
+			return err
+		}
 	}
 	return c.Cmd.Run()
 }

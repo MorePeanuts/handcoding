@@ -27,7 +27,7 @@ hc 自身的行为（`hc test` 运行哪些用例、`hc fetch` 如何导入题�
 
 | 版本 | 定稿于 | 变更 |
 |---|---|---|
-| 1 | hc v0.1.0（尚未发布：仍是草案） | 最初的协议：题目包和 `pack.yaml`、题目目录、`problem.yaml`、类型、签名、用例、判题、判题程序和解答 ABI，解答语言为 Go、Python、C++ 和 Java。 |
+| 1 | hc v0.1.0（尚未发布：仍是草案） | 最初的协议：题目包和 `pack.yaml`、题目目录、`problem.yaml`、类型、签名、用例、判题、判题程序和解答 ABI，解答语言为 Go、Python、C++、Java、JavaScript 和 TypeScript。 |
 
 ### 不在范围内
 
@@ -36,7 +36,7 @@ hc 自身的行为（`hc test` 运行哪些用例、`hc fetch` 如何导入题�
 - 交互题，即解答要与评测程序对话的题目（issue #7）；
 - `tests` 题，用测试代码而不是用例评判（issue #31）；
 - 内存评判，以及[时间限制](#时间限制)以外的时间评判；
-- Go、Python、C++ 和 Java 以外的解答语言。
+- Go、Python、C++、Java、JavaScript 和 TypeScript 以外的解答语言。
 
 ## 题目包
 
@@ -86,6 +86,9 @@ problems/<dir>/    每道题目一个题目目录；见题目目录
 | `go` | Go | 1 |
 | `python` | Python | 1 |
 | `cpp` | C++ | 1 |
+| `java` | Java | 1 |
+| `javascript` | JavaScript | 1 |
+| `typescript` | TypeScript | 1 |
 
 包含所有字段的 pack.yaml：
 
@@ -207,21 +210,21 @@ judge:
 
 用例、期望输出和解答输出中的每个值都是 JSON。本节为每个类型规定它的 JSON 编码，以及它在各解答语言中的绑定。除非某个类型另有说明，输入（用例中的 `input`）和输出（`expected`，以及解答结果编码成的值）的编码相同。
 
-| 类型 | JSON | Go | Python | C++ | Java | 起始版本 |
-|---|---|---|---|---|---|---|
-| `integer` | 整数 | `int` | `int` | `int` | `int` | 1 |
-| `long` | 整数 | `int64` | `int` | `long long` | `long` | 1 |
-| `double` | 数字 | `float64` | `float` | `double` | `double` | 1 |
-| `boolean` | `true` 或 `false` | `bool` | `bool` | `bool` | `boolean` | 1 |
-| `string` | 字符串 | `string` | `str` | `std::string` | `String` | 1 |
-| `character` | 一个字节的字符串 | `byte` | `str` | `char` | `char` | 1 |
-| `ListNode` | 见 [ListNode 和 TreeNode](#listnode-和-treenode) | `*ListNode` | `ListNode \| None` | `ListNode*` | `ListNode` | 1 |
-| `TreeNode` | 见 [ListNode 和 TreeNode](#listnode-和-treenode) | `*TreeNode` | `TreeNode \| None` | `TreeNode*` | `TreeNode` | 1 |
-| `GraphNode`、`NaryNode`、`RandomListNode`、`NextTreeNode`、`QuadNode`、`MultilevelNode` | 见 [LeetCode 的 Node 类型](#leetcode-的-node-类型) | `*Node` | `Node \| None` | `Node*` | `Node` | 1 |
-| `NestedInteger` | 见 [NestedInteger 和 Employee](#nestedinteger-和-employee) | `*NestedInteger` | `NestedInteger` | `NestedInteger` | `NestedInteger` | 1 |
-| `Employee` | 见 [NestedInteger 和 Employee](#nestedinteger-和-employee) | `*Employee` | `Employee` | `Employee*` | `Employee` | 1 |
-| `T[]` | 见[数组](#数组) | `[]T` | `list[T]` | `std::vector<T>` | `T[] / List<T>` | 1 |
-| `void` | 无；只能作返回类型 | 没有返回值 | `None` | `void` | `void` | 1 |
+| 类型 | JSON | Go | Python | C++ | Java | JS / TS | 起始版本 |
+|---|---|---|---|---|---|---|---|
+| `integer` | 整数 | `int` | `int` | `int` | `int` | `number` | 1 |
+| `long` | 整数 | `int64` | `int` | `long long` | `long` | `number` (safe integer) | 1 |
+| `double` | 数字 | `float64` | `float` | `double` | `double` | `number` | 1 |
+| `boolean` | `true` 或 `false` | `bool` | `bool` | `bool` | `boolean` | `boolean` | 1 |
+| `string` | 字符串 | `string` | `str` | `std::string` | `String` | `string` | 1 |
+| `character` | 一个字节的字符串 | `byte` | `str` | `char` | `char` | `string` | 1 |
+| `ListNode` | 见 [ListNode 和 TreeNode](#listnode-和-treenode) | `*ListNode` | `ListNode \| None` | `ListNode*` | `ListNode` | `ListNode \| null` | 1 |
+| `TreeNode` | 见 [ListNode 和 TreeNode](#listnode-和-treenode) | `*TreeNode` | `TreeNode \| None` | `TreeNode*` | `TreeNode` | `TreeNode \| null` | 1 |
+| `GraphNode`、`NaryNode`、`RandomListNode`、`NextTreeNode`、`QuadNode`、`MultilevelNode` | 见 [LeetCode 的 Node 类型](#leetcode-的-node-类型) | `*Node` | `Node \| None` | `Node*` | `Node` | `Node / _Node \| null` | 1 |
+| `NestedInteger` | 见 [NestedInteger 和 Employee](#nestedinteger-和-employee) | `*NestedInteger` | `NestedInteger` | `NestedInteger` | `NestedInteger` | `NestedInteger` | 1 |
+| `Employee` | 见 [NestedInteger 和 Employee](#nestedinteger-和-employee) | `*Employee` | `Employee` | `Employee*` | `Employee` | `Employee` | 1 |
+| `T[]` | 见[数组](#数组) | `[]T` | `list[T]` | `std::vector<T>` | `T[] / List<T>` | `T[]` | 1 |
+| `void` | 无；只能作返回类型 | 没有返回值 | `None` | `void` | `void` | `void` | 1 |
 
 ### 标量
 
@@ -232,6 +235,8 @@ judge:
 - `boolean`：`true` 或 `false`。
 - `string`：JSON 字符串，可以包含任意 Unicode 文本。
 - `character`：恰好一个字节的 JSON 字符串，即一个 ASCII 字符：`"a"`。
+
+JS/TS 的 `integer`、`long` 都绑定为 `number`。`long` 的语言绑定额外限定在安全整数范围 **−9007199254740991 到 9007199254740991**，包括嵌套数组；协议自身仍是有符号 64 位。驱动在转换前检查原始 JSON 数字，超范围的输入或输出报告 Runtime Error，不会静默舍入，也不会自动改用 `bigint`。声明这两种语言的题包 MUST 保证输入和期望结果满足该范围；解答中间计算的精度仍由作者负责。
 
 ### 数组
 
@@ -248,9 +253,9 @@ Go：`type ListNode struct { Val int; Next *ListNode }` 和 `type TreeNode struc
 
 ### LeetCode 的 Node 类型
 
-LeetCode 把六种不同的结构都叫作 `Node`。协议给每种结构各起一个类型名。在解答代码中，每种都是名为 `Node`、字段名与 LeetCode 一致的类型（Go）或类（Python/C++/Java），所以一道题不得使用其中一种以上。
+LeetCode 把六种不同的结构都叫作 `Node`。协议给每种结构各起一个类型名。在解答代码中，每种都是名为 `Node`、字段名与 LeetCode 一致的类型（Go）或类（Python/C++/Java/JS/TS），所以一道题不得使用其中一种以上。
 
-| 类型 | 字段（Go；Python/C++/Java 用同名但首字母小写的字段） | JSON | LeetCode 题目 |
+| 类型 | 字段（Go；Python/C++/Java/JS/TS 用同名但首字母小写的字段） | JSON | LeetCode 题目 |
 |---|---|---|---|
 | `GraphNode` | `Val int`、`Neighbors []*Node` | 节点值为 1 到 n 的图的邻接表：第 i 项（从 0 开始）按值列出值为 i+1 的节点的邻居，该类型的值是值为 1 的节点。`[[2,4],[1,3],[2,4],[1,3]]`；`[[]]` 是单个节点，`[]` 表示没有节点。每个邻居都必须在 1 到 n 之间 | 133 |
 | `NaryNode` | `Val int`、`Children []*Node` | 层序：根的值、`null`，然后按层序依次写出每个节点的子节点，每组后面跟一个 `null`，去掉末尾的 `null`：`[1,null,3,2,4,null,5,6]`。`[]` 表示没有树。组数不得多于节点数 | 429、559、589、590 |
@@ -608,7 +613,7 @@ judge:
 
 ### 运行时限
 
-解答运行有一个墙钟时限。Go/Python/Java 的时限覆盖整次运行；C++ 的时限分别约束每个用例的工作进程，包括启动和退出。它用来防止卡死，比如解答卡在计时的调用之外；它不评判复杂度，那是[时间限制](#时间限制)的事。这个时限属于评测端，而不属于题目：hc 的时限是工作区 `hc.yaml` 中的 `timeout`，未配置时为 10s。到时后运行被终止：当前尚未完成的用例判为超时（Time Limit Exceeded），其后的用例为 Not Run，已经完成的用例保留各自的结果。判题程序的运行、生成器的运行，以及参考解为生成用例计算期望输出的运行，各自另有一个同样长度的时限。
+解答运行有一个墙钟时限。Go/Python/Java/JavaScript/TypeScript 的时限覆盖整次运行；C++ 的时限分别约束每个用例的工作进程，包括启动和退出。它用来防止卡死，比如解答卡在计时的调用之外；它不评判复杂度，那是[时间限制](#时间限制)的事。这个时限属于评测端，而不属于题目：hc 的时限是工作区 `hc.yaml` 中的 `timeout`，未配置时为 10s。到时后运行被终止：当前尚未完成的用例判为超时（Time Limit Exceeded），其后的用例为 Not Run，已经完成的用例保留各自的结果。判题程序的运行、生成器的运行，以及参考解为生成用例计算期望输出的运行，各自另有一个同样长度的时限。
 
 ### 就绪
 
@@ -622,7 +627,7 @@ judge:
 
 | 结果 | 何时 |
 |---|---|
-| Compile Error | 解答无法构建：Go 或 C++ 编译错误、Python 语法错误。这是整次运行的结果，没有用例会运行 |
+| Compile Error | 解答无法构建：编译型语言的构建错误（含 TS 类型错误），或 Python/JavaScript 语法错误。这是整次运行的结果，没有用例会运行 |
 | Runtime Error | 用例出错（异常、panic、驱动程序无法解码的输入，或者编码无法表达的结果），或者程序在该用例运行期间退出了 |
 | Time Limit Exceeded | 运行在该用例期间用完了[时间限制](#时间限制)，或者用例完成之前（包括 C++ 工作进程退出）[运行时限](#运行时限)已到 |
 | Not Run | 运行在该用例之前就停止了：之前有用例超时，或者程序在之前的用例之后退出了 |
@@ -697,7 +702,7 @@ def distinct(rng, n):
 
 ## 解答 ABI
 
-解答必须是什么样子，驱动程序才能调用它。用户的解答、参考解（`reference/solution.*` / `reference/Solution.java`）和初始代码（`templates/solution.*` / `templates/Solution.java`）都是解答。参考解和初始代码必须遵守本节，并且只使用标准库；初始代码必须保持签名，即这里规定的函数名、类名、方法名、参数顺序和类型。解答按 `function.params`（或构造函数和方法参数）的顺序收到参数，不含隐藏输入，绑定方式见[类型](#类型)。
+解答必须是什么样子，驱动程序才能调用它。用户的解答、参考解（`reference/solution.*` / `reference/Solution.java`）和初始代码（`templates/solution.*` / `templates/Solution.java`）都是解答。参考解和初始代码必须遵守本节，并且只使用标准库及明确提供的评测辅助类型/库；初始代码必须保持签名，即这里规定的函数名、类名、方法名、参数顺序和类型。解答按 `function.params`（或构造函数和方法参数）的顺序收到参数，不含隐藏输入，绑定方式见[类型](#类型)。
 
 ### Python
 
@@ -748,6 +753,14 @@ def distinct(rng, n):
 - 编译失败是 Compile Error；普通未捕获异常及断言失败使当前用例 Runtime Error，后续用例继续。致命 VM 错误、显式退出进程及超时会停止后续用例。用户可以正常打印 stdout/stderr。算法计时只统计解答调用（设计题包含构造器和方法），包括调用期间的 JIT/GC 停顿，不包含启动和编解码；墙钟超时覆盖整个 JVM 运行。Java 参考解按相同的**有序用例批次，包括重复用例**计时，取三个新 JVM 运行的最小总耗时，不得把不同批次的单例最小耗时拼接。
 - 协议最低 Java 17，生成代码、参考解和模板都必须兼容。hc 普通编译直接使用所选本地 JDK，不固定 release 目标，也不启用预览功能。`--release 17` 检查参考解的语法、标准 API 和字节码兼容性，仍需在 Java 17 上验证实际运行。
 
+### JavaScript / TypeScript
+
+- 语言标识为 `javascript`、`typescript`，文件为 `solution.js`、`solution.ts`。沿用 LeetCode 的顶层函数、构造器/prototype 或 class 声明，无需 exports 或 main。模板和提交源码保持原样。往返题也接受协议方法指定的原生顶层编码/解码函数对（`serialize`/`deserialize`、`encode`/`decode`），无需包进 `Codec` 类。
+- 标量按类型表绑定，数组使用原生数组。`long` 使用安全整数 `number`，不用 `bigint`。hc 提供 `ListNode`、`TreeNode`、本题的 `Node`（也提供 TS 模板使用的 `_Node`）、`NestedInteger` 和 `Employee`，字段及构造器与 LeetCode 一致。结构输入、节点身份、深拷贝检查、原地输出及输出长度截断遵循共同协议。
+- 一个 Node 进程运行整个有序批次。每个用例重新解码输入、创建设计类实例，但共享模块全局变量和 JIT 状态。调用必须同步，Promise 结果会被拒绝。普通异常作为本用例的 Runtime Error；致命退出和超时停止后续用例。保留 stdout/stderr。算法计时只覆盖解答调用（包括构造器和方法），不含编译、启动和编解码；wall timeout 覆盖整个批次。基线与 Java 一样，对同一有序批次（含重复）启动三个新 Node 进程，取最小总耗时。独立 watchdog 可中断同步死循环。
+- 两种语言最低要求 Node.js 22。TypeScript 使用本地 `tsc` 5.7+，先做类型检查再执行，目标为 ES2022，使用 Node/CommonJS 模块语义。参考解和模板 MUST 兼容 Node 22 API、TS 5.7 语法；用户解答可使用本地编译器和运行时支持的新特性。暂不支持 Bun、Deno 或异步题目签名。
+- hc 通过工作区管理、锁定版本的环境提供 LeetCode 库：`@datastructures-js/priority-queue` 6.3.5、`heap` 4.3.7、`queue` 4.3.0、`deque` 1.0.8、`stack` 3.1.6、`linked-list` 6.1.4、`set` 4.2.2、`binary-search-tree` 5.4.0、`graph` 5.3.1、`trie` 4.2.3，以及 `lodash` 4.17.21。这些是仅使用标准库规则的例外。可直接使用全局 `PriorityQueue`、`MinPriorityQueue`、`MaxPriorityQueue`、`Heap`、`MinHeap`、`MaxHeap`、`Queue`、`Deque`、`Stack`、链表类、`EnhancedSet` 和 `_`；也可用 JS `require` 或 TS import 加载任何上述库。版本和完整性摘要固定在 hc 的锁文件中。准备环境时，本地 npm 将这些包（含许可证）安装到 `.hc/node`，并禁用安装脚本。环境就绪后无需 npm 即可离线运行；安装不属于解答执行或计时的一部分。hc 仓库和二进制都不包含第三方包内容。
+
 ### 语言版本
 
 | 语言 | 支持的最低版本 |
@@ -756,6 +769,8 @@ def distinct(rng, n):
 | Go | 1.22 |
 | C++ | C++17（编译器与标准库）；默认编译标准 C++23 |
 | Java | 17 |
+| JavaScript | Node.js 22 |
+| TypeScript | Node.js 22 + TypeScript 5.7; ES2022 |
 
 参考解、初始代码、判题程序和生成器必须能在这些版本上运行，包括语言和标准库：只有在受支持的工具链上，才会用参考解计算期望输出或检查参考解。用户的解答可以使用其工具链支持的任何特性。要按 Go 1.22 检查 Go 代码，在它的模块中写 `go 1.22` 并运行 `go vet`，其中的 `stdversion` 检查会报告较新的标准库符号。
 

@@ -26,6 +26,9 @@ const settingsHeader = `# handcoding workspace settings
 # go.command / go.debugger: executable names or workspace-relative paths
 # cpp.command / cpp.debugger: platform C++ compiler and terminal debugger
 # cpp.standard: c++17 or newer (default c++23); cpp.sanitizers: none | address | undefined | address,undefined
+# javascript.command: Node.js 22+ for JavaScript and TypeScript
+# javascript.npm: local npm used to prepare workspace dependencies
+# typescript.command: local tsc 5.7+
 # java.home: empty uses JAVA_HOME, then PATH; requires JDK 17+
 # java.jvm_args: VM arguments shared by solutions and references
 # python.interpreter: empty keeps hc's managed .hc/venv; a path selects an external Python

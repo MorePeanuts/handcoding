@@ -85,6 +85,18 @@ Java 解答统一使用 `Solution.java`，保持 LeetCode 的方法和设计类�
 
 一次完整有序批次使用一个 JVM，每个用例创建新实例，但共享静态字段和 JIT 状态，`timeout` 覆盖整个运行。普通异常报告 Runtime Error 后继续；致命 VM 错误和超时停止后续用例。编译后的类缓存在 `.hc/cache/build/java/`，不指定范围的 `hc clean` 会清理它。`hc debug -l java` 使用 jdb，在真实源码的函数入口或设计类构造器处停下（往返题停在编码方法）。Java 目前只支持终端调试，不支持 `--headless`。题包需要声明 `java` 并提供 `reference/Solution.java` 才能判定 Java 解答。
 
+JavaScript 和 TypeScript 使用本地 **Node.js 22+**，由 `javascript.command` 选择（默认 `node`）；TypeScript 还使用 `typescript.command`（默认 `tsc`，最低 5.7）。可执行文件路径可相对工作区。hc 不安装 Node、npm 或 tsc；`hc doctor -l typescript --debug` 检查运行时、编译器、内置 inspector 和 Python 基础环境。打开旧工作区时会自动补齐缺少的设置。CLI 可用 `js`/`ts` 别名，题包和设置使用 `javascript`/`typescript`。
+
+解答文件为 `solution.js` / `solution.ts`，保留 LeetCode 原生模板，无需 exports。`integer` 和 `long` 都使用 `number`，long 输入/输出超出 ±9007199254740991 会在舍入前被拒绝。常用数据结构库和 lodash（见[协议](protocol_zh.md#javascript--typescript)）由本地 npm 安装到 `.hc/node/<锁文件摘要>/node_modules`，与解答目录分开。`javascript.npm` 选择 npm 可执行文件，默认 `npm`。TS 由本地 tsc 做类型检查并编译为 ES2022。一个 Node 进程运行整个有序批次，每个用例使用新的输入和设计类实例，同时共享模块/JIT 状态；基线采用与 Java 相同的有序批次规则。不支持返回 Promise 的解答。
+
+`hc init --lang js/ts` 会在准备 Python 基础环境后安装这份依赖；已有工作区在首次启动 JS/TS 解答、打开编辑器、运行或调试时准备。浏览设置和切换语言不会安装。安装使用 hc 携带的锁文件执行 `npm ci --ignore-scripts --no-audit --no-fund`，显示进度，首次可能需要网络。并发命令共用安装锁；先安装到临时目录，npm 失败时保留已有环境。后续运行检查并复用完成的环境，不调用 npm。锁文件变化会使用新目录；离线时若新版本未准备好，会提示修复，不借用旧版本的包。
+
+`hc env sync --lang javascript`（或 `typescript`）从一次干净的 npm 安装中修复共用依赖，不改变 Python；Node/npm/tsc 始终由用户提供。直接运行 `hc env sync` 保持原来的 Python 行为。`hc doctor -l ts` 只读检查，报告依赖缺失或不完整，并在需要安装时检查 npm。准备完成后，Node（TS 还需 tsc）即可离线执行，npm 只用于安装和修复。`.hc/node` 属于环境而非可丢弃的判题缓存，`hc clean` 会保留它。
+
+打开解答时会生成 `jsconfig.json` / `tsconfig.json` 和 `_hc_js/types.d.ts`，让 TypeScript 语言服务器识别评测类型、Node API 和工作区中的库。在编辑器打开该解答目录即可。`_hc_js/` 和 `zz_hc_solution.cts` 是生成的驱动文件；编译使用临时 CommonJS 副本，避免父级 `package.json` 的 `type: module` 改变解答 ABI，source map 仍指向真实 `solution.ts`。只有 hc 自己的共享驱动保存在 `.hc/runtime/javascript/<hash>/`；无范围的 `hc clean` 清理已知驱动文件，保留 `.hc/node` 环境。不要修改生成文件，每次运行前会重新生成。
+
+`hc debug -l javascript` / `-l typescript` 打开终端 inspector 界面，先停在驱动入口，`cont` 后停在解答入口。它显示原始 TS 源码，支持 `next`、`step`、`out`、`cont`、`list`、`exec 表达式`、`backtrace`、`sb(行号)` / `sb("文件", 行号)` 和 `quit`，保留解答 stderr。`--headless` 则暴露 Node inspector，默认地址 `127.0.0.1:38697`（通过 `--addr` 修改），可连接编辑器的 Node 调试器。这是 Node inspector，不是 DAP 服务；TS 调试需启用编辑器的 source map 支持。
+
 
 Go 版本检测、模块准备、编译、最低版本检查和调试都使用指定的编译器。调试时先关闭优化编译出程序，再由指定的 Delve 通过 `exec` 启动，避免 Delve 从 PATH 选择另一个 Go。编译缓存和参考解计时的标识包含编译器路径。`execution.backend` 默认是 `local`，目前也只实现了 `local`；设置 `docker` 或其他值会报错，不会悄悄在本地执行。
 
@@ -461,7 +473,7 @@ hc cases edit two-sum               # 在编辑器中编辑你的用例文件
 - 题目没有你所用语言的参考解时不作评判（见[就绪](protocol_zh.md#就绪)），所以也没有时间限制。参考解、`hc cases build` 和 `hc validate --run` 从不受限，`hc debug` 也一样。它们在生成用例上运行参考解以算出期望输出，这次运行也算作参考解的三次计时之一；但 `hc validate` 或 `hc pack check` 同时检查多道题时（`--jobs`）除外。
 - `hc.yaml` 中的 `timeout` 是另一个限制，针对整次运行的墙钟时间：它用来防止解答卡死。它也可能先于时间限制生效：参考解在本次运行用例上的总用时超过它的四十分之一时（默认 10s 下即 250ms，Python 参考解在大用例较多的题目上可能如此），慢得多的解答会先用完 `timeout`。判定结果相同，都是超时（Time Limit Exceeded），只是要等满整个 `timeout`。
 
-Java 的基线按完整有序批次运行三个新 JVM，取最小**总耗时**。顺序和重复用例都是缓存键的一部分，改变选择会重新计时，不使用上述按单例拼接的规则。计算生成用例期望输出的运行，仅能为它实际执行的完整批次贡献一次计时，不能抽取子集。这样保留实际 JIT 预热影响，不额外添加人工预热轮次。
+Java、JavaScript 和 TypeScript 的基线按完整有序批次运行三个新的运行时进程，取最小**总耗时**。顺序和重复用例都是缓存键的一部分，改变选择会重新计时，不使用上述按单例拼接的规则。计算生成用例期望输出的运行，仅能为它实际执行的完整批次贡献一次计时，不能抽取子集。这样保留实际 JIT 预热影响，不额外添加人工预热轮次。
 
 ## 获取题目
 
@@ -475,7 +487,7 @@ hc fetch --site cn "LCR 001"                                  # leetcode.cn 的 
 hc gen 146                  # 让题目就绪：生成测试用例并决定判题规则
 ```
 
-`hc fetch` 会下载题面及其图片（包括预格式化示例中的示意图）、函数签名、Go、Python、C++ 和 Java 的初始代码，以及示例用例。能安全解析时，会成对保留同一题面示例的输入和期望输出。若无法确认示例输入，hc 会给出警告，并保留未匹配的 API 输入但不写入期望输出；不会仅按顺序拼接输入和输出。
+`hc fetch` 会下载题面及其图片（包括预格式化示例中的示意图）、函数签名、Go、Python、C++、Java、JavaScript 和 TypeScript 的初始代码，以及示例用例。能安全解析时，会成对保留同一题面示例的输入和期望输出。若无法确认示例输入，hc 会给出警告，并保留未匹配的 API 输入但不写入期望输出；不会仅按顺序拼接输入和输出。
 
 它按目标题目包的语言区域写入题面：你自己的题目由 `packs/local/pack.yaml` 中的 `locales` 决定（见[多语言题面](#多语言题面)）。两个站点都有英文题面；只有 leetcode.cn 有中文题面和中文标题：
 
@@ -745,7 +757,7 @@ hc leetcode login --port 8765         # 在服务器上
 工作区根目录下的 `hc.yaml` 保存个人设置与已安装题目包清单。新工作区会显式写出所有全局默认值：
 
 ```yaml
-language: go          # 首选解题语言：go | python | cpp | java
+language: go          # 首选解题语言：go | python | cpp | java | javascript | typescript
 locale: en            # 首选题面语言
 editor: ""           # 空值依次使用 $VISUAL、$EDITOR、vi
 theme: auto           # auto | dark | light
@@ -764,6 +776,11 @@ cpp:
 java:
   home: ""
   jvm_args: [-Xss16m]
+javascript:
+  command: node
+  npm: npm
+typescript:
+  command: tsc
 python:
   interpreter: ""    # 空值保留 hc 管理的 .hc/venv；填写后使用外部解释器
 agent:

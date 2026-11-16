@@ -85,6 +85,18 @@ Java solutions use `Solution.java`, with LeetCode's method and design-class sign
 
 One JVM runs the entire ordered batch, with fresh per-case instances but shared static/JIT state. `timeout` applies to that entire run. Normal exceptions report Runtime Error and continue; fatal VM errors and timeouts stop later cases. Compiled classes are cached in `.hc/cache/build/java/`, and unscoped `hc clean` removes them. `hc debug -l java` uses jdb, stopping in your real source at the function or design constructor (the encoder for round trips). Java supports terminal debugging only, not `--headless`. The pack must declare `java` and provide `reference/Solution.java` to judge Java solutions.
 
+JavaScript and TypeScript use local **Node.js 22+**, selected by `javascript.command` (default `node`); TypeScript additionally uses `typescript.command` (default `tsc`, minimum 5.7). Executable paths can be workspace-relative. hc does not install Node, npm or tsc; `hc doctor -l typescript --debug` diagnoses both and the built-in inspector, plus Python infrastructure. Missing fields are filled automatically when opening an existing workspace. `js`/`ts` are CLI aliases; packs and settings use `javascript`/`typescript`.
+
+Solutions are `solution.js` / `solution.ts`, preserving native LeetCode templates without exports. `integer` and `long` use `number`; long inputs/outputs outside ±9007199254740991 are rejected before rounding. The data-structure libraries and lodash (see [protocol](protocol.md#javascript--typescript)) are installed with local npm into `.hc/node/<lock hash>/node_modules`, separate from your solution. `javascript.npm` selects the npm executable (default `npm`). TypeScript is typechecked and compiled to ES2022 using local tsc. One Node process runs the ordered case batch; fresh inputs and design instances coexist with shared module/JIT state. Baselines follow the same ordered-batch rule as Java. Promise-returning solutions are unsupported.
+
+`hc init --lang js/ts` prepares this environment after Python infrastructure. Existing workspaces prepare it on the first JS/TS start, editor launch, run or debug; browsing settings and switching languages do not install anything. Installation uses the embedded lockfile with `npm ci --ignore-scripts --no-audit --no-fund`, shows progress and may need network access once. Concurrent commands share an installation lock. Packages are installed in a temporary directory first, and a failed npm run leaves an existing environment intact. Repeated runs check and reuse the completed environment without invoking npm. A changed lockfile gets its own directory; offline use fails with a repair hint if that version is not installed, rather than substituting older packages.
+
+`hc env sync --lang javascript` (or `typescript`) repairs these shared dependencies from a clean npm installation without touching Python. Node/npm/tsc remain user-provided. Plain `hc env sync` retains its existing Python behavior. `hc doctor -l ts` is read-only, reports incomplete dependencies and checks npm when installation is needed. Once prepared, a working Node (and tsc for TS) suffices for offline execution; npm is only needed for installation/repair. `.hc/node` is an environment, not disposable judge cache, so `hc clean` keeps it.
+
+Opening a solution writes `jsconfig.json` / `tsconfig.json` and `_hc_js/types.d.ts` so TypeScript language servers see judge types, Node APIs and the workspace libraries. Open that solution directory in your editor. `_hc_js/` and `zz_hc_solution.cts` are generated driver files, never user code; compilation uses a temporary CommonJS copy so a parent `package.json` with `type: module` does not change the solution ABI. Source maps point back to the real `solution.ts`. Only hc’s own shared driver lives in `.hc/runtime/javascript/<hash>/`; unscoped `hc clean` removes known driver files and preserves the `.hc/node` environment. Do not edit generated files; hc recreates them before runs.
+
+`hc debug -l javascript` / `-l typescript` opens a terminal inspector frontend, stopping at the driver start and then the solution entry after `cont`. It displays original TS source and supports `next`, `step`, `out`, `cont`, `list`, `exec expression`, `backtrace`, `sb(line)` / `sb("file", line)`, and `quit`. Debuggee stderr is retained. `--headless` instead exposes Node's inspector on `127.0.0.1:38697` by default (`--addr` changes the address); attach an editor's Node debugger. This is Node inspector, not a DAP server. Use source-map support in the editor for TS.
+
 
 Go's version detection, module preparation, builds, minimum-version checks and debugging use the selected compiler. Debugging builds a binary with optimizations disabled, then starts the selected Delve with `exec`, so Delve cannot pick a different Go from PATH. Build-cache and reference-timing identities include the compiler path. `execution.backend` defaults to `local`; only `local` is implemented. `docker` and other values are rejected rather than silently running locally.
 
@@ -483,7 +495,7 @@ As on LeetCode, a solution that is correct but too slow fails with Time Limit Ex
 
 - Forty times leaves room for a different way of writing the same algorithm, such as a map where the reference uses an array, but not for a worse complexity on inputs as large as the problem's constraints allow. Whether a slower solution fails depends on the problem's cases: some problems cannot separate two complexities within their constraints, and then the slower one passes, as it would on LeetCode.
 - For Go, Python and C++, the first run of a problem times the reference: three runs on each case, of which hc keeps the fastest, in `.hc/cache/baseline/<pack>/<problem>/<language>.json`. hc notes it on stderr ("Timing the Go reference…"), and later runs, with any selection of cases, reuse the times. They are measured again when hc, your toolchain, `problem.yaml` or the reference change.
-- Java times the complete ordered batch in three fresh JVMs and caches the minimum **total**. Case order and duplicates are part of the cache key; changing the selection runs the reference again. A run already computing generated outputs counts only for its exact batch, never for a subset extracted from a larger run. This preserves the effect of JIT warm-up without adding artificial warm-up iterations.
+- Java, JavaScript and TypeScript time the complete ordered batch in three fresh runtime processes and caches the minimum **total**. Case order and duplicates are part of the cache key; changing the selection runs the reference again. A run already computing generated outputs counts only for its exact batch, never for a subset extracted from a larger run. This preserves the effect of JIT warm-up without adding artificial warm-up iterations.
 - A problem without a reference in your language is not judged ([readiness](protocol.md#readiness)), so it has no time limit either. References, `hc cases build` and `hc validate --run` are never limited, and neither is `hc debug`. Their runs of a reference on generated cases, which compute the expected outputs, count as one of its three timed runs, except while `hc validate` or `hc pack check` checks several problems at once (`--jobs`).
 - The `timeout` of `hc.yaml` is another limit, on the wall-clock time of the whole run: it guards against a solution that hangs. It can also come first: when the reference takes more than a fortieth of it on the run's cases (250ms with the default 10s, as Python references can on problems with many large cases), a much slower solution reaches the `timeout` before the time limit. The verdict is the same, Time Limit Exceeded, only after the whole `timeout`.
 
@@ -499,7 +511,7 @@ hc fetch --site cn "LCR 001"                                  # leetcode.cn IDs 
 hc gen 146                  # make it ready: test cases and the judge rule
 ```
 
-`hc fetch` downloads the statement and its images, including diagrams inside preformatted examples, the signature, the Go, Python, C++ and Java starter code, and the examples. Inputs and expected outputs are kept together from each statement example when they can be parsed safely. If an example input cannot be verified, hc warns and keeps unmatched API inputs without expected outputs; it never pairs inputs and outputs merely by their order.
+`hc fetch` downloads the statement and its images, including diagrams inside preformatted examples, the signature, the Go, Python, C++, Java, JavaScript and TypeScript starter code, and the examples. Inputs and expected outputs are kept together from each statement example when they can be parsed safely. If an example input cannot be verified, hc warns and keeps unmatched API inputs without expected outputs; it never pairs inputs and outputs merely by their order.
 
 It writes the statements in the locales of the pack it fetches into: `locales` in `packs/local/pack.yaml` for your own problems (see [statements in several languages](#statements-in-several-languages)). Both sites have the English statement; only leetcode.cn has the Chinese one, and its title:
 
@@ -769,7 +781,7 @@ Either way, hc checks the session with LeetCode and saves the single login, read
 `hc.yaml` at the workspace root holds personal settings and the installed-pack inventory. New workspaces write all global defaults explicitly:
 
 ```yaml
-language: go          # preferred solution language: go | python | cpp | java
+language: go          # preferred solution language: go | python | cpp | java | javascript | typescript
 locale: en            # preferred statement language
 editor: ""           # empty: $VISUAL, $EDITOR, then vi
 theme: auto           # auto | dark | light
@@ -788,6 +800,11 @@ cpp:
 java:
   home: ""
   jvm_args: [-Xss16m]
+javascript:
+  command: node
+  npm: npm
+typescript:
+  command: tsc
 python:
   interpreter: ""    # empty keeps hc's managed .hc/venv; a value selects an external Python
 agent:

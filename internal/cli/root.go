@@ -267,5 +267,5 @@ func confirm(question string) bool {
 
 // langFlag registers the common --lang flag.
 func langFlag(cmd *cobra.Command, target *string) {
-	cmd.Flags().StringVarP(target, "lang", "l", "", "language (go, python, cpp, java); default from hc.yaml")
+	cmd.Flags().StringVarP(target, "lang", "l", "", "language (go, python, cpp, java, javascript, typescript); default from hc.yaml")
 }

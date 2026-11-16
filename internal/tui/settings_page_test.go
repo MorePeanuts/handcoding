@@ -105,7 +105,7 @@ func TestSettingsPagePackScope(t *testing.T) {
 	// Search spans categories, while ordinary browsing respects the category.
 	h.press("s", "g", "enter", "tab", "tab", "/")
 	h.m.Update(tea.PasteMsg{Content: "compiler"})
-	if len(h.m.settings.visible) != 3 || h.m.selectedSetting().Key != "go.command" || h.m.settings.rows[h.m.settings.visible[1]].Key != "cpp.command" {
+	if len(h.m.settings.visible) != 4 || h.m.selectedSetting().Key != "go.command" || h.m.settings.rows[h.m.settings.visible[1]].Key != "cpp.command" {
 		t.Fatal("cross-category search failed")
 	}
 	h.press("esc")

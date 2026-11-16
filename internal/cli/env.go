@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/ui"
 )
 
@@ -17,6 +18,11 @@ func newEnvCmd(root *rootOptions) *cobra.Command {
 (.hc/venv), unless python.interpreter is set in hc.yaml, which hc then uses
 as it is. Python 3.12 or later runs Python solutions, and the generators and
 checkers that most problems have, whatever your solution's language.
+
+For JavaScript/TypeScript, hc uses local npm to install locked libraries
+into .hc/node at JS/TS initialization or first use. Ready environments run
+offline without npm. Use hc env sync --lang javascript (or typescript) to
+repair them without changing Python. Node, npm and tsc are user-provided.
 
 hc init and hc pack init create the environment (a pack checkout's on
 Python 3.12, the oldest the protocol supports), and so does the first
@@ -32,13 +38,18 @@ command that needs Python when it is missing:
 The environment holds debugpy for headless debugging. After installing uv
 or Python, run ` + "`hc env sync`" + `.`,
 	}
-	cmd.AddCommand(&cobra.Command{
+	var language string
+	sync := &cobra.Command{
 		Use:   "sync",
-		Short: "Create the Python virtual environment again",
+		Short: "Repair a workspace language environment",
 		Long: `Delete .hc/venv and create it again, with debugpy. Run it after installing
 uv or Python when hc could not create it, after installing a newer Python,
 or when debugpy is missing. Installing debugpy, and downloading Python with
-uv, need network access.`,
+uv, need network access.
+
+With --lang javascript (or typescript), repair locked libraries in .hc/node
+using local npm instead. Both languages share one environment. Python is
+unchanged. Node, npm and tsc are user-provided tools; hc installs no tools.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, err := root.openApp()
@@ -46,7 +57,12 @@ uv, need network access.`,
 				return err
 			}
 			defer a.Close()
-			tc, err := a.SyncEnv(cmd.Context(), os.Stderr)
+			var tc lang.Toolchain
+			if language == "python" || language == "py" || language == "python3" {
+				tc, err = a.SyncEnv(cmd.Context(), os.Stderr)
+			} else {
+				tc, err = a.SyncJavaScriptEnv(cmd.Context(), language, os.Stderr)
+			}
 			if err != nil {
 				return err
 			}
@@ -56,6 +72,8 @@ uv, need network access.`,
 			}
 			return nil
 		},
-	})
+	}
+	sync.Flags().StringVarP(&language, "lang", "l", "python", "environment to repair: python, javascript, typescript")
+	cmd.AddCommand(sync)
 	return cmd
 }

@@ -10,44 +10,48 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/lang/java"
+	"github.com/MorePeanuts/handcoding/internal/lang/javascript"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/testenv"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
-func TestJavaBatchMinimum(t *testing.T) {
+func TestOrderedBatchMinimum(t *testing.T) {
 	t.Parallel()
-	l := java.Language{}
-	c := &baselineCache{Cases: map[string]baselineTime{}}
-	d := []string{"a", "b"}
-	for _, times := range [][]time.Duration{{time.Millisecond, 9 * time.Millisecond}, {8 * time.Millisecond, 2 * time.Millisecond}, {3 * time.Millisecond, 8 * time.Millisecond}} {
-		r := &runner.Report{}
-		for _, v := range times {
-			r.Cases = append(r.Cases, runner.CaseResult{Verdict: runner.Accepted, Elapsed: v})
+	for _, l := range []lang.Language{java.Language{}, javascript.Language{}, javascript.Language{TypeScript: true}} {
+		c := &baselineCache{Cases: map[string]baselineTime{}}
+		d := []string{"a", "b"}
+		for _, times := range [][]time.Duration{{time.Millisecond, 9 * time.Millisecond}, {8 * time.Millisecond, 2 * time.Millisecond}, {3 * time.Millisecond, 8 * time.Millisecond}} {
+			r := &runner.Report{}
+			for _, v := range times {
+				r.Cases = append(r.Cases, runner.CaseResult{Verdict: runner.Accepted, Elapsed: v})
+			}
+			if err := c.record(l, r, d); err != nil {
+				t.Fatal(err)
+			}
 		}
-		if err := c.record(l, r, d); err != nil {
-			t.Fatal(err)
+		got := c.Batches[batchDigest(d)]
+		if got.Runs != 3 || got.Ns != int64(10*time.Millisecond) {
+			t.Fatalf("must use minimum whole run, not 3 ms sum of case minima: %+v", got)
 		}
-	}
-	got := c.Batches[batchDigest(d)]
-	if got.Runs != 3 || got.Ns != int64(10*time.Millisecond) {
-		t.Fatalf("must use minimum whole run, not 3 ms sum of case minima: %+v", got)
-	}
-	for _, other := range [][]string{{"b", "a"}, {"a", "b", "a"}, {"a"}} {
-		if batchDigest(d) == batchDigest(other) {
-			t.Fatal("batch identity lost order/multiplicity")
+		for _, other := range [][]string{{"b", "a"}, {"a", "b", "a"}, {"a"}} {
+			if batchDigest(d) == batchDigest(other) {
+				t.Fatal("batch identity lost order/multiplicity")
+			}
 		}
-	}
-	before := c.Batches[batchDigest(d)]
-	if err := c.record(l, &runner.Report{Cases: []runner.CaseResult{{Verdict: runner.Accepted, Elapsed: time.Nanosecond}, {Verdict: runner.RuntimeError}}}, d); err == nil {
-		t.Fatal("accepted partial run")
-	}
-	if c.Batches[batchDigest(d)] != before {
-		t.Fatal("failed run changed baseline")
+		before := c.Batches[batchDigest(d)]
+		if err := c.record(l, &runner.Report{Cases: []runner.CaseResult{{Verdict: runner.Accepted, Elapsed: time.Nanosecond}, {Verdict: runner.RuntimeError}}}, d); err == nil {
+			t.Fatal("accepted partial run")
+		}
+		if c.Batches[batchDigest(d)] != before {
+			t.Fatal("failed run changed baseline")
+		}
 	}
 }
+
 func TestJavaBatchCacheRuns(t *testing.T) {
 	t.Parallel()
 	tc, err := (java.Language{}).Toolchain()

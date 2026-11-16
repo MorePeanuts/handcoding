@@ -19,6 +19,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/lang/cpp"
 	"github.com/MorePeanuts/handcoding/internal/lang/golang"
 	"github.com/MorePeanuts/handcoding/internal/lang/java"
+	"github.com/MorePeanuts/handcoding/internal/lang/javascript"
 	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
@@ -58,7 +59,17 @@ func Languages(ws *workspace.Workspace) *lang.Registry {
 		pythonLanguage(ws),
 		cpp.Language{Compiler: lang.ExecutableName(ws.Root, ws.Config.CPP.Command), Debugger: lang.ExecutableName(ws.Root, ws.Config.CPP.Debugger), Standard: ws.Config.CPP.Standard, Sanitizers: ws.Config.CPP.Sanitizers},
 		javaLanguage(ws),
+		javascriptLanguage(ws, false),
+		javascriptLanguage(ws, true),
 	)
+}
+
+func javascriptLanguage(ws *workspace.Workspace, ts bool) javascript.Language {
+	environment := ""
+	if ws.Root != "" {
+		environment = filepath.Join(ws.StatePath(), "node")
+	}
+	return javascript.Language{TypeScript: ts, Environment: environment, NPM: lang.ExecutableName(ws.Root, ws.Config.JavaScript.NPM), Node: lang.ExecutableName(ws.Root, ws.Config.JavaScript.Command), Compiler: lang.ExecutableName(ws.Root, ws.Config.TypeScript.Command), Runtime: ws.RuntimePath("javascript")}
 }
 
 func javaLanguage(ws *workspace.Workspace) java.Language {
@@ -136,6 +147,42 @@ func (a *App) SetUpPython(ctx context.Context, w io.Writer) error {
 		return err
 	}
 	return l.Setup(ctx, w)
+}
+
+// SetUpInitial prepares Python infrastructure and the selected JS/TS environment.
+func (a *App) SetUpInitial(ctx context.Context, w io.Writer) error {
+	if err := a.SetUpPython(ctx, w); err != nil {
+		return err
+	}
+	l, err := a.Langs.Get(a.WS.Config.Language)
+	if err != nil {
+		return err
+	}
+	if l.ID() == "javascript" || l.ID() == "typescript" {
+		return l.Setup(ctx, w)
+	}
+	return nil
+}
+
+// SyncJavaScriptEnv repairs the shared JS/TS dependencies, leaving Python alone.
+func (a *App) SyncJavaScriptEnv(ctx context.Context, name string, w io.Writer) (lang.Toolchain, error) {
+	release, err := a.WS.UseCaches()
+	if err != nil {
+		return lang.Toolchain{}, err
+	}
+	defer release()
+	l, err := a.Langs.Get(name)
+	if err != nil {
+		return lang.Toolchain{}, err
+	}
+	js, ok := l.(javascript.Language)
+	if !ok {
+		return lang.Toolchain{}, fmt.Errorf("environment sync supports python, javascript and typescript")
+	}
+	if err := js.SyncEnvironment(ctx, w); err != nil {
+		return lang.Toolchain{}, err
+	}
+	return js.Toolchain()
 }
 
 // SetUpEnv prepares l's environment (see lang.Language.Setup), writing

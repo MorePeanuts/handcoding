@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/MorePeanuts/handcoding/internal/lang/javascript"
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 )
@@ -174,6 +175,16 @@ func cacheDirectory(name string, scoped bool) bool {
 	if scoped {
 		return false
 	}
+	if name == "runtime/javascript" {
+		return true
+	}
+	if len(parts) >= 3 && parts[0] == "runtime" && parts[1] == "javascript" && lowerHex(parts[2], 20) {
+		if len(parts) == 3 {
+			return true
+		}
+		dir, ok := javascript.RuntimeEntry(strings.Join(parts[3:], "/"))
+		return ok && dir
+	}
 	if name == "cache/build" || name == "cache/build/go" || name == "cache/build/java" || name == "runtime" || name == "runtime/python" || name == "runtime/python/__pycache__" {
 		return true
 	}
@@ -226,6 +237,12 @@ func cacheCategory(name, packName, slug string) string {
 	}
 	if len(parts) >= 5 && strings.Join(parts[:3], "/") == "cache/build/java" && lowerHex(parts[3], 32) && (strings.HasSuffix(name, ".class") || len(parts) == 5 && parts[4] == "complete") {
 		return "Java classes"
+	}
+	if len(parts) >= 4 && parts[0] == "runtime" && parts[1] == "javascript" && lowerHex(parts[2], 20) {
+		dir, ok := javascript.RuntimeEntry(strings.Join(parts[3:], "/"))
+		if ok && !dir {
+			return "JavaScript runtime"
+		}
 	}
 	if name == "runtime/python/hc_runtime.py" {
 		return "Python runtime"

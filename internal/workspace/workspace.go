@@ -89,9 +89,11 @@ type Config struct {
 	// Execution selects the backend; only local is implemented.
 	Execution ExecutionConfig `yaml:"execution"`
 	// Go selects user-provided compiler and debugger executables.
-	Go   GoConfig   `yaml:"go"`
-	CPP  CPPConfig  `yaml:"cpp"`
-	Java JavaConfig `yaml:"java"`
+	Go         GoConfig         `yaml:"go"`
+	CPP        CPPConfig        `yaml:"cpp"`
+	Java       JavaConfig       `yaml:"java"`
+	JavaScript JavaScriptConfig `yaml:"javascript"`
+	TypeScript TypeScriptConfig `yaml:"typescript"`
 	// Python configures the Python language.
 	Python PythonConfig `yaml:"python"`
 	// Agent configures the coding agent used to generate and fix test cases.
@@ -154,6 +156,14 @@ type CPPConfig struct {
 	Sanitizers string `yaml:"sanitizers"`
 }
 
+type JavaScriptConfig struct {
+	NPM     string `yaml:"npm"`
+	Command string `yaml:"command"`
+}
+type TypeScriptConfig struct {
+	Command string `yaml:"command"`
+}
+
 // JavaConfig selects one local JDK for compilation, execution and debugging.
 type JavaConfig struct {
 	Home    string   `yaml:"home"`
@@ -191,6 +201,8 @@ func DefaultConfig() Config {
 		Go:           GoConfig{Command: "go", Debugger: "dlv"},
 		CPP:          CPPConfig{Command: cpp.DefaultCompiler(), Debugger: cpp.DefaultDebugger(), Standard: "c++23", Sanitizers: "none"},
 		Java:         JavaConfig{JVMArgs: []string{"-Xss16m"}},
+		JavaScript:   JavaScriptConfig{Command: "node", NPM: "npm"},
+		TypeScript:   TypeScriptConfig{Command: "tsc"},
 		PackSettings: map[string]PackSettings{},
 		Packs:        []PackSource{},
 		Theme:        "auto",

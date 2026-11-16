@@ -77,7 +77,7 @@ func TestInitNoPython(t *testing.T) {
 			t.Fatalf("%s: init succeeded without Python", langName)
 		}
 		for _, want := range []string{
-			"the workspace at " + dir + " is created, but not its Python environment: cannot create .hc/venv: there is no uv, and no Python 3.12 or later on PATH (" + py + " is 3.9.6)",
+			"the workspace at " + dir + " is created, but its language environment is not ready: cannot create .hc/venv: there is no uv, and no Python 3.12 or later on PATH (" + py + " is 3.9.6)",
 			python.UVInstallURL, "`hc env sync`",
 		} {
 			if !strings.Contains(err.Error(), want) {
