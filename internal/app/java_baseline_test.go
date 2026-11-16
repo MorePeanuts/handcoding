@@ -50,7 +50,7 @@ func TestJavaBatchMinimum(t *testing.T) {
 }
 func TestJavaBatchCacheRuns(t *testing.T) {
 	t.Parallel()
-	tc, err := (java.Language{Release: 17}).Toolchain()
+	tc, err := (java.Language{}).Toolchain()
 	if err != nil {
 		testenv.Skip(t, err)
 	}
@@ -61,7 +61,6 @@ func TestJavaBatchCacheRuns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ws.Config.Java.Release = 17
 	a := New(ws)
 	t.Cleanup(func() { a.Close() })
 	l, _ := a.Langs.Get("java")

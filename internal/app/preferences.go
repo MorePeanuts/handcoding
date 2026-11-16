@@ -4,13 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/lang/cpp"
-	"github.com/MorePeanuts/handcoding/internal/lang/java"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
@@ -36,10 +34,9 @@ func Settings() []Setting {
 		{Key: "go.debugger", Label: "Go debugger", Category: "Execution & tools", Description: "Delve executable name or workspace-relative path. Used by the next debugging session."},
 		{Key: "cpp.command", Label: "C++ compiler", Category: "Execution & tools", Description: "Local g++ on Linux or clang++ on macOS. Executable name or workspace-relative path."},
 		{Key: "cpp.debugger", Label: "C++ debugger", Category: "Execution & tools", Description: "Terminal GDB or LLDB executable. Editor debugging is not supported for C++."},
-		{Key: "cpp.standard", Label: "C++ standard", Category: "Execution & tools", Description: "C++23 by default; newer standard modes require support from the selected compiler."},
+		{Key: "cpp.standard", Label: "C++ standard", Category: "Execution & tools", Description: "C++17 minimum, C++23 default. The selected compiler must support the requested standard."},
 		{Key: "cpp.sanitizers", Label: "C++ sanitizers", Category: "Execution & tools", Description: "Optional address/undefined behavior diagnostics. References use the same options; leak reporting is disabled because each case owns its process.", Choices: []string{"none", "address", "undefined", "address,undefined"}},
 		{Key: "java.home", Label: "Java JDK", Category: "Execution & tools", Description: "JDK directory, relative to the workspace or absolute. Empty uses JAVA_HOME, then the JDK selected on PATH. hc never installs a JDK."},
-		{Key: "java.release", Label: "Java release", Category: "Execution & tools", Description: "Source, API and bytecode version. Default 25; protocol minimum 17. The selected JDK must support this release."},
 		{Key: "java.jvm_args", Label: "Java VM options", Category: "Execution & tools", Description: "VM tuning and system properties for solutions and references. Edit the argument array in YAML. Default: a 16 MB thread stack.", YAMLOnly: true},
 		{Key: "python.interpreter", Label: "Python interpreter", Category: "Execution & tools", Description: "Empty keeps hc's managed .hc/venv. A command or path selects an external Python and bypasses management. Editing never sets up an environment."},
 		{Key: "agent.name", Label: "Coding agent", Category: "Coding agent", Description: "Preset for the next generation or repair. A nonempty agent.command overrides this preset.", Choices: []string{"claude", "codex"}},
@@ -63,7 +60,7 @@ func settingValues(c workspace.Config) map[string]string {
 	argv, _ := json.Marshal(command)
 	vmargs, _ := json.Marshal(c.Java.JVMArgs)
 	return map[string]string{
-		"java.home": c.Java.Home, "java.release": strconv.Itoa(c.Java.Release), "java.jvm_args": string(vmargs),
+		"java.home": c.Java.Home, "java.jvm_args": string(vmargs),
 		"language": c.Language, "locale": c.Locale, "editor": c.Editor, "theme": c.Theme, "images": c.Images, "timeout": c.Timeout,
 		"execution.backend": c.Execution.Backend, "go.command": c.Go.Command, "go.debugger": c.Go.Debugger,
 		"cpp.command": c.CPP.Command, "cpp.debugger": c.CPP.Debugger, "cpp.standard": c.CPP.Standard, "cpp.sanitizers": c.CPP.Sanitizers,
@@ -202,15 +199,6 @@ func (a *App) SavePreference(scope, key, value string, reset bool) (warning stri
 		if err != nil || duration <= 0 {
 			return "", fmt.Errorf("timeout must be a positive duration, such as 10s")
 		}
-	case "java.release":
-		n, err := strconv.Atoi(value)
-		if err != nil {
-			return "", fmt.Errorf("java.release must be an integer")
-		}
-		if err = java.CheckRelease(n); err != nil {
-			return "", err
-		}
-		return "", a.WS.SaveGlobalSetting(key, n)
 	case "cpp.standard":
 		if err := cpp.CheckStandard(value); err != nil {
 			return "", err

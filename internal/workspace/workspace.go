@@ -44,7 +44,6 @@ import (
 	"github.com/goccy/go-yaml"
 
 	"github.com/MorePeanuts/handcoding/internal/lang/cpp"
-	"github.com/MorePeanuts/handcoding/internal/lang/java"
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 )
@@ -158,7 +157,6 @@ type CPPConfig struct {
 // JavaConfig selects one local JDK for compilation, execution and debugging.
 type JavaConfig struct {
 	Home    string   `yaml:"home"`
-	Release int      `yaml:"release"`
 	JVMArgs []string `yaml:"jvm_args"`
 }
 
@@ -192,7 +190,7 @@ func DefaultConfig() Config {
 		Execution:    ExecutionConfig{Backend: "local"},
 		Go:           GoConfig{Command: "go", Debugger: "dlv"},
 		CPP:          CPPConfig{Command: cpp.DefaultCompiler(), Debugger: cpp.DefaultDebugger(), Standard: "c++23", Sanitizers: "none"},
-		Java:         JavaConfig{Release: java.DefaultRelease, JVMArgs: []string{"-Xss16m"}},
+		Java:         JavaConfig{JVMArgs: []string{"-Xss16m"}},
 		PackSettings: map[string]PackSettings{},
 		Packs:        []PackSource{},
 		Theme:        "auto",

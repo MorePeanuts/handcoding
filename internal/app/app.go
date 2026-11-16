@@ -66,7 +66,7 @@ func javaLanguage(ws *workspace.Workspace) java.Language {
 	if home != "" && !filepath.IsAbs(home) {
 		home = filepath.Join(ws.Root, home)
 	}
-	l := java.Language{Home: home, Release: ws.Config.Java.Release, JVMArgs: ws.Config.Java.JVMArgs}
+	l := java.Language{Home: home, JVMArgs: ws.Config.Java.JVMArgs}
 	if ws.Root != "" {
 		l.BuildCache = filepath.Join(ws.StatePath(), "cache", "build", "java")
 	}

@@ -28,6 +28,8 @@ var runtimeHeader []byte
 //go:embed types.hpp
 var typesHeader string
 
+const MinStandard = "c++17"
+
 type Language struct{ Compiler, Debugger, Standard, Sanitizers string }
 
 func DefaultCompiler() string {
@@ -73,11 +75,11 @@ func (l Language) sanitizers() string {
 	return "none"
 }
 
-var standardRE = regexp.MustCompile(`^c\+\+(?:23|26|29|[3-9][0-9]|2[c-z])$`)
+var standardRE = regexp.MustCompile(`^c\+\+(?:17|20|23|26|29|[3-9][0-9]|2[c-z])$`)
 
 func CheckStandard(s string) error {
 	if !standardRE.MatchString(s) {
-		return fmt.Errorf("cpp.standard must be c++23 or a newer standard (for example c++26)")
+		return fmt.Errorf("cpp.standard must be c++17 or newer (default c++23)")
 	}
 	return nil
 }
@@ -117,18 +119,20 @@ func (l Language) toolchain(ctx context.Context) (lang.Toolchain, error) {
 	if m == nil {
 		return lang.Toolchain{}, fmt.Errorf("unrecognized C++ compiler: %s", b)
 	}
-	name, min := "GCC", "13"
+	name := "GCC"
 	if strings.Contains(string(b), "clang") {
-		name, min = "Clang", "17"
+		name = "Clang"
 	}
 	if strings.Contains(string(b), "Apple clang") {
-		name, min = "Apple Clang", "16"
+		name = "Apple Clang"
 	}
 	flags, err := l.flags(false)
 	if err != nil {
 		return lang.Toolchain{}, err
 	}
-	return lang.Toolchain{Name: name, Version: m[1], Path: path, Min: min, Upgrade: "install a supported local C++ compiler or set cpp.command", Flags: flags}, nil
+	// C++ support is a language/standard-library capability, not a vendor
+	// version floor. Diagnose probes the selected mode; Build uses it verbatim.
+	return lang.Toolchain{Name: name, Version: m[1], Path: path, Flags: flags}, nil
 }
 func (l Language) Diagnose(ctx context.Context, o lang.DiagnosticOptions) []lang.Diagnostic {
 	d := lang.Diagnostic{Language: "cpp", Role: "compiler", Command: l.compiler(), Source: "PATH"}
@@ -140,13 +144,10 @@ func (l Language) Diagnose(ctx context.Context, o lang.DiagnosticOptions) []lang
 		if err != nil {
 			d.Status, d.Message = "error", err.Error()
 		} else {
-			d.Version, d.Minimum = tc.Version, tc.Min
-			d.CheckVersion()
-			if d.Status == "ok" {
-				_, err = lang.Probe(ctx, d.Path, nil, "-std="+l.standard(), "-fsyntax-only", "-include", "vector", "-include", "thread", "-x", "c++", "/dev/null")
-				if err != nil {
-					d.Status, d.Message = "error", err.Error()
-				}
+			d.Version, d.Minimum, d.Status = tc.Version, MinStandard, "ok"
+			_, err = lang.Probe(ctx, d.Path, nil, "-std="+l.standard(), "-fsyntax-only", "-include", "vector", "-include", "thread", "-include", "optional", "-include", "variant", "-x", "c++", "/dev/null")
+			if err != nil {
+				d.Status, d.Message = "error", err.Error()
 			}
 		}
 	}
@@ -230,6 +231,34 @@ func (l Language) build(ctx context.Context, dir, binDir string, debug bool) err
 func (l Language) Build(ctx context.Context, dir, binDir string) error {
 	return l.build(ctx, dir, binDir, false)
 }
+
+// CheckMinVersion compiles the complete reference translation unit in C++17,
+// independent of the standard selected for the user's solutions.
+func (l Language) CheckMinVersion(ctx context.Context, p *problem.Problem, file string) error {
+	dir, err := os.MkdirTemp("", "hc-cpp-min-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return err
+	}
+	if err = write(filepath.Join(dir, "solution.cpp"), b); err != nil {
+		return err
+	}
+	l.Standard = MinStandard
+	if err = l.Prepare(dir, p); err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, l.compiler(), "-std="+MinStandard, "-pedantic-errors", "-pthread", "-fsyntax-only", "zz_hc_driver.cpp")
+	cmd.Dir = dir
+	if b, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("C++17 compatibility: %w", &lang.CompileError{Output: string(b) + "\n" + err.Error()})
+	}
+	return nil
+}
+
 func (l Language) Command(ctx context.Context, dir, binDir string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, filepath.Join(binDir, "prog"))
 	cmd.Dir = dir

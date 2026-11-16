@@ -73,15 +73,15 @@ Python 在 hc 管理的虚拟环境 `.hc/venv` 中运行：包括 Python 解答�
 
 hc 使用你的本地开发工具。`hc.yaml` 的 `go.command` 和 `go.debugger` 分别指定 Go 编译器命令和 Delve 可执行文件，默认使用 PATH 中的 `go` 和 `dlv`。Python 保留现有托管方式，设置 `python.interpreter` 时使用指定的解释器。这些配置都接受命令名或可执行文件路径；包含 `/` 的相对路径以工作区根目录为基准，不以解答目录为基准。配置值是可执行文件，不是 shell 命令行；hc 不展开 `~` 或环境变量。显式指定的工具不可用时直接报错，不回退到其他工具。hc 不安装 Go 或 Delve。
 
-C++ 使用 `solution.cpp`，保持 LeetCode 的 `class Solution` / 设计类签名。`cpp.command` 和 `cpp.debugger` 指向本地工具，Linux 默认 `g++` / `gdb`，macOS 默认 `clang++` / `lldb`。`cpp.standard` 默认为 `c++23`，显式选择更新标准时要求编译器支持。`cpp.sanitizers` 可为 `none`、`address`、`undefined` 或 `address,undefined`，参考解使用相同选项，时间基线也按选项区分。hc 不安装这些工具。`hc doctor -l cpp --debug` 检查编译器、标准与头文件可用性、终端调试器和 Python 基础环境。C++ 暂不支持编辑器调试（`--headless`），Go/Python 的现有支持保留。
+C++ 使用 `solution.cpp`，保持 LeetCode 的 `class Solution` / 设计类签名。`cpp.command` 和 `cpp.debugger` 指向本地工具，Linux 默认 `g++` / `gdb`，macOS 默认 `clang++` / `lldb`。`cpp.standard` 默认为 `c++23`，也接受 `c++17`、`c++20` 和更新标准。编译器和标准库必须支持所选标准，hc 不会静默降级。`cpp.sanitizers` 可为 `none`、`address`、`undefined` 或 `address,undefined`，参考解使用相同选项，时间基线也按选项区分。hc 不安装这些工具。`hc doctor -l cpp --debug` 检查编译器、标准与头文件可用性、终端调试器和 Python 基础环境。C++ 暂不支持编辑器调试（`--headless`），Go/Python 的现有支持保留。
 
 打开 C++ 解答时，会在旁边生成 `hc_types.hpp`、驱动及运行时头文件和 `compile_commands.json`。编辑器中的 clangd（或兼容语言服务器）读取这份编译数据库，就能识别相同的标准、头文件和评测器定义类型。解答不需要 hc 专用导入或 `main`，提交到 LeetCode 时保留源码。题目包需要声明 `cpp` 并提供 C++ 参考解，才能判定 C++ 解答；更新 hc 不会自动给现有题包增加参考解。
 
 每个 C++ 用例使用独立进程；类题同一用例的全部操作共享对象。一次运行只编译一次。累计算法时限只统计调用，不包含启动、退出和编解码；配置的墙钟超时分别约束每个 C++ 工作进程。正常构建使用 `-O2`，`hc debug -l cpp` 使用 `-O0 -g`，在 GDB/LLDB 中停在解答入口。进程退出回收节点分配的内存，因此关闭 sanitizer 的泄漏报告，仍可诊断非法访问及未定义行为。
 
-Java 使用同一个本地 JDK：按 `java.home`（绝对路径或相对工作区的目录）、`JAVA_HOME`、PATH 中 `java` 所选 JDK 的顺序查找；`java`、`javac` 和终端调试器 `jdb` 都来自该目录。`java.release` 默认 **25**，协议最低 **17**。使用 JDK 17 时显式设置 `java.release: 17`。hc 不安装或升级 Java。`java.jvm_args` 是 VM 调优和系统属性参数数组，解答和参考解共用，显式默认值为 `[-Xss16m]`。JDK、release、VM 选项或驱动变化会使 Java 构建和计时缓存失效。`hc doctor -l java --debug` 检查 JDK、配置的 release、VM 参数形式、jdb 和 Python 基础环境。诊断时不会执行自定义 VM 参数（日志选项可能写文件），具体 VM 选项由实际运行时的 JVM 验证。
+Java 使用同一个本地 JDK：按 `java.home`（绝对路径或相对工作区的目录）、`JAVA_HOME`、PATH 中 `java` 所选 JDK 的顺序查找；`java`、`javac` 和终端调试器 `jdb` 都来自该目录。最低要求为 **JDK 17**。普通编译直接使用该 JDK 的语言级别、标准 API 和字节码目标，不传入 `--release`、`--source` 或 `--target`。不再设置默认 JDK 版本或 `java.release`；正常打开工作区时会自动移除旧字段，保留 `java.home` 和 `java.jvm_args`。hc 不安装或升级 Java。`java.jvm_args` 是 VM 调优和系统属性参数数组，解答和参考解共用，显式默认值为 `[-Xss16m]`。JDK、VM 选项或驱动变化会使 Java 构建和计时缓存失效。`hc doctor -l java --debug` 检查 JDK 版本、VM 参数形式、jdb 和 Python 基础环境。诊断时不会执行自定义 VM 参数（日志选项可能写文件），具体 VM 选项由实际运行时的 JVM 验证。
 
-Java 解答统一使用 `Solution.java`，保持 LeetCode 的方法和设计类签名。不同名的顶层设计类必须使用包可见性；从 LeetCode 模板创建初始代码时，hc 会去掉该类的 `public`。hc 生成 `_hc_java/`（评测类型、运行时和 `javafx.util.Pair`）以及 Eclipse JDT 语言服务器可读的 `.project`、`.classpath`、`.settings/`。把解答目录作为 Java 项目打开，或在编辑器导入其 Eclipse 项目，即可从生成的源码识别评测类型，不需要复制到解答里。若编辑器没有自动找到匹配 JDK，需将编辑器的 Java runtime 配置为 `java.release` 对应版本；hc 的 JDK 设置不替代语言服务器自己的 runtime 设置。`.hc-java-bin/` 是编辑器输出目录；这些生成文件受 hc 的 Git 忽略块保护，并在运行前重新生成。
+Java 解答统一使用 `Solution.java`，保持 LeetCode 的方法和设计类签名。不同名的顶层设计类必须使用包可见性；从 LeetCode 模板创建初始代码时，hc 会去掉该类的 `public`。hc 生成 `_hc_java/`（评测类型、运行时和 `javafx.util.Pair`）以及 Eclipse JDT 语言服务器可读的 `.project`、`.classpath`、`.settings/`。把解答目录作为 Java 项目打开，或在编辑器导入其 Eclipse 项目，即可从生成的源码识别评测类型，不需要复制到解答里。生成的编辑器语言级别跟随所选本地 JDK（创建初始代码时若无法检测 JDK，则暂用 17）。若编辑器没有自动找到该 JDK，需将编辑器的 Java runtime 配置为同一个 JDK；hc 的 JDK 设置不替代语言服务器自己的 runtime 设置。`.hc-java-bin/` 是编辑器输出目录；这些生成文件受 hc 的 Git 忽略块保护，并在运行前重新生成。
 
 一次完整有序批次使用一个 JVM，每个用例创建新实例，但共享静态字段和 JIT 状态，`timeout` 覆盖整个运行。普通异常报告 Runtime Error 后继续；致命 VM 错误和超时停止后续用例。编译后的类缓存在 `.hc/cache/build/java/`，不指定范围的 `hc clean` 会清理它。`hc debug -l java` 使用 jdb，在真实源码的函数入口或设计类构造器处停下（往返题停在编码方法）。Java 目前只支持终端调试，不支持 `--headless`。题包需要声明 `java` 并提供 `reference/Solution.java` 才能判定 Java 解答。
 
@@ -763,7 +763,6 @@ cpp:
   sanitizers: none
 java:
   home: ""
-  release: 25
   jvm_args: [-Xss16m]
 python:
   interpreter: ""    # 空值保留 hc 管理的 .hc/venv；填写后使用外部解释器

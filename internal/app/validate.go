@@ -446,7 +446,7 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 			if mc, ok := l.(lang.MinVersionChecker); ok && len(refErrs) == 0 {
 				file, _ := p.Reference(l.SolutionFile())
 				if err := mc.CheckMinVersion(ctx, p, file); err != nil {
-					refErrs = append(refErrs, fmt.Sprintf("%s reference does not work on %s %s: %v", l.Name(), l.Name(), tc.Min, err))
+					refErrs = append(refErrs, fmt.Sprintf("%s reference fails minimum-version compatibility: %v", l.Name(), err))
 				}
 			}
 			errs = append(errs, refErrs...)

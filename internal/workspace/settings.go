@@ -25,7 +25,9 @@ const settingsHeader = `# handcoding workspace settings
 # execution.backend: local (Docker is not implemented)
 # go.command / go.debugger: executable names or workspace-relative paths
 # cpp.command / cpp.debugger: platform C++ compiler and terminal debugger
-# cpp.standard: c++23 or newer; cpp.sanitizers: none | address | undefined | address,undefined
+# cpp.standard: c++17 or newer (default c++23); cpp.sanitizers: none | address | undefined | address,undefined
+# java.home: empty uses JAVA_HOME, then PATH; requires JDK 17+
+# java.jvm_args: VM arguments shared by solutions and references
 # python.interpreter: empty keeps hc's managed .hc/venv; a path selects an external Python
 # agent.name: claude | codex; agent.command: [] uses that preset
 # leetcode.site: com | cn
@@ -59,6 +61,11 @@ func (w *Workspace) SyncSettings(locales map[string]string) error {
 			return err
 		}
 		removeSetting(m, "locales")
+		if entry := setting(m, "java"); entry != nil {
+			if j, ok := entry.Value.(*ast.MappingNode); ok {
+				removeSetting(j, "release")
+			}
+		}
 		data, err := settingsDefaults(DefaultConfig(), w.Kind)
 		if err != nil {
 			return err

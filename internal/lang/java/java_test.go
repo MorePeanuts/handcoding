@@ -19,7 +19,7 @@ import (
 
 func jdk(t *testing.T) java.Language {
 	t.Helper()
-	l := java.Language{Release: 17, JVMArgs: []string{"-Xss16m"}}
+	l := java.Language{JVMArgs: []string{"-Xss16m"}}
 	tc, err := l.Toolchain()
 	if err != nil {
 		testenv.Skip(t, err)

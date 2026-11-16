@@ -1,7 +1,6 @@
 #pragma once
 #include <algorithm>
 #include <array>
-#include <bit>
 #include <bitset>
 #include <cassert>
 #include <cctype>
@@ -25,9 +24,7 @@
 #include <optional>
 #include <queue>
 #include <random>
-#include <ranges>
 #include <set>
-#include <span>
 #include <sstream>
 #include <stack>
 #include <stdexcept>
@@ -38,6 +35,17 @@
 #include <utility>
 #include <variant>
 #include <vector>
+#if __cplusplus >= 202002L
+#if __has_include(<bit>)
+#include <bit>
+#endif
+#if __has_include(<ranges>)
+#include <ranges>
+#endif
+#if __has_include(<span>)
+#include <span>
+#endif
+#endif
 using namespace std;
 static_assert(sizeof(int) == 4 && sizeof(long long) == 8,
               "hc requires 32-bit int and 64-bit long long");

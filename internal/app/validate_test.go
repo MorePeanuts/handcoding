@@ -232,7 +232,6 @@ func TestValidateJobs(t *testing.T) {
 		t.Fatal(err)
 	}
 	ws.Config.Python.Interpreter = "python3"
-	ws.Config.Java.Release = 17
 	writeLocalLocales(t, ws)
 	local := filepath.Join(ws.WritablePack().Dir, pack.ProblemsDir)
 	// two-sum has generated cases, longest-palindromic-substring a checker.
