@@ -1,9 +1,20 @@
- hc   Settings · Pack: regression
-Choose language
+ hc   Settings · regression
+  Choose language
 ────────────────────────────────────────────────────────────
-> Inherit workspace
+▌ Inherit workspace
   go
   python
+
+
+
+
+
+
+
+
+
+
+
 ────────────────────────────────────────────────────────────
 
  enter choose    esc cancel    ? help

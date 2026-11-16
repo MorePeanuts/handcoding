@@ -1,26 +1,30 @@
- hc   Settings · Pack: regression
-All · s scope · Tab category · e YAML · d doctor
+ hc   Settings · Pack: regression                                        s scope · e YAML · d doctor
+ All   General
 ────────────────────────────────────────────────────────────────────────────────────────────────────
-> All               │ > Solution language  Inherit workspace
-  General           │   language · Workspace
-                    │   Statement locale  Inherit workspace
-                    │   locale · Workspace
-                    │
-                    │
-                    │
-                    │
-                    │
-                    │
-                    │
-                    │
-                    │
-                    │
-                    │
-                    │
+▌ Solution language           go · inherited
+  Statement locale            en · inherited
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ────────────────────────────────────────────────────────────────────────────────────────────────────
-Effective: go · Source: Workspace
-Saved: inherit workspace
-Preferred solution language. Unavailable preferences fall back without changing the saved value.
+  Solution language · language
+  Preferred solution language. Unavailable preferences fall back without changing the saved value.
+
+
+  Saved: inherit workspace
+  Effective: go · Source: Workspace
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 
- enter edit    r reset    / search    esc back    ? help
+ enter edit    esc back    / search    r reset    ←/→ category    ? help                  2 settings

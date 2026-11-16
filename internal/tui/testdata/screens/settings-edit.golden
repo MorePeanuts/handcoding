@@ -1,18 +1,20 @@
  hc   Settings · Workspace
-/ timeout
+  / timeout
 ────────────────────────────────────────────────────────────
-> Run timeout  10s
-  timeout · Workspace
+▌ Run timeout                 10s
+
+
 
 
 
 
 ────────────────────────────────────────────────────────────
-Effective: 10s · Source: Workspace
-Saved: "10s"
-Positive duration, such as 10s or 2m. Applies to the next
-run; separate from reference-based time limits.
-> 10s
+  Run timeout · timeout
+  Positive duration, such as 10s or 2m. Applies to the
+  next run; separate from reference-based time limits.
+
+  Saved: "10s"
+  > 10s
 ────────────────────────────────────────────────────────────
 
  enter save    esc cancel
