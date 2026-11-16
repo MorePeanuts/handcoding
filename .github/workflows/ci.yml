@@ -54,9 +54,10 @@ jobs:
       - if: runner.os == 'macOS'
         run: brew install pkgconf glib
       # go vet runs once, as part of golangci-lint in the lint job.
-      # Each integration test may launch a native compiler. Bound both
-      # package and test concurrency so they do not oversubscribe the runner.
-      - run: make test TEST_FLAGS='-p=2 -parallel=2'
+      # Keep short doctor/time-limit tests out of other packages' native
+      # compilation load. Give the active package up to four parallel tests.
+      # Verbose results expose individual test costs when a package is slow.
+      - run: make test TEST_FLAGS='-p=1 -parallel=4 -v'
         env:
           # make test sets it too: a missing or too old tool fails the tests
           # instead of skipping them.
