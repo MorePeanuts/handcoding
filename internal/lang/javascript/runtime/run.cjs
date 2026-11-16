@@ -46,14 +46,26 @@ function run(options) {
     if (limit > 0n && state[0] > limit) throw new Limit();
     return value;
   }
-  const localRequire = createRequire(options.original),
+  const localRequire = createRequire(options.source),
+    originalRequire = createRequire(options.original),
     vendorRequire = createRequire(
       path.join(options.dependencies, "hc.cjs"),
     );
   function requireSolution(name) {
     if (name === "lodash" || name.startsWith("@datastructures-js/"))
       return vendorRequire(name);
-    return localRequire(name);
+    let resolved;
+    try {
+      // TypeScript's relative imports must load the emitted helper modules.
+      resolved = localRequire.resolve(name);
+    } catch (e) {
+      if (e.code !== "MODULE_NOT_FOUND" || options.source === options.original)
+        throw e;
+      // Keep runtime-only JS/data files beside the original solution usable.
+      resolved = originalRequire.resolve(name);
+    }
+    // Do not retry module execution: a missing transitive dependency is an error.
+    return localRequire(resolved);
   }
   const globals = {
     console,
