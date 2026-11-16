@@ -35,6 +35,9 @@ func TestValidateWithoutPython(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin)
+	// Java also discovers its tools outside PATH. Keep the host JDK from
+	// adding a reference (and another Python checker finding) to this test.
+	t.Setenv("JAVA_HOME", "")
 
 	summary := "cannot create .hc/venv: there is no uv, and no Python 3.12 or later on PATH" + app.SetupPointer
 	guide := python.Guide(runtime.GOOS)
