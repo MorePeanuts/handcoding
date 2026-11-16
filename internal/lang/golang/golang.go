@@ -47,6 +47,9 @@ type Language struct {
 	// BuildCache is where Build keeps programs, by the content of the
 	// module they are built from (see build.go); empty builds into binDir.
 	BuildCache string
+	// GoCommand and Debugger are executable names or resolved workspace paths.
+	GoCommand string
+	Debugger  string
 }
 
 var _ lang.Language = Language{}
@@ -59,28 +62,56 @@ func (Language) SolutionFile() string { return solutionFile }
 // MinVersion is the oldest Go the problem protocol supports.
 const MinVersion = "1.22"
 
-func (Language) Toolchain() (lang.Toolchain, error) { return detect() }
+func (l Language) Toolchain() (lang.Toolchain, error) {
+	path, err := l.compiler()
+	if err != nil {
+		return lang.Toolchain{}, err
+	}
+	env, err := goEnv(path)
+	if err != nil {
+		return lang.Toolchain{}, err
+	}
+	return toolchain(path, env)
+}
+
+func (l Language) compilerName() string {
+	if l.GoCommand != "" {
+		return l.GoCommand
+	}
+	return "go"
+}
+func (l Language) debuggerName() string {
+	if l.Debugger != "" {
+		return l.Debugger
+	}
+	return "dlv"
+}
+func (l Language) compiler() (string, error) {
+	path, err := lang.ResolveExecutable(l.compilerName())
+	if err != nil {
+		return "", fmt.Errorf("go compiler %q unavailable; provide a Go toolchain or set go.command in hc.yaml: %w", l.compilerName(), err)
+	}
+	return path, nil
+}
 
 // Setup does nothing: Go needs no environment besides the toolchain.
 func (Language) Setup(context.Context, io.Writer) error { return nil }
 
 var goVersionRE = regexp.MustCompile(`go(\d+(?:\.\d+)*)`)
 
-// goEnv runs `go env` for the settings a build depends on, GOVERSION first:
-// once per process once it succeeds, so that a toolchain missing at first
-// is found when it appears on PATH.
-var goEnv = onceOK(func() ([]byte, error) {
-	if _, err := exec.LookPath("go"); err != nil {
-		return nil, errors.New("go toolchain not found in PATH")
-	}
-	cmd := exec.Command("go", "env", "GOVERSION", "GOOS", "GOARCH", "GOFLAGS", "CGO_ENABLED", "GOEXPERIMENT")
-	cmd.Env = localToolchain()
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("go env GOVERSION: %w", err)
-	}
-	return out, nil
-})
+// Cache by executable, not globally: workspaces may select different Go tools.
+var goEnvironments sync.Map
+
+func goEnv(path string) ([]byte, error) {
+	f, _ := goEnvironments.LoadOrStore(path, onceOK(func() ([]byte, error) {
+		return readGoEnv(context.Background(), path)
+	}))
+	return f.(func() ([]byte, error))()
+}
+
+func readGoEnv(ctx context.Context, path string) ([]byte, error) {
+	return lang.Probe(ctx, path, localToolchain(), "env", "GOVERSION", "GOOS", "GOARCH", "GOFLAGS", "CGO_ENABLED", "GOEXPERIMENT")
+}
 
 // onceOK is sync.OnceValues for a function that may fail: it calls f until
 // f succeeds, and keeps only that result.
@@ -105,25 +136,15 @@ func onceOK[T any](f func() (T, error)) func() (T, error) {
 	}
 }
 
-// detect reads the toolchain's version from goEnv.
-var detect = onceOK(func() (lang.Toolchain, error) {
-	env, err := goEnv()
-	if err != nil {
-		return lang.Toolchain{}, err
-	}
+func toolchain(path string, env []byte) (lang.Toolchain, error) {
 	out, _, _ := bytes.Cut(env, []byte("\n"))
-	// "go1.27.2", or "devel go1.28-abcdef …" for a development build.
 	m := goVersionRE.FindStringSubmatch(string(out))
 	if m == nil {
 		return lang.Toolchain{}, fmt.Errorf("cannot read the Go version from %q", strings.TrimSpace(string(out)))
 	}
-	return lang.Toolchain{
-		Name:    "Go",
-		Version: m[1],
-		Min:     MinVersion,
-		Upgrade: "install Go " + MinVersion + " or later from https://go.dev/dl/",
-	}, nil
-})
+	return lang.Toolchain{Name: "Go", Version: m[1], Path: path, Min: MinVersion,
+		Upgrade: "provide a supported Go toolchain or set go.command in hc.yaml"}, nil
+}
 
 // Starter returns the problem's Go template if it has one, otherwise one
 // generated from the signature.
@@ -282,14 +303,14 @@ func signature(params []problem.Param) (string, error) {
 }
 
 // Prepare writes go.mod and the driver.
-func (Language) Prepare(dir string, p *problem.Problem) error {
+func (l Language) Prepare(dir string, p *problem.Problem) error {
 	// The go directive sets the language version. Following the local
 	// toolchain lets solutions use all of its features, and with
 	// GOTOOLCHAIN=local a go.mod never asks for a toolchain to download.
 	// Without a Go to ask, the minimum is as good as anything: nothing can
 	// build until one is installed, and the next run rewrites the file.
 	version := MinVersion
-	if tc, err := detect(); err == nil {
+	if tc, err := l.Toolchain(); err == nil {
 		version = modVersion(tc.Version)
 	}
 	if err := writeIfChanged(filepath.Join(dir, "go.mod"), GoMod(version)); err != nil {
@@ -559,11 +580,24 @@ func writeRoundTripCall(b *strings.Builder, p *problem.Problem) error {
 
 // DebugCommand starts Delve. Interactively it stops at the solution's entry
 // point; headless it serves the JSON-RPC/DAP API for an editor to attach to.
-func (Language) DebugCommand(dir, binDir string, p *problem.Problem, opts lang.DebugOptions) (*exec.Cmd, error) {
-	if _, err := exec.LookPath("dlv"); err != nil {
-		return nil, errors.New("delve not found: go install github.com/go-delve/delve/cmd/dlv@latest")
+func (l Language) DebugCommand(dir, binDir string, p *problem.Problem, opts lang.DebugOptions) (*exec.Cmd, error) {
+	debugger, err := lang.ResolveExecutable(l.debuggerName())
+	if err != nil {
+		return nil, fmt.Errorf("go debugger %q unavailable; provide Delve or set go.debugger in hc.yaml: %w", l.debuggerName(), err)
 	}
-	args := []string{"debug", ".", "--output", filepath.Join(binDir, "debug")}
+	compiler, err := l.compiler()
+	if err != nil {
+		return nil, err
+	}
+	// Compile with the selected Go ourselves: dlv debug would look up its own
+	// go on PATH, which may differ (including a differently named wrapper).
+	binary := filepath.Join(binDir, "debug")
+	build := exec.Command(compiler, "build", "-gcflags=all=-N -l", "-o", binary, ".")
+	build.Dir, build.Env = dir, localToolchain()
+	if out, err := build.CombinedOutput(); err != nil {
+		return nil, &lang.CompileError{Output: strings.TrimSpace(string(out)) + "\n" + err.Error()}
+	}
+	args := []string{"exec", binary}
 	if opts.Headless {
 		args = append(args, "--headless", "--listen="+opts.Addr, "--api-version=2", "--accept-multiclient")
 	} else {
@@ -583,7 +617,7 @@ func (Language) DebugCommand(dir, binDir string, p *problem.Problem, opts lang.D
 		}
 		args = append(args, "--init", initFile)
 	}
-	cmd := exec.Command("dlv", args...)
+	cmd := exec.Command(debugger, args...)
 	cmd.Dir = dir
 	cmd.Env = localToolchain()
 	return cmd, nil
@@ -612,7 +646,11 @@ func (l Language) CheckMinVersion(ctx context.Context, p *problem.Problem, file 
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), GoMod(MinVersion), 0o644); err != nil {
 		return err
 	}
-	cmd := exec.CommandContext(ctx, "go", "vet", ".")
+	compiler, err := l.compiler()
+	if err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, compiler, "vet", ".")
 	cmd.Dir = dir
 	cmd.Env = localToolchain()
 	out, err := cmd.CombinedOutput()

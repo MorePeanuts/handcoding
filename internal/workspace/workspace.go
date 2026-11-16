@@ -83,6 +83,10 @@ type Config struct {
 	Images string `yaml:"images,omitempty"`
 	// Timeout is the wall clock limit for a run.
 	Timeout string `yaml:"timeout,omitempty"`
+	// Execution selects the backend; only local is implemented.
+	Execution ExecutionConfig `yaml:"execution,omitempty"`
+	// Go selects user-provided compiler and debugger executables.
+	Go GoConfig `yaml:"go,omitempty"`
 	// Python configures the Python language.
 	Python PythonConfig `yaml:"python,omitempty"`
 	// Agent configures the coding agent used to generate and fix test cases.
@@ -125,6 +129,17 @@ func (c Config) PackSource(name string) (PackSource, bool) {
 		}
 	}
 	return PackSource{}, false
+}
+
+// ExecutionConfig selects where code runs. Docker remains a future backend.
+type ExecutionConfig struct {
+	Backend string `yaml:"backend,omitempty"`
+}
+
+// GoConfig selects user-provided executables; hc never installs them.
+type GoConfig struct {
+	Command  string `yaml:"command,omitempty"`
+	Debugger string `yaml:"debugger,omitempty"`
 }
 
 // PythonConfig configures Python.
@@ -307,6 +322,9 @@ func Open(dir string) (*Workspace, error) {
 	case !errors.Is(err, os.ErrNotExist):
 		return nil, err
 	}
+	if cfg.Execution.Backend != "" && cfg.Execution.Backend != "local" {
+		return nil, fmt.Errorf("%s: execution.backend %q is not supported; only local execution is available", ConfigFile, cfg.Execution.Backend)
+	}
 	if kind == Practice && isDir(filepath.Join(abs, legacyProblemsDir)) && !exists(filepath.Join(abs, PacksDir)) {
 		return nil, fmt.Errorf("%s uses the layout of an older hc, with the problems in %s/: "+
 			"create a new workspace with `hc init <dir>` and move your problems into its %s/ "+
@@ -355,7 +373,7 @@ func Create(dir, language string) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	header := "# handcoding workspace configuration\n# agent.name: claude | codex   (or set agent.command for a custom agent)\n# leetcode.site: com | cn\n# locales: the languages of your own problems' statements, the default first, e.g. [en, zh-CN] (default [en])\n# theme: auto | dark | light   (set it if statements look wrong in your terminal)\n# images: auto | kitty | blocks | none   (kitty: kitty, Ghostty, herdr; blocks: any truecolor terminal)\n# python.interpreter: a Python 3.12+ to use instead of the virtual environment hc manages in .hc/venv\n"
+	header := "# handcoding workspace configuration\n# agent.name: claude | codex   (or set agent.command for a custom agent)\n# leetcode.site: com | cn\n# locales: the languages of your own problems' statements, the default first, e.g. [en, zh-CN] (default [en])\n# theme: auto | dark | light   (set it if statements look wrong in your terminal)\n# images: auto | kitty | blocks | none   (kitty: kitty, Ghostty, herdr; blocks: any truecolor terminal)\n# execution.backend: local (Docker is not implemented)\n# go.command / go.debugger: executable names or workspace-relative paths (defaults: go / dlv)\n# python.interpreter: a Python 3.12+ to use instead of the virtual environment hc manages in .hc/venv\n"
 	if err := os.WriteFile(filepath.Join(abs, ConfigFile), append([]byte(header), data...), 0o644); err != nil {
 		return nil, err
 	}

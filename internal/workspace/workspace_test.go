@@ -70,6 +70,27 @@ func TestCreateLayout(t *testing.T) {
 	}
 }
 
+func TestExecutionAndGoConfig(t *testing.T) {
+	t.Parallel()
+	for _, backend := range []string{"local", "docker", "unknown"} {
+		dir := t.TempDir()
+		writeFile(t, filepath.Join(dir, ConfigFile), "execution:\n  backend: "+backend+"\ngo:\n  command: tools/go\n  debugger: tools/dlv\n")
+		ws, err := Open(dir)
+		if backend != "local" {
+			if err == nil || !strings.Contains(err.Error(), "execution.backend") {
+				t.Fatalf("%s: %v", backend, err)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ws.Config.Go.Command != "tools/go" || ws.Config.Go.Debugger != "tools/dlv" {
+			t.Fatalf("%+v", ws.Config.Go)
+		}
+	}
+}
+
 func TestOldLayout(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ConfigFile), "language: go\n")

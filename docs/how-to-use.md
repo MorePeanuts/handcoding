@@ -69,6 +69,25 @@ The oldest supported toolchains are Python 3.12 and Go 1.22 (the protocol's [lan
 
 Consider running `git init` in the workspace to keep a record of your practice. The `.gitignore` that `hc init` writes leaves out `.hc/`, the installed packs, which `hc pack install` reinstalls from `hc.yaml`, and the files hc writes next to your solutions before every run (`zz_hc_driver.go`, `go.mod`, `_hc_runner.py`, `__pycache__/`, and the `hc_runtime.py` that versions before v0.1.0-alpha.12 wrote there), so the repository holds only your own code. These rules are a block between `# hc:begin` and `# hc:end`, which a newer hc refreshes when it opens the workspace; add your own rules outside it. A `.gitignore` without the block, such as one written by an hc before v0.1.0-alpha.12, is yours and hc leaves it alone: to get the block, copy it from a new workspace (`hc init` in a temporary directory), and remove the generated files already committed with `git rm -r --cached solutions` followed by `git add solutions`.
 
+### Toolchains and environment diagnostics
+
+hc uses your local development tools. `go.command` and `go.debugger` in `hc.yaml` select the Go compiler command and Delve executable; they default to `go` and `dlv` on PATH. Python keeps its existing managed environment unless `python.interpreter` is set. Each setting accepts a command name or an executable path. Relative paths containing `/` are resolved from the workspace root, not the solution directory. Values are executables, not shell command lines; hc does not expand `~` or environment variables. An unavailable configured tool is an error, with no fallback to another executable. hc does not install Go or Delve.
+
+Go's version detection, module preparation, builds, minimum-version checks and debugging use the selected compiler. Debugging builds a binary with optimizations disabled, then starts the selected Delve with `exec`, so Delve cannot pick a different Go from PATH. Build-cache and reference-timing identities include the compiler path. `execution.backend` defaults to `local`; only `local` is implemented. `docker` and other values are rejected rather than silently running locally.
+
+```sh
+hc doctor                                  # default solution language and Python infrastructure
+hc doctor --lang go                        # Go and Python, without checking debuggers
+hc doctor --lang go --debug                # also check Delve
+hc doctor --lang python --debug            # Python and pdb
+hc doctor --lang python --debug --headless # Python and debugpy
+hc doctor --json                           # structured report, including overall ok
+```
+
+`hc doctor` reports each tool's command, configuration source, resolved path, version, minimum version and status. Python is checked even for Go because generators and checkers use it. Only the selected solution language's debugger is checked, and only with `--debug`; `--headless` requires `--debug`. Missing unused tools do not fail the check. Missing, uninitialized, too-old or broken required tools produce a nonzero exit status, including with `--json`. This is a supported-environment check; normal solution runs keep their existing warning policy for old toolchains.
+
+Diagnosis never calls Python setup, installs tools, synchronizes skills, opens history, writes editor configuration or runs problem code. A missing managed venv is reported as uninitialized; `hc env sync` retains its existing behavior of recreating it. Probes have a three-second timeout each and Python probes disable bytecode writes. They establish availability, not successful compilation of every program or a working debugger attachment. With no workspace found, doctor checks default tools on PATH; an explicit `-w` or `HC_WORKSPACE` must still point to a valid workspace. In the TUI, use `:doctor` with the same options.
+
 ### Cleaning caches
 
 `hc clean` explicitly removes known, rebuildable cache files. It works in practice workspaces and pack checkouts, and follows the usual `-w`, `HC_WORKSPACE`, and current-directory workspace selection:
@@ -714,8 +733,13 @@ editor: nvim          # falls back to $VISUAL, $EDITOR, then vi
 theme: auto           # statement colors: auto | dark | light
 images: auto          # statement images: auto | kitty | blocks | none
 timeout: 10s          # wall-clock limit of a run, its checker and its generators (protocol: run-limit)
+execution:
+  backend: local      # only local is implemented; docker is deferred
+go:
+  command: go         # executable name or path, relative to the workspace
+  debugger: dlv       # used only for debugging
 python:
-  interpreter: python3.12  # Python 3.12+ to use instead of .hc/venv; e.g. a full path. Unset by default
+  interpreter: python3.12  # optional external Python; unset to keep the managed .hc/venv
 agent:
   name: claude        # claude | codex, or set command (see above)
 leetcode:

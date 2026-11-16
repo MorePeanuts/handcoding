@@ -125,6 +125,7 @@ type LeetCoder interface {
 type Toolchain struct {
 	Name    string // e.g. "Python"
 	Version string // e.g. "3.12.9"
+	Path    string // resolved executable, when available; part of timing identity
 	// Min is the oldest version the problem protocol supports: the code hc
 	// generates and the code packs ship must work with it.
 	Min string

@@ -67,6 +67,13 @@ To fix a problem that has landed, use `hc-problem` or `hc-cases` the same
 way, then `hc pack check`. Fixing cases, a reference or a statement is not
 breaking; changing a signature is, since users' solutions must follow it.
 
+If a toolchain prevents validation, `hc doctor --lang go` or
+`hc doctor --lang python` reports its configured executable and version
+without setting up environments or changing the workspace. Report missing
+tools to the user; hc does not install Go or Delve. Python's managed
+environment still uses `hc env sync`, which recreates it. Tool paths belong
+in the checkout's personal `hc.yaml`, never in `pack.yaml`.
+
 ## Locales
 
 A pack may give its statements in several languages, `locales` in

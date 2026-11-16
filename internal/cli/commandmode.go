@@ -30,7 +30,7 @@ func supportedTUICommand(cmd *cobra.Command) bool {
 		return true
 	case "pack":
 		return len(parts) == 2 || parts[2] != "init"
-	case "list", "show", "open", "quit", "test", "submit", "debug", "fetch", "validate", "gen", "fix", "clean":
+	case "list", "show", "open", "quit", "test", "submit", "debug", "fetch", "validate", "gen", "fix", "clean", "doctor":
 		return len(parts) == 2
 	}
 	return false

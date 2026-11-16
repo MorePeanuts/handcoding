@@ -69,6 +69,25 @@ Python 在 hc 管理的虚拟环境 `.hc/venv` 中运行：包括 Python 解答�
 
 建议在工作区里执行 `git init`，记录下自己的练习过程。`hc init` 写入的 `.gitignore` 排除了 `.hc/`、已安装的题目包（可以由 `hc pack install` 根据 `hc.yaml` 重新安装），以及 hc 每次运行前在解答旁生成的文件（`zz_hc_driver.go`、`go.mod`、`_hc_runner.py`、`__pycache__/`，以及 v0.1.0-alpha.12 之前的版本写在那里的 `hc_runtime.py`），这样仓库里只有你自己的代码。这些规则位于 `# hc:begin` 和 `# hc:end` 之间的区块中，更新的 hc 打开工作区时会刷新它；你自己的规则请写在区块之外。没有这个区块的 `.gitignore`（例如 v0.1.0-alpha.12 之前的 hc 写入的）归你所有，hc 不会改动它：要使用这个区块，从新工作区中复制一份（在临时目录中运行 `hc init`），并用 `git rm -r --cached solutions` 再 `git add solutions` 把已提交的生成文件移出仓库。
 
+### 工具链配置与环境诊断
+
+hc 使用你的本地开发工具。`hc.yaml` 的 `go.command` 和 `go.debugger` 分别指定 Go 编译器命令和 Delve 可执行文件，默认使用 PATH 中的 `go` 和 `dlv`。Python 保留现有托管方式，设置 `python.interpreter` 时使用指定的解释器。这些配置都接受命令名或可执行文件路径；包含 `/` 的相对路径以工作区根目录为基准，不以解答目录为基准。配置值是可执行文件，不是 shell 命令行；hc 不展开 `~` 或环境变量。显式指定的工具不可用时直接报错，不回退到其他工具。hc 不安装 Go 或 Delve。
+
+Go 版本检测、模块准备、编译、最低版本检查和调试都使用指定的编译器。调试时先关闭优化编译出程序，再由指定的 Delve 通过 `exec` 启动，避免 Delve 从 PATH 选择另一个 Go。编译缓存和参考解计时的标识包含编译器路径。`execution.backend` 默认是 `local`，目前也只实现了 `local`；设置 `docker` 或其他值会报错，不会悄悄在本地执行。
+
+```sh
+hc doctor                                  # 默认解答语言及 Python 基础依赖
+hc doctor --lang go                        # Go 和 Python，不检查调试器
+hc doctor --lang go --debug                # 另查 Delve
+hc doctor --lang python --debug            # Python 和 pdb
+hc doctor --lang python --debug --headless # Python 和 debugpy
+hc doctor --json                           # 结构化报告，包含整体 ok 状态
+```
+
+`hc doctor` 报告每个工具的命令、配置来源、实际路径、版本、最低版本和状态。即使用 Go，也检查 generator 和 checker 所需的 Python。只有指定 `--debug` 才检查所选解答语言的调试器；`--headless` 必须与 `--debug` 一起使用。缺少未使用的工具不会导致检查失败。必要工具缺失、未初始化、过旧或无法运行时返回非零退出码，`--json` 也一样。这是受支持环境的检查；正常运行解答时对旧工具链的警告策略保持不变。
+
+诊断不调用 Python 环境准备、不安装工具、不同步技能、不打开历史数据库、不写编辑器配置，也不运行题目代码。缺失的托管 venv 会报告为未初始化；`hc env sync` 仍按现有方式重建它。每个探测命令的超时为三秒，Python 探测禁止写入字节码。探测确认工具可用，不保证所有程序都能编译或调试器一定能附加。找不到工作区时，doctor 检查 PATH 中的默认工具；显式指定的 `-w` 或 `HC_WORKSPACE` 仍必须指向有效工作区。TUI 中可以用 `:doctor`，选项相同。
+
 ### 清理缓存
 
 `hc clean` 按你的明确要求删除已知、可重建的缓存文件，适用于练习工作区和题目包检出目录，并遵循通常的 `-w`、`HC_WORKSPACE` 与当前目录工作区选择规则：
@@ -689,6 +708,11 @@ editor: nvim          # 未设置时依次使用 $VISUAL、$EDITOR、vi
 theme: auto           # 题面配色：auto | dark | light
 images: auto          # 题面图片：auto | kitty | blocks | none
 timeout: 10s          # 每次运行及其判题程序、生成器的墙钟时限（协议：运行时限）
+execution:
+  backend: local      # 目前只支持 local，docker 留待后续开发
+go:
+  command: go         # 可执行文件名或路径，相对路径以工作区为基准
+  debugger: dlv       # 仅调试时需要
 python:
   interpreter: python3.12  # 代替 .hc/venv 使用的 Python 3.12+，也可以是完整路径；默认不设置
 agent:
