@@ -123,6 +123,9 @@ func setUpPackPython(cmd *cobra.Command, root string) error {
 	}
 	a := app.New(ws)
 	defer a.Close()
+	if err := a.SyncSettings(cmd.Context()); err != nil {
+		return err
+	}
 	return a.SetUpPython(cmd.Context(), os.Stderr)
 }
 
@@ -498,6 +501,10 @@ and a summary, and fails if anything is wrong.`,
 					return err
 				}
 				a = app.New(ws)
+				if err := a.SyncSettings(cmd.Context()); err != nil {
+					a.Close()
+					return err
+				}
 			} else {
 				var err error
 				if a, err = root.openApp(); err != nil {

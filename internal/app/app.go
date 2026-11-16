@@ -240,24 +240,47 @@ func (a *App) Lang(name string) (lang.Language, error) {
 // the default falls back to the pack's first language, with a note saying
 // so.
 func (a *App) SolutionLang(p *problem.Problem, name string) (l lang.Language, note string, err error) {
-	l, err = a.Lang(name)
+	k, err := a.WS.Pack(p.Pack)
 	if err != nil {
 		return nil, "", err
 	}
-	err = a.CheckLang(p, l)
-	if err == nil || name != "" {
-		return l, "", err
+	return a.PackLanguage(k, name)
+}
+
+// PackLanguage resolves an explicit language or the pack/workspace preference.
+// Only inherited preferences fall back; the saved preference never changes.
+func (a *App) PackLanguage(k *workspace.Pack, name string) (lang.Language, string, error) {
+	explicit := name != ""
+	if name == "" {
+		name = a.WS.Config.PackSettings[k.Name].Language
 	}
-	k, kerr := a.WS.Pack(p.Pack)
-	if kerr != nil {
-		return nil, "", kerr
+	if name == "" {
+		name = a.WS.Config.Language
 	}
-	for _, id := range k.Languages() {
-		if fb, err := a.Langs.Get(id); err == nil {
-			return fb, fmt.Sprintf("pack %s is not solved in %s, using %s", k.Name, l.Name(), fb.Name()), nil
+	l, err := a.Langs.Get(name)
+	if err != nil {
+		return nil, "", err
+	}
+	if slices.Contains(k.Languages(), l.ID()) {
+		return l, "", nil
+	}
+	if !explicit {
+		for _, id := range k.Languages() {
+			if fb, err := a.Langs.Get(id); err == nil {
+				return fb, fmt.Sprintf("pack %s is not solved in %s, using %s", k.Name, l.Name(), fb.Name()), nil
+			}
 		}
 	}
-	return nil, "", err
+	return nil, "", fmt.Errorf("pack %s is solved in %s, not %s", k.Name, strings.Join(k.Languages(), ", "), l.ID())
+}
+
+// SetLanguage saves a supported language as the pack's preference.
+func (a *App) SetLanguage(k *workspace.Pack, name string) error {
+	l, _, err := a.PackLanguage(k, name)
+	if err != nil {
+		return err
+	}
+	return a.WS.SavePackSetting(k.Name, "language", l.ID())
 }
 
 // CheckLang returns an error unless p's pack is solved in l.

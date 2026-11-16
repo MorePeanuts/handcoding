@@ -42,7 +42,7 @@
 
 工作区里的题目按[题目包](protocol_zh.md#题目包)组织，每个题目包是 `packs/` 下的一个目录：
 
-- `packs/local/` 存放你自己的题目，也就是 `hc fetch`、`hc new` 和 `hc import` 添加的题目。它没有 `pack.yaml`（`local` 是保留名称），可以用所有语言作答。它的题面使用 `hc.yaml` 中 `locales` 设置的[语言区域](#多语言题面)，默认为英文（`[en]`）。
+- `packs/local/` 存放你自己的题目，也就是 `hc fetch`、`hc new` 和 `hc import` 添加的题目。它的 `packs/local/pack.yaml` 声明支持的编程语言和题面[语言区域](#多语言题面)，初始为协议支持的全部编程语言和英文（`[en]`）。`local` 是为这个工作区自有题目包保留的名称。
 - 其余每个目录都是一个已安装的题目包：一个 `name` 与目录名相同的 `pack.yaml`，加上它的 `problems/`。已安装的题目包是**只读**的：`hc gen`、`hc fix` 和 `hc cases build` 拒绝修改它们，因为更新题目包会覆盖这些修改；`hc cases add|rm|edit` 则改为作用于这道题的[你自己的用例](#你自己的用例)。`pack.yaml` 列出了 `languages` 的题目包只能用这些语言作答：`hc start -l` 拒绝其他语言；如果你的默认语言不在其中，hc 会改用题目包的第一种语言并给出提示。`hc pack install` 负责安装题目包（见[题目包](#题目包)）；手动复制到 `packs/` 下的题目包也能用，`hc pack list` 会把它显示为 unmanaged（未托管）。
 
 hc 无法读取的题目包（没有 `pack.yaml`、`pack.yaml` 不合法，或为更新的协议编写，此时会提示升级 hc）会由 `hc validate` 和题目列表报告，它的题目不会被加载；工作区的其余部分照常工作。
@@ -123,7 +123,7 @@ my-pack/
   .claude/  .agents/  AGENTS.md  CLAUDE.md   智能体技能与说明，在某个命令安装之后出现
 ```
 
-没有 `hc.yaml` 时 hc 使用默认设置，并且从不在检出目录中创建它。检出目录的 `locales` 来自 `pack.yaml`，所以其中的 `hc.yaml` 不得设置它，就像不得列出 `packs` 一样。hc 无法读取的 `pack.yaml`（例如为更新的协议编写）不会妨碍工作区打开：`hc validate` 会指出问题所在。hc 添加的这些内容属于你而不属于题目包，所以不要把它们提交到仓库：
+正常打开检出目录时，hc 会创建写明默认个人设置的 `hc.yaml`，或补齐已有文件中缺失的设置。只读诊断不会创建它。检出目录的 `locales` 来自 `pack.yaml`，所以其中的 `hc.yaml` 不得设置它，就像不得列出 `packs` 一样。hc 无法读取的 `pack.yaml`（例如为更新的协议编写）不会妨碍工作区打开：`hc validate` 会指出问题所在。hc 添加的这些内容属于你而不属于题目包，所以不要把它们提交到仓库：
 
 ```
 # .gitignore
@@ -435,9 +435,9 @@ hc gen 146                  # 让题目就绪：生成测试用例并决定判�
 
 `hc fetch` 会下载题面及其图片（包括预格式化示例中的示意图）、函数签名、Go 和 Python 的初始代码，以及示例用例。能安全解析时，会成对保留同一题面示例的输入和期望输出。若无法确认示例输入，hc 会给出警告，并保留未匹配的 API 输入但不写入期望输出；不会仅按顺序拼接输入和输出。
 
-它按目标题目包的语言区域写入题面：你自己的题目由 `hc.yaml` 中的 `locales` 决定（见[多语言题面](#多语言题面)）。两个站点都有英文题面；只有 leetcode.cn 有中文题面和中文标题：
+它按目标题目包的语言区域写入题面：你自己的题目由 `packs/local/pack.yaml` 中的 `locales` 决定（见[多语言题面](#多语言题面)）。两个站点都有英文题面；只有 leetcode.cn 有中文题面和中文标题：
 
-| `hc.yaml` 中的 `locales` | leetcode.com | leetcode.cn |
+| `packs/local/pack.yaml` 中的 `locales` | leetcode.com | leetcode.cn |
 |---|---|---|
 | `[en]`（默认） | `description.md`：英文 | `description.md`：英文 |
 | `[en, zh-CN]` | `description.md`：英文；没有中文题面，并给出提示 | 两者都有：英文写入 `description.md`，中文写入 `description.zh-CN.md`，以及两个标题 |
@@ -484,14 +484,14 @@ hc docs protocol structure-inputs   # 某一节，包括其下的小节
 
 ### 多语言题面
 
-题目包可以用多种语言提供题面，即它的[语言区域](protocol_zh.md#语言区域)：在 `pack.yaml` 中写 `locales: [en, zh-CN]`。第一个是题目包的默认语言区域，也就是 `description.md` 和 `title` 的语言；其他语言区域的题面在 `description.<locale>.md` 中，标题在 `problem.yaml` 的 `titles` 中。题目包有哪些语言区域、哪个排在第一，由题目包的作者决定。你自己的题目，作者就是你，由 `hc.yaml` 中的 `locales` 设置，未设置时为 `[en]`：
+题目包可以用多种语言提供题面，即它的[语言区域](protocol_zh.md#语言区域)：在 `pack.yaml` 中写 `locales: [en, zh-CN]`。第一个是题目包的默认语言区域，也就是 `description.md` 和 `title` 的语言；其他语言区域的题面在 `description.<locale>.md` 中，标题在 `problem.yaml` 的 `titles` 中。题目包有哪些语言区域、哪个排在第一，由题目包的作者决定。你自己的题目，作者就是你，由 `packs/local/pack.yaml` 中的 `locales` 设置，初始为 `[en]`：
 
 ```yaml
 locales: [en, zh-CN]   # 你自己的题目：英文优先，也有中文
 ```
 
-- 在列表中按 `i` 切换题目包的语言区域，hc 会在 `.hc/` 中为每个题目包记住这个选择。第一次打开的题目包显示其默认语言区域。
-- `hc show <problem> --locale zh-CN` 以指定语言区域打开题面（使用 `--raw` 或非交互输入输出时直接打印）；不带 `--locale` 时，使用上次记住的选择。`--locale` 只对本次会话生效，在 TUI 中按 `i` 切换才会保存新的选择。
+- 在列表中按 `i` 切换题目包的语言区域，hc 会将选择保存到 `hc.yaml` 的 `pack_settings.<包名>.locale`。没有按包覆盖项时，优先采用工作区的 `locale`；题目包不提供该语言时，使用包的默认题面语言。
+- `hc show <problem> --locale zh-CN` 以指定语言区域打开题面（使用 `--raw` 或非交互输入输出时直接打印）；不带 `--locale` 时，使用题目包或工作区的阅读偏好。`--locale` 只对本次会话生效，在 TUI 中按 `i` 切换才会保存新的选择。
 - 题目缺少所选语言区域的题面时（只有不合法的题目包才会这样），hc 显示默认语言区域的题面，并加以说明。
 - `hc validate` 会报告缺少某个语言区域的题面或标题的题目，以及使用了题目包未声明的语言区域的题面或标题。`hc pack check` 也会因此失败。
 - hc 不翻译任何内容。`hc fetch` 写入 LeetCode 提供的题面（见[上文](#从-leetcode-获取)）；你自己的题目，每种语言的题面都要自己写。`hc gen` 和 `hc fix` 只读取默认语言区域的题面，也从不写入题面。
@@ -700,27 +700,53 @@ hc leetcode login --port 8765         # 在服务器上
 
 ## 配置
 
-工作区根目录下的 `hc.yaml`：
+工作区根目录下的 `hc.yaml` 保存个人设置与已安装题目包清单。新工作区会显式写出所有全局默认值：
 
 ```yaml
-language: go          # 默认解题语言：go | python
-editor: nvim          # 未设置时依次使用 $VISUAL、$EDITOR、vi
-theme: auto           # 题面配色：auto | dark | light
-images: auto          # 题面图片：auto | kitty | blocks | none
-timeout: 10s          # 每次运行及其判题程序、生成器的墙钟时限（协议：运行时限）
+language: go          # 首选解题语言：go | python
+locale: en            # 首选题面语言
+editor: ""           # 空值依次使用 $VISUAL、$EDITOR、vi
+theme: auto           # auto | dark | light
+images: auto          # auto | kitty | blocks | none
+timeout: 10s          # 每次运行及其判题程序、生成器的墙钟时限
 execution:
-  backend: local      # 目前只支持 local，docker 留待后续开发
+  backend: local      # 目前仅支持 local
 go:
-  command: go         # 可执行文件名或路径，相对路径以工作区为基准
+  command: go         # 可执行文件名或相对于工作区的路径
   debugger: dlv       # 仅调试时需要
 python:
-  interpreter: python3.12  # 代替 .hc/venv 使用的 Python 3.12+，也可以是完整路径；默认不设置
+  interpreter: ""    # 空值保留 hc 管理的 .hc/venv；填写后使用外部解释器
 agent:
-  name: claude        # claude | codex，或者设置 command（见上文）
+  name: claude        # claude | codex
+  command: []         # 空列表使用预设；否则为带 {prompt} 的自定义命令参数
 leetcode:
-  site: com           # fetch/login 的默认站点：com | cn；提交使用当前登录
-locales: [en]         # 你自己题目的题面语言，默认的排在第一
+  site: com           # fetch/login 的默认站点；提交使用当前登录
+pack_settings: {}     # 按题目包保存的个人覆盖项
+packs: []             # 已安装包的来源和版本；创作工作区不含此项
 ```
+
+正常命令打开工作区时，会补齐缺失的全局字段，开发版本也会执行。已有值、注释和未知字段会保留，不会用新版默认值重置你的设置。`hc doctor` 和缓存清理操作不执行设置同步。设置同步独立于仅在发布版本中执行的 agent skills 升级。
+
+例如，平时使用 Python、阅读中文，但某个包使用 Go：
+
+```yaml
+language: python
+locale: zh-CN
+pack_settings:
+  leetcode:
+    language: go
+    locale: zh-CN
+  local:
+    locale: en
+```
+
+各字段独立解析，优先级为：本次命令参数 → 当前包的覆盖项 → 工作区偏好。继承的编程语言不受支持时，回退到题目包声明的、hc 支持的第一种语言；继承的题面语言不可用时，回退到包的默认题面语言。hc 会提示回退，但不改写偏好。显式指定不受支持的语言则报错。本地缺少工具链是环境问题，不会因此自动切换编程语言。
+
+TUI 的 `L` 只在当前包支持的编程语言之间切换，`i` 在它提供的题面语言之间切换。主动切换会立即保存到 `pack_settings.<包名>`，重启后恢复。CLI 参数与命令模式中的覆盖只对本次使用生效。删除覆盖项即可恢复继承；缺失的按包字段不会自动填默认值。直接打开创作工作区也使用这套结构，键名取自包清单。更新题目包不会改写这些偏好。
+
+打开旧工作区时，hc 先根据原顶层 `locales`（未设置时为 `[en]`）创建 `packs/local/pack.yaml`，再移除旧字段。两处声明已存在且冲突时，会要求先协调，避免丢失声明。数据库中的旧题面语言偏好迁移到 `pack_settings`，YAML 中已有字段优先；成功保存后才移除数据库旧值。历史、收藏和导航状态仍保存在 `.hc/hc.db`。
+
+`pack.yaml` 中的 `locales`、`languages` 声明包提供哪些内容；`hc.yaml` 中单数的 `locale`、`language` 表示你的选择，修改它们不会改变包的内容和验证要求。Python 环境的创建、修复和依赖管理保持不变：保留 `python.interpreter: ""` 即使用托管环境。显式写 `.hc/venv/bin/python` 会被视为外部解释器，从而绕过托管。
 
 `images: auto` 在 kitty、Ghostty 和 [herdr](https://herdr.dev) 中，以及外层是 kitty 或 Ghostty 的 tmux 中（见下文）选择 `kitty`，在其他真彩色终端中选择 `blocks`，其余情况为 `none`。
 

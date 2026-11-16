@@ -30,7 +30,7 @@ func TestSubmitNote(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(config, append(data, "python:\n  interpreter: python3\n"...), 0o644); err != nil {
+	if err := os.WriteFile(config, []byte(strings.Replace(string(data), `interpreter: ""`, "interpreter: python3", 1)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	a := app.New(ws)
@@ -132,7 +132,7 @@ func TestTestInputReference(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	write(filepath.Join(dir, workspace.ConfigFile), string(config)+"python:\n  interpreter: python3\n")
+	write(filepath.Join(dir, workspace.ConfigFile), strings.Replace(string(config), `interpreter: ""`, "interpreter: python3", 1))
 	pdir := filepath.Join(ws.WritablePack().ProblemsPath(), "0001-next")
 	write(filepath.Join(pdir, problem.MetaFile), "slug: next\ntitle: Next\nkind: function\nfunction:\n  name: next\n  params:\n    - name: n\n      type: integer\n  returns: integer\njudge:\n  compare: exact\n")
 	write(filepath.Join(pdir, problem.DescriptionFile), "# Next\n")

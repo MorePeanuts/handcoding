@@ -12,7 +12,7 @@
 //	  .hc/hc.db                       submission history
 //	  .hc/venv/                       the Python virtual environment hc manages
 //
-// Its own problems form the pack local, which has no pack.yaml and is the
+// Its own problems form the pack local, with packs/local/pack.yaml, and it is the
 // only writable pack. Every other directory in packs/ is an installed pack:
 // read-only, with a pack.yaml that names it after its directory.
 //
@@ -74,33 +74,35 @@ const legacyProblemsDir = "problems"
 type Config struct {
 	// Language is the default solution language.
 	Language string `yaml:"language"`
+	// Locale is the preferred statement language, subject to pack availability.
+	Locale string `yaml:"locale"`
 	// Editor opens solution files; falls back to $VISUAL, $EDITOR, then vi.
-	Editor string `yaml:"editor,omitempty"`
+	Editor string `yaml:"editor"`
 	// Theme is the color theme for rendered statements: auto, dark or light.
-	Theme string `yaml:"theme,omitempty"`
+	Theme string `yaml:"theme"`
 	// Images selects how statement images are drawn: auto, kitty, blocks or
 	// none (see package termimg).
-	Images string `yaml:"images,omitempty"`
+	Images string `yaml:"images"`
 	// Timeout is the wall clock limit for a run.
-	Timeout string `yaml:"timeout,omitempty"`
+	Timeout string `yaml:"timeout"`
 	// Execution selects the backend; only local is implemented.
-	Execution ExecutionConfig `yaml:"execution,omitempty"`
+	Execution ExecutionConfig `yaml:"execution"`
 	// Go selects user-provided compiler and debugger executables.
-	Go GoConfig `yaml:"go,omitempty"`
+	Go GoConfig `yaml:"go"`
 	// Python configures the Python language.
-	Python PythonConfig `yaml:"python,omitempty"`
+	Python PythonConfig `yaml:"python"`
 	// Agent configures the coding agent used to generate and fix test cases.
-	Agent AgentConfig `yaml:"agent,omitempty"`
+	Agent AgentConfig `yaml:"agent"`
 	// LeetCode configures fetching problems.
-	LeetCode LeetCodeConfig `yaml:"leetcode,omitempty"`
-	// Locales are the locales of the local pack's statements, as locales in
-	// a pack.yaml (the default first); see LocalLocales. Only a practice
-	// workspace has them: a pack checkout's are in its pack.yaml.
+	LeetCode LeetCodeConfig `yaml:"leetcode"`
+	// Locales is read only to migrate old workspaces to local/pack.yaml.
 	Locales []string `yaml:"locales,omitempty"`
+	// PackSettings override the workspace preferences independently per pack.
+	PackSettings map[string]PackSettings `yaml:"pack_settings"`
 	// Packs are the packs that hc pack install put in packs/, so that a
 	// workspace can be reproduced from hc.yaml. Only a practice workspace
 	// has them; hc changes them with SavePacks.
-	Packs []PackSource `yaml:"packs,omitempty"`
+	Packs []PackSource `yaml:"packs"`
 }
 
 // PackSource records an installed pack in hc.yaml: where it came from and
@@ -133,50 +135,55 @@ func (c Config) PackSource(name string) (PackSource, bool) {
 
 // ExecutionConfig selects where code runs. Docker remains a future backend.
 type ExecutionConfig struct {
-	Backend string `yaml:"backend,omitempty"`
+	Backend string `yaml:"backend"`
 }
 
 // GoConfig selects user-provided executables; hc never installs them.
 type GoConfig struct {
-	Command  string `yaml:"command,omitempty"`
-	Debugger string `yaml:"debugger,omitempty"`
+	Command  string `yaml:"command"`
+	Debugger string `yaml:"debugger"`
 }
 
 // PythonConfig configures Python.
 type PythonConfig struct {
 	// Interpreter is the Python to run solutions with. Unset, hc manages a
 	// virtual environment in .hc/venv.
-	Interpreter string `yaml:"interpreter,omitempty"`
+	Interpreter string `yaml:"interpreter"`
 }
 
 // AgentConfig selects a coding agent.
 type AgentConfig struct {
 	// Name is a preset: claude or codex. Ignored when Command is set.
-	Name string `yaml:"name,omitempty"`
+	Name string `yaml:"name"`
 	// Command is a custom command line; the literal {prompt} is replaced by
 	// the prompt. Example: ["my-agent", "--yes", "{prompt}"].
-	Command []string `yaml:"command,omitempty"`
+	Command []string `yaml:"command"`
 }
 
 // LeetCodeConfig configures LeetCode access.
 type LeetCodeConfig struct {
 	// Site is "com" (leetcode.com) or "cn" (leetcode.cn).
-	Site string `yaml:"site,omitempty"`
+	Site string `yaml:"site"`
 }
 
 // DefaultConfig is written by `hc init`.
 func DefaultConfig() Config {
 	return Config{
-		Language: "go",
-		Theme:    "auto",
-		Images:   "auto",
-		Timeout:  "10s",
-		Agent:    AgentConfig{Name: "claude"},
-		LeetCode: LeetCodeConfig{Site: "com"},
+		Language:     "go",
+		Locale:       "en",
+		Execution:    ExecutionConfig{Backend: "local"},
+		Go:           GoConfig{Command: "go", Debugger: "dlv"},
+		PackSettings: map[string]PackSettings{},
+		Packs:        []PackSource{},
+		Theme:        "auto",
+		Images:       "auto",
+		Timeout:      "10s",
+		Agent:        AgentConfig{Name: "claude", Command: []string{}},
+		LeetCode:     LeetCodeConfig{Site: "com"},
 	}
 }
 
-// DefaultLocales are the local pack's locales when hc.yaml sets none.
+// DefaultLocales are the locales of a new local pack.
 var DefaultLocales = []string{"en"}
 
 // LocalLocales are the locales of the local pack: Locales, or
@@ -369,12 +376,16 @@ func Create(dir, language string) (*Workspace, error) {
 	if language != "" {
 		cfg.Language = language
 	}
-	data, err := yaml.Marshal(cfg)
+	data, err := settingsDefaults(cfg, Practice)
 	if err != nil {
 		return nil, err
 	}
-	header := "# handcoding workspace configuration\n# agent.name: claude | codex   (or set agent.command for a custom agent)\n# leetcode.site: com | cn\n# locales: the languages of your own problems' statements, the default first, e.g. [en, zh-CN] (default [en])\n# theme: auto | dark | light   (set it if statements look wrong in your terminal)\n# images: auto | kitty | blocks | none   (kitty: kitty, Ghostty, herdr; blocks: any truecolor terminal)\n# execution.backend: local (Docker is not implemented)\n# go.command / go.debugger: executable names or workspace-relative paths (defaults: go / dlv)\n# python.interpreter: a Python 3.12+ to use instead of the virtual environment hc manages in .hc/venv\n"
+	header := settingsHeader
 	if err := os.WriteFile(filepath.Join(abs, ConfigFile), append([]byte(header), data...), 0o644); err != nil {
+		return nil, err
+	}
+	w := &Workspace{Root: abs, Kind: Practice, Config: cfg}
+	if err := w.ensureLocalManifest(); err != nil {
 		return nil, err
 	}
 	// Installed packs are git checkouts of their own, reproduced from the
@@ -455,9 +466,7 @@ type Pack struct {
 	// workspace's own problems are writable; installed packs are replaced
 	// as a whole when they are updated.
 	Writable bool
-	// Manifest is the pack's pack.yaml. The local pack has none, and gets
-	// one of the newest protocol, with every language and the locales of
-	// hc.yaml (Config.LocalLocales). Nil when Err is set.
+	// Manifest is the pack's pack.yaml. Nil when Err is set.
 	Manifest *pack.Manifest
 	// Err is why the pack cannot be read, a *PackError: its pack.yaml is
 	// missing or invalid, or of a protocol this hc does not read.
@@ -495,12 +504,22 @@ func (e *PackError) Unwrap() error { return e.Err }
 // localPack is the pack of a practice workspace's own problems.
 func (w *Workspace) localPack() *Pack {
 	dir := filepath.Join(w.PacksPath(), pack.LocalName)
-	return &Pack{
-		Name:     pack.LocalName,
-		Dir:      dir,
-		Writable: true,
-		Manifest: &pack.Manifest{Protocol: problem.Protocol, Name: pack.LocalName, Locales: w.Config.LocalLocales(), Dir: dir},
+	k := &Pack{Name: pack.LocalName, Dir: dir, Writable: true}
+	m, err := pack.Load(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		// Read-only commands can still inspect an old workspace before sync.
+		m = w.defaultLocalManifest()
+		err = nil
 	}
+	if err == nil {
+		err = m.ValidateLocal()
+	}
+	if err != nil {
+		k.Err = &PackError{Pack: k.Name, Err: fmt.Errorf("%s: %w", w.Rel(filepath.Join(dir, pack.ManifestFile)), err)}
+	} else {
+		k.Manifest = m
+	}
+	return k
 }
 
 // checkoutPack is the pack an authoring workspace is the checkout of. While

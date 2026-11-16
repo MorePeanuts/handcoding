@@ -209,7 +209,7 @@ func TestValidateJobs(t *testing.T) {
 	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
-	a.WS.Config.Locales = []string{"en", "zh-CN"}
+	writeLocalLocales(t, a.WS)
 	addFailingProblems(t, a)
 	sum1, f1, _ := validateAll(t, a, app.ValidateOptions{Jobs: 1})
 	if len(f1) < 40 || sum1.Failed != 1 || sum1.PackErrors != 0 {
@@ -231,7 +231,7 @@ func TestValidateJobs(t *testing.T) {
 		t.Fatal(err)
 	}
 	ws.Config.Python.Interpreter = "python3"
-	ws.Config.Locales = []string{"en", "zh-CN"}
+	writeLocalLocales(t, ws)
 	local := filepath.Join(ws.WritablePack().Dir, pack.ProblemsDir)
 	// two-sum has generated cases, longest-palindromic-substring a checker.
 	for _, dir := range []string{"0001-two-sum", "0005-longest-palindromic-substring", "0027-remove-element"} {
@@ -293,5 +293,12 @@ func TestValidateJobs(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(baselines, pack.LocalName, "two-sum")); err != nil {
 		t.Errorf("no baseline: %v", err)
+	}
+}
+
+func writeLocalLocales(t *testing.T, ws *workspace.Workspace) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(ws.PackPath("local"), "pack.yaml"), []byte("protocol: 1\nname: local\nlocales: [en, zh-CN]\n"), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

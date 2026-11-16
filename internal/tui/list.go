@@ -87,6 +87,9 @@ func (m *model) selectProblems() {
 func (m *model) show() {
 	m.cursor, m.offset = 0, 0
 	err := m.loadGroup(m.pack)
+	if err == nil {
+		err = m.loadPackLanguage()
+	}
 	m.selectProblems()
 	if err == nil {
 		err = m.remember()

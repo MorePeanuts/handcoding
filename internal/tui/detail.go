@@ -31,6 +31,12 @@ func (m *model) openInitialProblem(p *problem.Problem) error {
 // created if needed and its path copied, ready to be opened in an editor
 // next door; otherwise the problem is only viewed.
 func (m *model) openDetail(p *problem.Problem, start bool) {
+	if p.Pack != m.pack {
+		if err := m.loadLanguage(p.Pack); err != nil {
+			m.message = ui.Red.Render(err.Error())
+			return
+		}
+	}
 	m.current = p
 	m.viewing = !start
 	if start {

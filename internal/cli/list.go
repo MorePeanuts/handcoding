@@ -73,9 +73,10 @@ func runList(cmd *cobra.Command, root *rootOptions, o listOptions) error {
 	}
 	if !o.plain && isTerminal(os.Stdout) && isTerminal(os.Stdin) {
 		return runTUI(cmd, a, tui.Options{
-			Lang:  l,
-			Pack:  o.pack,
-			Group: o.group,
+			Lang:     l,
+			Language: o.lang,
+			Pack:     o.pack,
+			Group:    o.group,
 		})
 	}
 	if loadErr != nil {

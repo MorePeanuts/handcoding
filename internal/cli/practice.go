@@ -141,6 +141,7 @@ default locale.
 			if err != nil {
 				return err
 			}
+			localeOverride := locale
 			if locale != "" {
 				if err := app.CheckLocale(k, locale); err != nil {
 					return err
@@ -148,12 +149,17 @@ default locale.
 			} else if locale, err = a.Locale(cmd.Context(), k); err != nil {
 				return err
 			}
+			if localeOverride == "" {
+				if note := a.LocaleFallback(k, locale); note != "" {
+					fmt.Fprintln(os.Stderr, ui.Faint.Render(note))
+				}
+			}
 			if !raw && isTerminal(os.Stdout) && isTerminal(os.Stdin) {
 				l, _, err := a.SolutionLang(p, "")
 				if err != nil {
 					return err
 				}
-				return runTUI(cmd, a, tui.Options{Lang: l, Problem: p, Locale: locale})
+				return runTUI(cmd, a, tui.Options{Lang: l, Problem: p, Locale: localeOverride})
 			}
 			st, err := app.StatementIn(p, locale, k.Manifest.DefaultLocale())
 			if err != nil {

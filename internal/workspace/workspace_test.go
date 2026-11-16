@@ -58,8 +58,8 @@ func TestCreateLayout(t *testing.T) {
 			t.Errorf("%s: %v", d, err)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(w.Root, PacksDir, pack.LocalName, pack.ManifestFile)); err == nil {
-		t.Error("the local pack has a pack.yaml")
+	if _, err := os.Stat(filepath.Join(w.Root, PacksDir, pack.LocalName, pack.ManifestFile)); err != nil {
+		t.Error("the local pack lacks pack.yaml")
 	}
 	packs, err := w.Packs()
 	if err != nil || len(packs) != 1 || packs[0].Name != pack.LocalName || !packs[0].Writable {

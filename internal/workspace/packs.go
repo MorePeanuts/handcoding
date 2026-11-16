@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -79,11 +78,16 @@ func (w *Workspace) PackPath(name string) string { return filepath.Join(w.PacksP
 
 // SavePacks makes list the packs list of hc.yaml, and of w.Config. Only that
 // list is rewritten: the rest of the file keeps its comments, order and
-// formatting. An empty list removes the key.
+// formatting. An empty list remains explicit as packs: [].
 func (w *Workspace) SavePacks(list []PackSource) error {
 	if w.Kind != Practice {
 		return errors.New("a pack checkout has no installed packs")
 	}
+	unlock, _, err := w.lock("settings.lock", true)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	path := filepath.Join(w.Root, ConfigFile)
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -115,81 +119,34 @@ func setPacks(data []byte, list []PackSource) ([]byte, error) {
 		case *ast.MappingNode:
 			m = body
 		case nil, *ast.CommentGroupNode:
-			// Nothing but comments: the list goes after them.
 		default:
 			return nil, fmt.Errorf("must be a mapping, not %s", body.Type())
 		}
 	}
-	var entry *ast.MappingValueNode
-	if len(list) > 0 {
-		n, err := yaml.ValueToNode(struct {
-			Packs []PackSource `yaml:"packs"`
-		}{list}, yaml.IndentSequence(true))
-		if err != nil {
-			return nil, err
-		}
-		entry = n.(*ast.MappingNode).Values[0]
+	n, err := yaml.ValueToNode(struct {
+		Packs []PackSource `yaml:"packs"`
+	}{list}, yaml.IndentSequence(true))
+	if err != nil {
+		return nil, err
 	}
+	entry := n.(*ast.MappingNode).Values[0]
 	if m == nil {
-		if entry == nil {
-			return data, nil
-		}
 		text := entry.String() + "\n"
 		if len(bytes.TrimSpace(data)) > 0 {
 			text = string(bytes.TrimRight(data, "\n")) + "\n" + text
 		}
 		return []byte(text), nil
 	}
-	values := m.Values[:0:0]
-	done := false
-	// The comment above a removed packs key, which may be the file's
-	// header: it goes to the key after it.
-	var orphan *ast.CommentGroupNode
-	for _, v := range m.Values {
-		if v.Key.String() != packsKey {
-			if orphan != nil && v.GetComment() == nil {
-				if err := v.SetComment(orphan); err != nil {
-					return nil, err
-				}
-			}
-			orphan = nil
-			values = append(values, v)
-			continue
+	if v := setting(m, packsKey); v != nil {
+		if err := v.Replace(entry.Value); err != nil {
+			return nil, err
 		}
-		if entry != nil && !done {
-			if err := v.Replace(entry.Value); err != nil {
-				return nil, err
-			}
-			values = append(values, v)
-			done = true
-			continue
+		if seq, ok := v.Value.(*ast.SequenceNode); ok && len(seq.Values) > 0 && !seq.IsFlowStyle {
+			seq.AddColumn(v.Key.GetToken().Position.Column + 2 - seq.GetToken().Position.Column)
 		}
-		done = true
-		orphan = v.GetComment()
-		// The comment after it, such as one at the end of the file, goes to
-		// the key before it, or else to the key after it.
-		if foot := v.FootComment; foot != nil {
-			switch {
-			case len(values) > 0 && values[len(values)-1].FootComment == nil:
-				values[len(values)-1].FootComment = foot
-			case orphan == nil:
-				orphan = foot
-			default:
-				orphan = &ast.CommentGroupNode{BaseNode: &ast.BaseNode{}, Comments: append(slices.Clone(orphan.Comments), foot.Comments...)}
-			}
-		}
+	} else {
+		appendSetting(m, entry)
 	}
-	if entry != nil && !done {
-		values = append(values, entry)
-	}
-	if len(values) == 0 {
-		// Nothing is left but, perhaps, the comment.
-		if orphan != nil {
-			return []byte(orphan.String() + "\n"), nil
-		}
-		return nil, nil
-	}
-	m.Values = values
 	if m.IsFlowStyle {
 		m.SetIsFlowStyle(true)
 	}
@@ -222,7 +179,7 @@ func writeAtomic(path string, data []byte) error {
 
 // RemoveFromGroups removes slug from every group of the pack's pack.yaml,
 // keeping its comments and layout, and returns the names of the groups it
-// was in. The local pack has no pack.yaml, and no groups.
+// was in. Old local packs without a manifest have no groups.
 func (k *Pack) RemoveFromGroups(slug string) ([]string, error) {
 	path := filepath.Join(k.Dir, pack.ManifestFile)
 	data, err := os.ReadFile(path)

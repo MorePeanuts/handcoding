@@ -74,7 +74,7 @@ problems/<dir>/    one problem directory per problem; see Problem directory
 | `groups[].problems` | list of strings | no | `[]` | Slugs of problems of the pack, without duplicates | 1 |
 
 - `protocol` is read first. A tool that does not read the declared version refuses the pack without reading the rest of it ([Protocol versions](#protocol-versions)), since a newer protocol may add fields it does not know.
-- `name` is the pack's identity. Installed packs, solutions and submission history are keyed by it, so renaming a pack is a breaking change, as renaming a slug is for a problem. `local` is reserved for the problems a workspace holds outside any pack.
+- `name` is the pack's identity. Installed packs, solutions and submission history are keyed by it, so renaming a pack is a breaking change, as renaming a slug is for a problem. `local` is reserved for the workspace-owned pack; it cannot name a distributable pack.
 - `languages` lists the languages the pack's problems can be solved in. Solutions in other languages are not supported, and tools MAY refuse to start one. Leaving it out means every language of the declared protocol, so a pack gets the languages a later protocol adds only when it declares that protocol. References may be written in any language of the protocol, whatever `languages` says. A solution is judged only in a language the problem has a reference in ([Readiness](#readiness)), so a problem SHOULD have one in every language of `languages`. Checkers are Python in any case ([Checkers](#checkers)).
 
 The language ids:

@@ -339,7 +339,7 @@ func localesText(k *workspace.Pack) string {
 	}
 	where := "locales in " + pack.ManifestFile
 	if k.Name == pack.LocalName {
-		where = "locales in " + workspace.ConfigFile
+		where = "locales in packs/local/" + pack.ManifestFile
 	}
 	return strings.Join(k.Manifest.Locales, ", ") + ", from " + where
 }

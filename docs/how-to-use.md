@@ -42,7 +42,7 @@ English · [简体中文](how-to-use_zh.md)
 
 The problems of a workspace come in [packs](protocol.md#packs), each a directory of `packs/`:
 
-- `packs/local/` holds your own problems: what `hc fetch`, `hc new` and `hc import` add. It has no `pack.yaml` (`local` is a reserved name), and is solved in every language. Its statements are in the [locales](#statements-in-several-languages) that `locales` in `hc.yaml` sets, English (`[en]`) by default.
+- `packs/local/` holds your own problems: what `hc fetch`, `hc new` and `hc import` add. Its `packs/local/pack.yaml` declares its supported languages and statement [locales](#statements-in-several-languages), initially every protocol language and English (`[en]`). The name `local` is reserved for this workspace-owned pack.
 - Every other directory is an installed pack: a `pack.yaml` whose `name` is the directory's name, and its `problems/`. Installed packs are **read-only**: `hc gen`, `hc fix` and `hc cases build` refuse to change them, since updating the pack would replace the change, and `hc cases add|rm|edit` work on [your own cases](#your-own-cases) of the problem instead. A pack whose `pack.yaml` lists `languages` can only be solved in those: `hc start -l` refuses the others, and if your default language is not among them, hc uses the pack's first language and says so. `hc pack install` installs them (see [Packs](#packs)); a pack copied into `packs/` by hand works too, and `hc pack list` shows it as unmanaged.
 
 A pack that hc cannot read (no `pack.yaml`, an invalid one, or one written for a newer protocol, which says to upgrade hc) is reported by `hc validate` and the list, and its problems are left out; the rest of the workspace works.
@@ -123,7 +123,7 @@ my-pack/
   .claude/  .agents/  AGENTS.md  CLAUDE.md   the agent skills and instructions, once a command installs them
 ```
 
-Without `hc.yaml` hc uses the defaults, and it never creates one in a checkout. Its `locales` are those of `pack.yaml`, so an `hc.yaml` there must not set them, as it must not list `packs`. A `pack.yaml` that hc cannot read, for example one of a newer protocol, does not keep the workspace from opening: `hc validate` says what is wrong. What hc adds is yours, not the pack's, so keep it out of the repository's history:
+Opening a checkout normally creates `hc.yaml` with explicit personal defaults, or fills missing settings in an existing file. Read-only diagnostics do not create it. Its `locales` are those of `pack.yaml`, so an `hc.yaml` there must not set them, as it must not list `packs`. A `pack.yaml` that hc cannot read, for example one of a newer protocol, does not keep the workspace from opening: `hc validate` says what is wrong. What hc adds is yours, not the pack's, so keep it out of the repository's history:
 
 ```
 # .gitignore
@@ -460,9 +460,9 @@ hc gen 146                  # make it ready: test cases and the judge rule
 
 `hc fetch` downloads the statement and its images, including diagrams inside preformatted examples, the signature, the Go and Python starter code, and the examples. Inputs and expected outputs are kept together from each statement example when they can be parsed safely. If an example input cannot be verified, hc warns and keeps unmatched API inputs without expected outputs; it never pairs inputs and outputs merely by their order.
 
-It writes the statements in the locales of the pack it fetches into: `locales` in `hc.yaml` for your own problems (see [statements in several languages](#statements-in-several-languages)). Both sites have the English statement; only leetcode.cn has the Chinese one, and its title:
+It writes the statements in the locales of the pack it fetches into: `locales` in `packs/local/pack.yaml` for your own problems (see [statements in several languages](#statements-in-several-languages)). Both sites have the English statement; only leetcode.cn has the Chinese one, and its title:
 
-| `locales` in `hc.yaml` | leetcode.com | leetcode.cn |
+| `locales` in `packs/local/pack.yaml` | leetcode.com | leetcode.cn |
 |---|---|---|
 | `[en]` (the default) | `description.md`: English | `description.md`: English |
 | `[en, zh-CN]` | `description.md`: English; no Chinese statement, and a note says so | both: English in `description.md`, Chinese in `description.zh-CN.md`, both titles |
@@ -509,14 +509,14 @@ A section is named by its heading's anchor on GitHub, as in `protocol.md#structu
 
 ### Statements in several languages
 
-A pack can give its statements in several languages, its [locales](protocol.md#locales): `locales: [en, zh-CN]` in `pack.yaml`. The first is the pack's default, the language of `description.md` and `title`; the others are in `description.<locale>.md` and `titles` in `problem.yaml`. The pack's author decides which locales it has and which comes first. For your own problems you are the author, and `locales` in `hc.yaml` sets them, `[en]` when unset:
+A pack can give its statements in several languages, its [locales](protocol.md#locales): `locales: [en, zh-CN]` in `pack.yaml`. The first is the pack's default, the language of `description.md` and `title`; the others are in `description.<locale>.md` and `titles` in `problem.yaml`. The pack's author decides which locales it has and which comes first. For your own problems you are the author, and `locales` in `packs/local/pack.yaml` sets them, initially `[en]`:
 
 ```yaml
 locales: [en, zh-CN]   # your own problems: English first, Chinese too
 ```
 
-- `i` in the list switches a pack's locale, and hc remembers the choice for each pack in `.hc/`. A pack you open for the first time shows its default locale.
-- `hc show <problem> --locale zh-CN` opens the statement in that locale (or prints it with `--raw` or non-interactive input/output); without `--locale`, it uses the remembered choice. `--locale` applies to this session only; pressing `i` in the TUI saves a new choice.
+- `i` in the list switches a pack's locale, and hc saves the choice in `hc.yaml` under `pack_settings.<name>.locale`. Without an override, the workspace `locale` is preferred; when unavailable, the pack default is shown.
+- `hc show <problem> --locale zh-CN` opens the statement in that locale (or prints it with `--raw` or non-interactive input/output); without `--locale`, it uses the pack/workspace preference. `--locale` applies to this session only; pressing `i` in the TUI saves a new choice.
 - When a problem lacks the chosen locale, which only happens in a pack that does not validate, hc shows the default one and says so.
 - `hc validate` reports a problem without a statement or a title in one of the pack's locales, and statements or titles in a locale the pack does not declare. `hc pack check` fails on them too.
 - hc translates nothing. `hc fetch` writes the statements LeetCode has (see [above](#from-leetcode)); for your own problems, you write each locale's statement yourself. `hc gen` and `hc fix` read only the statement in the default locale, and never write one.
@@ -725,27 +725,53 @@ Either way, hc checks the session with LeetCode and saves the single login, read
 
 ## Configuration
 
-`hc.yaml` at the workspace root:
+`hc.yaml` at the workspace root holds personal settings and the installed-pack inventory. New workspaces write all global defaults explicitly:
 
 ```yaml
-language: go          # default solution language: go | python
-editor: nvim          # falls back to $VISUAL, $EDITOR, then vi
-theme: auto           # statement colors: auto | dark | light
-images: auto          # statement images: auto | kitty | blocks | none
-timeout: 10s          # wall-clock limit of a run, its checker and its generators (protocol: run-limit)
+language: go          # preferred solution language: go | python
+locale: en            # preferred statement language
+editor: ""           # empty: $VISUAL, $EDITOR, then vi
+theme: auto           # auto | dark | light
+images: auto          # auto | kitty | blocks | none
+timeout: 10s          # wall-clock limit of a run, its checker and generators
 execution:
-  backend: local      # only local is implemented; docker is deferred
+  backend: local      # only local is implemented
 go:
-  command: go         # executable name or path, relative to the workspace
+  command: go         # executable name or workspace-relative path
   debugger: dlv       # used only for debugging
 python:
-  interpreter: python3.12  # optional external Python; unset to keep the managed .hc/venv
+  interpreter: ""    # empty keeps hc's managed .hc/venv; a value selects an external Python
 agent:
-  name: claude        # claude | codex, or set command (see above)
+  name: claude        # claude | codex
+  command: []         # empty uses the preset; otherwise a custom argv with {prompt}
 leetcode:
-  site: com           # default for fetch/login: com | cn; submissions use the current login
-locales: [en]         # the statement languages of your own problems, the default first
+  site: com           # fetch/login default: com | cn; submissions use the current login
+pack_settings: {}     # per-pack personal overrides
+packs: []             # installed sources/revisions; absent in an authoring checkout
 ```
+
+Normal commands fill missing global fields on open, including development builds. Existing values, comments and unknown fields are preserved; synchronization never resets your settings to new defaults. `hc doctor` and cache-cleaning operations do not synchronize settings. Settings synchronization is separate from the release-only upgrade of agent skills.
+
+For example, to prefer Python and Chinese generally, but Go for one pack:
+
+```yaml
+language: python
+locale: zh-CN
+pack_settings:
+  leetcode:
+    language: go
+    locale: zh-CN
+  local:
+    locale: en
+```
+
+Each field resolves independently: an explicit command argument, then the pack override, then the workspace preference. An unavailable inherited language falls back to the first language the pack and hc support; an unavailable statement locale falls back to the pack default. hc reports the fallback without saving it. An explicitly requested unsupported language or locale is an error. A missing local toolchain is an environment problem, not a reason to switch languages.
+
+In the TUI, `L` cycles only the pack's supported solution languages and `i` its statement locales. A deliberate switch immediately saves the corresponding field in `pack_settings.<name>` and survives a restart. CLI flags and command-mode overrides are temporary. Removing an override restores inheritance; missing override fields are deliberately not filled with defaults. The same structure works in a pack checkout, using its manifest name. Package updates do not rewrite these preferences.
+
+When opening an older workspace, hc first creates `packs/local/pack.yaml` from the old top-level `locales` (or `[en]`), then removes that setting. If both declarations exist and conflict, hc asks you to reconcile them rather than discard one. Existing database locale preferences migrate to `pack_settings`; an explicit YAML field wins. Old database entries are removed only after the settings file is saved. History, stars and navigation state stay in `.hc/hc.db`.
+
+`locales` and `languages` in `pack.yaml` declare available content. The singular `locale` and `language` in `hc.yaml` express your choices; editing them does not change the pack's content or validation requirements. Python environment creation, repair and dependency management are unchanged: keep `python.interpreter: ""` for the managed environment. Setting it to `.hc/venv/bin/python` explicitly selects an external interpreter and bypasses that management.
 
 `images: auto` picks `kitty` in kitty, Ghostty and [herdr](https://herdr.dev), and in tmux around kitty or Ghostty (below), `blocks` in other truecolor terminals, and `none` otherwise.
 

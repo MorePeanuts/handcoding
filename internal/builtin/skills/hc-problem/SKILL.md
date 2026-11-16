@@ -195,7 +195,7 @@ The statement users read in the TUI with `hc show <slug>`. Use
 ### Statements in several locales
 
 A pack may declare `locales` (`[en, zh-CN]`; for the workspace's own
-problems, `locales` in `hc.yaml`, `[en]` when unset). Read
+problems, `locales` in `packs/local/pack.yaml`, initially `[en]`). Read
 `hc docs protocol locales`. `description.md` and `title` are in the first,
 the default locale; every other locale has `description.<locale>.md` and
 `titles.<locale>` in problem.yaml.

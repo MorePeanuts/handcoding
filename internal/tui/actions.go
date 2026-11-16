@@ -44,7 +44,7 @@ func (m *model) problemKey(key string, p *problem.Problem) (tea.Cmd, bool) {
 		m.toggleStar(p)
 		return nil, true
 	case "L":
-		m.switchLang()
+		m.switchLang(p.Pack)
 		return nil, true
 	case "i":
 		m.switchLocale(p.Pack)
@@ -137,13 +137,32 @@ func (m *model) copyPath(path string) {
 	m.message = ui.Green.Render(label) + clipLeft(displayPath(path), m.width-len(label))
 }
 
-func (m *model) switchLang() {
-	all := m.app.Langs.All()
-	for i, l := range all {
-		if l.ID() == m.lang.ID() {
-			m.lang = all[(i+1)%len(all)]
+func (m *model) switchLang(name string) {
+	k, err := m.app.WS.Pack(name)
+	if err != nil {
+		m.message = ui.Red.Render(err.Error())
+		return
+	}
+	ids := k.Languages()
+	if len(ids) < 2 {
+		m.message = "pack " + k.Name + " has only one solution language"
+		return
+	}
+	next := ids[0]
+	for i, id := range ids {
+		if id == m.lang.ID() {
+			next = ids[(i+1)%len(ids)]
 			break
 		}
+	}
+	if err := m.app.SetLanguage(k, next); err != nil {
+		m.message = ui.Red.Render(err.Error())
+		return
+	}
+	delete(m.languageOverrides, k.Name)
+	if err := m.loadLanguage(name); err != nil {
+		m.message = ui.Red.Render(err.Error())
+		return
 	}
 	m.message = "language: " + m.lang.Name()
 	if m.top() == screenDetail && m.current != nil {

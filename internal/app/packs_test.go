@@ -679,7 +679,7 @@ func TestPackCommentsKept(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, _ = os.ReadFile(path)
-	if strings.Contains(string(data), "packs") || !strings.Contains(string(data), "# I like Python") || !strings.Contains(string(data), "# the agent") {
+	if !strings.Contains(string(data), "packs: []") || !strings.Contains(string(data), "# I like Python") || !strings.Contains(string(data), "# the agent") {
 		t.Errorf("hc.yaml after remove:\n%s", data)
 	}
 }

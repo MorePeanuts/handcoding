@@ -63,8 +63,8 @@ func TestSavePacks(t *testing.T) {
 				if !slices.Equal(o.Config.Packs, want) {
 					t.Errorf("%s: packs %+v, want %+v\n%s", stage, o.Config.Packs, want, data)
 				}
-				if want == nil && strings.Contains(string(data), "packs") {
-					t.Errorf("%s: the key is left:\n%s", stage, data)
+				if want == nil && !strings.Contains(string(data), "packs: []") {
+					t.Errorf("%s: empty list is not explicit:\n%s", stage, data)
 				}
 			}
 			if err := w.SavePacks(list); err != nil {
@@ -83,7 +83,7 @@ func TestSavePacks(t *testing.T) {
 	}
 }
 
-// locales in hc.yaml are the local pack's, [en] when unset; a pack
+// locales in local/pack.yaml are the local pack's; legacy hc.yaml declarations are validated before migration. A pack
 // checkout's are in its pack.yaml.
 func TestConfigLocales(t *testing.T) {
 	w := newWorkspace(t)
@@ -98,7 +98,7 @@ func TestConfigLocales(t *testing.T) {
 		t.Errorf("default locales = %q, want [en]", got)
 	}
 	path := filepath.Join(w.Root, ConfigFile)
-	writeFile(t, path, "language: go\nlocales: [zh-CN, en]\n")
+	writeFile(t, filepath.Join(w.PackPath("local"), "pack.yaml"), "protocol: 1\nname: local\nlocales: [zh-CN, en]\n")
 	w, err := Open(w.Root)
 	if err != nil {
 		t.Fatal(err)
