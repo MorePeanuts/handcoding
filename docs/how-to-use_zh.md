@@ -75,7 +75,7 @@ hc 使用你的本地开发工具。`hc.yaml` 的 `go.command` 和 `go.debugger`
 
 C 使用 `solution.c`，沿用 LeetCode 顶层函数与显式数组尺寸。协议最低 C11，`c.standard` 默认 `gnu11`。Linux 默认 `gcc` / `gdb`，macOS 默认 `clang` / `lldb`，可通过 `c.command`、`c.debugger` 修改。`c.sanitizers` 选项与 C++ 相同。`hc debug -l c` 只支持终端调试。每个用例使用独立进程，算法耗时只统计解答调用，墙钟时限覆盖每个工作进程及其退出阶段。
 
-`hc init -l c`、首次使用 C 和 `hc env sync -l c` 会将经过摘要校验的 yyjson、uthash 下载到 `.hc/c/<锁文件摘要>`。准备好后离线复用，sync 修复缺失或损坏文件。依赖源码不进入仓库或 hc 二进制。`hc clean` 保留该环境，`hc doctor -l c --debug` 只检查而不下载，Python 生命周期不变。GLib 由用户本地安装：`c.pkg_config` 选择 `pkg-config`，`c.glib` 可选 `auto`（找到就使用）、`required`（缺少即报错）、`disabled`。题目声明 `c.libraries: [glib]` 也会要求 GLib。缺少开发头文件或库时给出提示，hc 不安装系统包。
+`hc init -l c`、首次使用 C 和 `hc env sync -l c` 会将经过摘要校验的 yyjson、uthash 下载到 `.hc/c/<锁文件摘要>`。准备好后离线复用，sync 修复缺失或损坏文件。构建会复用环境中已编译的 yyjson 对象文件；编译器、编译选项或预处理后的头文件变化时会重新编译。依赖源码不进入仓库或 hc 二进制。`hc clean` 保留该环境，`hc doctor -l c --debug` 只检查而不下载，Python 生命周期不变。GLib 由用户本地安装：`c.pkg_config` 选择 `pkg-config`，`c.glib` 可选 `auto`（找到就使用）、`required`（缺少即报错）、`disabled`。题目声明 `c.libraries: [glib]` 也会要求 GLib。缺少开发头文件或库时给出提示，hc 不安装系统包。
 
 打开 C 解答会在原文件旁生成 `hc_c_types.h`、运行时/驱动文件和 `compile_commands.json`。clangd 可通过编译数据库获得相同的标准、自动提供的类型、uthash 和可用的 GLib 头文件。题目包必须声明 `c` 并提供 `reference/solution.c` 才能用 C 判题。原生模板特殊绑定与 hc 扩展见 [C ABI](protocol_zh.md#c-语言)；本地模板不代表 LeetCode 支持该题的 C 提交。
 
