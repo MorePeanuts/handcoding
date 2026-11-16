@@ -48,7 +48,7 @@ func TestSettingsSyncOnOpen(t *testing.T) {
 		t.Fatalf("local pack: %+v %v", k, err)
 	}
 	data, _ := os.ReadFile(config)
-	for _, want := range []string{"# keep my settings", "backend: local", "debugger: dlv", "pack_settings:", "packs: []"} {
+	for _, want := range []string{"# keep my settings", "backend: local", "debugger: dlv", "command: node", "command: tsc", "pack_settings:", "packs: []"} {
 		if !strings.Contains(string(data), want) {
 			t.Fatalf("missing %q:\n%s", want, data)
 		}

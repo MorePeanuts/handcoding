@@ -108,6 +108,15 @@ workspace's own problems; `hc validate <slug>` names a missing reference.
   case: each case runs in its own process. Use `int` for `integer` and
   `long long` for `long`.
 
+- JavaScript/TypeScript references are `reference/solution.js` and
+  `reference/solution.ts` (`hc docs protocol javascript--typescript`). Preserve
+  native top-level functions/classes and round-trip function pairs. Target
+  Node.js 22 / TypeScript 5.7; the local tsc typechecks TS. Use `number` for
+  `long`, and keep every long input/expected result within ±9007199254740991.
+  LeetCode libraries are prepared in `.hc/node` using local npm on first use.
+  A ready environment works offline; repair with `hc env sync --lang javascript`. Calls must
+  be synchronous. Module globals persist through the ordered batch, so avoid
+  unintended state between cases. Validate references in both languages.
 - A Java reference is `reference/Solution.java` (`hc docs protocol java`).
   Target Java 17 APIs and syntax, with explicit standard-library imports.
   Keep native arrays or generic lists and the original design-class name

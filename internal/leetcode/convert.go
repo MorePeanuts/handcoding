@@ -176,6 +176,10 @@ func Convert(q *Question, site Site) (*Converted, error) {
 	conv := &Converted{Problem: p, Templates: map[string]string{}}
 	for _, s := range q.CodeSnippets {
 		switch s.LangSlug {
+		case "javascript":
+			conv.Templates["solution.js"] = s.Code
+		case "typescript":
+			conv.Templates["solution.ts"] = s.Code
 		case "java":
 			conv.Templates["Solution.java"] = s.Code
 		case "cpp":

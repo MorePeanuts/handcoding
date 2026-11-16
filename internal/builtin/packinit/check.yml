@@ -29,6 +29,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - run: npm install --global --ignore-scripts typescript@5.7.3
       - name: Install the C++ compiler
         run: sudo apt-get update && sudo apt-get install -y g++-13
 <%- if .Pinned %>

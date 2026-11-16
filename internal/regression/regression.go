@@ -1,6 +1,6 @@
 // Package regression locates hc's regression set for tests: the pack in
 // testdata/regression at the root of the repository, whose problems
-// together use the whole problem protocol, each with Go, Python, C++ and Java
+// together use the whole problem protocol, each with Go, Python, C++, Java, JavaScript and TypeScript
 // references. hc itself does not ship it; only tests import this package.
 //
 // The set is also an authoring workspace (hc -w testdata/regression), so its

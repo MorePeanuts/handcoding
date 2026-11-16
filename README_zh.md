@@ -35,7 +35,7 @@
 
 ## 功能
 
-- **本地判题**：支持 Go、Python、C++ 和 Java，题型包括设计题（`LRUCache`）、原地修改、链表、二叉树、字符矩阵、浮点误差、任意顺序答案，为合法答案很多或输出随机的题目准备的判题程序，通过解码来评判的编码器（二叉树的序列化与反序列化），以及由生成器构造而不必存储的大规模输入。不需要联网。
+- **本地判题**：支持 Go、Python、C++、Java、JavaScript 和 TypeScript，题型包括设计题（`LRUCache`）、原地修改、链表、二叉树、字符矩阵、浮点误差、任意顺序答案，为合法答案很多或输出随机的题目准备的判题程序，通过解码来评判的编码器（二叉树的序列化与反序列化），以及由生成器构造而不必存储的大规模输入。不需要联网。
 - **真正的调试器**：`hc debug` 启动 Delve 或 pdb，停在你的函数入口；`--headless` 提供 DAP 服务，可用 nvim-dap 或 VS Code 连接。
 - **交互界面**：rustlings 风格的题目列表，每个题目包一个标签并显示进度；题面、配图、测试结果和提交历史都在同一个界面里，编辑器开在旁边的窗格。
 - **个人分组**：通过 `hc group` 或交互界面保存有序的复习题单和学习计划，与题目包分组并存，更新题目包时会保留。见[个人分组](docs/how-to-use_zh.md#个人分组)。
@@ -55,7 +55,7 @@ Linux 和 macOS 的预编译二进制文件见 [Releases 页面](https://github.
 
 hc 支持 Linux 和 macOS，不支持 Windows：在 Windows 上请在 [WSL](https://learn.microsoft.com/windows/wsl/install) 中安装和使用 hc，用法与 Linux 相同。
 
-用 Go 答题需要 Go 1.22+；无论用哪种语言答题都需要 Python 3.12+：除了运行 Python 解答，大多数题目带有的生成器和判题程序也用 Python 运行。最简单的办法是安装 [uv](https://docs.astral.sh/uv/getting-started/installation/)（推荐；`brew install uv`，或 `curl -LsSf https://astral.sh/uv/install.sh | sh`），即使系统自带的 Python 太旧（macOS 自带 3.9），它也会下载一个新版本；PATH 上的 Python 3.12+ 也可以。`hc init` 会在工作区中为它创建虚拟环境，两者都找不到时会说明如何安装。C++ 解答还需要支持所选标准的本地编译器和标准库（最低 C++17，默认 C++23），终端调试使用 GDB（Linux）或 LLDB（macOS）。Java 解答需要本地 JDK 17 或更高版本，终端调试使用 jdb。以下为可选依赖：
+用 Go 答题需要 Go 1.22+；无论用哪种语言答题都需要 Python 3.12+：除了运行 Python 解答，大多数题目带有的生成器和判题程序也用 Python 运行。最简单的办法是安装 [uv](https://docs.astral.sh/uv/getting-started/installation/)（推荐；`brew install uv`，或 `curl -LsSf https://astral.sh/uv/install.sh | sh`），即使系统自带的 Python 太旧（macOS 自带 3.9），它也会下载一个新版本；PATH 上的 Python 3.12+ 也可以。`hc init` 会在工作区中为它创建虚拟环境，两者都找不到时会说明如何安装。C++ 解答还需要支持所选标准的本地编译器和标准库（最低 C++17，默认 C++23），终端调试使用 GDB（Linux）或 LLDB（macOS）。Java 解答需要本地 JDK 17 或更高版本，终端调试使用 jdb。JavaScript/TypeScript 使用本地 Node.js 22+；TypeScript 还需要本地 `tsc` 5.7+。JS/TS 初始化或首次使用时，由本地 npm 按锁文件把 LeetCode 库安装到工作区 `.hc/node`，准备完成后可离线使用。hc 不安装 Node、npm 或 TypeScript，仓库和 hc 二进制也不包含这些第三方库。以下为可选依赖：
 
 - [Delve](https://github.com/go-delve/delve)：调试 Go；
 - `claude` 或 `codex`：生成测试用例。
@@ -103,7 +103,7 @@ hc debug two-sum        # 调试第一个失败的用例（-c 4：第 4 个用�
 
 接下来计划做的：
 
-- 更多语言：C、Rust、JavaScript、TypeScript；
+- 更多语言：C、Rust；
 - 题目包，以及官方维护的 LeetCode 题库；
 - 题目笔记，以及只给提示、绝不直接给答案的 AI 辅导；
 - 开放的题目商店。

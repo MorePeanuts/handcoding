@@ -24,7 +24,7 @@ const (
 // kept in git leaves out, and LegacyFiles those older hc versions wrote
 // there, still in solutions not run since. TestGitignoreCoversGenerated
 // (internal/app) keeps the list equal to what the drivers write.
-var GeneratedFiles = []string{"_hc_java/", ".project", ".classpath", ".settings/", ".hc-java-bin/", "hc_types.hpp", "hc_json.hpp", "hc_runtime.hpp", "zz_hc_driver.cpp", "compile_commands.json", "go.mod", "zz_hc_driver.go", "_hc_runner.py", "__pycache__/", "hc_runtime.py"}
+var GeneratedFiles = []string{"_hc_js/", "zz_hc_solution.cts", "tsconfig.json", "jsconfig.json", "_hc_java/", ".project", ".classpath", ".settings/", ".hc-java-bin/", "hc_types.hpp", "hc_json.hpp", "hc_runtime.hpp", "zz_hc_driver.cpp", "compile_commands.json", "go.mod", "zz_hc_driver.go", "_hc_runner.py", "__pycache__/", "hc_runtime.py"}
 
 // LegacyFiles are the GeneratedFiles no driver writes any longer.
 var LegacyFiles = []string{"hc_runtime.py"}

@@ -36,7 +36,7 @@ pack_settings:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Config.Java.Home != "" || strings.Join(got.Config.Java.JVMArgs, " ") != "-Xss16m" || got.Config.Language != "python" || got.Config.Go.Command != "./tools/go" || got.Config.Go.Debugger != "dlv" || got.Config.Execution.Backend != "local" || got.Config.Python.Interpreter != "" {
+	if got.Config.JavaScript.NPM != "npm" || got.Config.JavaScript.Command != "node" || got.Config.TypeScript.Command != "tsc" || got.Config.Java.Home != "" || strings.Join(got.Config.Java.JVMArgs, " ") != "-Xss16m" || got.Config.Language != "python" || got.Config.Go.Command != "./tools/go" || got.Config.Go.Debugger != "dlv" || got.Config.Execution.Backend != "local" || got.Config.Python.Interpreter != "" {
 		t.Fatalf("settings: %+v", got.Config)
 	}
 	if got.Config.PackSettings["demo"].Locale != "en" || got.Config.PackSettings["other"].Locale != "zh-CN" {

@@ -66,7 +66,7 @@ hc pack check               # 像 CI 那样检查整个题目包
 
 ## CI 与固定的 hc 版本
 
-`.github/workflows/check.yml` 在每次 push 和 pull request 时运行。它安装 Go、支持 C++17 的编译器、JDK 17 和 Python 3.12（协议支持的最旧 Python），从而在用户可能使用的环境中检查参考解和判题程序，然后：
+`.github/workflows/check.yml` 在每次 push 和 pull request 时运行。它安装 Go、支持 C++17 的编译器、JDK 17、Node.js 22、TypeScript 5.7 和 Python 3.12（协议支持的最旧 Python），从而在用户可能使用的环境中检查参考解和判题程序，然后：
 
 1. 用 `go install github.com/MorePeanuts/handcoding/cmd/hc@<version>` 安装 hc；
 2. 写入一个设置了 `python.interpreter: python3`、`cpp.command: g++-13` 和 `cpp.standard: c++17` 的 `hc.yaml`，让 hc 用这个 Python 判题，而不是创建虚拟环境（`hc.yaml` 不提交）；

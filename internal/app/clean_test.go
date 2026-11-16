@@ -25,6 +25,7 @@ func TestCleanInventory(t *testing.T) {
 		"cache/build/go/0123456789abcdef0123456789abcdef/prog",
 		"cache/cases/regression/two-sum/go.json", "cache/cases/regression/two-sum/python.user.json",
 		"cache/baseline/regression/two-sum/python.json", "cache/lastrun/regression/two-sum/go.json",
+		"runtime/javascript/0123456789abcdef0123/runtime/run.cjs",
 		"runtime/python/hc_runtime.py", "runtime/python/012345abcdef/hc_checker.py",
 		"runtime/python/012345abcdef/__pycache__/hc_runtime.cpython-312.pyc",
 		"runtime/python/__pycache__/hc_runtime.cpython-312.pyc",
@@ -33,9 +34,10 @@ func TestCleanInventory(t *testing.T) {
 	kept := []string{
 		"cache/build/java/0123456789abcdef0123456789abcdef/notes.txt",
 		"cache/build/java/unknown/Solution.class",
-		"hc.db", "hc.db-wal", "hc.db-shm", "packs.lock", "venv/bin/python", "scratch/two-sum/slow.py", "agent/regression/two-sum/log.jsonl",
+		"node/0123456789abcdef0123/node_modules/lodash/lodash.js", "hc.db", "hc.db-wal", "hc.db-shm", "packs.lock", "venv/bin/python", "scratch/two-sum/slow.py", "agent/regression/two-sum/log.jsonl",
 		"cache/mine/file", "cache/cases/regression/two-sum/notes.txt", "cache/cases/regression/two-sum/rust.json",
 		"cache/build/go/0123456789abcdef0123456789abcdef/my-file", "runtime/python/012345abcdef/notes.txt",
+		"runtime/javascript/0123456789abcdef0123/notes.txt",
 		"runtime/python/unknown/hc_runtime.py", "leetcode-other-problems.json",
 	}
 	for _, name := range append(append([]string{}, cached...), kept...) {

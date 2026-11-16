@@ -64,7 +64,7 @@ If a problem cannot be expressed in the protocol, do not work around it (with a 
 
 ## CI and the pinned hc version
 
-`.github/workflows/check.yml` runs on every push and pull request. It sets up Go, a C++17-capable compiler, JDK 17 and Python 3.12, the oldest Python the protocol supports, so that references and checkers are checked where users may run them, and then:
+`.github/workflows/check.yml` runs on every push and pull request. It sets up Go, a C++17-capable compiler, JDK 17, Node.js 22, TypeScript 5.7 and Python 3.12, the oldest Python the protocol supports, so that references and checkers are checked where users may run them, and then:
 
 1. installs hc with `go install github.com/MorePeanuts/handcoding/cmd/hc@<version>`;
 2. writes a `hc.yaml` that sets `python.interpreter: python3`, `cpp.command: g++-13` and `cpp.standard: c++17`, so hc judges with that Python rather than creating a virtual environment (`hc.yaml` is not committed);
