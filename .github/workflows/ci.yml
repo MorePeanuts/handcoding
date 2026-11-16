@@ -59,18 +59,21 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y g++-13 gdb
+        run: sudo apt-get update && sudo apt-get install -y g++-13 gdb pkg-config libglib2.0-dev
       - if: runner.os == 'Linux'
         run: |
           mkdir -p "$RUNNER_TEMP/hc-tools"
           ln -s /usr/bin/g++-13 "$RUNNER_TEMP/hc-tools/g++"
           echo "$RUNNER_TEMP/hc-tools" >> "$GITHUB_PATH"
+      - if: runner.os == 'macOS'
+        run: brew install pkgconf glib
       # go vet runs once, as part of golangci-lint in the lint job.
       - run: make test ${{ matrix.python != '' && 'PY=system' || '' }}
         env:
           # make test sets it too: a missing or too old tool fails the tests
           # instead of skipping them.
           HC_TEST_REQUIRE_TOOLS: "1"
+          HC_TEST_REQUIRE_GLIB: "1"
 
   cpp-minimum:
     name: C++17 (${{ matrix.compiler }}, Ubuntu 20.04)

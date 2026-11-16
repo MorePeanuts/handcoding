@@ -105,7 +105,7 @@ func TestSettingsPagePackScope(t *testing.T) {
 	// Search spans categories, while ordinary browsing respects the category.
 	h.press("s", "g", "enter", "tab", "tab", "/")
 	h.m.Update(tea.PasteMsg{Content: "compiler"})
-	if len(h.m.settings.visible) != 4 || h.m.selectedSetting().Key != "go.command" || h.m.settings.rows[h.m.settings.visible[1]].Key != "cpp.command" {
+	if len(h.m.settings.visible) != 6 || h.m.selectedSetting().Key != "go.command" || h.m.settings.rows[h.m.settings.visible[1]].Key != "c.command" {
 		t.Fatal("cross-category search failed")
 	}
 	h.press("esc")
@@ -240,7 +240,7 @@ func TestSettingsScreens(t *testing.T) {
 	}
 	h := newHarness(t)
 	// Keep snapshots independent of the host's platform-specific defaults.
-	for key, value := range map[string]string{"cpp.command": "clang++", "cpp.debugger": "lldb"} {
+	for key, value := range map[string]string{"c.command": "clang", "c.debugger": "lldb", "cpp.command": "clang++", "cpp.debugger": "lldb"} {
 		if err := h.m.app.WS.SaveGlobalSetting(key, value); err != nil {
 			t.Fatal(err)
 		}

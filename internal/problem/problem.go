@@ -232,6 +232,7 @@ type Problem struct {
 	Difficulty string            `yaml:"difficulty,omitempty"`
 	Tags       []string          `yaml:"tags,omitempty"`
 	Kind       Kind              `yaml:"kind"`
+	C          *CBinding         `yaml:"c,omitempty"`
 	Function   *Function         `yaml:"function,omitempty"`
 	Class      *Class            `yaml:"class,omitempty"`
 	Judge      Judge             `yaml:"judge,omitempty"`
@@ -341,6 +342,9 @@ var errKindRequired = errors.New("kind is required: function or class")
 
 // Validate checks the problem definition for consistency.
 func (p *Problem) Validate() error {
+	if err := p.ValidateC(); err != nil {
+		return err
+	}
 	var errs []error
 	if !slugRE.MatchString(p.Slug) {
 		errs = append(errs, fmt.Errorf("slug %q must be kebab-case: letters, digits and single hyphens", p.Slug))

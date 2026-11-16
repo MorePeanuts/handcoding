@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/MorePeanuts/handcoding/internal/lang"
+	clang "github.com/MorePeanuts/handcoding/internal/lang/c"
 	"github.com/MorePeanuts/handcoding/internal/lang/cpp"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
@@ -32,6 +33,12 @@ func Settings() []Setting {
 		{Key: "execution.backend", Label: "Execution backend", Category: "Execution & tools", Description: "Code runs locally. Docker is not implemented.", Choices: []string{"local"}},
 		{Key: "go.command", Label: "Go compiler", Category: "Execution & tools", Description: "Executable name or workspace-relative path. Used by the next build; hc does not install Go."},
 		{Key: "go.debugger", Label: "Go debugger", Category: "Execution & tools", Description: "Delve executable name or workspace-relative path. Used by the next debugging session."},
+		{Key: "c.command", Label: "C compiler", Category: "Execution & tools", Description: "Local gcc on Linux or clang on macOS. Executable name or workspace-relative path."},
+		{Key: "c.debugger", Label: "C debugger", Category: "Execution & tools", Description: "Terminal GDB or LLDB executable."},
+		{Key: "c.standard", Label: "C standard", Category: "Execution & tools", Description: "C11 minimum, gnu11 default. The compiler must support the requested mode."},
+		{Key: "c.sanitizers", Label: "C sanitizers", Category: "Execution & tools", Description: "Address/undefined behavior checks; process exit owns node memory, so leak reporting is disabled.", Choices: []string{"none", "address", "undefined", "address,undefined"}},
+		{Key: "c.pkg_config", Label: "C pkg-config", Category: "Execution & tools", Description: "Local pkg-config used to locate GLib development headers and libraries."},
+		{Key: "c.glib", Label: "C GLib", Category: "Execution & tools", Description: "Auto uses local GLib when available; required reports missing development files; disabled omits GLib.", Choices: []string{"auto", "required", "disabled"}},
 		{Key: "cpp.command", Label: "C++ compiler", Category: "Execution & tools", Description: "Local g++ on Linux or clang++ on macOS. Executable name or workspace-relative path."},
 		{Key: "cpp.debugger", Label: "C++ debugger", Category: "Execution & tools", Description: "Terminal GDB or LLDB executable. Editor debugging is not supported for C++."},
 		{Key: "cpp.standard", Label: "C++ standard", Category: "Execution & tools", Description: "C++17 minimum, C++23 default. The selected compiler must support the requested standard."},
@@ -67,6 +74,7 @@ func settingValues(c workspace.Config) map[string]string {
 		"java.home": c.Java.Home, "java.jvm_args": string(vmargs),
 		"language": c.Language, "locale": c.Locale, "editor": c.Editor, "theme": c.Theme, "images": c.Images, "timeout": c.Timeout,
 		"execution.backend": c.Execution.Backend, "go.command": c.Go.Command, "go.debugger": c.Go.Debugger,
+		"c.command": c.C.Command, "c.debugger": c.C.Debugger, "c.standard": c.C.Standard, "c.sanitizers": c.C.Sanitizers, "c.pkg_config": c.C.PkgConfig, "c.glib": c.C.GLib,
 		"cpp.command": c.CPP.Command, "cpp.debugger": c.CPP.Debugger, "cpp.standard": c.CPP.Standard, "cpp.sanitizers": c.CPP.Sanitizers,
 		"python.interpreter": c.Python.Interpreter, "agent.name": c.Agent.Name, "agent.command": string(argv), "leetcode.site": c.LeetCode.Site,
 	}
@@ -203,11 +211,15 @@ func (a *App) SavePreference(scope, key, value string, reset bool) (warning stri
 		if err != nil || duration <= 0 {
 			return "", fmt.Errorf("timeout must be a positive duration, such as 10s")
 		}
+	case "c.standard":
+		if err := clang.CheckStandard(value); err != nil {
+			return "", err
+		}
 	case "cpp.standard":
 		if err := cpp.CheckStandard(value); err != nil {
 			return "", err
 		}
-	case "go.command", "go.debugger", "cpp.command", "cpp.debugger", "javascript.command", "javascript.npm", "typescript.command":
+	case "c.command", "c.debugger", "c.pkg_config", "go.command", "go.debugger", "cpp.command", "cpp.debugger", "javascript.command", "javascript.npm", "typescript.command":
 		if strings.TrimSpace(value) == "" {
 			return "", fmt.Errorf("%s must name an executable", key)
 		}
@@ -215,7 +227,7 @@ func (a *App) SavePreference(scope, key, value string, reset bool) (warning stri
 	if err := a.WS.SaveGlobalSetting(key, value); err != nil {
 		return "", err
 	}
-	if key == "javascript.npm" || key == "javascript.command" || key == "typescript.command" || key == "cpp.command" || key == "cpp.debugger" || key == "go.command" || key == "go.debugger" || key == "python.interpreter" && value != "" {
+	if key == "c.command" || key == "c.debugger" || key == "c.pkg_config" || key == "javascript.npm" || key == "javascript.command" || key == "typescript.command" || key == "cpp.command" || key == "cpp.debugger" || key == "go.command" || key == "go.debugger" || key == "python.interpreter" && value != "" {
 		if _, err := lang.ResolveExecutable(lang.ExecutableName(a.WS.Root, value)); err != nil {
 			return "Saved; executable not found or not executable. Run doctor to inspect the environment.", nil
 		}

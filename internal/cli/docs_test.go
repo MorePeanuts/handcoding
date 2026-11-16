@@ -26,6 +26,13 @@ func TestProtocolLinksResolve(t *testing.T) {
 
 func TestProtocolSection(t *testing.T) {
 	sections := protocolSections()
+	// C++ historically owns #c. Adding C must not redirect existing skill links.
+	for id, heading := range map[string]string{"c": "### C++\n", "c-language": "### C language\n"} {
+		text, err := sectionText(sections, id)
+		if err != nil || !strings.HasPrefix(text, heading) {
+			t.Fatalf("section %s: %q, %v", id, text, err)
+		}
+	}
 	text, err := sectionText(sections, "checkers")
 	if err != nil {
 		t.Fatal(err)

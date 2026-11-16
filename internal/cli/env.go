@@ -19,6 +19,11 @@ func newEnvCmd(root *rootOptions) *cobra.Command {
 as it is. Python 3.12 or later runs Python solutions, and the generators and
 checkers that most problems have, whatever your solution's language.
 
+For C, hc downloads pinned, SHA-256-verified yyjson and uthash sources into
+.hc/c at initialization or first use. Ready environments work offline.
+Use hc env sync --lang c to repair them. GLib and pkg-config, when needed,
+are installed locally by the user; hc does not install system libraries.
+
 For C++, hc downloads a pinned, SHA-256-verified JSON header into .hc/cpp
 at C++ initialization or first use. No package manager is needed. Ready
 environments work offline; hc env sync --lang cpp repairs missing or
@@ -52,6 +57,9 @@ uv or Python when hc could not create it, after installing a newer Python,
 or when debugpy is missing. Installing debugpy, and downloading Python with
 uv, need network access.
 
+With --lang c, verify yyjson and uthash in .hc/c and download missing or
+corrupt files. Python and locally installed GLib are unchanged.
+
 With --lang cpp, verify the JSON header in .hc/cpp and download it when
 missing or corrupt. This needs network only when the header is not ready.
 Python is unchanged.
@@ -82,7 +90,7 @@ unchanged. Node, npm and tsc are user-provided tools; hc installs no tools.`,
 			return nil
 		},
 	}
-	sync.Flags().StringVarP(&language, "lang", "l", "python", "environment to repair: python, cpp, javascript, typescript")
+	sync.Flags().StringVarP(&language, "lang", "l", "python", "environment to repair: python, c, cpp, javascript, typescript")
 	cmd.AddCommand(sync)
 	return cmd
 }

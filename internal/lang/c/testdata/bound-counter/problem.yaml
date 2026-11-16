@@ -1,0 +1,16 @@
+slug: bound-counter
+title: Bound Counter
+kind: class
+class:
+  name: Counter
+  constructor: [{name: start, type: integer}]
+  methods:
+    - {name: next, params: [], returns: integer}
+c:
+  object: struct
+  type: State
+  constructor: makeState
+  destructor: destroyState
+  methods: {next: stepState}
+  libraries: [glib]
+judge: {compare: exact}

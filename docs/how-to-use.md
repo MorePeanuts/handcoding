@@ -73,6 +73,12 @@ Consider running `git init` in the workspace to keep a record of your practice. 
 
 hc uses your local development tools. `go.command` and `go.debugger` in `hc.yaml` select the Go compiler command and Delve executable; they default to `go` and `dlv` on PATH. Python keeps its existing managed environment unless `python.interpreter` is set. Each setting accepts a command name or an executable path. Relative paths containing `/` are resolved from the workspace root, not the solution directory. Values are executables, not shell command lines; hc does not expand `~` or environment variables. An unavailable configured tool is an error, with no fallback to another executable. hc does not install Go or Delve.
 
+C uses `solution.c` with LeetCode's top-level functions and explicit array sizes. The protocol minimum is C11; `c.standard` defaults to `gnu11`. Linux defaults to `gcc` / `gdb`, macOS to `clang` / `lldb`; set `c.command` and `c.debugger` to override them. `c.sanitizers` accepts the same options as C++. `hc debug -l c` supports terminal debugging only. Each case runs in its own process; only solution calls count toward algorithm time, and the wall timeout covers each worker including teardown.
+
+`hc init -l c`, C first use, and `hc env sync -l c` download checksum-verified yyjson and uthash into `.hc/c/<lock hash>`. Prepared environments work offline; sync repairs missing/corrupt files. Neither dependency is stored in the repository or hc binary. `hc clean` preserves this environment, and `hc doctor -l c --debug` inspects without downloading. Python's lifecycle is unchanged. GLib is user-installed: `c.pkg_config` selects `pkg-config`; `c.glib` is `auto` (use it if found), `required` (error if missing), or `disabled`. A problem's `c.libraries: [glib]` also makes it required. Missing GLib development headers/libraries are reported; hc never installs system packages.
+
+Opening a C solution writes `hc_c_types.h`, generated runtime/driver files, and `compile_commands.json` beside the unchanged solution. clangd can use this database to see the same standard, provided types, uthash and available GLib headers. A pack must declare `c` and provide `reference/solution.c` for C judging. Native template exceptions and hc-only extensions are documented in the [C ABI](protocol.md#c-language); local scaffolding does not imply LeetCode supports C for that problem.
+
 C++ uses `solution.cpp` with LeetCode's `class Solution` / design-class signatures. Set `cpp.command` and `cpp.debugger` to local executables (defaults: `g++` / `gdb` on Linux, `clang++` / `lldb` on macOS). `cpp.standard` defaults to `c++23`; `c++17`, `c++20` and newer modes are also accepted. The compiler and standard library must support the selected mode; hc never silently downgrades it. `cpp.sanitizers` is `none`, `address`, `undefined`, or `address,undefined`; the same options apply to reference solutions and distinguish time baselines. hc installs none of these tools. `hc doctor -l cpp --debug` checks the compiler, standard/header availability, terminal debugger and Python infrastructure. C++ editor debugging (`--headless`) is not supported; Go/Python keep theirs.
 
 hc downloads the pinned nlohmann/json header over HTTPS into `.hc/cpp/json-<version>-<digest>/include/nlohmann/json.hpp` when you initialize with `hc init --lang cpp`, first use C++, or run `hc env sync --lang cpp`. No C++ package manager is needed. Downloads are SHA-256 verified and published atomically; concurrent commands share the installation. A valid local header is reused offline, including during environment sync. Missing or corrupt headers are downloaded again; failed downloads leave existing files intact and report how to retry. `hc doctor -l cpp` only inspects the environment, and `hc clean` preserves it. Python's environment is unchanged.
@@ -496,7 +502,7 @@ Your own problems (`packs/local/`) have no such separate file: their `cases.json
 As on LeetCode, a solution that is correct but too slow fails with Time Limit Exceeded. hc judges speed against the problem's reference solution in your language, timed on your machine ([the protocol's time limit](protocol.md#time-limit)): a run may take **40 times** what the reference takes on the same cases, in total, with the reference's time counted as at least **1.25ms**, so the limit is never under 50ms: below that, times are mostly noise. Both values may still change. The run stops at the case during which your total passes the limit: that case is Time Limit Exceeded (it is ended even if it would never return), and the cases after it are Not Run. Such a run has no total time, in the result or in the history (where its TIME is `—`): it would count only the cases that ran, so it compares with no other run. The same goes for a run that a crash stops.
 
 - Forty times leaves room for a different way of writing the same algorithm, such as a map where the reference uses an array, but not for a worse complexity on inputs as large as the problem's constraints allow. Whether a slower solution fails depends on the problem's cases: some problems cannot separate two complexities within their constraints, and then the slower one passes, as it would on LeetCode.
-- For Go, Python and C++, the first run of a problem times the reference: three runs on each case, of which hc keeps the fastest, in `.hc/cache/baseline/<pack>/<problem>/<language>.json`. hc notes it on stderr ("Timing the Go reference…"), and later runs, with any selection of cases, reuse the times. They are measured again when hc, your toolchain, `problem.yaml` or the reference change.
+- For Go, Python, C and C++, the first run of a problem times the reference: three runs on each case, of which hc keeps the fastest, in `.hc/cache/baseline/<pack>/<problem>/<language>.json`. hc notes it on stderr ("Timing the Go reference…"), and later runs, with any selection of cases, reuse the times. They are measured again when hc, your toolchain, `problem.yaml` or the reference change.
 - Java, JavaScript and TypeScript time the complete ordered batch in three fresh runtime processes and caches the minimum **total**. Case order and duplicates are part of the cache key; changing the selection runs the reference again. A run already computing generated outputs counts only for its exact batch, never for a subset extracted from a larger run. This preserves the effect of JIT warm-up without adding artificial warm-up iterations.
 - A problem without a reference in your language is not judged ([readiness](protocol.md#readiness)), so it has no time limit either. References, `hc cases build` and `hc validate --run` are never limited, and neither is `hc debug`. Their runs of a reference on generated cases, which compute the expected outputs, count as one of its three timed runs, except while `hc validate` or `hc pack check` checks several problems at once (`--jobs`).
 - The `timeout` of `hc.yaml` is another limit, on the wall-clock time of the whole run: it guards against a solution that hangs. It can also come first: when the reference takes more than a fortieth of it on the run's cases (250ms with the default 10s, as Python references can on problems with many large cases), a much slower solution reaches the `timeout` before the time limit. The verdict is the same, Time Limit Exceeded, only after the whole `timeout`.
@@ -513,7 +519,7 @@ hc fetch --site cn "LCR 001"                                  # leetcode.cn IDs 
 hc gen 146                  # make it ready: test cases and the judge rule
 ```
 
-`hc fetch` downloads the statement and its images, including diagrams inside preformatted examples, the signature, the Go, Python, C++, Java, JavaScript and TypeScript starter code, and the examples. Inputs and expected outputs are kept together from each statement example when they can be parsed safely. If an example input cannot be verified, hc warns and keeps unmatched API inputs without expected outputs; it never pairs inputs and outputs merely by their order.
+`hc fetch` downloads the statement and its images, including diagrams inside preformatted examples, the signature, the Go, Python, C, C++, Java, JavaScript and TypeScript starter code, and the examples. Inputs and expected outputs are kept together from each statement example when they can be parsed safely. If an example input cannot be verified, hc warns and keeps unmatched API inputs without expected outputs; it never pairs inputs and outputs merely by their order.
 
 It writes the statements in the locales of the pack it fetches into: `locales` in `packs/local/pack.yaml` for your own problems (see [statements in several languages](#statements-in-several-languages)). Both sites have the English statement; only leetcode.cn has the Chinese one, and its title:
 
@@ -783,7 +789,7 @@ Either way, hc checks the session with LeetCode and saves the single login, read
 `hc.yaml` at the workspace root holds personal settings and the installed-pack inventory. New workspaces write all global defaults explicitly:
 
 ```yaml
-language: go          # preferred solution language: go | python | cpp | java | javascript | typescript
+language: go          # preferred solution language: go | python | c | cpp | java | javascript | typescript
 locale: en            # preferred statement language
 editor: ""           # empty: $VISUAL, $EDITOR, then vi
 theme: auto           # auto | dark | light
@@ -794,6 +800,13 @@ execution:
 go:
   command: go         # executable name or workspace-relative path
   debugger: dlv       # used only for debugging
+c:
+  command: gcc       # macOS: clang
+  debugger: gdb      # macOS: lldb
+  standard: gnu11
+  sanitizers: none
+  pkg_config: pkg-config
+  glib: auto
 cpp:
   command: g++        # macOS: clang++
   debugger: gdb       # macOS: lldb

@@ -27,7 +27,7 @@ hc 自身的行为（`hc test` 运行哪些用例、`hc fetch` 如何导入题�
 
 | 版本 | 定稿于 | 变更 |
 |---|---|---|
-| 1 | hc v0.1.0（尚未发布：仍是草案） | 最初的协议：题目包和 `pack.yaml`、题目目录、`problem.yaml`、类型、签名、用例、判题、判题程序和解答 ABI，解答语言为 Go、Python、C++、Java、JavaScript 和 TypeScript。 |
+| 1 | hc v0.1.0（尚未发布：仍是草案） | 最初的协议：题目包和 `pack.yaml`、题目目录、`problem.yaml`、类型、签名、用例、判题、判题程序和解答 ABI，解答语言为 Go、Python、C、C++、Java、JavaScript 和 TypeScript。 |
 
 ### 不在范围内
 
@@ -36,7 +36,7 @@ hc 自身的行为（`hc test` 运行哪些用例、`hc fetch` 如何导入题�
 - 交互题，即解答要与评测程序对话的题目（issue #7）；
 - `tests` 题，用测试代码而不是用例评判（issue #31）；
 - 内存评判，以及[时间限制](#时间限制)以外的时间评判；
-- Go、Python、C++、Java、JavaScript 和 TypeScript 以外的解答语言。
+- Go、Python、C、C++、Java、JavaScript 和 TypeScript 以外的解答语言。
 
 ## 题目包
 
@@ -85,6 +85,7 @@ problems/<dir>/    每道题目一个题目目录；见题目目录
 |---|---|---|
 | `go` | Go | 1 |
 | `python` | Python | 1 |
+| `c` | C | 1 |
 | `cpp` | C++ | 1 |
 | `java` | Java | 1 |
 | `javascript` | JavaScript | 1 |
@@ -141,8 +142,8 @@ groups:
 | `description.<locale>.md` | 题目包的每个其他语言区域 | 该语言区域的题面；见[语言区域](#语言区域) |
 | `assets/` | 否 | 题面引用的文件，如图片 |
 | `cases.jsonl` | 否 | 测试用例；见[用例](#用例) |
-| `reference/solution.py`、`reference/solution.go` | 否 | 参考解，可以只有其中一部分语言；解答只在有参考解的语言中评判（[就绪](#就绪)） |
-| `templates/solution.py`、`templates/solution.go` | 否 | 初始代码，取代根据签名生成的初始代码 |
+| `reference/solution.*`、`reference/Solution.java` | 否 | 参考解，可以只有其中一部分语言；解答只在有参考解的语言中评判（[就绪](#就绪)） |
+| `templates/solution.*`、`templates/Solution.java` | 否 | 初始代码，取代根据签名生成的初始代码 |
 | `checker.py` | 仅限 `judge.compare: checker` | 判题程序；见[判题程序](#判题程序) |
 | `generator.py` | 仅限有生成用例时 | 生成用例的生成器；见[生成器](#生成器) |
 
@@ -177,6 +178,7 @@ groups:
 | `judge.output` | 字符串 | `void` 函数必需 | 无 | 仅限函数题：一个参数或隐藏输入；见[原地修改的输出](#原地修改的输出) | 1 |
 | `judge.output_length` | 字符串 | 否 | 无 | 仅限函数题：`return`；见[原地修改的输出](#原地修改的输出) | 1 |
 | `judge.round_trip` | 映射 | 否 | 无 | 仅限设计题：`encode`、`decode`、`instances`；见[编解码往返题](#编解码往返题) | 1 |
+| `c` | 映射 | 否 | 原生默认值 | C 符号绑定与可选库，见 [C](#c-语言) | 1 |
 | `source.site` | 字符串 | 否 | 无 | 任意文本，如 `leetcode.com` | 1 |
 | `source.url` | 字符串 | 否 | 无 | | 1 |
 
@@ -210,21 +212,21 @@ judge:
 
 用例、期望输出和解答输出中的每个值都是 JSON。本节为每个类型规定它的 JSON 编码，以及它在各解答语言中的绑定。除非某个类型另有说明，输入（用例中的 `input`）和输出（`expected`，以及解答结果编码成的值）的编码相同。
 
-| 类型 | JSON | Go | Python | C++ | Java | JS / TS | 起始版本 |
-|---|---|---|---|---|---|---|---|
-| `integer` | 整数 | `int` | `int` | `int` | `int` | `number` | 1 |
-| `long` | 整数 | `int64` | `int` | `long long` | `long` | `number` (safe integer) | 1 |
-| `double` | 数字 | `float64` | `float` | `double` | `double` | `number` | 1 |
-| `boolean` | `true` 或 `false` | `bool` | `bool` | `bool` | `boolean` | `boolean` | 1 |
-| `string` | 字符串 | `string` | `str` | `std::string` | `String` | `string` | 1 |
-| `character` | 一个字节的字符串 | `byte` | `str` | `char` | `char` | `string` | 1 |
-| `ListNode` | 见 [ListNode 和 TreeNode](#listnode-和-treenode) | `*ListNode` | `ListNode \| None` | `ListNode*` | `ListNode` | `ListNode \| null` | 1 |
-| `TreeNode` | 见 [ListNode 和 TreeNode](#listnode-和-treenode) | `*TreeNode` | `TreeNode \| None` | `TreeNode*` | `TreeNode` | `TreeNode \| null` | 1 |
-| `GraphNode`、`NaryNode`、`RandomListNode`、`NextTreeNode`、`QuadNode`、`MultilevelNode` | 见 [LeetCode 的 Node 类型](#leetcode-的-node-类型) | `*Node` | `Node \| None` | `Node*` | `Node` | `Node / _Node \| null` | 1 |
-| `NestedInteger` | 见 [NestedInteger 和 Employee](#nestedinteger-和-employee) | `*NestedInteger` | `NestedInteger` | `NestedInteger` | `NestedInteger` | `NestedInteger` | 1 |
-| `Employee` | 见 [NestedInteger 和 Employee](#nestedinteger-和-employee) | `*Employee` | `Employee` | `Employee*` | `Employee` | `Employee` | 1 |
-| `T[]` | 见[数组](#数组) | `[]T` | `list[T]` | `std::vector<T>` | `T[] / List<T>` | `T[]` | 1 |
-| `void` | 无；只能作返回类型 | 没有返回值 | `None` | `void` | `void` | `void` | 1 |
+| 类型 | JSON | Go | Python | C | C++ | Java | JS / TS | 起始版本 |
+|---|---|---|---|---|---|---|---|---|
+| `integer` | 整数 | `int` | `int` | `int` | `int` | `int` | `number` | 1 |
+| `long` | 整数 | `int64` | `int` | `long long` | `long long` | `long` | `number` (safe integer) | 1 |
+| `double` | 数字 | `float64` | `float` | `double` | `double` | `double` | `number` | 1 |
+| `boolean` | `true` 或 `false` | `bool` | `bool` | `bool` | `bool` | `boolean` | `boolean` | 1 |
+| `string` | 字符串 | `string` | `str` | `char*` | `std::string` | `String` | `string` | 1 |
+| `character` | 一个字节的字符串 | `byte` | `str` | `char` | `char` | `char` | `string` | 1 |
+| `ListNode` | 见 [ListNode 和 TreeNode](#listnode-和-treenode) | `*ListNode` | `ListNode \| None` | `struct ListNode*` | `ListNode*` | `ListNode` | `ListNode \| null` | 1 |
+| `TreeNode` | 见 [ListNode 和 TreeNode](#listnode-和-treenode) | `*TreeNode` | `TreeNode \| None` | `struct TreeNode*` | `TreeNode*` | `TreeNode` | `TreeNode \| null` | 1 |
+| `GraphNode`、`NaryNode`、`RandomListNode`、`NextTreeNode`、`QuadNode`、`MultilevelNode` | 见 [LeetCode 的 Node 类型](#leetcode-的-node-类型) | `*Node` | `Node \| None` | `struct Node*` | `Node*` | `Node` | `Node / _Node \| null` | 1 |
+| `NestedInteger` | 见 [NestedInteger 和 Employee](#nestedinteger-和-employee) | `*NestedInteger` | `NestedInteger` | `struct NestedInteger*` | `NestedInteger` | `NestedInteger` | `NestedInteger` | 1 |
+| `Employee` | 见 [NestedInteger 和 Employee](#nestedinteger-和-employee) | `*Employee` | `Employee` | `struct Employee*` | `Employee*` | `Employee` | `Employee` | 1 |
+| `T[]` | 见[数组](#数组) | `[]T` | `list[T]` | `T*` + sizes | `std::vector<T>` | `T[] / List<T>` | `T[]` | 1 |
+| `void` | 无；只能作返回类型 | 没有返回值 | `None` | `void` | `void` | `void` | `void` | 1 |
 
 ### 标量
 
@@ -613,13 +615,13 @@ judge:
 
 ### 运行时限
 
-解答运行有一个墙钟时限。Go/Python/Java/JavaScript/TypeScript 的时限覆盖整次运行；C++ 的时限分别约束每个用例的工作进程，包括启动和退出。它用来防止卡死，比如解答卡在计时的调用之外；它不评判复杂度，那是[时间限制](#时间限制)的事。这个时限属于评测端，而不属于题目：hc 的时限是工作区 `hc.yaml` 中的 `timeout`，未配置时为 10s。到时后运行被终止：当前尚未完成的用例判为超时（Time Limit Exceeded），其后的用例为 Not Run，已经完成的用例保留各自的结果。判题程序的运行、生成器的运行，以及参考解为生成用例计算期望输出的运行，各自另有一个同样长度的时限。
+解答运行有一个墙钟时限。Go/Python/Java/JavaScript/TypeScript 的时限覆盖整次运行；C/C++ 的时限分别约束每个用例的工作进程，包括启动和退出。它用来防止卡死，比如解答卡在计时的调用之外；它不评判复杂度，那是[时间限制](#时间限制)的事。这个时限属于评测端，而不属于题目：hc 的时限是工作区 `hc.yaml` 中的 `timeout`，未配置时为 10s。到时后运行被终止：当前尚未完成的用例判为超时（Time Limit Exceeded），其后的用例为 Not Run，已经完成的用例保留各自的结果。判题程序的运行、生成器的运行，以及参考解为生成用例计算期望输出的运行，各自另有一个同样长度的时限。
 
 ### 就绪
 
 有 `judge.compare` 的题目是**就绪**的。`judge.compare` 没有默认值，即使是 `exact` 也必须写出。不就绪的题目是合法的，但它的判题规则尚未确定。
 
-题目就绪并且有某种语言的参考解（`reference/solution.py`、`reference/solution.go`、`reference/solution.cpp`）时，它**对这种语言就绪**；这种语言的解答以这份参考解为准计时（见[时间限制](#时间限制)）。题目对某种语言不就绪时，这种语言的解答的用例不作评判（Not Judged），也不能提交。题目应当对其题目包 `languages` 中的每种语言都就绪。
+题目就绪并且有某种语言的参考解（`reference/solution.py`、`reference/solution.go`、`reference/solution.c`、`reference/solution.cpp`、`reference/Solution.java`、`reference/solution.js`、`reference/solution.ts`）时，它**对这种语言就绪**；这种语言的解答以这份参考解为准计时（见[时间限制](#时间限制)）。题目对某种语言不就绪时，这种语言的解答的用例不作评判（Not Judged），也不能提交。题目应当对其题目包 `languages` 中的每种语言都就绪。
 
 ### 判题结果
 
@@ -629,7 +631,7 @@ judge:
 |---|---|
 | Compile Error | 解答无法构建：编译型语言的构建错误（含 TS 类型错误），或 Python/JavaScript 语法错误。这是整次运行的结果，没有用例会运行 |
 | Runtime Error | 用例出错（异常、panic、驱动程序无法解码的输入，或者编码无法表达的结果），或者程序在该用例运行期间退出了 |
-| Time Limit Exceeded | 运行在该用例期间用完了[时间限制](#时间限制)，或者用例完成之前（包括 C++ 工作进程退出）[运行时限](#运行时限)已到 |
+| Time Limit Exceeded | 运行在该用例期间用完了[时间限制](#时间限制)，或者用例完成之前（包括 C/C++ 工作进程退出）[运行时限](#运行时限)已到 |
 | Not Run | 运行在该用例之前就停止了：之前有用例超时，或者程序在之前的用例之后退出了 |
 | No Expected Output | 用例运行了，但没有 `expected` |
 | Not Judged | 用例运行了，但题目对解答的语言不是[就绪](#就绪)的 |
@@ -734,6 +736,31 @@ def distinct(rng, n):
 - panic 算运行错误；构建失败算编译错误。
 - 没有 `package` 子句的初始代码前面会加上 `package main`。
 
+### C 语言
+
+- 语言 ID 为 `c`，文件为 `solution.c`。使用原生顶层函数，无需 `main`。驱动按纯 C 编译，不经过 C++。协议最低 C11，默认模式 `gnu11`；参考解还会在严格 C11 模式下检查。用户解可显式选择编译器支持的更新标准。`main`、`hc_` 和 `HC_` 名称保留给驱动。
+- 标量分别绑定为 32 位 `int`、64 位 `long long`、`double`、`bool`、ASCII `char` 和以 NUL 结束的 UTF-8 `char*`。C 的 `string` 输入和期望输出不得包含 U+0000；含零字节的数据使用 `character[]`。返回的字符串必须是合法且以 NUL 结束的 UTF-8，第一个 NUL 表示字符串结束。
+- `T[]` 输入展开为 `T* value, int size`；`T[][]` 展开为 `T** value, int size, int* columnSizes`，支持不等长行。返回数组时追加 `int* returnSize`，二维数组再追加 `int** returnColumnSizes`。每个数组的尺寸紧跟该参数，随后才是下一个参数。`string[]` 因此为 `char**` 加数量；节点数组为指针数组加数量。空数组可返回 NULL 且长度为零。输出尺寸必须初始化且非负，非空缓冲区和尺寸数组在编码完成前必须有效。
+- hc 的三维数组扩展使用 `T*** value, int size, int* rowSizes, int** columnSizes`；返回参数追加 `int* returnSize, int** returnColumnSizes, int*** returnDepthSizes`。可在本地使用，但 hc 的 LeetCode 命令不接受这种扩展的远端提交。
+- 自动提供 `struct ListNode`、`struct TreeNode`、本题的 `struct Node`、不透明的 `struct NestedInteger` 和 `struct Employee`，不要重复定义。图节点在 `struct Node** neighbors` 旁增加 `int numNeighbors`，N 叉树在 `struct Node** children` 旁增加 `int numChildren`。其他 Node 变体使用文档中的指针字段和小写标量名；QuadNode 使用 `bool val, isLeaf`。Employee 包含 `int id, importance`、`int* subordinates` 和 `int subordinatesSize`。LeetCode 没有 C 模板时，QuadNode、MultilevelNode 和 Employee 属于 hc 扩展。`NestedIntegerInit()` 创建空列表；另有原生 API `NestedIntegerIsInteger`、`NestedIntegerGetInteger`、`NestedIntegerSetInteger`、`NestedIntegerAdd`、`NestedIntegerGetList`、`NestedIntegerGetListSize`。列表 getter 返回借用的内存，Add 保留传入的子节点指针。
+- 函数符号默认为 `function.name`。以类 `MinStack` 为例，默认对象是 `MinStack*`，构造为 `minStackCreate(...)`，方法为 `minStackPush(obj, ...)`，析构为 `minStackFree(obj)`。可选的顶层 `c` 映射只覆盖符号，JSON 转换仍遵循共同签名。`object` 可选 `typedef`（默认）、`struct`、`none`；`type` 指定对象类型；`constructor`、`destructor` 指定函数符号；`methods` 把协议方法名映射到 C 符号。显式空 `destructor` 禁用析构调用。`object: none` 的方法没有对象参数，也没有构造和析构，不允许构造参数，适用于原生 `serialize`/`deserialize`。有对象的往返题仍按 `instances` 使用一个或两个对象。析构在结果编码后执行，不计入算法耗时。
+- `hc fetch` 原样保留 C 模板并记录特殊绑定，包括 `NestedIterator` 的 `nestedIterCreate` 和 `struct NestedIterator`。远端提交原样使用源码，且所选站点必须实际提供该题的 C 模板；hc 本地生成的扩展模板不保证能远端提交。
+- 每个用例使用新进程，设计题同一用例的操作共享对象。每次运行只编译一次；累计算法时限只统计构造、函数和方法调用，不包含启动、编解码和退出。墙钟时限约束每个工作进程，包含退出阶段；崩溃停止后续用例。进程退出回收内存，hc 不遍历并释放用户节点。可以正常使用 `malloc`/`free`，悬空指针和重复释放仍是错误。可选 address/undefined sanitizer 同样作用于参考解，并关闭泄漏报告。
+- 自动提供标准头文件及 uthash 2.3.0。驱动使用 yyjson 0.10.0 精确处理 64 位 JSON 整数；它不属于解答 API。两种依赖固定 SHA-256，下载到 `.hc/c`，不会嵌入 hc。GLib 为可选的本地系统库，通过 `pkg-config glib-2.0` 获取；需要它的题目声明 `c.libraries: [glib]`。缺少 GLib 开发文件时 hc 给出提示，不安装系统包。
+
+特殊类绑定示例：
+
+```yaml
+c:
+  object: struct
+  type: NestedIterator
+  constructor: nestedIterCreate
+  destructor: nestedIterFree
+  methods:
+    next: nestedIterNext
+    hasNext: nestedIterHasNext
+```
+
 ### C++
 
 - 语言 ID 为 `cpp`，解答文件为 `solution.cpp`。函数题使用 `class Solution` 的公开方法；类题使用题目声明的类名、构造函数和方法名。用户无需编写 `main`。保留 LeetCode C++ 模板，远端提交原样使用解答源码。
@@ -767,6 +794,7 @@ def distinct(rng, n):
 |---|---|
 | Python | 3.12 |
 | Go | 1.22 |
+| C | C11；默认 gnu11 |
 | C++ | C++17（编译器与标准库）；默认编译标准 C++23 |
 | Java | 17 |
 | JavaScript | Node.js 22 |

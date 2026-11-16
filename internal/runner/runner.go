@@ -118,6 +118,13 @@ type Options struct {
 // Run prepares, builds and runs the solution in dir against the cases,
 // which it does not validate (see Validate).
 func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, cases []Selected, opts Options) (*Report, error) {
+	if validator, ok := l.(lang.CaseValidator); ok {
+		for _, c := range cases {
+			if err := validator.ValidateCase(p, c.Case); err != nil {
+				return nil, invalidCase(c.Index, err)
+			}
+		}
+	}
 	if opts.Timeout <= 0 {
 		opts.Timeout = 10 * time.Second
 	}
@@ -365,6 +372,14 @@ func DebugCommand(l lang.Language, p *problem.Problem, dir string, cases []Selec
 	if err := Validate(p, cases); err != nil {
 		return nil, nil, err
 	}
+	if validator, ok := l.(lang.CaseValidator); ok {
+		for _, c := range cases {
+			if err := validator.ValidateCase(p, c.Case); err != nil {
+				return nil, nil, invalidCase(c.Index, err)
+			}
+		}
+	}
+
 	if err := l.Prepare(dir, p); err != nil {
 		return nil, nil, err
 	}

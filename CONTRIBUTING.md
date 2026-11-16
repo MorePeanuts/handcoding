@@ -45,7 +45,7 @@ internal/app        use cases shared by the CLI and the TUI, including validatio
 internal/problem    problem protocol: problem.yaml, cases.jsonl, types
 internal/pack       packs: pack.yaml, a pack's problems and their identity
 internal/workspace  the workspace (practice, or a pack checkout): its packs, solutions, pack/slug lookup
-internal/lang       language interface; golang/, python/, cpp/, java/ and javascript/ drivers
+internal/lang       language interface; golang/, python/, c/, cpp/, java/ and javascript/ drivers
 internal/git        runs the git executable to install and update packs
 internal/runner     build, run the driver, collect results
 internal/judge      output comparison
@@ -84,6 +84,8 @@ A driver only **decodes the inputs, calls the user's code and encodes the result
 - The user's stdout and stderr go straight to the terminal, so print debugging works.
 - Cases run in order. The first case without a result line is Runtime Error, or Time Limit Exceeded when the run timed out, and the cases after it, like the cases after one that exceeded the time limit, are Not Run (`runner.Run`).
 - Checkers (`judge.compare: checker`) are not the driver's business either: they are Python for every solution language, run through `lang.Checker`, which the Python language implements, and `judge.Checked` turns their results into verdicts. Nor are generated cases: `runner.Generate` runs the problem's `generator.py` through `lang.Generator` (Python again) before the driver starts, and the driver gets their inputs like any other.
+
+`internal/lang/c` is a pure C11 driver (default gnu11) with per-case processes, native pointer/size signatures, explicit `problem.CBinding` symbols and 3D array extensions. It shares runner isolation with C++. `dependencies/lock.json` pins yyjson/uthash URLs and SHA-256 digests; setup installs them under `.hc/c/<lock hash>`, never in Git or the binary. GLib is optional local pkg-config infrastructure; tests cover missing requirements and real GLib when available. C-specific case validation rejects NUL strings before execution, without restricting other languages. Tests cover codecs, structure inputs, class/round-trip bindings, crash/timeout/sanitizer handling, strict C11 and editor flags, plus compilation of 42 native LeetCode templates. Existing regression pack content is intentionally unchanged.
 
 `internal/lang/cpp` provides native C++ signatures, workspace-managed nlohmann/json (MIT, version/URL/SHA-256 pinned in `environment.go`), generated editor compile commands, and a watchdog. It implements `lang.CaseIsolator`: runner builds once and launches one worker per case, with a per-worker wall timeout and the remaining cumulative algorithm budget. Compiler flags participate in baseline identity. Initialization with C++ selected and first use download the header into `.hc/cpp/`; a cross-process lock and atomic publication protect concurrent runs. Ready headers are checksum-verified and reused offline, `hc env sync -l cpp` repairs them, and doctor/cache cleanup neither download nor delete dependencies. The repository and binary contain no JSON library source. Go builds need no C++ dependency download; C++ integration tests use temporary environments and need network on first use.
 

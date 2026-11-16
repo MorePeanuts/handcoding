@@ -30,6 +30,7 @@ const (
 const (
 	LangGo         = "go"
 	LangPython     = "python"
+	LangC          = "c"
 	LangCPP        = "cpp"
 	LangJava       = "java"
 	LangJavaScript = "javascript"
@@ -43,5 +44,5 @@ func Languages(protocol int) []string {
 	if protocol < MinProtocol || protocol > Protocol {
 		return nil
 	}
-	return []string{LangGo, LangPython, LangCPP, LangJava, LangJavaScript, LangTypeScript}
+	return []string{LangGo, LangPython, LangC, LangCPP, LangJava, LangJavaScript, LangTypeScript}
 }

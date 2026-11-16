@@ -73,6 +73,12 @@ Python 在 hc 管理的虚拟环境 `.hc/venv` 中运行：包括 Python 解答�
 
 hc 使用你的本地开发工具。`hc.yaml` 的 `go.command` 和 `go.debugger` 分别指定 Go 编译器命令和 Delve 可执行文件，默认使用 PATH 中的 `go` 和 `dlv`。Python 保留现有托管方式，设置 `python.interpreter` 时使用指定的解释器。这些配置都接受命令名或可执行文件路径；包含 `/` 的相对路径以工作区根目录为基准，不以解答目录为基准。配置值是可执行文件，不是 shell 命令行；hc 不展开 `~` 或环境变量。显式指定的工具不可用时直接报错，不回退到其他工具。hc 不安装 Go 或 Delve。
 
+C 使用 `solution.c`，沿用 LeetCode 顶层函数与显式数组尺寸。协议最低 C11，`c.standard` 默认 `gnu11`。Linux 默认 `gcc` / `gdb`，macOS 默认 `clang` / `lldb`，可通过 `c.command`、`c.debugger` 修改。`c.sanitizers` 选项与 C++ 相同。`hc debug -l c` 只支持终端调试。每个用例使用独立进程，算法耗时只统计解答调用，墙钟时限覆盖每个工作进程及其退出阶段。
+
+`hc init -l c`、首次使用 C 和 `hc env sync -l c` 会将经过摘要校验的 yyjson、uthash 下载到 `.hc/c/<锁文件摘要>`。准备好后离线复用，sync 修复缺失或损坏文件。依赖源码不进入仓库或 hc 二进制。`hc clean` 保留该环境，`hc doctor -l c --debug` 只检查而不下载，Python 生命周期不变。GLib 由用户本地安装：`c.pkg_config` 选择 `pkg-config`，`c.glib` 可选 `auto`（找到就使用）、`required`（缺少即报错）、`disabled`。题目声明 `c.libraries: [glib]` 也会要求 GLib。缺少开发头文件或库时给出提示，hc 不安装系统包。
+
+打开 C 解答会在原文件旁生成 `hc_c_types.h`、运行时/驱动文件和 `compile_commands.json`。clangd 可通过编译数据库获得相同的标准、自动提供的类型、uthash 和可用的 GLib 头文件。题目包必须声明 `c` 并提供 `reference/solution.c` 才能用 C 判题。原生模板特殊绑定与 hc 扩展见 [C ABI](protocol_zh.md#c-语言)；本地模板不代表 LeetCode 支持该题的 C 提交。
+
 C++ 使用 `solution.cpp`，保持 LeetCode 的 `class Solution` / 设计类签名。`cpp.command` 和 `cpp.debugger` 指向本地工具，Linux 默认 `g++` / `gdb`，macOS 默认 `clang++` / `lldb`。`cpp.standard` 默认为 `c++23`，也接受 `c++17`、`c++20` 和更新标准。编译器和标准库必须支持所选标准，hc 不会静默降级。`cpp.sanitizers` 可为 `none`、`address`、`undefined` 或 `address,undefined`，参考解使用相同选项，时间基线也按选项区分。hc 不安装这些工具。`hc doctor -l cpp --debug` 检查编译器、标准与头文件可用性、终端调试器和 Python 基础环境。C++ 暂不支持编辑器调试（`--headless`），Go/Python 的现有支持保留。
 
 执行 `hc init --lang cpp`、首次使用 C++ 或运行 `hc env sync --lang cpp` 时，hc 会通过 HTTPS 将固定版本的 nlohmann/json 头文件下载到 `.hc/cpp/json-<版本>-<摘要>/include/nlohmann/json.hpp`，不需要 C++ 包管理器。下载经过 SHA-256 校验后原子写入，并发命令共用同一次安装。本地文件完整时直接离线复用，环境同步也不必重新下载；缺失或损坏时自动下载修复，下载失败会保留已有文件并提示重试方式。`hc doctor -l cpp` 只读检查，`hc clean` 保留该环境。Python 的环境机制不变。
@@ -489,7 +495,7 @@ hc fetch --site cn "LCR 001"                                  # leetcode.cn 的 
 hc gen 146                  # 让题目就绪：生成测试用例并决定判题规则
 ```
 
-`hc fetch` 会下载题面及其图片（包括预格式化示例中的示意图）、函数签名、Go、Python、C++、Java、JavaScript 和 TypeScript 的初始代码，以及示例用例。能安全解析时，会成对保留同一题面示例的输入和期望输出。若无法确认示例输入，hc 会给出警告，并保留未匹配的 API 输入但不写入期望输出；不会仅按顺序拼接输入和输出。
+`hc fetch` 会下载题面及其图片（包括预格式化示例中的示意图）、函数签名、Go、Python、C、C++、Java、JavaScript 和 TypeScript 的初始代码，以及示例用例。能安全解析时，会成对保留同一题面示例的输入和期望输出。若无法确认示例输入，hc 会给出警告，并保留未匹配的 API 输入但不写入期望输出；不会仅按顺序拼接输入和输出。
 
 它按目标题目包的语言区域写入题面：你自己的题目由 `packs/local/pack.yaml` 中的 `locales` 决定（见[多语言题面](#多语言题面)）。两个站点都有英文题面；只有 leetcode.cn 有中文题面和中文标题：
 
@@ -759,7 +765,7 @@ hc leetcode login --port 8765         # 在服务器上
 工作区根目录下的 `hc.yaml` 保存个人设置与已安装题目包清单。新工作区会显式写出所有全局默认值：
 
 ```yaml
-language: go          # 首选解题语言：go | python | cpp | java | javascript | typescript
+language: go          # 首选解题语言：go | python | c | cpp | java | javascript | typescript
 locale: en            # 首选题面语言
 editor: ""           # 空值依次使用 $VISUAL、$EDITOR、vi
 theme: auto           # auto | dark | light
@@ -770,6 +776,13 @@ execution:
 go:
   command: go         # 可执行文件名或相对于工作区的路径
   debugger: dlv       # 仅调试时需要
+c:
+  command: gcc       # macOS: clang
+  debugger: gdb      # macOS: lldb
+  standard: gnu11
+  sanitizers: none
+  pkg_config: pkg-config
+  glib: auto
 cpp:
   command: g++        # macOS: clang++
   debugger: gdb       # macOS: lldb

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/MorePeanuts/handcoding/internal/problem"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -263,7 +265,7 @@ func completionValueFlag(cmd *cobra.Command, rest []string) string {
 func commandFlagValues(name string, ctx tui.CommandContext) []string {
 	switch name {
 	case "lang":
-		return []string{"go", "python", "cpp", "java"}
+		return problem.Languages(problem.Protocol)
 	case "pack":
 		return ctx.Packs
 	case "group":

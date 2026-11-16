@@ -1,0 +1,9 @@
+slug: bound-function
+title: Bound Function
+kind: function
+function:
+  name: identity
+  params: [{name: value, type: integer}]
+  returns: integer
+c: {function: actualIdentity}
+judge: {compare: exact}

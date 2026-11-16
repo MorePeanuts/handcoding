@@ -29,6 +29,15 @@ import (
 // (internal/app) checks that the problems' references pass.
 func TestProtocolCoverage(t *testing.T) {
 	m, probs := loadSet(t)
+	// C binding fixtures are kept with their driver; the existing regression
+	// pack does not yet declare C and is deliberately left unchanged.
+	for _, name := range []string{"bound-counter", "bound-function"} {
+		p, err := problem.Load(filepath.Join("..", "lang", "c", "testdata", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		probs = append(probs, p)
+	}
 	consts := protocolConstants(t)
 
 	used := map[string][]string{} // feature -> slugs of the problems using it

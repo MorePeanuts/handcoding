@@ -43,6 +43,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 
+	clang "github.com/MorePeanuts/handcoding/internal/lang/c"
 	"github.com/MorePeanuts/handcoding/internal/lang/cpp"
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -90,6 +91,7 @@ type Config struct {
 	Execution ExecutionConfig `yaml:"execution"`
 	// Go selects user-provided compiler and debugger executables.
 	Go         GoConfig         `yaml:"go"`
+	C          CConfig          `yaml:"c"`
 	CPP        CPPConfig        `yaml:"cpp"`
 	Java       JavaConfig       `yaml:"java"`
 	JavaScript JavaScriptConfig `yaml:"javascript"`
@@ -149,6 +151,15 @@ type GoConfig struct {
 	Debugger string `yaml:"debugger"`
 }
 
+type CConfig struct {
+	Command    string `yaml:"command"`
+	Debugger   string `yaml:"debugger"`
+	Standard   string `yaml:"standard"`
+	Sanitizers string `yaml:"sanitizers"`
+	PkgConfig  string `yaml:"pkg_config"`
+	GLib       string `yaml:"glib"`
+}
+
 type CPPConfig struct {
 	Command    string `yaml:"command"`
 	Debugger   string `yaml:"debugger"`
@@ -199,6 +210,7 @@ func DefaultConfig() Config {
 		Locale:       "en",
 		Execution:    ExecutionConfig{Backend: "local"},
 		Go:           GoConfig{Command: "go", Debugger: "dlv"},
+		C:            CConfig{Command: clang.DefaultCompiler(), Debugger: clang.DefaultDebugger(), Standard: "gnu11", Sanitizers: "none", PkgConfig: "pkg-config", GLib: "auto"},
 		CPP:          CPPConfig{Command: cpp.DefaultCompiler(), Debugger: cpp.DefaultDebugger(), Standard: "c++23", Sanitizers: "none"},
 		Java:         JavaConfig{JVMArgs: []string{"-Xss16m"}},
 		JavaScript:   JavaScriptConfig{Command: "node", NPM: "npm"},

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-yaml"
+
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -301,5 +303,45 @@ func writeLocalLocales(t *testing.T, ws *workspace.Workspace) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(ws.PackPath("local"), "pack.yaml"), []byte("protocol: 1\nname: local\nlocales: [en, zh-CN]\n"), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestValidateCStringRestriction(t *testing.T) {
+	t.Parallel()
+	a := newWorkspace(t)
+	p := addProblem(t, a, "c-string", `slug: c-string
+title: C String
+kind: function
+function:
+  name: identity
+  params: [{name: text, type: string}]
+  returns: string
+judge: {compare: exact}
+`, `{"input":{"text":"a\u0000b"},"expected":"a\u0000b"}`)
+	f := a.ValidateProblem(context.Background(), p, nil, p.Slug, app.ValidateOptions{})
+	if !strings.Contains(strings.Join(f.Errors, "\n"), "U+0000") {
+		t.Fatal(f.Errors)
+	}
+	// Narrow the local pack to Python: the same JSON remains valid there.
+	manifest := filepath.Join(a.WS.WritablePack().Dir, "pack.yaml")
+	b, e := os.ReadFile(manifest)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var m pack.Manifest
+	if e = yaml.Unmarshal(b, &m); e != nil {
+		t.Fatal(e)
+	}
+	m.Languages = []string{"python"}
+	b, e = yaml.Marshal(m)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = os.WriteFile(manifest, b, 0644); e != nil {
+		t.Fatal(e)
+	}
+	f = a.ValidateProblem(context.Background(), p, nil, p.Slug, app.ValidateOptions{})
+	if strings.Contains(strings.Join(f.Errors, "\n"), "U+0000") {
+		t.Fatal(f.Errors)
 	}
 }

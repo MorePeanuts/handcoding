@@ -334,6 +334,28 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 			}
 		}
 	}
+	// Check only languages declared by this pack, without initializing tools.
+	// Generated inputs are checked after materialization by runner.Run.
+	if len(errs) == 0 {
+		if k, err := a.WS.Pack(p.Pack); err == nil {
+			for _, id := range k.Languages() {
+				l, err := a.Langs.Get(id)
+				if err != nil {
+					continue
+				}
+				if validator, ok := l.(lang.CaseValidator); ok {
+					for i, c := range cases {
+						if c.Generated() {
+							continue
+						}
+						if err := validator.ValidateCase(p, c); err != nil {
+							errs = append(errs, fmt.Sprintf("case %d (%s): %v", i+1, id, err))
+						}
+					}
+				}
+			}
+		}
+	}
 	for i, c := range cases {
 		switch {
 		case c.Generated():
