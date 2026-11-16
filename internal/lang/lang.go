@@ -87,6 +87,10 @@ type Language interface {
 // timeout and the remaining cumulative algorithm budget. Build still runs once.
 type CaseIsolator interface{ IsolatedCases() bool }
 
+// OrderedBaseliner times complete ordered batches, because JIT compilation and
+// other process state make per-case times dependent on preceding cases.
+type OrderedBaseliner interface{ OrderedBaseline() bool }
+
 // MinVersionChecker is a Language that can check, with any supported
 // toolchain, that code works on the oldest one (the Toolchain's Min).
 type MinVersionChecker interface {

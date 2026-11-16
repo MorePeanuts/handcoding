@@ -94,7 +94,7 @@ error; run ` + "`hc env sync`" + ` in the workspace afterwards.`,
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&langName, "lang", "l", workspace.DefaultConfig().Language, "default solution language (go, python, cpp)")
+	cmd.Flags().StringVarP(&langName, "lang", "l", workspace.DefaultConfig().Language, "default solution language (go, python, cpp, java)")
 	return cmd
 }
 
@@ -552,7 +552,7 @@ outputs of the one that runs.`,
 		},
 	}
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "recompute every expected output")
-	cmd.Flags().StringVarP(&langName, "lang", "l", "", "reference to run (go, python, cpp); default: the first one found, Go, then Python, then C++")
+	cmd.Flags().StringVarP(&langName, "lang", "l", "", "reference to run (go, python, cpp, java); default: the first one found, Go, then Python, then C++, then Java")
 	return cmd
 }
 

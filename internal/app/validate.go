@@ -526,7 +526,11 @@ func (a *App) checkReference(ctx context.Context, p *problem.Problem, l lang.Lan
 			}
 		}
 		if ok {
-			a.recordBaseline(p, l, gen, &runner.Report{Cases: times})
+			if ordered, yes := l.(lang.OrderedBaseliner); yes && ordered.OrderedBaseline() {
+				a.recordBaseline(p, l, sel, rep)
+			} else {
+				a.recordBaseline(p, l, gen, &runner.Report{Cases: times})
+			}
 		}
 	} else {
 		ok = true

@@ -701,6 +701,7 @@ func checkout(t *testing.T, edit func(dir string)) (app.ValidateSummary, map[str
 	if err != nil {
 		t.Fatal(err)
 	}
+	ws.Config.Java.Release = 17
 	a := app.New(ws)
 	defer a.Close()
 	findings := map[string]app.Finding{}

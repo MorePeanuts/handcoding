@@ -77,7 +77,8 @@ func check(ctx context.Context, p *problem.Problem, work string, rep *Report, ca
 	}
 	for i := range rep.Cases {
 		cr := &rep.Cases[i]
-		r, ok := decided[cr.Index]
+		// Checker IDs are one-based execution positions, including duplicates.
+		r, ok := decided[i+1]
 		switch {
 		case !ok || cr.Verdict != "":
 		case r.OK:

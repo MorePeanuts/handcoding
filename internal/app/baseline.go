@@ -58,6 +58,9 @@ func (a *App) baseline(ctx context.Context, p *problem.Problem, l lang.Language,
 		return 0, err
 	}
 	c := readBaseline(path, key)
+	if ordered, ok := l.(lang.OrderedBaseliner); ok && ordered.OrderedBaseline() {
+		return a.batchBaseline(ctx, p, l, sel, w, path, c)
+	}
 	digests := make([]string, len(sel))
 	for i, s := range sel {
 		if digests[i], err = caseDigest(s.Case); err != nil {
@@ -181,7 +184,8 @@ func caseDigest(c problem.Case) (string, error) {
 type baselineCache struct {
 	Key string `json:"key"`
 	// Cases are the times of the reference by the digest of the input.
-	Cases map[string]baselineTime `json:"cases"`
+	Cases   map[string]baselineTime `json:"cases"`
+	Batches map[string]baselineTime `json:"batches,omitempty"`
 }
 
 type baselineTime struct {
@@ -208,6 +212,26 @@ func (c *baselineCache) record(l lang.Language, rep *runner.Report, digests []st
 	if len(rep.Cases) != len(digests) {
 		return fmt.Errorf("the %s reference solution ran %d case(s) of %d", l.Name(), len(rep.Cases), len(digests))
 	}
+	if ordered, ok := l.(lang.OrderedBaseliner); ok && ordered.OrderedBaseline() {
+		var total int64
+		for _, cr := range rep.Cases {
+			if cr.Verdict == runner.RuntimeError || cr.Verdict == runner.TimeLimit || cr.Verdict == runner.NotRun {
+				return fmt.Errorf("the %s reference fails on case %d: %s: %s", l.Name(), cr.Index, cr.Verdict, cr.Error)
+			}
+			total += cr.Elapsed.Nanoseconds()
+		}
+		if c.Batches == nil {
+			c.Batches = map[string]baselineTime{}
+		}
+		key := batchDigest(digests)
+		t := c.Batches[key]
+		if t.Runs == 0 || total < t.Ns {
+			t.Ns = total
+		}
+		t.Runs++
+		c.Batches[key] = t
+		return nil
+	}
 	for i, cr := range rep.Cases {
 		switch cr.Verdict {
 		case runner.RuntimeError, runner.TimeLimit, runner.NotRun:
@@ -232,4 +256,41 @@ func orDiscard(w io.Writer) io.Writer {
 		return io.Discard
 	}
 	return w
+}
+
+// batchDigest includes order and multiplicity; input-only reuse is unsound for a JVM.
+func batchDigest(digests []string) string {
+	h := sha256.New()
+	for _, d := range digests {
+		part(h, []byte(d))
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+func (a *App) batchBaseline(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, w io.Writer, path string, c *baselineCache) (time.Duration, error) {
+	digests := make([]string, len(sel))
+	todo := make([]runner.Selected, len(sel))
+	for i, s := range sel {
+		d, err := caseDigest(s.Case)
+		if err != nil {
+			return 0, err
+		}
+		digests[i] = d
+		s.Case.Expected = nil
+		todo[i] = s
+	}
+	key := batchDigest(digests)
+	if c.Batches[key].Runs < baselineRuns && w != nil {
+		fmt.Fprintln(w, ui.Faint.Render(fmt.Sprintf("Timing the %s reference on the ordered batch of %d case(s)…", l.Name(), len(sel))))
+	}
+	for c.Batches[key].Runs < baselineRuns {
+		rep, _, err := a.RunReference(ctx, p, l.ID(), todo, RunOptions{Stderr: w})
+		if err != nil {
+			return 0, err
+		}
+		if err = c.record(l, rep, digests); err != nil {
+			return 0, err
+		}
+	}
+	writeCacheFile(path, c)
+	return time.Duration(c.Batches[key].Ns), nil
 }

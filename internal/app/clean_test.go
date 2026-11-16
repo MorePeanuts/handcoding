@@ -19,6 +19,9 @@ func TestCleanInventory(t *testing.T) {
 	t.Parallel()
 	a := newWorkspace(t)
 	cached := []string{
+		"cache/build/java/0123456789abcdef0123456789abcdef/complete",
+		"cache/build/java/0123456789abcdef0123456789abcdef/Solution.class",
+		"cache/build/java/0123456789abcdef0123456789abcdef/javafx/util/Pair.class",
 		"cache/build/go/0123456789abcdef0123456789abcdef/prog",
 		"cache/cases/regression/two-sum/go.json", "cache/cases/regression/two-sum/python.user.json",
 		"cache/baseline/regression/two-sum/python.json", "cache/lastrun/regression/two-sum/go.json",
@@ -28,6 +31,8 @@ func TestCleanInventory(t *testing.T) {
 		"cache/go-build/ab/tool-cache", "cache/uv/archive-v0/pkg/code.py", "leetcode-com-problems.json",
 	}
 	kept := []string{
+		"cache/build/java/0123456789abcdef0123456789abcdef/notes.txt",
+		"cache/build/java/unknown/Solution.class",
 		"hc.db", "hc.db-wal", "hc.db-shm", "packs.lock", "venv/bin/python", "scratch/two-sum/slow.py", "agent/regression/two-sum/log.jsonl",
 		"cache/mine/file", "cache/cases/regression/two-sum/notes.txt", "cache/cases/regression/two-sum/rust.json",
 		"cache/build/go/0123456789abcdef0123456789abcdef/my-file", "runtime/python/012345abcdef/notes.txt",

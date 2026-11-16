@@ -36,7 +36,7 @@ pack_settings:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Config.Language != "python" || got.Config.Go.Command != "./tools/go" || got.Config.Go.Debugger != "dlv" || got.Config.Execution.Backend != "local" || got.Config.Python.Interpreter != "" {
+	if got.Config.Java.Release != 25 || got.Config.Java.Home != "" || strings.Join(got.Config.Java.JVMArgs, " ") != "-Xss16m" || got.Config.Language != "python" || got.Config.Go.Command != "./tools/go" || got.Config.Go.Debugger != "dlv" || got.Config.Execution.Backend != "local" || got.Config.Python.Interpreter != "" {
 		t.Fatalf("settings: %+v", got.Config)
 	}
 	if got.Config.PackSettings["demo"].Locale != "en" || got.Config.PackSettings["other"].Locale != "zh-CN" {
