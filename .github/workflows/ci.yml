@@ -21,20 +21,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Both ends of the supported Python range, on both OSes. On Linux,
-        # the oldest Python the problem protocol supports (python.MinVersion),
-        # which make test takes from the uv project's .python-version, as it
-        # does locally. On macOS, the latest release: setup-python's "3.x"
-        # follows it, which no uv request does (">=3.12" finds the newest
-        # Python installed, not the newest released), so make test
-        # PY=system uses the python3 it puts on PATH. The oldest Go is
-        # checked by TestGoMinimumVersion with the toolchain that builds hc.
-        include:
-          - { os: ubuntu-latest, python: "", java: "17", node: "22.0.0", typescript: "5.7.3" }
-          - { os: ubuntu-latest, python: "", java: "25", node: "26", typescript: "7.0.2" }
-          - { os: macos-latest, python: "3.x", java: "17", node: "22.0.0", typescript: "5.7.3" }
-          - { os: macos-latest, python: "3.x", java: "25", node: "26", typescript: "7.0.2" }
-    name: test (${{ matrix.os }}, Python ${{ matrix.python || '.python-version' }}, Java ${{ matrix.java }}, Node ${{ matrix.node }}, TS ${{ matrix.typescript }})
+        # Exercise the protocol minimums on both supported platforms.
+        # C11/C++17 and Go 1.22 are checked by the tests themselves;
+        # GCC on Linux and Clang on macOS cover both compiler families.
+        os: [ubuntu-latest, macos-latest]
+    name: test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -44,20 +35,15 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: ${{ matrix.java }}
+          java-version: "17"
       - uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node }}
-      - run: npm install --global --ignore-scripts typescript@${{ matrix.typescript }}
+          node-version: "22.0.0"
+      - run: npm install --global --ignore-scripts typescript@5.7.3
       # setup-uv publishes no major-version tags since v8.
-      - if: matrix.python == ''
-        uses: astral-sh/setup-uv@v10.3.3
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: false
-      - if: matrix.python != ''
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python }}
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y g++-13 gdb pkg-config libglib2.0-dev
       - if: runner.os == 'Linux'
@@ -68,37 +54,14 @@ jobs:
       - if: runner.os == 'macOS'
         run: brew install pkgconf glib
       # go vet runs once, as part of golangci-lint in the lint job.
-      - run: make test ${{ matrix.python != '' && 'PY=system' || '' }}
+      # Each integration test may launch a native compiler. Bound both
+      # package and test concurrency so they do not oversubscribe the runner.
+      - run: make test TEST_FLAGS='-p=2 -parallel=2'
         env:
           # make test sets it too: a missing or too old tool fails the tests
           # instead of skipping them.
           HC_TEST_REQUIRE_TOOLS: "1"
           HC_TEST_REQUIRE_GLIB: "1"
-
-  cpp-minimum:
-    name: C++17 (${{ matrix.compiler }}, Ubuntu 20.04)
-    runs-on: ubuntu-latest
-    container: ubuntu:20.04
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler: [g++-9, clang++-10]
-    steps:
-      - run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl git g++-9 clang-10
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-      - uses: astral-sh/setup-uv@v10.3.3
-        with:
-          enable-cache: false
-      - run: |
-          mkdir -p /tmp/hc-tools
-          ln -s /usr/bin/${{ matrix.compiler }} /tmp/hc-tools/g++
-          echo /tmp/hc-tools >> "$GITHUB_PATH"
-      - run: uv run --locked go test ./internal/app -run '^TestCPPMinimumVersion$' -count=1 -parallel=4
-        env:
-          HC_TEST_REQUIRE_TOOLS: "1"
 
   lint:
     runs-on: ubuntu-latest

@@ -8,6 +8,7 @@ LDFLAGS  := -s -w -X github.com/MorePeanuts/handcoding/internal/version.Version=
 # PY=system on the python3 on PATH as it is. HC_TEST_REQUIRE_TOOLS makes a
 # test that would skip for a missing or too old tool fail instead.
 PY ?=
+TEST_FLAGS ?=
 ifeq ($(PY),)
 UV_RUN := uv run --locked
 else
@@ -26,7 +27,7 @@ install:
 test:
 ifeq ($(PY),system)
 	@$(SHOW_PYTHON)
-	HC_TEST_REQUIRE_TOOLS=1 go test -race ./...
+	HC_TEST_REQUIRE_TOOLS=1 go test -race $(TEST_FLAGS) ./...
 else
 	@command -v uv >/dev/null 2>&1 || { \
 		echo "make test needs uv: https://docs.astral.sh/uv/getting-started/installation/" >&2; \
@@ -34,7 +35,7 @@ else
 		exit 1; \
 	}
 	@$(UV_RUN) sh -c '$(SHOW_PYTHON)'
-	HC_TEST_REQUIRE_TOOLS=1 $(UV_RUN) go test -race ./...
+	HC_TEST_REQUIRE_TOOLS=1 $(UV_RUN) go test -race $(TEST_FLAGS) ./...
 endif
 
 lint:
