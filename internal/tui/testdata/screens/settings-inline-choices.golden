@@ -1,0 +1,30 @@
+ hc   Settings · Workspace
+
+ All   General   Display   Tools   Agent   LeetCode
+
+  SETTING                     VALUE                      DESCRIPTION
+────────────────────────────────────────────────────────────────────────────────────────────────────
+▌ Theme                       auto                       Statement colors. Auto follows terminal th…
+    › auto
+      dark
+      light
+    Statement colors. Auto follows terminal theme reports; changes apply immediately.
+    theme · Saved: "auto"
+    Effective: auto · Source: Workspace
+  Statement images            auto                       How statement images are drawn. Changes ap…
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ enter save   pgup/pgdown description   esc cancel

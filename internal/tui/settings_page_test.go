@@ -248,6 +248,9 @@ func TestSettingsScreens(t *testing.T) {
 	h.m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	h.press("right", "right")
 	golden(t, "settings-display", h.view())
+	h.press("enter")
+	golden(t, "settings-inline-choices", h.view())
+	h.press("esc")
 	h.press("left", "left")
 	h.press("s")
 	golden(t, "settings-scopes", h.view())
@@ -262,6 +265,60 @@ func TestSettingsScreens(t *testing.T) {
 	selectSetting(t, h.m, "timeout")
 	h.press("enter")
 	golden(t, "settings-edit", h.view())
+}
+
+func TestSettingsEditExpandsAtSelectedRow(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	m := h.m
+	h.press(",", "right", "right") // Display, with two settings.
+	h.press("enter")
+	view := ansi.Strip(m.viewSettings())
+	row := strings.Index(view, "▌ Theme")
+	choice := strings.Index(view, "› auto")
+	next := strings.Index(view, "Statement images")
+	if row < 0 || choice < row || next < choice || !strings.Contains(view, "Auto follows terminal theme reports") {
+		t.Fatal("choices and full description did not expand between the selected row and its neighbor")
+	}
+	h.press("down", "enter")
+	if m.settings.expanded() || m.app.WS.Config.Theme != "dark" {
+		t.Fatal("choice did not save and collapse")
+	}
+	h.press("left", "left")
+	m.settings.cursor = 5 // Timeout; retain the rest of the list.
+	h.press("enter")
+	view = ansi.Strip(m.viewSettings())
+	row = strings.Index(view, "▌ Run timeout")
+	input := strings.Index(view, "> 10s")
+	next = strings.Index(view, "Execution backend")
+	if row < 0 || input < row || next < input {
+		t.Fatal("text input did not expand directly under its setting")
+	}
+	h.press("esc")
+	if m.app.WS.Config.Timeout != "10s" || m.settings.expanded() {
+		t.Fatal("cancel failed to collapse without saving")
+	}
+	// Tiny terminals keep the control visible; the whole explanation remains
+	// accessible separately instead of moving focus away from that control.
+	m.Update(tea.WindowSizeMsg{Width: 40, Height: 16})
+	selectSetting(t, m, "python.interpreter")
+	h.press("enter")
+	before := m.viewSettings()
+	h.press("pgdown")
+	after := m.viewSettings()
+	if s := m.settings; s.detailOffset == 0 || s.choice != 0 || before == after {
+		t.Fatal("description paging lost the selected choice")
+	}
+	h.press("esc")
+	selectSetting(t, m, "agent.command")
+	h.press("enter")
+	if !m.settings.inspecting || !strings.Contains(ansi.Strip(m.viewSettings()), "e YAML") {
+		t.Fatal("YAML-only setting did not expand with its action")
+	}
+	h.press("esc")
+	if m.settings.expanded() {
+		t.Fatal("read-only expansion did not close")
+	}
 }
 
 func TestSettingsFooterStaysAtBottom(t *testing.T) {
@@ -279,13 +336,20 @@ func TestSettingsFooterStaysAtBottom(t *testing.T) {
 				if len(lines) != size[1] {
 					t.Fatalf("%s: got %d rows, want %d", state, len(lines), size[1])
 				}
-				if !strings.Contains(lines[size[1]-3], "───") || !strings.Contains(lines[size[1]-1], "esc") {
-					t.Fatalf("%s: footer moved: %q", state, lines[size[1]-3:])
+				footer := size[1] - m.settingsFooterHeight()
+				if !strings.Contains(lines[footer], "───") || !strings.Contains(lines[size[1]-1], "esc") {
+					t.Fatalf("%s: footer moved: %q", state, lines[footer:])
 				}
 				for i, line := range lines {
 					if ansi.StringWidth(line) > size[0] {
 						t.Fatalf("%s row %d exceeds terminal width", state, i)
 					}
+				}
+			}
+			foot := ansi.Strip(m.viewSettings())
+			for _, hint := range []string{"s scope", "e YAML", "d doctor", "r reset", "/ search", "tab category", "esc back"} {
+				if !strings.Contains(foot, hint) {
+					t.Fatalf("missing shortcut %q", hint)
 				}
 			}
 			for _, pref := range m.settings.rows {

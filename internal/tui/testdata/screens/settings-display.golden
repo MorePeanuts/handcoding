@@ -1,8 +1,15 @@
- hc   Settings · Workspace                                               s scope · e YAML · d doctor
+ hc   Settings · Workspace
+
  All   General   Display   Tools   Agent   LeetCode
+
+  SETTING                     VALUE                      DESCRIPTION
 ────────────────────────────────────────────────────────────────────────────────────────────────────
-▌ Theme                       auto
-  Statement images            auto
+▌ Theme                       auto                       Statement colors. Auto follows terminal th…
+  Statement images            auto                       How statement images are drawn. Changes ap…
+
+
+
+
 
 
 
@@ -19,12 +26,5 @@
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
-  Theme · theme
-  Statement colors. Auto follows terminal theme reports; changes apply immediately.
 
-
-  Saved: "auto"
-  Effective: auto · Source: Workspace
-────────────────────────────────────────────────────────────────────────────────────────────────────
-
- enter edit    esc back    / search    r reset    ←/→ category    ? help                  2 settings
+ enter edit   s scope   e YAML   d doctor   r reset   / search   tab category   ? help   esc back
