@@ -306,6 +306,18 @@ func (l Language) Build(ctx context.Context, dir, work string) error {
 		if e = write(mapPath, b); e != nil {
 			return e
 		}
+		// Emitted helpers use Node's own require, so expose the same locked
+		// libraries through normal module resolution throughout this build.
+		dependencies, err := filepath.Abs(filepath.Join(l.environment(dir), "node_modules"))
+		if err != nil {
+			return err
+		}
+		link := filepath.Join(work, "node_modules")
+		if target, err := os.Readlink(link); err != nil || target != dependencies {
+			if err := os.Symlink(dependencies, link); err != nil {
+				return err
+			}
+		}
 	} else {
 		cmd := exec.CommandContext(ctx, tc.Path, "--check", source)
 		cmd.Dir = dir
