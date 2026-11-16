@@ -204,6 +204,10 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 				if err := p.ValidateExpected(cr.Case); err != nil {
 					return nil, invalidCase(sel.Index, err)
 				}
+			} else if err := p.ValidateOutput(cr.Case, res.Output); err != nil {
+				cr.Verdict = RuntimeError
+				cr.Error = err.Error()
+				break
 			}
 			if self && ready && p.Judge.Compare != problem.CompareChecker {
 				// An output is what it is compared with.

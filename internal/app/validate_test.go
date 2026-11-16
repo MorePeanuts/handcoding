@@ -127,7 +127,8 @@ func TestValidateGeneratedOutputs(t *testing.T) {
 		}
 	}
 
-	// A run validates the expected outputs too, of the cases it runs.
+	// Materializing generated cases validates every reference output before
+	// caching it, including other generated cases built in the same batch.
 	writeFile(t, ref, "class Solution:\n    def largest(self, nums):\n        return str(max(nums)) if len(nums) > 600 else max(nums)\n")
 	l := writeSolution(t, a, p, "python", "class Solution:\n    def largest(self, nums):\n        return max(nums)\n")
 	cases, _ := p.LoadCases()
@@ -136,8 +137,8 @@ func TestValidateGeneratedOutputs(t *testing.T) {
 		err   string
 	}{
 		{1, ""},
-		{3, ""},
-		{2, `case 2 is invalid: expected: must be integer, got string "1000" (hc validate checks the whole problem)`},
+		{3, `failed on generated case 2: the reference solution: Runtime Error`},
+		{2, `output: must be integer, got string "1000"`},
 	} {
 		sel, _ := app.Select(cases, []int{tt.index}, false)
 		rep, err := a.Run(ctx, p, l, sel, app.RunOptions{})
