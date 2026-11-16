@@ -41,10 +41,18 @@ func TestConvertFunction(t *testing.T) {
 		LangSlug string `json:"langSlug"`
 		Code     string `json:"code"`
 	}{"cpp", cppTemplate})
+	javaTemplate := "class Solution {public int[] twoSum(int[] nums,int target){return null;}}"
+	q.CodeSnippets = append(q.CodeSnippets, struct {
+		LangSlug string `json:"langSlug"`
+		Code     string `json:"code"`
+	}{"java", javaTemplate})
 
 	c, err := Convert(q, SiteCom)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if c.Templates["Solution.java"] != javaTemplate {
+		t.Fatal("Java template not preserved")
 	}
 	p := c.Problem
 	// The judge rule is left for hc gen even though the statement says

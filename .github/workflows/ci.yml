@@ -30,15 +30,21 @@ jobs:
         # PY=system uses the python3 it puts on PATH. The oldest Go is
         # checked by TestGoMinimumVersion with the toolchain that builds hc.
         include:
-          - { os: ubuntu-latest, python: "" }
-          - { os: macos-latest, python: "3.x" }
-    name: test (${{ matrix.os }}, Python ${{ matrix.python || '.python-version' }})
+          - { os: ubuntu-latest, python: "", java: "17" }
+          - { os: ubuntu-latest, python: "", java: "25" }
+          - { os: macos-latest, python: "3.x", java: "17" }
+          - { os: macos-latest, python: "3.x", java: "25" }
+    name: test (${{ matrix.os }}, Python ${{ matrix.python || '.python-version' }}, Java ${{ matrix.java }})
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
       # setup-uv publishes no major-version tags since v8.
       - if: matrix.python == ''
         uses: astral-sh/setup-uv@v10.3.3

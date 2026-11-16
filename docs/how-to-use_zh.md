@@ -79,6 +79,12 @@ C++ 使用 `solution.cpp`，保持 LeetCode 的 `class Solution` / 设计类签�
 
 每个 C++ 用例使用独立进程；类题同一用例的全部操作共享对象。一次运行只编译一次。累计算法时限只统计调用，不包含启动、退出和编解码；配置的墙钟超时分别约束每个 C++ 工作进程。正常构建使用 `-O2`，`hc debug -l cpp` 使用 `-O0 -g`，在 GDB/LLDB 中停在解答入口。进程退出回收节点分配的内存，因此关闭 sanitizer 的泄漏报告，仍可诊断非法访问及未定义行为。
 
+Java 使用同一个本地 JDK：按 `java.home`（绝对路径或相对工作区的目录）、`JAVA_HOME`、PATH 中 `java` 所选 JDK 的顺序查找；`java`、`javac` 和终端调试器 `jdb` 都来自该目录。`java.release` 默认 **25**，协议最低 **17**。使用 JDK 17 时显式设置 `java.release: 17`。hc 不安装或升级 Java。`java.jvm_args` 是 VM 调优和系统属性参数数组，解答和参考解共用，显式默认值为 `[-Xss16m]`。JDK、release、VM 选项或驱动变化会使 Java 构建和计时缓存失效。`hc doctor -l java --debug` 检查 JDK、配置的 release、VM 参数形式、jdb 和 Python 基础环境。诊断时不会执行自定义 VM 参数（日志选项可能写文件），具体 VM 选项由实际运行时的 JVM 验证。
+
+Java 解答统一使用 `Solution.java`，保持 LeetCode 的方法和设计类签名。不同名的顶层设计类必须使用包可见性；从 LeetCode 模板创建初始代码时，hc 会去掉该类的 `public`。hc 生成 `_hc_java/`（评测类型、运行时和 `javafx.util.Pair`）以及 Eclipse JDT 语言服务器可读的 `.project`、`.classpath`、`.settings/`。把解答目录作为 Java 项目打开，或在编辑器导入其 Eclipse 项目，即可从生成的源码识别评测类型，不需要复制到解答里。若编辑器没有自动找到匹配 JDK，需将编辑器的 Java runtime 配置为 `java.release` 对应版本；hc 的 JDK 设置不替代语言服务器自己的 runtime 设置。`.hc-java-bin/` 是编辑器输出目录；这些生成文件受 hc 的 Git 忽略块保护，并在运行前重新生成。
+
+一次完整有序批次使用一个 JVM，每个用例创建新实例，但共享静态字段和 JIT 状态，`timeout` 覆盖整个运行。普通异常报告 Runtime Error 后继续；致命 VM 错误和超时停止后续用例。编译后的类缓存在 `.hc/cache/build/java/`，不指定范围的 `hc clean` 会清理它。`hc debug -l java` 使用 jdb，在真实源码的函数入口或设计类构造器处停下（往返题停在编码方法）。Java 目前只支持终端调试，不支持 `--headless`。题包需要声明 `java` 并提供 `reference/Solution.java` 才能判定 Java 解答。
+
 
 Go 版本检测、模块准备、编译、最低版本检查和调试都使用指定的编译器。调试时先关闭优化编译出程序，再由指定的 Delve 通过 `exec` 启动，避免 Delve 从 PATH 选择另一个 Go。编译缓存和参考解计时的标识包含编译器路径。`execution.backend` 默认是 `local`，目前也只实现了 `local`；设置 `docker` 或其他值会报错，不会悄悄在本地执行。
 
@@ -455,6 +461,8 @@ hc cases edit two-sum               # 在编辑器中编辑你的用例文件
 - 题目没有你所用语言的参考解时不作评判（见[就绪](protocol_zh.md#就绪)），所以也没有时间限制。参考解、`hc cases build` 和 `hc validate --run` 从不受限，`hc debug` 也一样。它们在生成用例上运行参考解以算出期望输出，这次运行也算作参考解的三次计时之一；但 `hc validate` 或 `hc pack check` 同时检查多道题时（`--jobs`）除外。
 - `hc.yaml` 中的 `timeout` 是另一个限制，针对整次运行的墙钟时间：它用来防止解答卡死。它也可能先于时间限制生效：参考解在本次运行用例上的总用时超过它的四十分之一时（默认 10s 下即 250ms，Python 参考解在大用例较多的题目上可能如此），慢得多的解答会先用完 `timeout`。判定结果相同，都是超时（Time Limit Exceeded），只是要等满整个 `timeout`。
 
+Java 的基线按完整有序批次运行三个新 JVM，取最小**总耗时**。顺序和重复用例都是缓存键的一部分，改变选择会重新计时，不使用上述按单例拼接的规则。计算生成用例期望输出的运行，仅能为它实际执行的完整批次贡献一次计时，不能抽取子集。这样保留实际 JIT 预热影响，不额外添加人工预热轮次。
+
 ## 获取题目
 
 ### 从 LeetCode 获取
@@ -467,7 +475,7 @@ hc fetch --site cn "LCR 001"                                  # leetcode.cn 的 
 hc gen 146                  # 让题目就绪：生成测试用例并决定判题规则
 ```
 
-`hc fetch` 会下载题面及其图片（包括预格式化示例中的示意图）、函数签名、Go、Python 和 C++ 的初始代码，以及示例用例。能安全解析时，会成对保留同一题面示例的输入和期望输出。若无法确认示例输入，hc 会给出警告，并保留未匹配的 API 输入但不写入期望输出；不会仅按顺序拼接输入和输出。
+`hc fetch` 会下载题面及其图片（包括预格式化示例中的示意图）、函数签名、Go、Python、C++ 和 Java 的初始代码，以及示例用例。能安全解析时，会成对保留同一题面示例的输入和期望输出。若无法确认示例输入，hc 会给出警告，并保留未匹配的 API 输入但不写入期望输出；不会仅按顺序拼接输入和输出。
 
 它按目标题目包的语言区域写入题面：你自己的题目由 `packs/local/pack.yaml` 中的 `locales` 决定（见[多语言题面](#多语言题面)）。两个站点都有英文题面；只有 leetcode.cn 有中文题面和中文标题：
 
@@ -737,7 +745,7 @@ hc leetcode login --port 8765         # 在服务器上
 工作区根目录下的 `hc.yaml` 保存个人设置与已安装题目包清单。新工作区会显式写出所有全局默认值：
 
 ```yaml
-language: go          # 首选解题语言：go | python | cpp
+language: go          # 首选解题语言：go | python | cpp | java
 locale: en            # 首选题面语言
 editor: ""           # 空值依次使用 $VISUAL、$EDITOR、vi
 theme: auto           # auto | dark | light
@@ -753,6 +761,10 @@ cpp:
   debugger: gdb       # macOS: lldb
   standard: c++23
   sanitizers: none
+java:
+  home: ""
+  release: 25
+  jvm_args: [-Xss16m]
 python:
   interpreter: ""    # 空值保留 hc 管理的 .hc/venv；填写后使用外部解释器
 agent:

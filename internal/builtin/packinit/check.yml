@@ -25,6 +25,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "<% .Python %>"
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
       - name: Install the C++ compiler
         run: sudo apt-get update && sudo apt-get install -y g++-13
 <%- if .Pinned %>
@@ -45,7 +49,7 @@ jobs:
       # environment of hc's.
       - name: Configure hc
         run: |
-          printf 'python:\n  interpreter: python3\ncpp:\n  command: g++-13\n' > hc.yaml
+          printf 'python:\n  interpreter: python3\ncpp:\n  command: g++-13\njava:\n  release: 17\n' > hc.yaml
       - name: Check the pack
         run: hc pack check
       # --force: the committed copies of hc's skills must be exactly the

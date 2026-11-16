@@ -108,6 +108,14 @@ workspace's own problems; `hc validate <slug>` names a missing reference.
   case: each case runs in its own process. Use `int` for `integer` and
   `long long` for `long`.
 
+- A Java reference is `reference/Solution.java` (`hc docs protocol java`).
+  Target Java 17 APIs and syntax, with explicit standard-library imports.
+  Keep native arrays or generic lists and the original design-class name
+  (package-private when it is not `Solution`). hc supplies judge types.
+  Use `int` for `integer`, `long` for `long`. One JVM runs the ordered batch:
+  instances reset per case, but static state persists, so keep references
+  independent of preceding cases. Do not add warm-up or forced GC.
+
 **Prove the rule with the second reference.** When more than one output is
 acceptable, write `reference/solution.go` so that it returns a
 *different* valid answer than the Python one wherever the rule allows:
@@ -308,7 +316,7 @@ the cases decide whether a solution of a worse complexity fails.
    problem.yaml.
 3. Write `reference/solution.py`, then a reference in every other
    language the pack is solved in (`reference/solution.go`,
-   `reference/solution.cpp`)
+   `reference/solution.cpp` or `reference/Solution.java`)
    ([Reference solutions](#reference-solutions)). If more than one output
    is acceptable, make the Go one return a different valid answer.
 4. For `checker`, write `checker.py` ([Checkers](#checkers)).

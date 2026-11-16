@@ -142,7 +142,14 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 		}
 		return nil, fmt.Errorf("build: %w", err)
 	}
-	results, runErr, timedOut, stderr, err := execute(ctx, l, dir, work, cases, opts)
+	// Driver/checker IDs identify occurrences, not displayed case numbers:
+	// `--case 1,2,1` must retain both executions of case 1 and their timings.
+	executions := make([]Selected, len(cases))
+	for i, c := range cases {
+		executions[i] = c
+		executions[i].Index = i + 1
+	}
+	results, runErr, timedOut, stderr, err := execute(ctx, l, dir, work, executions, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -152,9 +159,9 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 	// result, or at the case that exceeded the time limit.
 	var total time.Duration
 	stopped := false
-	for _, sel := range cases {
+	for i, sel := range cases {
 		cr := CaseResult{Index: sel.Index, Case: sel.Case}
-		res, ok := results[sel.Index]
+		res, ok := results[i+1]
 		if ok && !stopped {
 			cr.Elapsed = time.Duration(res.ElapsedNs)
 			total += cr.Elapsed
@@ -175,6 +182,7 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 		case res.Error != "":
 			cr.Verdict = RuntimeError
 			cr.Error = res.Error
+			stopped = res.Fatal
 		default:
 			cr.Output = res.Output
 			self := opts.ExpectGenerated && cr.Case.Generated() && !cr.Case.HasExpected() && res.Output != nil
@@ -199,7 +207,7 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 				if err != nil {
 					return nil, err
 				}
-				toCheck = append(toCheck, judge.CheckerCase{ID: sel.Index, Input: input, Output: res.Output, Expected: cr.Case.Expected})
+				toCheck = append(toCheck, judge.CheckerCase{ID: i + 1, Input: input, Output: res.Output, Expected: cr.Case.Expected})
 			}
 		}
 		rep.Cases = append(rep.Cases, cr)
@@ -284,6 +292,8 @@ type driverResult struct {
 	// TimeLimit marks a case the driver ended because the time limit was
 	// spent during it.
 	TimeLimit bool `json:"time_limit"`
+	// Fatal marks a reported VM failure after which subsequent cases cannot run.
+	Fatal bool `json:"fatal"`
 }
 
 // WriteCases writes the driver input file into dir and returns the paths of

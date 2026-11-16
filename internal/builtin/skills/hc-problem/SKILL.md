@@ -215,7 +215,7 @@ the default locale; every other locale has `description.<locale>.md` and
 
 ## Templates
 
-`templates/solution.go`, `templates/solution.py`, and `templates/solution.cpp` are optional: without
+`templates/solution.go`, `templates/solution.py`, `templates/solution.cpp`, and `templates/Solution.java` are optional: without
 them hc generates the starter from the signature. When the problem is on
 LeetCode, use LeetCode's templates.
 
@@ -225,6 +225,9 @@ LeetCode, use LeetCode's templates.
   a Go template that lacks it, and its import header to a Python one. C++
   templates keep their native class signatures; hc provides headers and
   judge-defined types without changing the solution source.
+- Java keeps native array/List signatures, adds its standard import block,
+  and removes public visibility from a non-Solution top-level design class
+  to allow the uniform Solution.java filename. Target Java 17.
 - Do not declare types hc predefines (`ListNode`, `TreeNode`, `Node`,
   `NestedInteger`, `Employee`); keep LeetCode's comment that shows them.
   Read `hc docs protocol solution-abi` for what each language provides.

@@ -44,6 +44,7 @@ import (
 	"github.com/goccy/go-yaml"
 
 	"github.com/MorePeanuts/handcoding/internal/lang/cpp"
+	"github.com/MorePeanuts/handcoding/internal/lang/java"
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 )
@@ -89,8 +90,9 @@ type Config struct {
 	// Execution selects the backend; only local is implemented.
 	Execution ExecutionConfig `yaml:"execution"`
 	// Go selects user-provided compiler and debugger executables.
-	Go  GoConfig  `yaml:"go"`
-	CPP CPPConfig `yaml:"cpp"`
+	Go   GoConfig   `yaml:"go"`
+	CPP  CPPConfig  `yaml:"cpp"`
+	Java JavaConfig `yaml:"java"`
 	// Python configures the Python language.
 	Python PythonConfig `yaml:"python"`
 	// Agent configures the coding agent used to generate and fix test cases.
@@ -153,6 +155,13 @@ type CPPConfig struct {
 	Sanitizers string `yaml:"sanitizers"`
 }
 
+// JavaConfig selects one local JDK for compilation, execution and debugging.
+type JavaConfig struct {
+	Home    string   `yaml:"home"`
+	Release int      `yaml:"release"`
+	JVMArgs []string `yaml:"jvm_args"`
+}
+
 // PythonConfig configures Python.
 type PythonConfig struct {
 	// Interpreter is the Python to run solutions with. Unset, hc manages a
@@ -183,6 +192,7 @@ func DefaultConfig() Config {
 		Execution:    ExecutionConfig{Backend: "local"},
 		Go:           GoConfig{Command: "go", Debugger: "dlv"},
 		CPP:          CPPConfig{Command: cpp.DefaultCompiler(), Debugger: cpp.DefaultDebugger(), Standard: "c++23", Sanitizers: "none"},
+		Java:         JavaConfig{Release: java.DefaultRelease, JVMArgs: []string{"-Xss16m"}},
 		PackSettings: map[string]PackSettings{},
 		Packs:        []PackSource{},
 		Theme:        "auto",

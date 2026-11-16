@@ -18,6 +18,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/lang/cpp"
 	"github.com/MorePeanuts/handcoding/internal/lang/golang"
+	"github.com/MorePeanuts/handcoding/internal/lang/java"
 	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/runner"
@@ -56,7 +57,20 @@ func Languages(ws *workspace.Workspace) *lang.Registry {
 		goLanguage(ws),
 		pythonLanguage(ws),
 		cpp.Language{Compiler: lang.ExecutableName(ws.Root, ws.Config.CPP.Command), Debugger: lang.ExecutableName(ws.Root, ws.Config.CPP.Debugger), Standard: ws.Config.CPP.Standard, Sanitizers: ws.Config.CPP.Sanitizers},
+		javaLanguage(ws),
 	)
+}
+
+func javaLanguage(ws *workspace.Workspace) java.Language {
+	home := ws.Config.Java.Home
+	if home != "" && !filepath.IsAbs(home) {
+		home = filepath.Join(ws.Root, home)
+	}
+	l := java.Language{Home: home, Release: ws.Config.Java.Release, JVMArgs: ws.Config.Java.JVMArgs}
+	if ws.Root != "" {
+		l.BuildCache = filepath.Join(ws.StatePath(), "cache", "build", "java")
+	}
+	return l
 }
 
 // goLanguage keeps the programs it builds in the workspace's cache, so that

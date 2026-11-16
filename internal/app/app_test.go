@@ -15,6 +15,7 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/lang"
 	"github.com/MorePeanuts/handcoding/internal/lang/cpp"
 	"github.com/MorePeanuts/handcoding/internal/lang/golang"
+	"github.com/MorePeanuts/handcoding/internal/lang/java"
 	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -37,6 +38,7 @@ func newWorkspace(t *testing.T) *app.App {
 	// The python3 on PATH, rather than a virtual environment that may need
 	// the network.
 	ws.Config.Python.Interpreter = "python3"
+	ws.Config.Java.Release = 17
 	a := app.New(ws)
 	// Tests run in parallel, and a stall under load must not make a run
 	// that is not about time limits Time Limit Exceeded: a floor of 250ms
@@ -68,12 +70,17 @@ func requireTools(t *testing.T, tools ...string) {
 }
 
 // TestRegressionReferences checks every problem of the regression set end to
-// end: its expected outputs must be reproduced by Python, Go and C++
+// end: its expected outputs must be reproduced by Python, Go, C++ and Java
 // reference solutions, exercising all drivers on every supported shape,
 // and the inputs of its generated cases must match their digests.
 func TestRegressionReferences(t *testing.T) {
 	t.Parallel()
 	testenv.LookPath(t, cpp.DefaultCompiler())
+	if tc, err := (java.Language{Release: 17}).Toolchain(); err != nil {
+		testenv.Skip(t, err)
+	} else if err = tc.Err(); err != nil {
+		testenv.Skip(t, err)
+	}
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
 	probs, err := a.WS.Problems()
@@ -116,7 +123,7 @@ func TestRegressionReferences(t *testing.T) {
 			if err := runner.Validate(p, sel); err != nil {
 				t.Fatal(err)
 			}
-			for _, langID := range []string{"python", "go", "cpp"} {
+			for _, langID := range []string{"python", "go", "cpp", "java"} {
 				rep, _, err := a.RunReference(ctx, p, langID, sel, app.RunOptions{})
 				if err != nil {
 					t.Fatalf("%s: %v", langID, err)
@@ -342,6 +349,7 @@ func TestPythonEnvironment(t *testing.T) {
 	}
 
 	ws.Config.Python.Interpreter = "python3"
+	ws.Config.Java.Release = 17
 	a := app.New(ws)
 	if l, _ := a.Lang("python"); l.(python.Language).Venv != nil {
 		t.Fatal("venv despite python.interpreter")

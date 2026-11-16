@@ -79,6 +79,12 @@ Opening a C++ solution generates `hc_types.hpp`, the driver/runtime headers and 
 
 Each C++ case gets its own process; one class case keeps its object across all operations. The executable is built once per run. Only calls count towards the cumulative algorithm limit; process startup/exit and codecs do not. The configured wall-clock timeout applies separately to each C++ worker. Normal builds use `-O2`, `hc debug -l cpp` uses `-O0 -g` and stops at the solution entry point in GDB/LLDB. Process exit reclaims node allocations; sanitizer leak detection is disabled, while invalid accesses and undefined behavior can still be diagnosed.
 
+Java uses one local JDK: `java.home` (an absolute or workspace-relative directory), then `JAVA_HOME`, then the JDK selected by `java` on PATH. `java`, `javac` and terminal `jdb` all come from that JDK. The default `java.release` is **25**; **17** is the protocol minimum. To use a JDK 17 installation, explicitly set `java.release: 17`. hc does not install or upgrade Java. `java.jvm_args` is an argument array for VM tuning and system properties, shared by solutions and references; its explicit default is `[-Xss16m]`. Changes to the JDK, release, VM options or driver invalidate Java build/timing caches. `hc doctor -l java --debug` checks the JDK, configured release, VM option structure, jdb and Python infrastructure. It does not execute custom VM options during diagnosis (logging options can write files); the JVM validates those options when running a solution.
+
+Java solutions use `Solution.java`, with LeetCode's method and design-class signatures. A top-level design class named differently must be package-private; hc removes `public` from that class when creating a starter from a LeetCode template. hc generates `_hc_java/` with the judge types, runtime and `javafx.util.Pair`, plus `.project`, `.classpath` and `.settings/` for Eclipse JDT language servers. Open the solution directory as a Java project (or import its Eclipse project in your editor): the generated sources expose judge types without copying them into your solution. Configure the editor's Java runtime to match `java.release` if it does not discover that JDK automatically; hc's JDK setting does not replace the language server's own runtime settings. `.hc-java-bin/` is the editor's output directory; these generated files are ignored by hc's Git block and regenerated before runs.
+
+One JVM runs the entire ordered batch, with fresh per-case instances but shared static/JIT state. `timeout` applies to that entire run. Normal exceptions report Runtime Error and continue; fatal VM errors and timeouts stop later cases. Compiled classes are cached in `.hc/cache/build/java/`, and unscoped `hc clean` removes them. `hc debug -l java` uses jdb, stopping in your real source at the function or design constructor (the encoder for round trips). Java supports terminal debugging only, not `--headless`. The pack must declare `java` and provide `reference/Solution.java` to judge Java solutions.
+
 
 Go's version detection, module preparation, builds, minimum-version checks and debugging use the selected compiler. Debugging builds a binary with optimizations disabled, then starts the selected Delve with `exec`, so Delve cannot pick a different Go from PATH. Build-cache and reference-timing identities include the compiler path. `execution.backend` defaults to `local`; only `local` is implemented. `docker` and other values are rejected rather than silently running locally.
 
@@ -476,7 +482,8 @@ Your own problems (`packs/local/`) have no such separate file: their `cases.json
 As on LeetCode, a solution that is correct but too slow fails with Time Limit Exceeded. hc judges speed against the problem's reference solution in your language, timed on your machine ([the protocol's time limit](protocol.md#time-limit)): a run may take **40 times** what the reference takes on the same cases, in total, with the reference's time counted as at least **1.25ms**, so the limit is never under 50ms: below that, times are mostly noise. Both values may still change. The run stops at the case during which your total passes the limit: that case is Time Limit Exceeded (it is ended even if it would never return), and the cases after it are Not Run. Such a run has no total time, in the result or in the history (where its TIME is `—`): it would count only the cases that ran, so it compares with no other run. The same goes for a run that a crash stops.
 
 - Forty times leaves room for a different way of writing the same algorithm, such as a map where the reference uses an array, but not for a worse complexity on inputs as large as the problem's constraints allow. Whether a slower solution fails depends on the problem's cases: some problems cannot separate two complexities within their constraints, and then the slower one passes, as it would on LeetCode.
-- The first run of a problem times the reference: three runs on each case, of which hc keeps the fastest, in `.hc/cache/baseline/<pack>/<problem>/<language>.json`. hc notes it on stderr ("Timing the Go reference…"), and later runs, with any selection of cases, reuse the times. They are measured again when hc, your toolchain, `problem.yaml` or the reference change.
+- For Go, Python and C++, the first run of a problem times the reference: three runs on each case, of which hc keeps the fastest, in `.hc/cache/baseline/<pack>/<problem>/<language>.json`. hc notes it on stderr ("Timing the Go reference…"), and later runs, with any selection of cases, reuse the times. They are measured again when hc, your toolchain, `problem.yaml` or the reference change.
+- Java times the complete ordered batch in three fresh JVMs and caches the minimum **total**. Case order and duplicates are part of the cache key; changing the selection runs the reference again. A run already computing generated outputs counts only for its exact batch, never for a subset extracted from a larger run. This preserves the effect of JIT warm-up without adding artificial warm-up iterations.
 - A problem without a reference in your language is not judged ([readiness](protocol.md#readiness)), so it has no time limit either. References, `hc cases build` and `hc validate --run` are never limited, and neither is `hc debug`. Their runs of a reference on generated cases, which compute the expected outputs, count as one of its three timed runs, except while `hc validate` or `hc pack check` checks several problems at once (`--jobs`).
 - The `timeout` of `hc.yaml` is another limit, on the wall-clock time of the whole run: it guards against a solution that hangs. It can also come first: when the reference takes more than a fortieth of it on the run's cases (250ms with the default 10s, as Python references can on problems with many large cases), a much slower solution reaches the `timeout` before the time limit. The verdict is the same, Time Limit Exceeded, only after the whole `timeout`.
 
@@ -492,7 +499,7 @@ hc fetch --site cn "LCR 001"                                  # leetcode.cn IDs 
 hc gen 146                  # make it ready: test cases and the judge rule
 ```
 
-`hc fetch` downloads the statement and its images, including diagrams inside preformatted examples, the signature, the Go, Python and C++ starter code, and the examples. Inputs and expected outputs are kept together from each statement example when they can be parsed safely. If an example input cannot be verified, hc warns and keeps unmatched API inputs without expected outputs; it never pairs inputs and outputs merely by their order.
+`hc fetch` downloads the statement and its images, including diagrams inside preformatted examples, the signature, the Go, Python, C++ and Java starter code, and the examples. Inputs and expected outputs are kept together from each statement example when they can be parsed safely. If an example input cannot be verified, hc warns and keeps unmatched API inputs without expected outputs; it never pairs inputs and outputs merely by their order.
 
 It writes the statements in the locales of the pack it fetches into: `locales` in `packs/local/pack.yaml` for your own problems (see [statements in several languages](#statements-in-several-languages)). Both sites have the English statement; only leetcode.cn has the Chinese one, and its title:
 
@@ -762,7 +769,7 @@ Either way, hc checks the session with LeetCode and saves the single login, read
 `hc.yaml` at the workspace root holds personal settings and the installed-pack inventory. New workspaces write all global defaults explicitly:
 
 ```yaml
-language: go          # preferred solution language: go | python | cpp
+language: go          # preferred solution language: go | python | cpp | java
 locale: en            # preferred statement language
 editor: ""           # empty: $VISUAL, $EDITOR, then vi
 theme: auto           # auto | dark | light
@@ -778,6 +785,10 @@ cpp:
   debugger: gdb       # macOS: lldb
   standard: c++23
   sanitizers: none
+java:
+  home: ""
+  release: 25
+  jvm_args: [-Xss16m]
 python:
   interpreter: ""    # empty keeps hc's managed .hc/venv; a value selects an external Python
 agent:

@@ -27,7 +27,7 @@ hc 自身的行为（`hc test` 运行哪些用例、`hc fetch` 如何导入题�
 
 | 版本 | 定稿于 | 变更 |
 |---|---|---|
-| 1 | hc v0.1.0（尚未发布：仍是草案） | 最初的协议：题目包和 `pack.yaml`、题目目录、`problem.yaml`、类型、签名、用例、判题、判题程序和解答 ABI，解答语言为 Go、Python 和 C++。 |
+| 1 | hc v0.1.0（尚未发布：仍是草案） | 最初的协议：题目包和 `pack.yaml`、题目目录、`problem.yaml`、类型、签名、用例、判题、判题程序和解答 ABI，解答语言为 Go、Python、C++ 和 Java。 |
 
 ### 不在范围内
 
@@ -36,7 +36,7 @@ hc 自身的行为（`hc test` 运行哪些用例、`hc fetch` 如何导入题�
 - 交互题，即解答要与评测程序对话的题目（issue #7）；
 - `tests` 题，用测试代码而不是用例评判（issue #31）；
 - 内存评判，以及[时间限制](#时间限制)以外的时间评判；
-- Go、Python 和 C++ 以外的解答语言。
+- Go、Python、C++ 和 Java 以外的解答语言。
 
 ## 题目包
 
@@ -207,21 +207,21 @@ judge:
 
 用例、期望输出和解答输出中的每个值都是 JSON。本节为每个类型规定它的 JSON 编码，以及它在各解答语言中的绑定。除非某个类型另有说明，输入（用例中的 `input`）和输出（`expected`，以及解答结果编码成的值）的编码相同。
 
-| 类型 | JSON | Go | Python | C++ | 起始版本 |
-|---|---|---|---|---|---|
-| `integer` | 整数 | `int` | `int` | `int` | 1 |
-| `long` | 整数 | `int64` | `int` | `long long` | 1 |
-| `double` | 数字 | `float64` | `float` | `double` | 1 |
-| `boolean` | `true` 或 `false` | `bool` | `bool` | `bool` | 1 |
-| `string` | 字符串 | `string` | `str` | `std::string` | 1 |
-| `character` | 一个字节的字符串 | `byte` | `str` | `char` | 1 |
-| `ListNode` | 见 [ListNode 和 TreeNode](#listnode-和-treenode) | `*ListNode` | `ListNode \| None` | `ListNode*` | 1 |
-| `TreeNode` | 见 [ListNode 和 TreeNode](#listnode-和-treenode) | `*TreeNode` | `TreeNode \| None` | `TreeNode*` | 1 |
-| `GraphNode`、`NaryNode`、`RandomListNode`、`NextTreeNode`、`QuadNode`、`MultilevelNode` | 见 [LeetCode 的 Node 类型](#leetcode-的-node-类型) | `*Node` | `Node \| None` | `Node*` | 1 |
-| `NestedInteger` | 见 [NestedInteger 和 Employee](#nestedinteger-和-employee) | `*NestedInteger` | `NestedInteger` | `NestedInteger` | 1 |
-| `Employee` | 见 [NestedInteger 和 Employee](#nestedinteger-和-employee) | `*Employee` | `Employee` | `Employee*` | 1 |
-| `T[]` | 见[数组](#数组) | `[]T` | `list[T]` | `std::vector<T>` | 1 |
-| `void` | 无；只能作返回类型 | 没有返回值 | `None` | `void` | 1 |
+| 类型 | JSON | Go | Python | C++ | Java | 起始版本 |
+|---|---|---|---|---|---|---|
+| `integer` | 整数 | `int` | `int` | `int` | `int` | 1 |
+| `long` | 整数 | `int64` | `int` | `long long` | `long` | 1 |
+| `double` | 数字 | `float64` | `float` | `double` | `double` | 1 |
+| `boolean` | `true` 或 `false` | `bool` | `bool` | `bool` | `boolean` | 1 |
+| `string` | 字符串 | `string` | `str` | `std::string` | `String` | 1 |
+| `character` | 一个字节的字符串 | `byte` | `str` | `char` | `char` | 1 |
+| `ListNode` | 见 [ListNode 和 TreeNode](#listnode-和-treenode) | `*ListNode` | `ListNode \| None` | `ListNode*` | `ListNode` | 1 |
+| `TreeNode` | 见 [ListNode 和 TreeNode](#listnode-和-treenode) | `*TreeNode` | `TreeNode \| None` | `TreeNode*` | `TreeNode` | 1 |
+| `GraphNode`、`NaryNode`、`RandomListNode`、`NextTreeNode`、`QuadNode`、`MultilevelNode` | 见 [LeetCode 的 Node 类型](#leetcode-的-node-类型) | `*Node` | `Node \| None` | `Node*` | `Node` | 1 |
+| `NestedInteger` | 见 [NestedInteger 和 Employee](#nestedinteger-和-employee) | `*NestedInteger` | `NestedInteger` | `NestedInteger` | `NestedInteger` | 1 |
+| `Employee` | 见 [NestedInteger 和 Employee](#nestedinteger-和-employee) | `*Employee` | `Employee` | `Employee*` | `Employee` | 1 |
+| `T[]` | 见[数组](#数组) | `[]T` | `list[T]` | `std::vector<T>` | `T[] / List<T>` | 1 |
+| `void` | 无；只能作返回类型 | 没有返回值 | `None` | `void` | `void` | 1 |
 
 ### 标量
 
@@ -248,9 +248,9 @@ Go：`type ListNode struct { Val int; Next *ListNode }` 和 `type TreeNode struc
 
 ### LeetCode 的 Node 类型
 
-LeetCode 把六种不同的结构都叫作 `Node`。协议给每种结构各起一个类型名。在解答代码中，每种都是名为 `Node`、字段名与 LeetCode 一致的类型（Go）或类（Python/C++），所以一道题不得使用其中一种以上。
+LeetCode 把六种不同的结构都叫作 `Node`。协议给每种结构各起一个类型名。在解答代码中，每种都是名为 `Node`、字段名与 LeetCode 一致的类型（Go）或类（Python/C++/Java），所以一道题不得使用其中一种以上。
 
-| 类型 | 字段（Go；Python/C++ 用同名但首字母小写的字段） | JSON | LeetCode 题目 |
+| 类型 | 字段（Go；Python/C++/Java 用同名但首字母小写的字段） | JSON | LeetCode 题目 |
 |---|---|---|---|
 | `GraphNode` | `Val int`、`Neighbors []*Node` | 节点值为 1 到 n 的图的邻接表：第 i 项（从 0 开始）按值列出值为 i+1 的节点的邻居，该类型的值是值为 1 的节点。`[[2,4],[1,3],[2,4],[1,3]]`；`[[]]` 是单个节点，`[]` 表示没有节点。每个邻居都必须在 1 到 n 之间 | 133 |
 | `NaryNode` | `Val int`、`Children []*Node` | 层序：根的值、`null`，然后按层序依次写出每个节点的子节点，每组后面跟一个 `null`，去掉末尾的 `null`：`[1,null,3,2,4,null,5,6]`。`[]` 表示没有树。组数不得多于节点数 | 429、559、589、590 |
@@ -608,7 +608,7 @@ judge:
 
 ### 运行时限
 
-解答运行有一个墙钟时限。Go/Python 的时限覆盖整次运行；C++ 的时限分别约束每个用例的工作进程，包括启动和退出。它用来防止卡死，比如解答卡在计时的调用之外；它不评判复杂度，那是[时间限制](#时间限制)的事。这个时限属于评测端，而不属于题目：hc 的时限是工作区 `hc.yaml` 中的 `timeout`，未配置时为 10s。到时后运行被终止：当前尚未完成的用例判为超时（Time Limit Exceeded），其后的用例为 Not Run，已经完成的用例保留各自的结果。判题程序的运行、生成器的运行，以及参考解为生成用例计算期望输出的运行，各自另有一个同样长度的时限。
+解答运行有一个墙钟时限。Go/Python/Java 的时限覆盖整次运行；C++ 的时限分别约束每个用例的工作进程，包括启动和退出。它用来防止卡死，比如解答卡在计时的调用之外；它不评判复杂度，那是[时间限制](#时间限制)的事。这个时限属于评测端，而不属于题目：hc 的时限是工作区 `hc.yaml` 中的 `timeout`，未配置时为 10s。到时后运行被终止：当前尚未完成的用例判为超时（Time Limit Exceeded），其后的用例为 Not Run，已经完成的用例保留各自的结果。判题程序的运行、生成器的运行，以及参考解为生成用例计算期望输出的运行，各自另有一个同样长度的时限。
 
 ### 就绪
 
@@ -697,7 +697,7 @@ def distinct(rng, n):
 
 ## 解答 ABI
 
-解答必须是什么样子，驱动程序才能调用它。用户的解答、参考解（`reference/solution.*`）和初始代码（`templates/solution.*`）都是解答。参考解和初始代码必须遵守本节，并且只使用标准库；初始代码必须保持签名，即这里规定的函数名、类名、方法名、参数顺序和类型。解答按 `function.params`（或构造函数和方法参数）的顺序收到参数，不含隐藏输入，绑定方式见[类型](#类型)。
+解答必须是什么样子，驱动程序才能调用它。用户的解答、参考解（`reference/solution.*` / `reference/Solution.java`）和初始代码（`templates/solution.*` / `templates/Solution.java`）都是解答。参考解和初始代码必须遵守本节，并且只使用标准库；初始代码必须保持签名，即这里规定的函数名、类名、方法名、参数顺序和类型。解答按 `function.params`（或构造函数和方法参数）的顺序收到参数，不含隐藏输入，绑定方式见[类型](#类型)。
 
 ### Python
 
@@ -738,6 +738,16 @@ def distinct(rng, n):
 - 每次运行只编译一次，全部用例复用同一二进制。算法耗时只统计调用（类题为构造和方法调用），不包含启动、编解码和退出；累计算法时限在工作进程之间共享。墙钟运行上限分别约束每个工作进程，包括其启动和退出，因此多个用例的总时间可能超过该上限。致命退出停止后续用例；捕获的异常使当前用例成为运行错误。
 - 默认 C++23，可以显式选择编译器支持的更新标准，不会静默降级。正常构建使用 `-O2`，终端调试使用 `-O0 -g`。可选的 address/undefined sanitizer 对用户解和参考解使用相同设置，其配置参与时间基线区分。因每个用例通过进程退出回收内存，关闭泄漏报告。
 
+### Java
+
+- 语言 ID 为 `java`，解答文件统一为 **`Solution.java`**，包括设计题。不写 package 声明或用户 `main`。函数题使用 `class Solution` 的实例方法和无参构造器；设计题保持声明的类名、构造器和方法名，顶层类名不是 `Solution` 时不得声明为 public。辅助类可以写在同一个文件里。`HC` 开头的名称保留给驱动使用。
+- 标量映射：`integer` → `int`、`long` → `long`、`double` → `double`、`boolean` → `boolean`、`character` → ASCII `char`、`string` → `String`、`void` → `void`。允许对应的包装类型，例如 `NestedIterator` 的 `Integer next()`。32/64 位有符号整数直接精确解码，不经过浮点数。
+- 每一级 `T[]` 按原生 Java 签名绑定为数组或有完整泛型信息的 `List<T>`，标量列表元素使用包装类型。例如 `integer[]` 接受 `int[]` / `List<Integer>`，`integer[][]` 接受 `int[][]` / `List<List<Integer>>`，`TreeNode[]` 接受 `TreeNode[]` / `List<TreeNode>`。不支持原始类型、通配符列表及有歧义的重载。模板保留这些选择；没有模板时默认生成数组，但 `NestedInteger[]` 和 `Employee[]` 的最内层数组生成列表。
+- hc 提供 LeetCode 风格的 `ListNode`、`TreeNode`、对应变体的 `Node`、`NestedInteger` 和 `Employee`，不要重新声明。`NestedInteger` 支持构造、`isInteger`、`getInteger`、`setInteger`、`add`、`getList`。另外提供 `javafx.util.Pair<K,V>`（`getKey`、`getValue`、相等比较、哈希和字符串表示），不需要安装 JavaFX。这些评测器辅助类型是“仅使用标准库”的例外，不支持其他依赖。初始代码导入 `java.util.*`、`java.math.*` 和 `javafx.util.Pair`；参考解必须自行包含所需导入。
+- 每次完整运行启动一个新 JVM，按顺序执行全部用例。每个函数用例创建新的 `Solution` 并重新解码输入；每个设计题用例创建自己的对象，全部操作共享该对象。往返题遵循 `instances`。静态字段、JVM/JIT 状态及被持有的对象会跨用例保留。节点内存由 GC 管理，hc 不强制 GC、重新加载类或为每个用例另启 JVM。批次结束后进程退出，下一次运行不会复用该 JVM。
+- 编译失败是 Compile Error；普通未捕获异常及断言失败使当前用例 Runtime Error，后续用例继续。致命 VM 错误、显式退出进程及超时会停止后续用例。用户可以正常打印 stdout/stderr。算法计时只统计解答调用（设计题包含构造器和方法），包括调用期间的 JIT/GC 停顿，不包含启动和编解码；墙钟超时覆盖整个 JVM 运行。Java 参考解按相同的**有序用例批次，包括重复用例**计时，取三个新 JVM 运行的最小总耗时，不得把不同批次的单例最小耗时拼接。
+- 协议最低 Java 17，生成代码、参考解和模板都必须兼容。hc 默认使用 `javac --release 25`；JDK 17 用户可以设置 `java.release: 17`。所选 JDK 必须支持配置的 release，不自动降级，也不启用预览功能。`--release 17` 检查参考解的语法、标准 API 和字节码兼容性，仍需在 Java 17 上验证实际运行。
+
 ### 语言版本
 
 | 语言 | 支持的最低版本 |
@@ -745,6 +755,7 @@ def distinct(rng, n):
 | Python | 3.12 |
 | Go | 1.22 |
 | C++ | C++23; GCC 13 / Clang 17 / Apple Clang 16 |
+| Java | 17 |
 
 参考解、初始代码、判题程序和生成器必须能在这些版本上运行，包括语言和标准库：只有在受支持的工具链上，才会用参考解计算期望输出或检查参考解。用户的解答可以使用其工具链支持的任何特性。要按 Go 1.22 检查 Go 代码，在它的模块中写 `go 1.22` 并运行 `go vet`，其中的 `stdversion` 检查会报告较新的标准库符号。
 

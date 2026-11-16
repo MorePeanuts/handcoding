@@ -207,3 +207,28 @@ func TestDoctorCPPConfiguredTools(t *testing.T) {
 		t.Fatal("C++ doctor changed the workspace")
 	}
 }
+
+func TestDoctorConfiguredJavaJDK(t *testing.T) {
+	dir := t.TempDir()
+	config := "language: java\njava:\n  home: tools/jdk\n  release: 17\n  jvm_args: [-Xss16m]\npython:\n  interpreter: tools/python\n"
+	if err := os.WriteFile(filepath.Join(dir, "hc.yaml"), []byte(config), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for tool, version := range map[string]string{"java": "openjdk version 17.0.21", "javac": "javac 17.0.21", "jdb": "jdb 17.0.21"} {
+		doctorScript(t, filepath.Join(dir, "tools", "jdk", "bin", tool), "echo '"+version+"'")
+	}
+	doctorScript(t, filepath.Join(dir, "tools", "python"), "echo '3.12.0'")
+	before := doctorSnapshot(t, dir)
+	rep, err := doctorReport(t, dir, "--debug")
+	if err != nil || !rep.OK || len(rep.Checks) != 4 {
+		t.Fatalf("%+v %v", rep, err)
+	}
+	for _, c := range rep.Checks[:3] {
+		if c.Source != "hc.yaml: java.home" || !strings.HasPrefix(c.Path, filepath.Join(dir, "tools", "jdk", "bin")) {
+			t.Fatalf("JDK selection: %+v", c)
+		}
+	}
+	if after := doctorSnapshot(t, dir); !reflect.DeepEqual(before, after) {
+		t.Fatal("doctor modified workspace")
+	}
+}

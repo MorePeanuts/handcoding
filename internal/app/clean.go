@@ -174,7 +174,10 @@ func cacheDirectory(name string, scoped bool) bool {
 	if scoped {
 		return false
 	}
-	if name == "cache/build" || name == "cache/build/go" || name == "runtime" || name == "runtime/python" || name == "runtime/python/__pycache__" {
+	if name == "cache/build" || name == "cache/build/go" || name == "cache/build/java" || name == "runtime" || name == "runtime/python" || name == "runtime/python/__pycache__" {
+		return true
+	}
+	if len(parts) >= 4 && strings.Join(parts[:3], "/") == "cache/build/java" && lowerHex(parts[3], 32) {
 		return true
 	}
 	if len(parts) == 4 && strings.Join(parts[:3], "/") == "cache/build/go" {
@@ -220,6 +223,9 @@ func cacheCategory(name, packName, slug string) string {
 	}
 	if len(parts) == 5 && strings.Join(parts[:3], "/") == "cache/build/go" && lowerHex(parts[3], 32) && (parts[4] == "prog" || strings.HasPrefix(parts[4], "prog.tmp-")) {
 		return "Go programs"
+	}
+	if len(parts) >= 5 && strings.Join(parts[:3], "/") == "cache/build/java" && lowerHex(parts[3], 32) && (strings.HasSuffix(name, ".class") || len(parts) == 5 && parts[4] == "complete") {
+		return "Java classes"
 	}
 	if name == "runtime/python/hc_runtime.py" {
 		return "Python runtime"

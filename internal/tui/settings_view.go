@@ -91,6 +91,8 @@ func settingDisplay(key, value string) string {
 		return value
 	}
 	switch key {
+	case "java.home":
+		return "Automatic (local JDK)"
 	case "editor":
 		return "Automatic"
 	case "python.interpreter":

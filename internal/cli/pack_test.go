@@ -110,9 +110,9 @@ func TestPackLanguages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	limited := strings.Replace(string(data), "\nlanguages: [go, python, cpp]\n", "\nlanguages: [python]\n", 1)
+	limited := strings.Replace(string(data), "\nlanguages: [go, python, cpp, java]\n", "\nlanguages: [python]\n", 1)
 	if limited == string(data) {
-		t.Fatal("the regression set's pack.yaml has no languages: [go, python, cpp]")
+		t.Fatal("the regression set's pack.yaml has no languages: [go, python, cpp, java]")
 	}
 	if err := os.WriteFile(manifest, []byte(limited), 0o644); err != nil {
 		t.Fatal(err)
