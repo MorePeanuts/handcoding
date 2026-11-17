@@ -84,7 +84,7 @@ func TestNativeCommandExecution(t *testing.T) {
 	ws.Config.Python.Interpreter = "python3"
 	a := app.New(ws)
 	defer a.Close()
-	p, err := ws.Problem("regression/two-sum")
+	p, err := ws.Problem("leetcode-regression/two-sum")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,13 +137,13 @@ func TestNativeCommandExecution(t *testing.T) {
 }
 
 func TestSettingsCommandPlan(t *testing.T) {
-	ctx := tui.CommandContext{Workspace: "/tmp/ws", Packs: []string{"local", "regression"}}
-	for _, line := range []string{"settings", "settings --pack regression"} {
+	ctx := tui.CommandContext{Workspace: "/tmp/ws", Packs: []string{"local", "leetcode-regression"}}
+	for _, line := range []string{"settings", "settings --pack leetcode-regression"} {
 		c, err := planTUICommand(line, ctx)
 		if err != nil || c.Action != "settings" {
 			t.Fatalf("%s: %+v %v", line, c, err)
 		}
-		if strings.Contains(line, "--pack") && c.Pack != "regression" {
+		if strings.Contains(line, "--pack") && c.Pack != "leetcode-regression" {
 			t.Fatal(c)
 		}
 	}

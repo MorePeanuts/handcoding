@@ -23,8 +23,8 @@ func TestCleanInventory(t *testing.T) {
 		"cache/build/java/0123456789abcdef0123456789abcdef/Solution.class",
 		"cache/build/java/0123456789abcdef0123456789abcdef/javafx/util/Pair.class",
 		"cache/build/go/0123456789abcdef0123456789abcdef/prog",
-		"cache/cases/regression/two-sum/go.json", "cache/cases/regression/two-sum/python.user.json",
-		"cache/baseline/regression/two-sum/python.json", "cache/lastrun/regression/two-sum/go.json",
+		"cache/cases/leetcode-regression/two-sum/go.json", "cache/cases/leetcode-regression/two-sum/python.user.json",
+		"cache/baseline/leetcode-regression/two-sum/python.json", "cache/lastrun/leetcode-regression/two-sum/go.json",
 		"runtime/javascript/0123456789abcdef0123/runtime/run.cjs",
 		"runtime/python/hc_runtime.py", "runtime/python/012345abcdef/hc_checker.py",
 		"runtime/python/012345abcdef/__pycache__/hc_runtime.cpython-312.pyc",
@@ -36,8 +36,8 @@ func TestCleanInventory(t *testing.T) {
 		"cpp/json-3.12.0-aaf127c04cb31c40/include/nlohmann/json.hpp",
 		"cache/build/java/0123456789abcdef0123456789abcdef/notes.txt",
 		"cache/build/java/unknown/Solution.class",
-		"node/0123456789abcdef0123/node_modules/lodash/lodash.js", "hc.db", "hc.db-wal", "hc.db-shm", "packs.lock", "venv/bin/python", "scratch/two-sum/slow.py", "agent/regression/two-sum/log.jsonl",
-		"cache/mine/file", "cache/cases/regression/two-sum/notes.txt", "cache/cases/regression/two-sum/rust.json",
+		"node/0123456789abcdef0123/node_modules/lodash/lodash.js", "hc.db", "hc.db-wal", "hc.db-shm", "packs.lock", "venv/bin/python", "scratch/two-sum/slow.py", "agent/leetcode-regression/two-sum/log.jsonl",
+		"cache/mine/file", "cache/cases/leetcode-regression/two-sum/notes.txt", "cache/cases/leetcode-regression/two-sum/rust.json",
 		"cache/build/go/0123456789abcdef0123456789abcdef/my-file", "runtime/python/012345abcdef/notes.txt",
 		"runtime/javascript/0123456789abcdef0123/notes.txt",
 		"runtime/python/unknown/hc_runtime.py", "leetcode-other-problems.json",
@@ -93,10 +93,10 @@ func TestCleanInventory(t *testing.T) {
 
 func TestCleanScope(t *testing.T) {
 	t.Parallel()
-	for _, o := range []app.CleanOptions{{Pack: "regression", Problem: "two-sum"}, {Problem: "regression/two-sum"}, {Pack: "regression"}, {Pack: "local"}, {Pack: "removed-pack"}} {
+	for _, o := range []app.CleanOptions{{Pack: "leetcode-regression", Problem: "two-sum"}, {Problem: "leetcode-regression/two-sum"}, {Pack: "leetcode-regression"}, {Pack: "local"}, {Pack: "removed-pack"}} {
 		t.Run(o.Pack+"/"+o.Problem, func(t *testing.T) {
 			a := newWorkspace(t)
-			files := []string{"cache/cases/regression/two-sum/go.json", "cache/cases/regression/lru-cache/go.json", "cache/cases/local/two-sum/go.json", "cache/cases/removed-pack/orphan/go.json", "cache/build/go/0123456789abcdef0123456789abcdef/prog"}
+			files := []string{"cache/cases/leetcode-regression/two-sum/go.json", "cache/cases/leetcode-regression/lru-cache/go.json", "cache/cases/local/two-sum/go.json", "cache/cases/removed-pack/orphan/go.json", "cache/build/go/0123456789abcdef0123456789abcdef/prog"}
 			for _, file := range files {
 				writeFile(t, filepath.Join(a.WS.StatePath(), file), file)
 			}
@@ -106,7 +106,7 @@ func TestCleanScope(t *testing.T) {
 			}
 			wantPack := o.Pack
 			if wantPack == "" {
-				wantPack = "regression"
+				wantPack = "leetcode-regression"
 			}
 			for _, file := range files {
 				wantRemove := strings.Contains(file, "/"+wantPack+"/") && (o.Problem == "" || strings.Contains(file, "/two-sum/"))
@@ -121,7 +121,7 @@ func TestCleanScope(t *testing.T) {
 
 func TestCleanSymlinks(t *testing.T) {
 	t.Parallel()
-	for _, component := range []string{".hc", ".hc/cache", ".hc/cache/cases", ".hc/cache/cases/regression"} {
+	for _, component := range []string{".hc", ".hc/cache", ".hc/cache/cases", ".hc/cache/cases/leetcode-regression"} {
 		t.Run(component, func(t *testing.T) {
 			a := newWorkspace(t)
 			outside := t.TempDir()
@@ -175,7 +175,7 @@ func TestCleanRebuild(t *testing.T) {
 	t.Parallel()
 	requireTools(t, "go", "python3")
 	a := newWorkspace(t)
-	p, err := a.WS.Problem("regression/lru-cache")
+	p, err := a.WS.Problem("leetcode-regression/lru-cache")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +234,7 @@ func TestCleanDuringRun(t *testing.T) {
 	t.Parallel()
 	requireTools(t, "python3")
 	a := newWorkspace(t)
-	p, err := a.WS.Problem("regression/two-sum")
+	p, err := a.WS.Problem("leetcode-regression/two-sum")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,8 +288,8 @@ func TestCleanPartialFailure(t *testing.T) {
 		t.Skip("root bypasses filesystem write permissions")
 	}
 	a := newWorkspace(t)
-	blocked := "cache/cases/regression/two-sum/go.json"
-	removed := "cache/baseline/regression/two-sum/go.json"
+	blocked := "cache/cases/leetcode-regression/two-sum/go.json"
+	removed := "cache/baseline/leetcode-regression/two-sum/go.json"
 	for _, file := range []string{blocked, removed} {
 		writeFile(t, filepath.Join(a.WS.StatePath(), file), file)
 	}

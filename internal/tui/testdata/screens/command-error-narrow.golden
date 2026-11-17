@@ -1,6 +1,6 @@
- hc    regression 0/50      lang Go   locale en   filter all
+ hc    leetcode-regression  lang Go   locale en   filter all
 
-50 problems    ✔ 0 solved    ● 0 attempted
+49 problems    ✔ 0 solved    ● 0 attempted
 
       #      TITLE                LEVEL    TAGS
 ────────────────────────────────────────────────────────────

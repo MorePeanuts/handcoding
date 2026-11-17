@@ -28,7 +28,7 @@ func TestShowMarkdown(t *testing.T) {
 	}{
 		{[]string{"show", "1"}, "description.md"},
 		{[]string{"show", "two-sum", "--raw"}, "description.md"},
-		{[]string{"show", "regression/two-sum", "--locale", "zh-CN"}, "description.zh-CN.md"},
+		{[]string{"show", "leetcode-regression/two-sum", "--locale", "zh-CN"}, "description.zh-CN.md"},
 		{[]string{"show", "two-sum", "--raw", "--locale", "zh-CN"}, "description.zh-CN.md"},
 	} {
 		want, err := os.ReadFile(filepath.Join(p.Dir, tt.file))

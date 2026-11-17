@@ -45,7 +45,7 @@ func TestValidateWithoutPython(t *testing.T) {
 		// two-sum has generated cases, longest-palindromic-substring a
 		// checker, remove-element neither: its Go reference runs.
 		stdout, stderr, err := captureAll(t, "-w", dir, "validate", "--run", "-j", jobs,
-			"regression/two-sum", "regression/longest-palindromic-substring", "regression/remove-element")
+			"leetcode-regression/two-sum", "leetcode-regression/longest-palindromic-substring", "leetcode-regression/remove-element")
 		out := stdout + stderr
 		if err == nil {
 			t.Errorf("-j %s: validate passed", jobs)
@@ -93,7 +93,7 @@ func TestValidateWithoutPython(t *testing.T) {
 	if n := strings.Count(stdout+stderr, guide); n != 1 {
 		t.Errorf("pack check: the guide appears %d times:\n%s", n, stdout+stderr)
 	}
-	if i, j := strings.Index(stdout, "FAIL regression: "), strings.Index(stdout, "How to set up Python: "); i < 0 || j < i {
+	if i, j := strings.Index(stdout, "FAIL leetcode-regression: "), strings.Index(stdout, "How to set up Python: "); i < 0 || j < i {
 		t.Errorf("pack check: the guide does not follow the summary:\n%s", stdout)
 	}
 	if !strings.Contains(stdout, "error: Python 3 reference not run: "+summary) {

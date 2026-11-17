@@ -1,6 +1,6 @@
- hc    regression 0/50      lang Go   locale en   filter all
+ hc    leetcode-regression  lang Go   locale en   filter all
 
-50 problems    ✔ 0 solved    ● 0 attempted    ★ 1 starred
+49 problems    ✔ 0 solved    ● 0 attempted    ★ 1 starred
 
       #      TITLE                LEVEL    TAGS
 ────────────────────────────────────────────────────────────
@@ -17,4 +17,4 @@
   ·   114    Flatten Binary Tree… Medium   stack · tree · d…
 ────────────────────────────────────────────────────────────
 
- enter open    p packs    : command    ? help     1–11 of 50
+ enter open    p packs    : command    ? help     1–11 of 49

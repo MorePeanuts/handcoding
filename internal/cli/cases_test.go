@@ -85,7 +85,7 @@ func TestUserCasesCommands(t *testing.T) {
 	if err := os.WriteFile(config, []byte(strings.Replace(string(data), `interpreter: ""`, "interpreter: python3", 1)), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	ref := "regression/two-sum"
+	ref := "leetcode-regression/two-sum"
 	for _, tt := range []struct {
 		args []string
 		err  string
@@ -105,7 +105,7 @@ func TestUserCasesCommands(t *testing.T) {
 	if !strings.Contains(out, "added your case") || !strings.Contains(out, "[1,2]") || !strings.Contains(out, "hc submit does not") {
 		t.Errorf("cases add:\n%s", out)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "cases", "regression", "two-sum.jsonl")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "cases", "leetcode-regression", "two-sum.jsonl")); err != nil {
 		t.Fatal(err)
 	}
 	out, err = capture(t, "-w", dir, "cases", "list", ref)

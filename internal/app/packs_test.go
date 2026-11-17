@@ -234,7 +234,7 @@ func TestInstallPackRefusals(t *testing.T) {
 	if err := regression.Install(a.WS); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.InstallPack(ctx, regression.Dir(), app.PackOptions{}); err == nil || !strings.Contains(err.Error(), "hc pack remove regression") {
+	if _, err := a.InstallPack(ctx, regression.Dir(), app.PackOptions{}); err == nil || !strings.Contains(err.Error(), "hc pack remove leetcode-regression") {
 		t.Errorf("unmanaged directory of that name: %v", err)
 	}
 }
@@ -340,7 +340,7 @@ func TestPackList(t *testing.T) {
 		{"local", app.PackLocal, 0, 0},
 		{"tiny", app.PackManaged, 3, 1},
 		{"gone", app.PackMissing, 0, 0},
-		{"regression", app.PackUnmanaged, len(regs), 0},
+		{"leetcode-regression", app.PackUnmanaged, len(regs), 0},
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("packs\n got %+v\nwant %+v", got, want)

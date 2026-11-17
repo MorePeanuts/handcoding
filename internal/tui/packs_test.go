@@ -41,14 +41,14 @@ func selectPack(t *testing.T, m *model, name string) {
 
 func TestPackManagerEntryAndReturn(t *testing.T) {
 	t.Parallel()
-	for _, opts := range []Options{{}, {Pack: "regression"}, {Group: "design"}} {
+	for _, opts := range []Options{{}, {Pack: "leetcode-regression"}, {Group: "design"}} {
 		h := newHarness(t)
 		h.m = h.openModel(opts)
 		h.press("j")
 		selected, cursor := h.m.selected().Ref(), h.m.cursor
 		for range 2 {
 			h.press("p")
-			if h.m.top() != screenPacks || h.m.selectedPack().Name != "regression" {
+			if h.m.top() != screenPacks || h.m.selectedPack().Name != "leetcode-regression" {
 				t.Fatal("p did not focus current pack")
 			}
 			// Empty local is manageable even though it has no browsing tab.

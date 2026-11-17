@@ -91,41 +91,43 @@ func TestRuntimePublicAPI(t *testing.T) {
 		}
 	}
 
-	dir := regression.ProblemsDir()
-	files := 0
-	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || filepath.Ext(path) != ".py" {
-			return err
-		}
-		src, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		rel, _ := filepath.Rel(dir, path)
-		check(rel, string(src))
-		files++
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if files == 0 {
-		t.Fatal("no Python files in the regression set")
-	}
-
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range entries {
-		p, err := problem.Load(filepath.Join(dir, e.Name()))
+	for _, corpus := range regression.Packs() {
+		dir := filepath.Join(corpus.Dir, "problems")
+		files := 0
+		err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() || filepath.Ext(path) != ".py" {
+				return err
+			}
+			src, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			rel, _ := filepath.Rel(dir, path)
+			check(rel, string(src))
+			files++
+			return nil
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		starter, err := Language{}.Starter(p)
-		if err != nil {
-			t.Fatalf("%s: %v", e.Name(), err)
+		if files == 0 {
+			t.Fatal("no Python files in the regression set")
 		}
-		check(e.Name()+" starter", starter)
+
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range entries {
+			p, err := problem.Load(filepath.Join(dir, e.Name()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			starter, err := Language{}.Starter(p)
+			if err != nil {
+				t.Fatalf("%s: %v", e.Name(), err)
+			}
+			check(e.Name()+" starter", starter)
+		}
 	}
 }

@@ -2,7 +2,7 @@
   PACK                  STATE         SOLVED  TITLE
 ────────────────────────────────────────────────────────────────────────────────
   local                 local            0/0
-▌ regression            unmanaged       0/50  hc regression set
+▌ leetcode-regression   unmanaged       0/49  LeetCode compatibility
 
 
 

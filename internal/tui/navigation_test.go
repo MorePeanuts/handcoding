@@ -74,7 +74,7 @@ func TestDirectProblemPreservesCompatibleConstraints(t *testing.T) {
 			t.Parallel()
 			h := newHarness(t)
 			m := h.m
-			ref := "regression/" + tt.target
+			ref := "leetcode-regression/" + tt.target
 			m.groups[m.pack] = tt.group
 			m.search.SetValue(tt.query)
 			m.searching = true
@@ -133,7 +133,7 @@ func TestRunReplacementKeepsOrigin(t *testing.T) {
 			} else {
 				h.native(Command{Action: "test", Problem: p.Ref(), Run: acceptedNavigationRun})
 			}
-			target, err := m.app.WS.Problem("regression/maximum-depth-of-binary-tree")
+			target, err := m.app.WS.Problem("leetcode-regression/maximum-depth-of-binary-tree")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -184,7 +184,7 @@ func TestHistoryDirectSubmissionAndPeerReplacement(t *testing.T) {
 	h := newHarness(t)
 	m := h.m
 	p := m.selected()
-	addSubs(t, m, "", "regression/lru-cache", p.Ref(), "regression/gone")
+	addSubs(t, m, "", "leetcode-regression/lru-cache", p.Ref(), "leetcode-regression/gone")
 	h.native(Command{Action: "show", Problem: p.Ref()})
 	m.detail.SetYOffset(3)
 	offset := m.detail.YOffset()
@@ -198,7 +198,7 @@ func TestHistoryDirectSubmissionAndPeerReplacement(t *testing.T) {
 	if m.top() != screenHistory || m.selectedSub().ID != 3 {
 		t.Fatal("submission did not return to focused history")
 	}
-	h.native(Command{Action: "history", Problem: "regression/lru-cache"})
+	h.native(Command{Action: "history", Problem: "leetcode-regression/lru-cache"})
 	h.native(Command{Action: "history"})
 	h.press("q")
 	if m.top() != screenDetail || m.current.Ref() != p.Ref() || m.detail.YOffset() != offset {

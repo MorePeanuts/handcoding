@@ -1,0 +1,25 @@
+protocol: 1
+name: leetcode-regression
+title: LeetCode compatibility
+titles: {zh-CN: LeetCode 兼容性回归测试集}
+description: >-
+  LeetCode problems covering native signatures, structures and judging behavior,
+  each with Go, Python, C, C++, Java, JavaScript and TypeScript references.
+  Synthetic hc extensions live in the separate protocol-regression pack.
+license: MIT
+languages: [go, python, c, cpp, java, javascript, typescript]
+# Every problem has its statement and title in both locales. The English
+# statements are LeetCode's, except for the premium problems clone-n-ary-tree and minimum-flips-in-binary-tree-to-
+# get-result, whose statements the set's authors wrote.
+locales: [en, zh-CN]
+# Groups exercise pack.yaml's groups (hc list --group); their order is
+# deliberately not the order of ids.
+groups:
+  - name: structure-inputs
+    title: Structure inputs
+    titles: {zh-CN: 结构输入}
+    problems: [intersection-of-two-linked-lists, linked-list-cycle-ii, linked-list-cycle, find-a-corresponding-node-of-a-binary-tree-in-a-clone-of-that-tree, copy-list-with-random-pointer]
+  - name: design
+    title: Design problems
+    titles: {zh-CN: 设计题}
+    problems: [lru-cache, binary-search-tree-iterator, serialize-and-deserialize-binary-tree, encode-and-decode-tinyurl, flatten-nested-list-iterator]

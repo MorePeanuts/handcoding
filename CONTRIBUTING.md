@@ -25,7 +25,7 @@ make test-integration # real-tool integration, excluding the full corpus
 make test-regression  # all 50 problems in all seven languages
 make lint       # go vet + golangci-lint (the version CI uses is in .github/workflows/ci.yml)
 
-uv run go test ./internal/app -run 'TestRegressionReferences/two-sum' -v   # one subtest
+uv run go test ./internal/app -run 'TestRegressionReferences/leetcode-regression/two-sum' -v   # one subtest
 uv run go test ./internal/app -run TestCMinimumVersion -parallel=4 -v     # all 50 C11 references
 ```
 
@@ -97,11 +97,12 @@ Use a scratch workspace instead of your own `~/handcoding`:
 
 ```sh
 go run ./cmd/hc init /tmp/hc-dev
-go run ./cmd/hc -w /tmp/hc-dev pack install testdata/regression   # the regression set, copied as an installed pack
+go run ./cmd/hc -w /tmp/hc-dev pack install testdata/leetcode-regression   # LeetCode compatibility pack
+go run ./cmd/hc -w /tmp/hc-dev pack install testdata/protocol-regression # hc extensions
 go run ./cmd/hc -w /tmp/hc-dev test two-sum
 ```
 
-The regression set is a pack, so it is also a workspace of its own (a pack checkout, see [working on a pack](docs/how-to-use.md#working-on-a-pack)): after changing its cases, `go run ./cmd/hc -w testdata/regression cases build <slug> --force -l python` regenerates their expected outputs in place. Its `.gitignore` keeps hc's state and your solutions out of git.
+The corpus has two independent packs: `testdata/leetcode-regression` for LeetCode compatibility and `testdata/protocol-regression` for hc extensions. The corpus tests build hc once and execute `hc pack install` for both into temporary workspaces; see [Regression packs](testdata/README.md). Each pack is also a workspace of its own (a pack checkout, see [working on a pack](docs/how-to-use.md#working-on-a-pack)): after changing its cases, `go run ./cmd/hc -w testdata/leetcode-regression cases build <slug> --force -l python` regenerates their expected outputs in place. Its `.gitignore` keeps hc's state and your solutions out of git.
 
 The tests of `internal/app` and `internal/tui` run in parallel (`t.Parallel()`), each in its own workspace, and a new one should too, unless it sets the environment (`t.Setenv`, which Go refuses in a parallel test: the LeetCode session and git tests) or times solutions against a time limit (`timelimit_test.go`), which other tests competing for the machine would make flaky. Go runs those first, one at a time, and the parallel ones after them.
 
@@ -127,7 +128,8 @@ internal/skill      agent skill registry and managed install
 internal/builtin    embedded agent skills
 internal/regression locates the regression set for tests
 internal/testenv    skips (or fails) tests whose tools are missing
-testdata/regression the regression set: a pack covering the whole protocol
+testdata/leetcode-regression LeetCode compatibility pack (49 problems)
+testdata/protocol-regression synthetic protocol-extension pack (1 problem)
 ```
 
 [CLAUDE.md](CLAUDE.md) describes the architecture in more detail.

@@ -283,7 +283,7 @@ func TestCommandRefreshAddedPackAndGroups(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	m := h.m
-	if err := m.app.CreateGroup("regression", "later", "Later"); err != nil {
+	if err := m.app.CreateGroup("leetcode-regression", "later", "Later"); err != nil {
 		t.Fatal(err)
 	}
 	if err := m.reloadCommand(); err != nil {
@@ -296,7 +296,7 @@ func TestCommandRefreshAddedPackAndGroups(t *testing.T) {
 			m.groupCursor = i
 		}
 	}
-	if err := m.app.CreateGroup("regression", "earlier", "Earlier"); err != nil {
+	if err := m.app.CreateGroup("leetcode-regression", "earlier", "Earlier"); err != nil {
 		t.Fatal(err)
 	}
 	if err := m.reloadCommand(); err != nil {
@@ -305,7 +305,7 @@ func TestCommandRefreshAddedPackAndGroups(t *testing.T) {
 	if got := m.tab().groups()[m.groupChoices()[m.groupCursor]].Key(); got != group {
 		t.Fatalf("group identity changed to %s from %s", got, group)
 	}
-	if err := m.app.DeleteGroup("regression", group); err != nil {
+	if err := m.app.DeleteGroup("leetcode-regression", group); err != nil {
 		t.Fatal(err)
 	}
 	if err := m.reloadCommand(); err != nil {

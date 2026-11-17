@@ -17,7 +17,7 @@ import (
 func TestPersonalGroups(t *testing.T) {
 	t.Parallel()
 	a := newWorkspace(t)
-	manifest := filepath.Join(a.WS.PackPath("regression"), pack.ManifestFile)
+	manifest := filepath.Join(a.WS.PackPath("leetcode-regression"), pack.ManifestFile)
 	before, err := os.ReadFile(manifest)
 	if err != nil {
 		t.Fatal(err)
@@ -28,48 +28,48 @@ func TestPersonalGroups(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	must(a.CreateGroup("regression", "design", "我的设计题"))
-	must(a.AddGroupProblems("regression", "user:design", []string{"146", "1", "lru-cache"}))
-	if _, err := a.ResolveGroup("regression", "design"); err == nil || !strings.Contains(err.Error(), "ambiguous") {
+	must(a.CreateGroup("leetcode-regression", "design", "我的设计题"))
+	must(a.AddGroupProblems("leetcode-regression", "user:design", []string{"146", "1", "lru-cache"}))
+	if _, err := a.ResolveGroup("leetcode-regression", "design"); err == nil || !strings.Contains(err.Error(), "ambiguous") {
 		t.Fatalf("collision: %v", err)
 	}
 	g, err := a.ResolveGroup("", "user:design")
 	must(err)
-	if g.Pack != "regression" || g.Title != "我的设计题" || !slices.Equal(g.Problems, []string{"lru-cache", "two-sum"}) {
+	if g.Pack != "leetcode-regression" || g.Title != "我的设计题" || !slices.Equal(g.Problems, []string{"lru-cache", "two-sum"}) {
 		t.Fatalf("group %+v", g)
 	}
-	if err := a.DeleteGroup("regression", "pack:design"); err == nil {
+	if err := a.DeleteGroup("leetcode-regression", "pack:design"); err == nil {
 		t.Fatal("deleted pack group")
 	}
-	if err := a.CreateGroup("regression", "design", ""); err == nil {
+	if err := a.CreateGroup("leetcode-regression", "design", ""); err == nil {
 		t.Fatal("duplicate group")
 	}
-	if err := a.AddGroupProblems("regression", "user:design", []string{"local/two-sum"}); err == nil {
+	if err := a.AddGroupProblems("leetcode-regression", "user:design", []string{"local/two-sum"}); err == nil {
 		t.Fatal("cross-pack member")
 	}
-	must(a.CopyGroup("regression", "pack:design", "snapshot", ""))
-	copy, err := a.ResolveGroup("regression", "user:snapshot")
+	must(a.CopyGroup("leetcode-regression", "pack:design", "snapshot", ""))
+	copy, err := a.ResolveGroup("leetcode-regression", "user:snapshot")
 	must(err)
-	original, err := a.ResolveGroup("regression", "pack:design")
+	original, err := a.ResolveGroup("leetcode-regression", "pack:design")
 	must(err)
 	if !slices.Equal(copy.Problems, original.Problems) {
 		t.Fatal("copy differs")
 	}
-	must(a.RemoveGroupProblems("regression", "user:snapshot", copy.Problems[:1]))
-	original, err = a.ResolveGroup("regression", "pack:design")
+	must(a.RemoveGroupProblems("leetcode-regression", "user:snapshot", copy.Problems[:1]))
+	original, err = a.ResolveGroup("leetcode-regression", "pack:design")
 	must(err)
 	if !slices.Equal(copy.Problems, original.Problems) {
 		t.Fatal("copy mutated source")
 	}
-	must(a.OrderGroupProblems("regression", "user:design", []string{"two-sum", "lru-cache"}))
-	if err := a.OrderGroupProblems("regression", "user:design", []string{"two-sum", "two-sum"}); err == nil {
+	must(a.OrderGroupProblems("leetcode-regression", "user:design", []string{"two-sum", "lru-cache"}))
+	if err := a.OrderGroupProblems("leetcode-regression", "user:design", []string{"two-sum", "two-sum"}); err == nil {
 		t.Fatal("order lost a member")
 	}
 	title := "复习"
-	must(a.RenameGroup("regression", "user:design", "review", &title))
+	must(a.RenameGroup("leetcode-regression", "user:design", "review", &title))
 	all, err := a.WS.Problems()
 	must(err)
-	probs, missing, err := a.FilterProblems(all, "regression", "user:review")
+	probs, missing, err := a.FilterProblems(all, "leetcode-regression", "user:review")
 	must(err)
 	if len(missing) != 0 || len(probs) != 2 || probs[0].Slug != "two-sum" || probs[1].Slug != "lru-cache" {
 		t.Fatalf("order: %v %v", probs, missing)
@@ -95,11 +95,11 @@ func TestPersonalGroupsMissingAndMalformed(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	must(a.SaveGroup("regression", "", workspace.UserGroup{Name: "review", Problems: []string{"two-sum", "lru-cache"}}))
-	p, err := a.WS.Problem("regression/two-sum")
+	must(a.SaveGroup("leetcode-regression", "", workspace.UserGroup{Name: "review", Problems: []string{"two-sum", "lru-cache"}}))
+	p, err := a.WS.Problem("leetcode-regression/two-sum")
 	must(err)
 	must(os.RemoveAll(p.Dir))
-	g, err := a.ResolveGroup("regression", "review")
+	g, err := a.ResolveGroup("leetcode-regression", "review")
 	must(err)
 	all, err := a.WS.Problems()
 	must(err)
@@ -108,18 +108,18 @@ func TestPersonalGroupsMissingAndMalformed(t *testing.T) {
 		t.Fatalf("missing: %v %v", probs, missing)
 	}
 	// The form may retain missing members, but cannot add a new missing slug.
-	must(a.SaveGroup("regression", "review", workspace.UserGroup{Name: "review", Title: "keep", Problems: g.Problems}))
-	if err := a.SaveGroup("regression", "review", workspace.UserGroup{Name: "review", Problems: []string{"not-a-problem"}}); err == nil {
+	must(a.SaveGroup("leetcode-regression", "review", workspace.UserGroup{Name: "review", Title: "keep", Problems: g.Problems}))
+	if err := a.SaveGroup("leetcode-regression", "review", workspace.UserGroup{Name: "review", Problems: []string{"not-a-problem"}}); err == nil {
 		t.Fatal("saved new missing member")
 	}
-	must(a.CopyGroup("regression", "review", "copy", ""))
-	must(a.RemoveGroupProblems("regression", "review", []string{"two-sum"}))
-	path := a.WS.UserGroupsPath("regression")
+	must(a.CopyGroup("leetcode-regression", "review", "copy", ""))
+	must(a.RemoveGroupProblems("leetcode-regression", "review", []string{"two-sum"}))
+	path := a.WS.UserGroupsPath("leetcode-regression")
 	must(os.WriteFile(path, []byte("groups:\n  - name: broken\n    unknown: true\n"), 0o644))
-	if _, err := a.ResolveGroup("regression", "design"); err == nil {
+	if _, err := a.ResolveGroup("leetcode-regression", "design"); err == nil {
 		t.Fatal("unqualified lookup ignored corrupted data")
 	}
-	if _, err := a.ResolveGroup("regression", "pack:design"); err != nil {
+	if _, err := a.ResolveGroup("leetcode-regression", "pack:design"); err != nil {
 		t.Fatal(err)
 	}
 	// A malformed personal file in a pack with no manifest groups must
@@ -128,13 +128,13 @@ func TestPersonalGroupsMissingAndMalformed(t *testing.T) {
 	if _, err := a.ResolveGroup("", "pack:design"); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := a.FilterProblems(all, "regression", ""); err != nil {
+	if _, _, err := a.FilterProblems(all, "leetcode-regression", ""); err != nil {
 		t.Fatal("corrupted personal file broke all problems:", err)
 	}
-	if err := a.CreateGroup("regression", "new", ""); err == nil {
+	if err := a.CreateGroup("leetcode-regression", "new", ""); err == nil {
 		t.Fatal("overwrote corrupted file")
 	}
-	if k, err := a.WS.Pack("regression"); err != nil || k.Err != nil {
+	if k, err := a.WS.Pack("leetcode-regression"); err != nil || k.Err != nil {
 		t.Fatalf("personal data invalidated pack: %v %v", k, err)
 	}
 }
@@ -235,21 +235,21 @@ func TestSaveEditedGroupCopy(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	must(a.WS.UpdateUserGroups("regression", func(gs []workspace.UserGroup) ([]workspace.UserGroup, error) {
+	must(a.WS.UpdateUserGroups("leetcode-regression", func(gs []workspace.UserGroup) ([]workspace.UserGroup, error) {
 		return append(gs, workspace.UserGroup{Name: "source", Problems: []string{"two-sum", "gone"}}), nil
 	}))
-	source, err := a.ResolveGroup("regression", "user:source")
+	source, err := a.ResolveGroup("leetcode-regression", "user:source")
 	must(err)
 	// Capture the source when opening the editor, rather than re-reading it
 	// on save and losing the user's draft when it changes elsewhere.
-	must(a.DeleteGroup("regression", "source"))
+	must(a.DeleteGroup("leetcode-regression", "source"))
 	must(a.SaveGroupCopy(source, workspace.UserGroup{Name: "copy", Title: "Edited copy", Problems: []string{"gone", "lru-cache"}}))
-	copy, err := a.ResolveGroup("regression", "user:copy")
+	copy, err := a.ResolveGroup("leetcode-regression", "user:copy")
 	must(err)
 	if !slices.Equal(copy.Problems, []string{"gone", "lru-cache"}) {
 		t.Fatalf("copy: %+v", copy)
 	}
-	path := a.WS.UserGroupsPath("regression")
+	path := a.WS.UserGroupsPath("leetcode-regression")
 	before, err := os.ReadFile(path)
 	must(err)
 	err = a.SaveGroupCopy(source, workspace.UserGroup{Name: "invalid", Problems: []string{"new-missing"}})

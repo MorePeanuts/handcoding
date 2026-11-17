@@ -35,7 +35,7 @@ function plan(files, {event = 'pull_request', full = false, knownProblems = []} 
       addPackages(`./internal/lang/${driver[1]}`, './internal/app', './internal/cli', './internal/tui', './internal/leetcode');
       reasons.add(`Driver: ${id}`); continue;
     }
-    const corpus = file.match(/^testdata\/regression\/problems\/([^/]+)\/(.+)$/);
+    const corpus = file.match(/^testdata\/(?:leetcode-regression|protocol-regression)\/problems\/([^/]+)\/(.+)$/);
     if (corpus) {
       const slug = corpus[1].replace(/^\d+-/, '');
       if (!knownProblems.includes(slug)) { all('Removed or unrecognized regression problem', true); continue; }
@@ -58,7 +58,7 @@ function plan(files, {event = 'pull_request', full = false, knownProblems = []} 
       addPackages('./internal/app', './internal/cli', './internal/tui');
       reasons.add('Agent/skill integration'); continue;
     }
-    const shared = /^(testdata\/regression\/pack\.yaml$|internal\/(app|runner|judge|problem|workspace|pack|git|store|regression|testenv|version|leetcode)\/|internal\/lang\/|cmd\/|docs\/docs\.go$|docs\/protocol\.md$|\.github\/|scripts\/|go\.(mod|sum)$|Makefile$|pyproject\.toml$|uv\.lock$|\.python-version$|\.golangci|\.goreleaser)/.test(file);
+    const shared = /^(testdata\/(?:leetcode-regression|protocol-regression)\/pack\.yaml$|internal\/(app|runner|judge|problem|workspace|pack|git|store|regression|testenv|version|leetcode)\/|internal\/lang\/|cmd\/|docs\/docs\.go$|docs\/protocol\.md$|\.github\/|scripts\/|go\.(mod|sum)$|Makefile$|pyproject\.toml$|uv\.lock$|\.python-version$|\.golangci|\.goreleaser)/.test(file);
     all(`${shared ? 'Shared' : 'Unclassified'}: ${file}`, !shared);
   }
   const mode = full || fallback || files === null || event !== 'pull_request' ? 'full' : 'smoke';
@@ -89,8 +89,9 @@ if (require.main === module) {
     files = execFileSync('git', ['diff', '--no-renames', '--name-only', '-z', base, head], {maxBuffer: 16 * 1024 * 1024})
       .toString().split('\0').filter(Boolean);
   } catch (error) { console.log(`Full fallback: ${error.message}`); }
-  const knownProblems = fs.readdirSync('testdata/regression/problems', {withFileTypes: true})
-    .filter(d => d.isDirectory()).map(d => d.name.replace(/^\d+-/, ''));
+  const knownProblems = ['leetcode-regression', 'protocol-regression'].flatMap(pack =>
+    fs.readdirSync(`testdata/${pack}/problems`, {withFileTypes: true})
+      .filter(d => d.isDirectory()).map(d => d.name.replace(/^\d+-/, '')));
   const result = plan(files, {event: kind, knownProblems,
     full: kind === 'workflow_dispatch' || event.pull_request?.labels?.some(l => l.name === 'ci:full')});
   const tests = result.unit || result.integration.length > 0 || result.languages.length > 0;

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -16,19 +17,21 @@ import (
 // instead of silently passing with no work. An empty slug asks about a language.
 func Select(t testing.TB) func(language, slug string) bool {
 	t.Helper()
-	probs, loadErrors, err := pack.LoadProblems(ProblemsDir(), Name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(probs) == 0 {
-		t.Fatal("no problems in the regression set")
-	}
-	if len(loadErrors) != 0 {
-		t.Fatal(loadErrors)
-	}
-	slugs := make([]string, 0, len(probs))
-	for _, p := range probs {
-		slugs = append(slugs, p.Slug)
+	var slugs []string
+	for _, corpus := range Packs() {
+		probs, loadErrors, err := pack.LoadProblems(filepath.Join(corpus.Dir, pack.ProblemsDir), corpus.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(probs) == 0 {
+			t.Fatal("no problems in the regression set")
+		}
+		if len(loadErrors) != 0 {
+			t.Fatal(loadErrors)
+		}
+		for _, p := range probs {
+			slugs = append(slugs, p.Slug)
+		}
 	}
 	if value := os.Getenv("HC_TEST_SELECTION"); value != "" {
 		if os.Getenv("HC_TEST_LANGUAGES") != "" || os.Getenv("HC_TEST_PROBLEMS") != "" {

@@ -1,5 +1,5 @@
- hc   regression / 1. Two Sum  two-sum   Easy   array · hash-table                                en
- Go   …/solutions/regression/go/0001-two-sum/solution.go  ● attempted
+ hc   leetcode-regression / 1. Two Sum  two-sum   Easy   array · hash-table                       en
+ Go   …/solutions/leetcode-regression/go/0001-two-sum/solution.go  ● attempted
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  Statement  Cases 9
                                                                                                    ┃
@@ -26,5 +26,5 @@
                                                                                                    │
   Example 2:                                                                                       │
 ────────────────────────────────────────────────────────────────────────────────────────────────────
-copied: …/solutions/regression/go/0001-two-sum/solution.go
+copied: …/solutions/leetcode-regression/go/0001-two-sum/solution.go
  t test    s submit    d debug    e edit    h history    : command    ? help          top · 54 lines

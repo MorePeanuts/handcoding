@@ -17,22 +17,22 @@ func TestWorkspaceHistoryColumns(t *testing.T) {
 	h := newHarness(t)
 	m := h.m
 	addLocal(t, m, "0001-two-sum")
-	refs := []string{"regression/two-sum", "local/two-sum", "regression/lru-cache", "regression/maximum-depth-of-binary-tree", "regression/中文题目", "missing/two-sum"}
+	refs := []string{"leetcode-regression/two-sum", "local/two-sum", "leetcode-regression/lru-cache", "leetcode-regression/maximum-depth-of-binary-tree", "leetcode-regression/中文题目", "missing/two-sum"}
 	addSubs(t, m, "", refs...)
 	// Exercise optional and nonnumeric IDs using the already-loaded metadata.
 	for _, tab := range m.tabs {
 		for _, p := range tab.probs {
 			switch p.Ref() {
-			case "regression/two-sum":
+			case "leetcode-regression/two-sum":
 				p.Titles = map[string]string{"zh-CN": "两数之和"}
-			case "regression/lru-cache":
+			case "leetcode-regression/lru-cache":
 				p.ID = ""
-			case "regression/maximum-depth-of-binary-tree":
+			case "leetcode-regression/maximum-depth-of-binary-tree":
 				p.ID = "LCR 001"
 			}
 		}
 	}
-	m.locales["regression"] = &packLocale{locales: []string{"en", "zh-CN"}, current: "zh-CN"}
+	m.locales["leetcode-regression"] = &packLocale{locales: []string{"en", "zh-CN"}, current: "zh-CN"}
 	h.press("h")
 	at := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
 	elapsed := int64(1)
@@ -60,7 +60,7 @@ func TestWorkspaceHistoryColumns(t *testing.T) {
 			t.Fatalf("history header no longer matches the problem list: %q", lines[:6])
 		}
 		if width == 160 {
-			for i, name := range []string{"regression/两数之和", "local/Two Sum", "regression/LRU 缓存", "regression/二叉树的最大深度", "regression/中文题目", "missing/two-sum"} {
+			for i, name := range []string{"leetcode-regression/两数之和", "local/Two Sum", "leetcode-regression/LRU 缓存", "leetcode-regression/二叉树的最大深度", "leetcode-regression/中文题目", "missing/two-sum"} {
 				if !strings.Contains(lines[6+i], name) {
 					t.Fatalf("title or fallback missing: %q, want %q", lines[6+i], name)
 				}
@@ -143,13 +143,13 @@ func TestHistoryColumnsRefreshAndEmpty(t *testing.T) {
 	}
 	// Resolve the same slug against its own pack, and re-read IDs from the
 	// loaded metadata after a refresh rather than caching them in history.
-	addSubs(t, m, "", "regression/two-sum")
+	addSubs(t, m, "", "leetcode-regression/two-sum")
 	m.loadHistory()
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 20})
 	if !strings.HasPrefix(strings.Split(h.view(), "\n")[6], "▌ 1 ") {
 		t.Fatal("problem ID missing")
 	}
-	p := m.commandProblem("regression/two-sum")
+	p := m.commandProblem("leetcode-regression/two-sum")
 	p.ID = "题 001"
 	if !strings.HasPrefix(strings.Split(h.view(), "\n")[6], "▌ 题 001 ") {
 		t.Fatal("updated Unicode ID missing")

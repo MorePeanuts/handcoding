@@ -581,7 +581,7 @@ hc import ./my-problems/            # import problem directories shared by other
 hc rm my-problem                    # remove a problem (--purge: your solutions and history of it too)
 ```
 
-`hc fetch`, `hc new` and `hc import` write into `packs/local/problems/`. The format of a problem, from `problem.yaml` to the reference solution, is specified by the [problem protocol](protocol.md); `hc new` scaffolds one to fill in, and hc's regression set ([`testdata/regression`](../testdata/regression) in its repository) has complete examples of every feature.
+`hc fetch`, `hc new` and `hc import` write into `packs/local/problems/`. The format of a problem, from `problem.yaml` to the reference solution, is specified by the [problem protocol](protocol.md); `hc new` scaffolds one to fill in, and hc's regression set ([`testdata`](../testdata) in its repository) has complete examples of every feature.
 
 - `hc cases build` runs a reference solution: the Go one if there is one, else the Python one; `-l` picks one. It refuses problems judged with `any_of`, whose `expected` lists every acceptable answer and has to be written by hand.
 - `hc validate` reports every break of the protocol's [validity rules](protocol.md#validity-rules) as an error, with the case number and field. With `--run` it also runs every reference solution on every case, and through the checker if there is one. It warns about an undecided judge rule (no `judge.compare`), no cases, cases without `expected`, generated cases without a digest, stored cases over 100 KB, no case marked as an example, no reference solution or none in a language the pack is solved in, and statement images that do not exist. `hc test`, `hc submit` and `hc debug` refuse to run a case that breaks these rules, and name it.

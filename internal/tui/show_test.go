@@ -15,8 +15,8 @@ import (
 func TestShowProblem(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct{ ref, group string }{
-		{"regression/lru-cache", "pack:design"},
-		{"regression/two-sum", ""},
+		{"leetcode-regression/lru-cache", "pack:design"},
+		{"leetcode-regression/two-sum", ""},
 		{"local/two-sum", ""},
 	} {
 		t.Run(tt.ref, func(t *testing.T) {
@@ -59,7 +59,7 @@ func TestShowProblem(t *testing.T) {
 func TestShowLocale(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	p, err := h.m.app.WS.Problem("regression/two-sum")
+	p, err := h.m.app.WS.Problem("leetcode-regression/two-sum")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,9 +102,9 @@ func TestShowMissingProblem(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	_, err := newModel(h.m.ctx, h.m.app, Options{
-		Lang: h.m.lang, Theme: "dark", Problem: &problem.Problem{Pack: "regression", Slug: "removed"},
+		Lang: h.m.lang, Theme: "dark", Problem: &problem.Problem{Pack: "leetcode-regression", Slug: "removed"},
 	})
-	if err == nil || !strings.Contains(err.Error(), "regression/removed") {
+	if err == nil || !strings.Contains(err.Error(), "leetcode-regression/removed") {
 		t.Fatalf("missing problem: %v", err)
 	}
 }

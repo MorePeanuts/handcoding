@@ -36,6 +36,11 @@ func newWorkspace(t *testing.T) *app.App {
 	if err := regression.Install(ws); err != nil {
 		t.Fatal(err)
 	}
+	return regressionApp(t, ws)
+}
+
+func regressionApp(t *testing.T, ws *workspace.Workspace) *app.App {
+	t.Helper()
 	// The python3 on PATH, rather than a virtual environment that may need
 	// the network.
 	ws.Config.Python.Interpreter = "python3"
@@ -93,7 +98,7 @@ func TestRegressionReferences(t *testing.T) {
 	if want("go", "") {
 		requireTools(t, "go")
 	}
-	a := newWorkspace(t)
+	a := newRegressionWorkspace(t)
 	probs, err := a.WS.Problems()
 	if err != nil {
 		t.Fatal(err)
@@ -108,12 +113,12 @@ func TestRegressionReferences(t *testing.T) {
 		if !want("python", p.Slug) && !want("go", p.Slug) && !want("java", p.Slug) {
 			continue
 		}
-		t.Run(p.Slug, func(t *testing.T) {
+		t.Run(p.Ref(), func(t *testing.T) {
 			t.Parallel()
 			if err := p.Validate(); err != nil {
 				t.Fatalf("invalid problem: %v", err)
 			}
-			for _, err := range pack.IdentityErrors(p, probs) {
+			for _, err := range pack.IdentityErrors(p, slices.DeleteFunc(slices.Clone(probs), func(peer *problem.Problem) bool { return peer.Pack != p.Pack })) {
 				t.Error(err)
 			}
 			cases, err := p.LoadCases()
@@ -167,7 +172,7 @@ func TestGoMinimumVersion(t *testing.T) {
 		t.Skip("Go regression not selected")
 	}
 	requireTools(t, "go")
-	a := newWorkspace(t)
+	a := newRegressionWorkspace(t)
 	probs, err := a.WS.Problems()
 	if err != nil {
 		t.Fatal(err)
@@ -181,7 +186,7 @@ func TestGoMinimumVersion(t *testing.T) {
 		if !ok {
 			continue
 		}
-		t.Run(p.Slug, func(t *testing.T) {
+		t.Run(p.Ref(), func(t *testing.T) {
 			t.Parallel()
 			if err := l.CheckMinVersion(context.Background(), p, ref); err != nil {
 				t.Error(err)
@@ -449,7 +454,7 @@ func TestCPPMinimumVersion(t *testing.T) {
 	}
 	testenv.LookPath(t, cpp.DefaultCompiler())
 	requireTools(t, "python3")
-	a := newWorkspace(t)
+	a := newRegressionWorkspace(t)
 	a.WS.Config.CPP.Standard = cpp.MinStandard
 	a.Langs = app.Languages(a.WS)
 	probs, err := a.WS.Problems()
@@ -460,7 +465,7 @@ func TestCPPMinimumVersion(t *testing.T) {
 		if !want("cpp", p.Slug) {
 			continue
 		}
-		t.Run(p.Slug, func(t *testing.T) {
+		t.Run(p.Ref(), func(t *testing.T) {
 			t.Parallel()
 			l := mustLang(t, a, "cpp").(cpp.Language)
 			file, ok := p.Reference(l.SolutionFile())
@@ -500,7 +505,7 @@ func TestCMinimumVersion(t *testing.T) {
 	}
 	testenv.LookPath(t, clang.DefaultCompiler())
 	requireTools(t, "python3")
-	a := newWorkspace(t)
+	a := newRegressionWorkspace(t)
 	a.WS.Config.C.Standard = clang.MinStandard
 	a.WS.Config.C.GLib = "disabled"
 	a.Langs = app.Languages(a.WS)
@@ -512,7 +517,7 @@ func TestCMinimumVersion(t *testing.T) {
 		if !want("c", p.Slug) {
 			continue
 		}
-		t.Run(p.Slug, func(t *testing.T) {
+		t.Run(p.Ref(), func(t *testing.T) {
 			t.Parallel()
 			l := mustLang(t, a, "c").(clang.Language)
 			file, ok := p.Reference(l.SolutionFile())
@@ -557,7 +562,7 @@ func TestECMAScriptReferences(t *testing.T) {
 	if want("typescript", "") {
 		requireTools(t, "tsc")
 	}
-	a := newWorkspace(t)
+	a := newRegressionWorkspace(t)
 	probs, err := a.WS.Problems()
 	if err != nil {
 		t.Fatal(err)
@@ -566,7 +571,7 @@ func TestECMAScriptReferences(t *testing.T) {
 		if !want("javascript", p.Slug) && !want("typescript", p.Slug) {
 			continue
 		}
-		t.Run(p.Slug, func(t *testing.T) {
+		t.Run(p.Ref(), func(t *testing.T) {
 			t.Parallel()
 			cases, err := p.LoadCases()
 			if err != nil {
