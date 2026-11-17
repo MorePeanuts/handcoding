@@ -1,0 +1,24 @@
+ hc   Pack manager · 2 packs
+Install a pack
+────────────────────────────────────────
+Source (Git URL or local directory)
+> https://github.com/MorePeanuts/leetcod
+
+Tag or branch (optional)
+> Default branch
+
+Install only sources you trust:
+reference solutions and checkers run
+locally.
+
+
+
+
+
+
+
+
+────────────────────────────────────────
+
+ tab field   enter next / install
+ esc cancel

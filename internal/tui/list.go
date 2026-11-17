@@ -206,6 +206,8 @@ func (m *model) updateList(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.switchPack(1)
 	case "shift+tab":
 		m.switchPack(-1)
+	case "p":
+		m.openPackManager(true)
 	case "c":
 		m.openGroups()
 	case "a":
@@ -342,7 +344,7 @@ func (m *model) ready(p *problem.Problem) bool {
 
 // listKeys are the keys of the problem list, the common ones first.
 func (m *model) listKeys() []string {
-	keys := []string{"↑↓ move", "enter open"}
+	keys := []string{"↑↓ move", "enter open", "p packs"}
 	if m.multiPack {
 		keys = append(keys, "tab pack")
 	}

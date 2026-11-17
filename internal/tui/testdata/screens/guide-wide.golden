@@ -1,16 +1,16 @@
  hc   TUI Guide · Workflows & commands
-Start here  ·  1/8                                                                    top · 30 lines
+Start here  ·  1/9                                                                    top · 31 lines
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 ── Guide ─────────────────────  │                                                                  ┃
 ▌ Start here                    │    Make progress without leaving the TUI                         ┃
   Browse, view & open           │                                                                  ┃
   Search while browsing         │   Browse a problem, read its statement, open a solution in       ┃
   Workspace & pack settings     │   your editor, then test, submit and review.                     ┃
-  Personal & pack groups        │                                                                  ┃
-  Test, submit & debug          │   ## A first session                                             ┃
-  Review past submissions       │                                                                  ┃
-  Command mode & context        │   1. Choose a pack and highlight a problem.                      ┃
-                                │   2. Press v to read it without creating files, or Enter to      ┃
+  Manage packs                  │                                                                  ┃
+  Personal & pack groups        │   ## A first session                                             ┃
+  Test, submit & debug          │                                                                  ┃
+  Review past submissions       │   1. Choose a pack and highlight a problem.                      ┃
+  Command mode & context        │   2. Press v to read it without creating files, or Enter to      ┃
                                 │   create a missing solution template and copy its path.          ┃
                                 │   3. Press e to edit, t to test examples, and s to judge and     ┃
                                 │   record a submission.                                           ┃
@@ -19,12 +19,12 @@ Start here  ·  1/8                                                             
                                 │                                                                  ┃
                                 │   ## Find your way                                               ┃
                                 │                                                                  ┃
-                                │   Esc goes back. :list returns to the problem list. :pack list   ┃
-                                │   opens the pack picker. :q exits the TUI.                       │
+                                │   Press p in the problem list to manage packs. Esc goes back.    │
+                                │   :list returns to the problem list. :pack list opens the pack   │
+                                │   manager. :q exits the TUI.                                     │
                                 │                                                                  │
                                 │   ? opens the current page's scrollable shortcut reference;      │
                                 │   q/Esc/? closes it. This guide explains the workflow. Use Tab   │
-                                │   / Shift+Tab to change topics, j/k or Up/Down to scroll,        │
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 
  tab/⇧tab topic    / search    q back    ? keys

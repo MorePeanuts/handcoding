@@ -188,8 +188,10 @@ To open a problem directly, run `hc show 707` or `hc show <pack>/<slug>`. In a t
 - The list shows one pack at a time. With more than one pack, a tab bar at the top names each pack with its progress (solved/total), and `tab` / `shift+tab` switch packs; on a narrow terminal the bar scrolls to keep the current pack in view. A pack without problems or personal groups, such as a new `local`, gets no tab unless `--pack` names it or no pack has problems yet.
 - `m` stars a problem you want to come back to, and `m` again unstars it. Starred problems show `★` in the list and the statement's title, and the `f` filter can list only them. Stars are kept in `.hc/hc.db`, and survive discarding a problem's solution.
 - `c` chooses a personal group, a group from the pack, or all of its problems, and shows the progress of each. The SOURCE column shows `user` for personal groups and stays blank for pack groups; names have no prefix in the TUI. In the picker, `n` creates a personal group, `e` edits it (including member order), `C` copies either kind of group, and `x` deletes a personal group after asking. In the problem list, `a` adds the selected problem to a personal group; `n` in that picker creates one containing the problem. A group lists its problems in the group's order. Search and the filter apply to the pack and group shown.
-- With more than one pack that has problems, `hc` opens on a pack picker that lists them with their progress, the pack you were in last under the cursor. `enter` opens a pack's list, and `esc` on the list comes back to the picker. With one such pack, `hc` opens its list directly.
-- `hc --pack <name>` (or `hc list --pack <name>`) skips the picker and opens that pack, even an empty one, and `--group <name>` that group (an unambiguous group needs no `--pack`; use `user:<name>` or `pack:<name>` when the sources share a name). Each pack opens on the group you chose last.
+- With more than one pack that has problems, `hc` opens on a pack manager that lists them with their progress, the pack you were in last under the cursor. `enter` opens a pack's list, and `esc` on the list comes back to the manager. With one such pack, `hc` opens its list directly.
+- Press `p` from the problem list, or run `:pack list`, to open pack management at any time. It includes empty, missing, unmanaged and unreadable packs. `enter` opens a readable pack; `v` shows its metadata, source, revision, progress and any loading error. `esc` returns to the list when opened with `p`.
+- In a practice workspace, `i` opens the install form (Git URL or local directory, optional tag/branch; relative paths use the workspace root). `tab` changes fields and `enter` on the ref field installs. `u` updates the selected managed pack; `x` asks before uninstalling and keeps solutions, personal cases, groups and submission history. `r` restores all missing packs at their recorded commits. Operations show progress and results in the page; `esc` or `ctrl+c` cancels an active operation and waits for it to finish before returning. A pack checkout supports browsing and details only.
+- `hc --pack <name>` (or `hc list --pack <name>`) skips the manager and opens that pack, even an empty one, and `--group <name>` that group (an unambiguous group needs no `--pack`; use `user:<name>` or `pack:<name>` when the sources share a name). Each pack opens on the group you chose last.
 - `i` switches the statement language of a pack whose statements come in [several languages](#statements-in-several-languages): titles in the list, and the statement on the detail screen. The list header and the statement's title line show the one in use.
 
 Press `/` to search as you type. While typing, `↑` / `↓` or `ctrl+p` / `ctrl+n` move the result highlight without leaving the input. `ctrl+o` opens the highlighted problem; returning restores the query, highlight and active input. `enter` finishes typing and browses from the highlighted result; `esc` clears the search. Editing the query moves the highlight to the first match, but moving the text cursor does not. Spaces and ordinary list shortcuts such as `j` / `k` remain query text.
@@ -212,9 +214,10 @@ Exact and prefix searches compare the ID's text (including leading zeros); they 
 | `y` | Copy the solution path again | `L` | Switch language |
 | `r` | Reset to the template | `D` | Discard: delete the solution and its history, back to not started |
 | `/` | Search | `f` | Filter: all / unsolved / solved / starred |
+| `p` | Open pack management from the list | `v` (in pack management) | View pack details |
 | `tab` / `shift+tab` | Next / previous pack | `c` | Choose a group of the pack |
 | `v` | View the statement only | `o` | Open the statement's images (statement view); the submission's problem (workspace history) |
-| `i` | Switch the statement language | `esc` / `q` | Back (`esc` on the list: to the pack picker); `q` on the list quits |
+| `i` | Switch the statement language | `esc` / `q` | Back (`esc` on the list: to the pack manager); `q` on the list quits |
 | `m` | Star or unstar the problem (`★` in the list) | `ctrl+c` | Quit |
 | `?` | Every key of the screen (the bottom line prioritizes page actions) | `tab` | Result and submission: switch between the cases and the program's output (result) or the code (submission) |
 | `↑↓` / `j` `k` | Result and submission, cases tab: select a case, whose input, output and expected output show under it | `d` | Result and submission, cases tab: debug the selected case |
@@ -307,7 +310,7 @@ command.
 | `:open two-sum` | Create the selected language's template if missing, open its details and copy its path, like Enter in the list. Existing code is kept. |
 | `:group` / `:group list` | Open the current pack's group picker; `--pack` chooses another pack. |
 | `:group show user:practice` | Browse that group's members in their stored order. |
-| `:pack list` | Open the pack picker. |
+| `:pack list` | Open the pack manager. |
 | `:cases list [problem]` | View cases; `-c` filters by original case numbers and `-v` shows complete values. |
 | `:history [problem]` | Browse all submissions, or those of the explicitly named problem. |
 | `:history show 42` | View that submission's report, saved code and notes. |

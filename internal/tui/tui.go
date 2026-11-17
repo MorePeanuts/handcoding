@@ -164,7 +164,8 @@ type model struct {
 	commandHistory []string
 	pageReturns    []pageReturn
 	guide          *guidePage
-	// packCursor is the cursor of the pack picker, an index into tabs.
+	// packCursor is an index into the complete management list.
+	packs      *packPage
 	packCursor int
 	packOffset int
 	// multiPack is set when the list has several tabs: the detail screen
@@ -547,6 +548,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// The program had the mode off, and the theme may have switched
 		// meanwhile.
 		return m, m.themeReports()
+	case packTickMsg:
+		if m.packs != nil && m.packs.operation == msg.op && msg.op.cancel != nil {
+			return m, packTick(msg.op)
+		}
+		return m, nil
+	case packDoneMsg:
+		m.finishPackOperation(msg)
+		return m, nil
 	case commandDoneMsg:
 		return m, m.finishCommand(msg)
 	case tea.FocusMsg:
@@ -571,6 +580,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setTheme(ui.ThemeLight)
 		return m, nil
 	case tea.PasteMsg:
+		if m.top() == screenPacks && m.packs != nil && m.packs.form != nil {
+			return m.updatePackForm(msg)
+		}
 		if m.help {
 			return m, nil
 		}
@@ -601,6 +613,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateGroupForm(msg)
 		}
 	case tea.KeyPressMsg:
+		if m.top() == screenPacks && m.packs != nil && (m.packs.form != nil || m.packs.operation != nil) {
+			return m.updatePacks(msg)
+		}
 		if msg.String() == "ctrl+c" {
 			if m.settings != nil && m.settings.cancel != nil {
 				m.settings.cancel()
@@ -772,7 +787,7 @@ func (m *model) screenKeys() (string, []string) {
 	case screenGuide:
 		return "guide", guideKeys
 	case screenPacks:
-		return "packs", packKeys
+		return "packs", m.packKeys()
 	case screenDetail:
 		if m.detailTab == tabProblemCases {
 			return "cases", m.detailKeys()

@@ -1,0 +1,24 @@
+ hc   Pack manager · 2 packs
+Pack details
+────────────────────────────────────────
+Name: regression                       ┃
+Status: unmanaged                      ┃
+Problems: 50                           ┃
+Solved: 0                              ┃
+Directory: /workspace/packs/regression ┃
+Title: hc regression set               ┃
+Version:                               ┃
+Protocol: 1                            ┃
+Languages: go, python, cpp, java,      ┃
+javascript, typescript                 ┃
+Locales: en, zh-CN                     ┃
+Authors:                               ┃
+License: MIT                           ┃
+Homepage:                              │
+                                       │
+hc's own test data: problems that      │
+together use every type, kind, compare │
+────────────────────────────────────────
+
+ ↑↓ scroll   esc back   : command
+ ? help

@@ -1,9 +1,8 @@
- hc   2 packs                                                                          choose a pack
-
-  PACK        TITLE                 SOLVED  DESCRIPTION
+ hc   Pack manager · 2 packs
+  PACK                  STATE         SOLVED  TITLE
 ────────────────────────────────────────────────────────────────────────────────────────────────────
-▌ local                                0/1  your own problems
-  regression  hc regression set       0/50  hc's own test data: problems that together use every ty…
+▌ local                 local            0/1
+  regression            unmanaged       0/50  hc regression set
 
 
 
@@ -27,4 +26,5 @@
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 
- enter open    q quit    : command    ? help
+ enter open   v details   i install   u update   x uninstall   r restore missing   esc quit   q quit
+ : command   ? help

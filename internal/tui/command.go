@@ -35,6 +35,8 @@ func (m *model) canCommand() bool {
 		return false
 	}
 	switch m.top() {
+	case screenPacks:
+		return m.packs == nil || m.packs.form == nil && m.packs.operation == nil
 	case screenSettings:
 		return m.settings != nil && !m.settings.editing && !m.settings.inspecting && !m.settings.searching && m.settings.picker == "" && !m.settings.showReport
 	case screenGuide:

@@ -139,8 +139,7 @@ func (m *model) nativeCommand(c Command) (tea.Cmd, error) {
 		case "group", "group list":
 			m.openGroups()
 		case "pack list":
-			m.stack = []screen{screenPacks}
-			m.packCursor = max(slices.IndexFunc(m.tabs, func(t packTab) bool { return t.pack.Name == m.pack }), 0)
+			m.openPackManager(false)
 		}
 		return nil, nil
 	case "history", "history show":
