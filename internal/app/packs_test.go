@@ -13,6 +13,7 @@ import (
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/pack"
+	"github.com/MorePeanuts/handcoding/internal/problem"
 	"github.com/MorePeanuts/handcoding/internal/regression"
 	"github.com/MorePeanuts/handcoding/internal/store"
 	"github.com/MorePeanuts/handcoding/internal/testenv"
@@ -52,7 +53,7 @@ var tinyProblems = []string{"0001-two-sum", "0027-remove-element", "2469-convert
 // writeTinyPack writes a pack called tiny into dir, holding tinyProblems.
 func writeTinyPack(t *testing.T, dir string) {
 	t.Helper()
-	manifest := "protocol: 1\nname: tiny\nversion: 1.0.0\ntitle: Tiny\nlanguages: [go, python, cpp, java, javascript, typescript]\nlocales: [en, zh-CN]\ngroups:\n  - name: easy\n    problems: [two-sum, remove-element]\n"
+	manifest := "protocol: 1\nname: tiny\nversion: 1.0.0\ntitle: Tiny\nlanguages: [go, python]\nlocales: [en, zh-CN]\ngroups:\n  - name: easy\n    problems: [two-sum, remove-element]\n"
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -60,8 +61,27 @@ func writeTinyPack(t *testing.T, dir string) {
 		t.Fatal(err)
 	}
 	for _, p := range tinyProblems {
-		if err := os.CopyFS(filepath.Join(dir, pack.ProblemsDir, p), os.DirFS(filepath.Join(regression.ProblemsDir(), p))); err != nil {
-			t.Fatal(err)
+		copyBusinessProblem(t, filepath.Join(dir, pack.ProblemsDir, p), p)
+	}
+}
+
+// copyBusinessProblem keeps two real drivers for cross-language orchestration
+// tests. Other drivers belong to the corpus test, not each pack operation.
+func copyBusinessProblem(t *testing.T, dest, name string) {
+	t.Helper()
+	if err := os.CopyFS(dest, os.DirFS(filepath.Join(regression.ProblemsDir(), name))); err != nil {
+		t.Fatal(err)
+	}
+	refs := filepath.Join(dest, problem.ReferenceDir)
+	entries, err := os.ReadDir(refs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.Name() != "solution.go" && entry.Name() != "solution.py" {
+			if err := os.RemoveAll(filepath.Join(refs, entry.Name())); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 }
