@@ -28,6 +28,18 @@ func TestProbeDeadline(t *testing.T) {
 	}
 }
 
+func TestProbeSlowStart(t *testing.T) {
+	t.Parallel()
+	sh := testenv.LookPath(t, "sh")
+	sleep := testenv.LookPath(t, "sleep")
+	// A slow startup must not be mistaken for a broken tool at the old
+	// three-second deadline. Pass paths as arguments, not shell source.
+	out, err := Probe(t.Context(), sh, nil, "-c", `"$1" 4; printf 'v22.0.0\n'`, "probe", sleep)
+	if err != nil || string(out) != "v22.0.0\n" {
+		t.Fatalf("slow probe: output=%q error=%v", out, err)
+	}
+}
+
 // Output can finish after the process exits: for example, a wrapper leaves a
 // descriptor in a child, or the copying goroutine is delayed under load.
 func TestProbeOutputDrain(t *testing.T) {
