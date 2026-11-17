@@ -18,8 +18,10 @@ import (
 
 func newFetchCmd(root *rootOptions) *cobra.Command {
 	var (
-		siteName string
-		force    bool
+		siteName              string
+		force                 bool
+		templatesOnly, dryRun bool
+		languages             []string
 	)
 	cmd := &cobra.Command{
 		Use:     "fetch <slug|id|url>...",
@@ -27,7 +29,8 @@ func newFetchCmd(root *rootOptions) *cobra.Command {
 		Short:   "Import problems from LeetCode",
 		Long: `Download problems from LeetCode's public API into the workspace's own
 problems (packs/local/problems/, or problems/ in a pack checkout): statement
-(with its images, for offline use), signature, Go/Python templates and the
+(with its images, for offline use), signature, native Go, Python, C, C++, Java,
+JavaScript and TypeScript templates when available, and the
 examples (with expected outputs when they can be parsed from the statement).
 Premium problems are not available.
 
@@ -36,6 +39,13 @@ The statements written are those of the pack's locales in pack.yaml
 Both sites have the English statement; only leetcode.cn has the Chinese one
 (zh-CN), so a pack whose default locale is zh-CN fetches from leetcode.cn.
 Fetching a problem again from the other site adds the locales it lacks.
+
+For an existing problem, --templates-only adds missing native templates and
+compatible C bindings without changing curated content or pack languages.
+Existing templates are kept; any difference or incompatible binding blocks
+all changes to that problem. --lang selects languages (repeatable or comma
+separated); --dry-run previews additions, conflicts and unavailable snippets.
+Run this in the pack's authoring checkout, not an installed read-only pack.
 
 The problem is not ready to submit yet: LeetCode publishes only the examples
 and not how answers are judged (any order? several valid answers?).
@@ -46,9 +56,24 @@ judge rule, or set judge.compare by hand.
   hc fetch two-sum 3 146
   hc fetch --site cn lru-cache
   hc fetch https://leetcode.cn/problems/two-sum/description/
-  hc fetch --site cn "LCR 001"`,
+  hc fetch --site cn "LCR 001"
+  hc fetch --templates-only --site cn --lang c,cpp,java --dry-run two-sum
+  hc fetch --templates-only --site cn two-sum lru-cache`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if templatesOnly && force {
+				return errors.New("--templates-only cannot be combined with --force")
+			}
+			if !templatesOnly && (dryRun || cmd.Flags().Changed("lang")) {
+				return errors.New("--lang and --dry-run require --templates-only")
+			}
+			if templatesOnly {
+				var err error
+				languages, err = leetcode.TemplateLanguages(languages)
+				if err != nil {
+					return err
+				}
+			}
 			a, err := root.openApp()
 			if err != nil {
 				return err
@@ -79,7 +104,13 @@ judge rule, or set judge.compare by hand.
 					client = leetcode.NewClient(refSite, a.WS.StatePath())
 					clients[refSite.Name] = client
 				}
-				if err := fetchOne(cmd, a, client, ref, force); err != nil {
+				var fetchErr error
+				if templatesOnly {
+					fetchErr = fetchTemplates(cmd, a, client, ref, languages, dryRun)
+				} else {
+					fetchErr = fetchOne(cmd, a, client, ref, force)
+				}
+				if err := fetchErr; err != nil {
 					fmt.Fprintf(os.Stderr, "%s %s: %v\n", ui.Red.Render("error"), ref, err)
 					failed++
 				}
@@ -92,7 +123,63 @@ judge rule, or set judge.compare by hand.
 	}
 	cmd.Flags().StringVar(&siteName, "site", "", "com or cn (default from hc.yaml)")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "overwrite an existing problem (keeps nothing)")
+	cmd.Flags().BoolVar(&templatesOnly, "templates-only", false, "backfill native templates in existing writable problems")
+	cmd.Flags().StringSliceVarP(&languages, "lang", "l", nil, "template languages, comma separated or repeated (default: all supported)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "preview --templates-only without writing problem content")
 	return cmd
+}
+
+func fetchTemplates(cmd *cobra.Command, a *app.App, client *leetcode.Client, ref string, languages []string, dryRun bool) error {
+	slug, err := client.ResolveSlug(cmd.Context(), ref)
+	if err != nil {
+		return err
+	}
+	q, err := client.Question(cmd.Context(), slug)
+	if err != nil {
+		return err
+	}
+	k := a.WS.WritablePack()
+	if k.Err != nil {
+		return k.Err
+	}
+	p, err := packProblem(k, q.TitleSlug)
+	if err != nil {
+		return err
+	}
+	if p == nil {
+		return fmt.Errorf("no existing writable problem %s; use the pack's authoring checkout to migrate installed problems", q.TitleSlug)
+	}
+	u, err := a.MigrateTemplates(p, q, client.Site, languages, dryRun)
+	if err != nil {
+		return err
+	}
+	state := "updated"
+	if dryRun {
+		state = "preview"
+	}
+	if len(u.Conflicts) > 0 {
+		state = "blocked"
+	}
+	fmt.Printf("%s %s\n", state, a.WS.Ref(p))
+	for _, name := range u.Added {
+		fmt.Printf("    add %s\n", name)
+	}
+	for _, field := range u.Bindings {
+		fmt.Printf("    add binding %s\n", field)
+	}
+	for _, name := range u.Unchanged {
+		fmt.Printf("    unchanged %s\n", name)
+	}
+	for _, language := range u.Missing {
+		fmt.Printf("    unavailable %s: no native snippet on leetcode.%s\n", language, client.Site.Name)
+	}
+	for _, conflict := range u.Conflicts {
+		fmt.Printf("    conflict %s\n", conflict)
+	}
+	if len(u.Conflicts) > 0 {
+		return errors.New("template migration blocked; no changes written to this problem")
+	}
+	return nil
 }
 
 func fetchOne(cmd *cobra.Command, a *app.App, client *leetcode.Client, ref string, force bool) error {
