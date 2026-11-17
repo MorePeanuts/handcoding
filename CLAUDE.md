@@ -100,6 +100,8 @@ go run ./cmd/hc -w testdata/leetcode-regression validate <slug> --run
 
 Without an `hc.yaml` there, hc creates `.hc/venv` on first use; to use an existing Python instead, put `python: {interpreter: python3}` in a (gitignored) `testdata/leetcode-regression/hc.yaml`. `git status` must show only the `cases.jsonl` you meant to change.
 
+CI separates Go test-build caches from lint and saves updated objects after each successful run; `-count=1` prevents cached verdicts. Base packages run with `-p=4`. Integration scheduling (`scripts/test.sh`) isolates `internal/app`, then optionally bounds the remaining packages with `TEST_PACKAGE_JOBS=2 TEST_PACKAGE_PARALLEL=2`. Keep timing-sensitive app tests isolated. Corpus C/C++ builds use compiler wrappers adding `-pedantic-errors` at their minimum standards, combining strict checking and executable compilation; standalone `CheckMinVersion` driver tests remain. Timing reports use layer markers, unioned package intervals and parent CONT/RUN-to-completion spans, not parent `Elapsed` as the duration of parallel children. See CONTRIBUTING.md for the scheduling and cache controls.
+
 ## Conventions
 
 - Platforms: Linux and macOS only (releases build no Windows binaries; the README sends Windows users to WSL). Code may assume Unix (paths, `flock`, executables without `.exe`) and needs no Windows branches; native Windows support is deferred to the VS Code extension.

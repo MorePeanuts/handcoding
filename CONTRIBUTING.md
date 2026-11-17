@@ -39,6 +39,23 @@ packages, rather than maintaining a fragile list of individual unit tests.
 `scripts/test.sh` owns this partition; a new package defaults to the base layer.
 All targets retain race detection and strict missing-tool failures.
 
+CI runs base packages with `-p=4`. Integration runs `internal/app` alone so
+its timing-sensitive tests do not compete with other packages, then uses
+`TEST_PACKAGE_JOBS=2 TEST_PACKAGE_PARALLEL=2` for the remaining packages.
+This bounds package/test concurrency without excluding any tests. Local runs
+keep their `TEST_FLAGS` unless these scheduling variables are set.
+
+C/C++ corpus builds use their minimum standards with `-pedantic-errors`, so
+the executable build also performs strict compatibility checking. They do not
+first compile the same translation unit in a separate syntax-only pass.
+Driver tests retain coverage of default modes and `CheckMinVersion` itself.
+
+Test jobs restore and save a separate Go build cache, publishing a new key
+after every successful run with a restore prefix for the same OS, architecture,
+Go version and dependencies. Lint cannot claim that cache first. CI uses
+`-count=1`: build objects are reusable, test verdicts are not. The first run on
+a new cache prefix is cold; compare a successful rerun to measure reuse.
+
 Use `TEST_PACKAGES` to select base/integration packages, or `HC_TEST_LANGUAGES`
 and `HC_TEST_PROBLEMS` (comma-separated canonical IDs/slugs) for corpus runs:
 
@@ -60,7 +77,7 @@ these conservative rules:
 
 | Changed inputs | Integration / corpus coverage |
 |---|---|
-| Known prose (README, contributing/usage guides) | Planner checks only |
+| Known prose (including testdata READMEs) and regression-pack root `.gitignore` | Planner checks only |
 | CLI/TUI/presentation | Base tests and affected frontend integration; no corpus |
 | A language driver | Driver and application/frontend integration; that language's corpus |
 | JS/TS runtime | Both JavaScript and TypeScript |
@@ -89,8 +106,11 @@ and languages; it does not replace the exact-commit push run required by Release
 The fixed **CI result** check rejects failed/cancelled jobs and unexpected skips;
 use it as the required check when enabling branch protection. Workflow-level
 path filters are intentionally avoided. Job summaries show the test plan,
-package elapsed times and slowest top-level tests; `go test -json` output remains
-in the logs. Compare test-step wall time and runner minutes, not just the number
+layer wall time, the union of package execution intervals, and test-group spans
+including parallel child waits. Leaf-test totals can overlap and must not be
+added to get wall time; parent `Elapsed` alone omits parallel child waits.
+`go test -json` output and layer start/end markers remain in the logs.
+Compare test-step wall time and runner minutes, not just the number
 of jobs. No test timeout is increased by this selection policy.
 
 Use a scratch workspace instead of your own `~/handcoding`:

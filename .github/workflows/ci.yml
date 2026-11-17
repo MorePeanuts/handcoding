@@ -54,8 +54,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
+        id: go
         with:
           go-version-file: go.mod
+          cache: false
+      - name: Go cache paths
+        id: go-cache
+        run: |
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "modules=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+      - name: Restore Go modules
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.go-cache.outputs.modules }}
+          key: hc-test-modules-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum') }}
+      - name: Restore test build cache
+        id: test-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.go-cache.outputs.build }}
+          key: hc-test-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            hc-test-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum') }}-
       # The minimum protocol versions, on both compiler/OS families.
       - uses: actions/setup-java@v6
         with:
@@ -77,29 +97,39 @@ jobs:
           echo "$RUNNER_TEMP/hc-tools" >> "$GITHUB_PATH"
       - if: runner.os == 'macOS'
         run: brew install pkgconf glib
-      # Each package belongs to one layer. Keep native compiler load away
-      # from timing-sensitive tests; don't increase Go's package timeout.
+      # Keep app's timing-sensitive tests isolated, then overlap at most two
+      # integration packages with two active tests each. Never cache verdicts.
       - name: Base tests (Linux)
         if: runner.os == 'Linux' && needs.plan.outputs.unit == 'true'
-        run: make test-unit TEST_FLAGS='-p=1 -parallel=4 -json' | tee test-unit.jsonl
+        run: make test-unit TEST_FLAGS='-count=1 -p=4 -parallel=4 -json' | tee test-unit.jsonl
       - name: Platform base tests (macOS)
         if: runner.os == 'macOS' && needs.plan.outputs.unit == 'true'
-        run: make test-unit TEST_FLAGS='-p=1 -parallel=4 -json' | tee test-unit.jsonl
+        run: make test-unit TEST_FLAGS='-count=1 -p=4 -parallel=4 -json' | tee test-unit.jsonl
         env:
           TEST_PACKAGES: ./internal/git ./internal/workspace ./internal/store ./internal/termimg
       - name: Selected integration tests
         if: needs.plan.outputs.integration != ''
-        run: make test-integration TEST_FLAGS='-p=1 -parallel=4 -json' | tee test-integration.jsonl
+        run: make test-integration TEST_FLAGS='-count=1 -parallel=4 -json' | tee test-integration.jsonl
         env:
           TEST_PACKAGES: ${{ needs.plan.outputs.integration }}
+          TEST_PACKAGE_JOBS: "2"
+          TEST_PACKAGE_PARALLEL: "2"
       - name: Selected regression tests
         if: needs.plan.outputs.regression == 'true'
-        run: make test-regression TEST_FLAGS='-p=1 -parallel=4 -json' | tee test-regression.jsonl
+        run: make test-regression TEST_FLAGS='-count=1 -p=1 -parallel=4 -json' | tee test-regression.jsonl
         env:
           HC_TEST_SELECTION: ${{ needs.plan.outputs.selection }}
       - name: Test timing summary
         if: always()
         run: node .github/scripts/test-report.cjs test-unit.jsonl test-integration.jsonl test-regression.jsonl
+      # Unlike setup-go's immutable dependency-only key, each successful run
+      # publishes newly compiled race/non-race objects for subsequent runs.
+      # Lint owns a separate cache; only build objects, never verdicts, are reused.
+      - name: Save test build cache
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.go-cache.outputs.build }}
+          key: ${{ steps.test-cache.outputs.cache-primary-key }}
 
   lint:
     needs: plan
