@@ -23,7 +23,7 @@ import (
 // leetcode.cn with a Chinese translation too. Both statements show the same
 // image, from a different URL on each site. It replaces both sites until the
 // test ends.
-func fakeLeetCode(t *testing.T) {
+func fakeLeetCode(t *testing.T, edits ...func(map[string]any)) {
 	t.Helper()
 	var img bytes.Buffer
 	if err := png.Encode(&img, image.NewRGBA(image.Rect(0, 0, 2, 2))); err != nil {
@@ -50,6 +50,9 @@ func fakeLeetCode(t *testing.T) {
 			if cn {
 				q["translatedTitle"] = "两数之和"
 				q["translatedContent"] = `<p>返回下标。</p><img src="/img/zh.png"><pre><strong>输出：</strong>[0,1]</pre>`
+			}
+			for _, edit := range edits {
+				edit(q)
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"question": q}})
 		}))

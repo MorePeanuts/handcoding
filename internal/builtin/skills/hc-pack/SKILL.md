@@ -67,8 +67,17 @@ To fix a problem that has landed, use `hc-problem` or `hc-cases` the same
 way, then `hc pack check`. Fixing cases, a reference or a statement is not
 breaking; changing a signature is, since users' solutions must follow it.
 
-If a toolchain prevents validation, `hc doctor --lang go` or
-`hc doctor --lang python` reports its configured executable and version
+To extend an existing curated pack to more languages, first follow
+`hc-problem`'s native-template backfill workflow:
+`hc fetch --templates-only --site cn --lang c,cpp,java,js,ts --dry-run <slug>...`,
+then apply without `--dry-run` after reviewing conflicts. This preserves the
+curated content and only adds native templates and compatible C bindings.
+It does not write references or change `pack.yaml`. Use `hc-cases` to write
+and validate references for each new language before enabling it in the pack,
+then run `hc pack check`. Never use `hc fetch --force` for this migration.
+
+If a toolchain prevents validation, `hc doctor --lang <language>` (Go,
+Python, C, C++, Java, JavaScript or TypeScript) reports its configured executable and version
 without setting up environments or changing the workspace. Report missing
 tools to the user; hc does not install Go or Delve. Python's managed
 environment still uses `hc env sync`, which recreates it. Tool paths belong

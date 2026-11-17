@@ -514,6 +514,34 @@ As on LeetCode, a solution that is correct but too slow fails with Time Limit Ex
 
 ### From LeetCode
 
+For an existing curated problem, use the template migration mode from its
+writable pack checkout (or for your own problems in `packs/local/`):
+
+```sh
+hc fetch --templates-only --site cn --lang c,cpp,java,js,ts --dry-run two-sum lru-cache
+hc fetch --templates-only --site cn --lang c,cpp,java,js,ts two-sum lru-cache
+```
+
+Omit `--lang` to check all supported languages; repeat it or use a comma-separated
+list to select them. Preview reports template additions, C binding additions,
+unchanged templates, conflicts, and native snippets unavailable on that site.
+Unavailable snippets are skipped, never synthesized; API errors are failures.
+Existing templates are never overwritten: a different template, incompatible
+shared signature, or conflicting C binding blocks all changes to that problem.
+Each problem is staged before replacement, and independent problems in a batch
+can still succeed; any failure makes the command exit nonzero. A successful
+repeat makes no content changes.
+
+Migration preserves references, cases, generators, checkers, statements, assets,
+identity, shared signatures and judge rules. It only adds templates and compatible
+missing `c` bindings, keeping other YAML content and comments. It does not change
+`pack.yaml` or enable languages. Write and validate the new references with
+`hc-cases` before enabling those languages in the pack. Installed packs are
+read-only; use their source checkout. `--force` cannot be combined with this mode.
+`--dry-run` leaves problem content untouched; normal workspace settings sync and
+API ID-resolution caching still apply. Problems containing symlinks or other
+non-regular files must be handled manually; migration refuses to replace them.
+
 ```sh
 hc fetch 3 146 lru-cache    # by number, slug or URL, from leetcode.com
 hc fetch --site cn 1        # from leetcode.cn, which also has Chinese statements

@@ -270,8 +270,9 @@ LeetCode, use LeetCode's templates.
 not. Read them if you ran it. Then check:
 
 1. **The signature matches the templates.** Compare `function` (or
-   `class`) in problem.yaml with `templates/solution.go` and
-   `templates/solution.py`: names, order and types of the parameters. For
+   `class`) in problem.yaml with every available native template: Go,
+   Python, C, C++, Java, JavaScript and TypeScript. Check names, parameter
+   order and types, including C pointer/size arguments and `c` bindings. For
    LeetCode's judge-defined types hc reads the signature from the Go
    template; check that the `Node` type matches the struct's fields
    ([LeetCode's Node types](#leetcodes-node-types)).
@@ -304,6 +305,28 @@ not. Read them if you ran it. Then check:
 
 Never run `hc fetch --force` on a problem that exists: it replaces the
 directory and keeps nothing, cases and references included.
+
+## Workflow: backfill native templates
+
+In a writable pack checkout or for a workspace's own problems, preview with
+`hc fetch --templates-only --site cn --lang c,cpp,java,js,ts --dry-run <slug>...`,
+then apply the same command without `--dry-run`. Omit `--lang` for all supported
+languages. Do not use an installed read-only pack or `--force`.
+
+The command adds only missing native templates and compatible missing C
+bindings. It preserves references, cases, generators/checkers, statements,
+assets, identity, shared signatures, judge rules and pack configuration.
+Review conflicts before continuing: differing existing templates are kept,
+and any template/signature/binding conflict blocks the whole problem's update.
+Unavailable snippets are reported separately from API failures; never invent
+starter code and present it as a native LeetCode template. Independent problems
+in a batch may succeed even when another fails. Repeating a successful migration
+is safe. A preview leaves problem content unchanged.
+
+After migration, review the native ABI as above, especially NestedIterator's
+C symbols and stateless serialize/deserialize bindings. New reference solutions
+and their validation belong to `hc-cases`; do not enable additional
+`pack.yaml` languages merely because their templates are now present.
 
 ## Workflow: fix a problem's definition
 

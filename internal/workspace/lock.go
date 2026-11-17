@@ -53,6 +53,18 @@ func (w *Workspace) LockSkills(wait bool) (unlock func(), held bool, err error) 
 	return w.lock(skillsLockFile, wait)
 }
 
+// LockTemplateMigration serializes template backfills within a workspace.
+func (w *Workspace) LockTemplateMigration() (func(), error) {
+	release, held, err := w.lock("templates.lock", false)
+	if err != nil {
+		return nil, err
+	}
+	if !held {
+		return nil, errors.New("another hc template migration is running in this workspace")
+	}
+	return release, nil
+}
+
 // lock takes the lock file name in StateDir.
 func (w *Workspace) lock(name string, wait bool) (unlock func(), held bool, err error) {
 	if err := os.MkdirAll(w.StatePath(), 0o755); err != nil {
