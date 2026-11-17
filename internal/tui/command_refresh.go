@@ -57,8 +57,8 @@ func (m *model) reloadCommand() error {
 		caseSelection = &copy
 	}
 	var packChoice, groupChoice string
-	if m.packCursor >= 0 && m.packCursor < len(m.tabs) {
-		packChoice = m.tabs[m.packCursor].pack.Name
+	if k := m.selectedPack(); k != nil {
+		packChoice = k.Name
 	}
 	if m.picking && m.tab() != nil {
 		choices := m.groupChoices()
@@ -87,7 +87,11 @@ func (m *model) reloadCommand() error {
 	if m.pack == oldPack {
 		m.offset = min(listOffset, max(len(m.visible)-1, 0))
 	}
-	m.packCursor = max(slices.IndexFunc(m.tabs, func(t packTab) bool { return t.pack.Name == packChoice }), 0)
+	if m.packs != nil {
+		if err := m.loadPackItems(packChoice); err != nil {
+			return err
+		}
+	}
 	if oldPack != m.pack {
 		m.picking, m.groupTarget, m.groupSearching = false, nil, false
 		m.message = ui.Yellow.Render("pack " + oldPack + " is no longer available")

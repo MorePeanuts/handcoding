@@ -105,7 +105,7 @@ func TestDirectProblemKeepsPackPickerParent(t *testing.T) {
 		t.Fatal("jump lost pack picker or target list")
 	}
 	h.press("esc")
-	if h.m.top() != screenPacks || h.m.tabs[h.m.packCursor].pack.Name != "local" {
+	if h.m.top() != screenPacks || h.m.selectedPack().Name != "local" {
 		t.Fatal("list did not return to destination pack in picker")
 	}
 }

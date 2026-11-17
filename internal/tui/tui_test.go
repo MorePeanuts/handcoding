@@ -78,7 +78,7 @@ func (h *harness) exec(cmd tea.Cmd) {
 		for _, c := range msg {
 			h.exec(c)
 		}
-	case runDoneMsg, caseAddedMsg:
+	case runDoneMsg, caseAddedMsg, packDoneMsg:
 		h.m.Update(msg)
 	}
 }
@@ -402,7 +402,7 @@ func TestPackPicker(t *testing.T) {
 		t.Fatalf("opened on screen %v, want the pack picker", p.m.top())
 	}
 	view := p.view()
-	for _, want := range []string{"2 packs", "choose a pack", "local", "0/1", "regression", "hc regression set", "enter open"} {
+	for _, want := range []string{"2 packs", "Pack manager", "local", "0/1", "regression", "hc regression set", "enter open"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("picker lacks %q:\n%s", want, view)
 		}
@@ -410,15 +410,15 @@ func TestPackPicker(t *testing.T) {
 	if got := strings.Count(view, "\n") + 1; got != 30 {
 		t.Errorf("picker has %d lines, want 30", got)
 	}
-	if p.m.tabs[p.m.packCursor].pack.Name != regression.Name {
-		t.Errorf("cursor on %s, want the pack shown last", p.m.tabs[p.m.packCursor].pack.Name)
+	if p.m.selectedPack().Name != regression.Name {
+		t.Errorf("cursor on %s, want the pack shown last", p.m.selectedPack().Name)
 	}
 	p.press("k", "enter")
 	if p.m.top() != screenList || p.m.pack != "local" || len(p.m.probs) != 1 || !strings.Contains(p.view(), "esc packs") {
 		t.Fatalf("enter: screen %v, pack %s", p.m.top(), p.m.pack)
 	}
 	p.press("tab", "esc")
-	if p.m.top() != screenPacks || p.m.tabs[p.m.packCursor].pack.Name != regression.Name {
+	if p.m.top() != screenPacks || p.m.selectedPack().Name != regression.Name {
 		t.Fatalf("esc: screen %v, cursor %d", p.m.top(), p.m.packCursor)
 	}
 	if _, cmd := p.m.Update(keyMsg("esc")); cmd == nil || cmd() != tea.Quit() {

@@ -16,28 +16,8 @@ var settingsBrowseKeys = []string{"enter edit", "s scope", "e YAML", "d doctor",
 
 func (s *settingsPage) expanded() bool { return s.editing || s.picker == "value" || s.inspecting }
 
-// Wrap complete key hints instead of silently dropping actions that do not fit.
-func (m *model) settingsKeyLines(keys []string) []string {
-	lines := []string{""}
-	for _, hint := range keys {
-		key, label, _ := strings.Cut(hint, " ")
-		part := m.st.key.Render(" "+key+" ") + ui.Faint.Render(label)
-		last := len(lines) - 1
-		gap := "  "
-		if lines[last] == "" {
-			gap = ""
-		}
-		if lipgloss.Width(lines[last]+gap+part) > m.width && lines[last] != "" {
-			lines = append(lines, part)
-		} else {
-			lines[last] += gap + part
-		}
-	}
-	return lines
-}
-
 func (m *model) settingsFooterHeight() int {
-	return 2 + len(m.settingsKeyLines(settingsBrowseKeys))
+	return 2 + len(m.wrappedKeyLines(settingsBrowseKeys))
 }
 
 func (m *model) settingsBodyHeight() int {
@@ -60,7 +40,7 @@ func (m *model) settingsFrame(title, subtitle, columns string, lines []string, k
 	for i := range lines {
 		lines[i] = clip(lines[i], m.width)
 	}
-	help := m.settingsKeyLines(keys)
+	help := m.wrappedKeyLines(keys)
 	for len(help) < m.settingsFooterHeight()-2 {
 		help = append([]string{""}, help...)
 	}

@@ -71,11 +71,7 @@ func TestBrowsingListsShareScrolling(t *testing.T) {
 				m.subs = make([]store.Submission, 100)
 				cursor, offset, height = &m.subCursor, &m.subOffset, m.historyHeight()
 			case "packs":
-				tab := m.tabs[0]
-				m.tabs = make([]packTab, 100)
-				for i := range m.tabs {
-					m.tabs[i] = tab
-				}
+				m.packs = &packPage{items: make([]app.PackInfo, 100)}
 				m.stack = []screen{screenPacks}
 				cursor, offset, height = &m.packCursor, &m.packOffset, m.packHeight()
 			case "groups":

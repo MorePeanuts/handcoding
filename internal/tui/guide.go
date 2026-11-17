@@ -29,7 +29,7 @@ Browse a problem, read its statement, open a solution in your editor, then test,
 
 ## Find your way
 
-Esc goes back. :list returns to the problem list. :pack list opens the pack picker. :q exits the TUI.
+Press p in the problem list to manage packs. Esc goes back. :list returns to the problem list. :pack list opens the pack manager. :q exits the TUI.
 
 ? opens the current page's scrollable shortcut reference; q/Esc/? closes it. This guide explains the workflow. Use Tab / Shift+Tab to change topics, j/k or Up/Down to scroll, Ctrl+e/y for one line, Ctrl+d/u for half a page, Ctrl+f/b or Page Down/Up for a page with two lines of overlap, and / to search topic names and content. :help search opens a topic directly.`},
 		{"navigation", "Browse, view & open", `# Navigate with keys or commands
@@ -39,7 +39,7 @@ Esc goes back. :list returns to the problem list. :pack list opens the pack pick
 - :show two-sum / :view two-sum only reads the problem. No template is created and no path is copied.
 - :open two-sum creates a template only if missing, opens the same detail page and copies its path, just like Enter in the list. Existing solutions are never overwritten.
 - :cases list two-sum opens its cases; Tab switches between cases and statement.
-- :pack list opens the pack picker; :group opens the current pack's groups.
+- :pack list opens the pack manager; :group opens the current pack's groups.
 
 Use pack/slug when a problem name is ambiguous. :open and :show/:view replace the previous problem flow; q/Esc returns to the target pack's list, focused on that problem. Groups, search and filters stay unless they hide the target. Temporary results, history and help return to their caller; repeated runs, history scopes and help topics replace their page. :list and picker commands go to navigation roots.
 
@@ -77,6 +77,18 @@ Press , on a browsing page, or run :settings. :settings --pack regression opens 
 Theme and image changes apply immediately. Tool paths, editor, agent and timeout apply to the next operation. A missing executable can be saved with a warning; hc does not install it. An empty Python interpreter keeps the existing managed environment behavior. Editing settings or running doctor does not create or synchronize Python environments.
 
 Custom agent.command is an argv array: edit it in YAML, or use r to reset it. execution.backend currently supports local only. Installed-pack sources and pack.yaml content are not editable settings.`},
+		{"packs", "Manage packs", `# Browse and manage packs
+
+Press p in the problem list, or run :pack list. The manager includes empty, missing, unmanaged and unreadable packs. Enter opens a readable pack's problems; v shows its metadata, source, revision, progress and loading errors. Esc returns to the list when opened with p.
+
+In a practice workspace:
+
+- i opens the install form: a Git URL or local directory, plus an optional tag or branch. Relative directories use the workspace root. Tab changes fields; Enter on the ref field starts installation. Install only sources you trust: reference solutions and checkers run locally.
+- u updates the selected managed pack. Local modifications are protected; advanced ref/force options remain available through :pack update.
+- x confirms uninstalling the selected pack. Solutions, personal cases, groups and submission history stay.
+- r restores all missing packs at their recorded commits.
+
+Operations run in the background and show progress and results. Esc or Ctrl+c cancels an active operation and waits for completion; Esc dismisses the result. A pack checkout allows browsing and viewing details only.`},
 		{"groups", "Personal & pack groups", `# Organize practice
 
 Press c in the problem list or run :group to choose a group. :group show user:practice opens that group's problems in stored order. Use --pack to disambiguate groups across packs.

@@ -1,0 +1,24 @@
+ hc   Pack manager · 2 packs
+  PACK           STATE         SOLVED
+────────────────────────────────────────
+  local          local            0/0
+▌ regression     unmanaged       0/50
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────
+
+ enter open   v details   i install
+ u update   x uninstall
+ r restore missing   esc back   q quit
+ : command   ? help

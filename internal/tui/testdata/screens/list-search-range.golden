@@ -27,4 +27,4 @@
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 search: id:100..110 (esc to clear)
- enter open    v view    e edit    h history    m star    / search    : command    ? help
+ enter open    p packs    v view    e edit    h history    m star    : command    ? help

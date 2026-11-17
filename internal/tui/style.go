@@ -222,3 +222,23 @@ func scrollPosition(vp viewport.Model) string {
 	}
 	return fmt.Sprintf("%d%% · %d lines", int(vp.ScrollPercent()*100), total)
 }
+
+// Wrap complete key hints instead of silently dropping actions that do not fit.
+func (m *model) wrappedKeyLines(keys []string) []string {
+	lines := []string{""}
+	for _, hint := range keys {
+		key, label, _ := strings.Cut(hint, " ")
+		part := m.st.key.Render(" "+key+" ") + ui.Faint.Render(label)
+		last := len(lines) - 1
+		gap := "  "
+		if lines[last] == "" {
+			gap = ""
+		}
+		if lipgloss.Width(lines[last]+gap+part) > m.width && lines[last] != "" {
+			lines = append(lines, part)
+		} else {
+			lines[last] += gap + part
+		}
+	}
+	return lines
+}
