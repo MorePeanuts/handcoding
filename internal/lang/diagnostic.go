@@ -55,7 +55,9 @@ type Diagnoser interface {
 // Probe runs only the requested tool probe, bounded even when the caller has no
 // deadline. WaitDelay also bounds waiting on inherited pipes from wrappers.
 func Probe(ctx context.Context, path string, env []string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	// Allow cold tool startup under load, while preserving an earlier deadline
+	// supplied by the caller and still bounding tools that hang.
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, path, args...)
 	cmd.Env = env
