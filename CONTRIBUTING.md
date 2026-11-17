@@ -8,7 +8,7 @@ Open an issue before starting on anything non-trivial. Use the bug report or fea
 
 ## Development
 
-You need Go (see `go.mod` for the version), a C++23 compiler (`g++` on Linux, `clang++` on macOS), JDK 17 or later, Node.js 22+ with npm, local `tsc` 5.7+, git and [uv](https://docs.astral.sh/uv/getting-started/installation/). The integration tests compile and run real solutions in all seven languages, with the `python3` on PATH, never the virtual environment hc manages for users. Solutions, references and drivers must keep working on the oldest versions hc supports (Python 3.12, Go 1.22, C11, C++17, Java 17, Node.js 22 and TypeScript 5.7; see the protocol's [language versions](docs/protocol.md#language-versions)), so the repository is a minimal uv project (`pyproject.toml`, no dependencies) pinned to Python 3.12 by `.python-version`, and `make test` runs the tests with `uv run`, which puts its `.venv` first on PATH (uv downloads Python 3.12 the first time if you have none). `make test PY=3.13` tests another version, in `.venv-3.13`, and `make test PY=system` the `python3` on PATH as it is. CI runs one full suite on each of Linux and macOS, both with Python 3.12, JDK 17, Node.js 22.0.0 and TypeScript 5.7.3, plus one lint job. GCC on Linux and Clang on macOS exercise C11/C++17 compatibility; `TestGoMinimumVersion` vets the Go side at Go 1.22.
+You need Go (see `go.mod` for the version), a C++23 compiler (`g++` on Linux, `clang++` on macOS), JDK 17 or later, Node.js 22+ with npm, local `tsc` 5.7+, git and [uv](https://docs.astral.sh/uv/getting-started/installation/). The integration tests compile and run real solutions in all seven languages, with the `python3` on PATH, never the virtual environment hc manages for users. Solutions, references and drivers must keep working on the oldest versions hc supports (Python 3.12, Go 1.22, C11, C++17, Java 17, Node.js 22 and TypeScript 5.7; see the protocol's [language versions](docs/protocol.md#language-versions)), so the repository is a minimal uv project (`pyproject.toml`, no dependencies) pinned to Python 3.12 by `.python-version`, and `make test` runs the tests with `uv run`, which puts its `.venv` first on PATH (uv downloads Python 3.12 the first time if you have none). `make test PY=3.13` tests another version, in `.venv-3.13`, and `make test PY=system` the `python3` on PATH as it is. CI selects tests by the changed paths (below), using Linux and macOS with Python 3.12, JDK 17, Node.js 22.0.0 and TypeScript 5.7.3, plus one lint job. GCC on Linux and Clang on macOS exercise C11/C++17 compatibility; `TestGoMinimumVersion` vets the Go side at Go 1.22.
 
 `uv sync` creates the same `.venv`, which pyright (configured in `pyproject.toml`) and editors that detect `.venv` use for hc's Python (`internal/lang/python/*.py`) and the regression set's references, checkers and generators, so they check them against Python 3.12.
 
@@ -19,12 +19,79 @@ Native integration tests launch external compilers. CI uses `TEST_FLAGS='-p=1 -p
 ```sh
 make build      # bin/hc
 make install    # go install into $(go env GOBIN)
-make test       # unit and end-to-end tests (-race), on Python 3.12
+make test       # complete suite (-race), on Python 3.12
+make test-unit  # base packages; no solution compiler matrix
+make test-integration # real-tool integration, excluding the full corpus
+make test-regression  # all 50 problems in all seven languages
 make lint       # go vet + golangci-lint (the version CI uses is in .github/workflows/ci.yml)
 
 uv run go test ./internal/app -run 'TestRegressionReferences/two-sum' -v   # one subtest
 uv run go test ./internal/app -run TestCMinimumVersion -parallel=4 -v     # all 50 C11 references
 ```
+
+### Test layers and CI selection
+
+`make test` remains the complete suite. The three narrower targets partition it:
+base packages (`test-unit`), packages with compiler/runtime integration
+(`test-integration`), and the five corpus tests in `internal/app`
+(`test-regression`). The integration layer includes the other tests in those
+packages, rather than maintaining a fragile list of individual unit tests.
+`scripts/test.sh` owns this partition; a new package defaults to the base layer.
+All targets retain race detection and strict missing-tool failures.
+
+Use `TEST_PACKAGES` to select base/integration packages, or `HC_TEST_LANGUAGES`
+and `HC_TEST_PROBLEMS` (comma-separated canonical IDs/slugs) for corpus runs:
+
+```sh
+make test-integration TEST_PACKAGES='./internal/tui'
+HC_TEST_LANGUAGES=c make test-regression
+HC_TEST_LANGUAGES=go,python HC_TEST_PROBLEMS=two-sum make test-regression
+```
+
+Empty corpus filters mean all languages/problems; unknown names fail. CI uses
+`HC_TEST_SELECTION`, a JSON object mapping languages to problem lists (an empty
+list means all 50), to avoid expanding every language when only C references
+changed. This cannot be combined with the two local filters.
+
+CI always starts its planning and result jobs, including on documentation PRs.
+The planner uses an untruncated Git diff (PR merge base to head; push before to
+after), including both sides of renames. `.github/scripts/test-plan.cjs` defines
+these conservative rules:
+
+| Changed inputs | Integration / corpus coverage |
+|---|---|
+| Known prose (README, contributing/usage guides) | Planner checks only |
+| CLI/TUI/presentation | Base tests and affected frontend integration; no corpus |
+| A language driver | Driver and application/frontend integration; that language's corpus |
+| JS/TS runtime | Both JavaScript and TypeScript |
+| Python runtime | All languages: generators/checkers serve every driver |
+| One reference | That problem and language |
+| A problem's cases, generator, checker or manifest | That problem in all languages |
+| Shared code, dependencies, CI scripts, unknown paths | All integration and all languages |
+
+Embedded protocol/skill documents are not treated as ordinary prose. Removed
+or unrecognized problem paths widen coverage; an unavailable diff forces full
+validation. Base tests run on Linux, with filesystem/process/storage/terminal
+base packages also on macOS. Selected integration and corpus tests run on both
+platforms at the protocol minimums. Business orchestration fixtures deliberately
+keep Go/Python references; seven-language compatibility belongs to the corpus.
+
+On PRs, a driver/shared-code change runs eight representative problems per
+selected language: generated cases, a checker, output prefixes, class calls,
+round trips, deep copies, node identity and 3D arrays. Explicitly changed corpus
+problems are added for their affected languages. On `main`/maintenance pushes,
+those driver/shared-code changes run the complete affected-language corpus.
+This deliberately leaves some full-corpus failures to post-merge CI; a failed
+main run still blocks release. Add the `ci:full` PR label or dispatch CI manually
+when full verification is needed before merging. A manual run tests all layers
+and languages; it does not replace the exact-commit push run required by Release.
+
+The fixed **CI result** check rejects failed/cancelled jobs and unexpected skips;
+use it as the required check when enabling branch protection. Workflow-level
+path filters are intentionally avoided. Job summaries show the test plan,
+package elapsed times and slowest top-level tests; `go test -json` output remains
+in the logs. Compare test-step wall time and runner minutes, not just the number
+of jobs. No test timeout is increased by this selection policy.
 
 Use a scratch workspace instead of your own `~/handcoding`:
 
@@ -92,7 +159,7 @@ A driver only **decodes the inputs, calls the user's code and encodes the result
 
 `internal/lang/cpp` provides native C++ signatures, workspace-managed nlohmann/json (MIT, version/URL/SHA-256 pinned in `environment.go`), generated editor compile commands, and a watchdog. It implements `lang.CaseIsolator`: runner builds once and launches one worker per case, with a per-worker wall timeout and the remaining cumulative algorithm budget. Compiler flags participate in baseline identity. Initialization with C++ selected and first use download the header into `.hc/cpp/`; a cross-process lock and atomic publication protect concurrent runs. Ready headers are checksum-verified and reused offline, `hc env sync -l cpp` repairs them, and doctor/cache cleanup neither download nor delete dependencies. The repository and binary contain no JSON library source. Go builds need no C++ dependency download; C++ integration tests use temporary environments and need network on first use.
 
-`internal/lang/java` uses standard-library JSON codecs and cached reflection bindings for native arrays/generic lists and judge types. One JVM runs an ordered batch; `lang.OrderedBaseliner` keeps its timing as the minimum of whole-run totals, keyed by order and multiplicity. The selected local `javac` emits cached classes without a release override, and Eclipse metadata exposes the generated sources to editors. Terminal debugging uses the same JDK's jdb with a temporary startup command file. Reference validation separately uses `--release 17` to reject newer syntax/APIs. CI runs the full Java corpus on real JDK 17 on Linux and macOS, so it does not separately recompile all references with `--release 17`; a focused driver test verifies the minimum-API check. `TestCPPMinimumVersion` runs all 50 C++ references in C++17 mode, with separate strict syntax checks; driver tests cover the default C++23 mode without repeating the entire corpus.
+`internal/lang/java` uses standard-library JSON codecs and cached reflection bindings for native arrays/generic lists and judge types. One JVM runs an ordered batch; `lang.OrderedBaseliner` keeps its timing as the minimum of whole-run totals, keyed by order and multiplicity. The selected local `javac` emits cached classes without a release override, and Eclipse metadata exposes the generated sources to editors. Terminal debugging uses the same JDK's jdb with a temporary startup command file. Reference validation separately uses `--release 17` to reject newer syntax/APIs. When Java regression is selected, CI runs it on real JDK 17 on Linux and macOS, so it does not separately recompile all references with `--release 17`; a focused driver test verifies the minimum-API check. `TestCPPMinimumVersion` runs all 50 C++ references in C++17 mode, with separate strict syntax checks; driver tests cover the default C++23 mode without repeating the entire corpus.
 
 `internal/lang/javascript` shares the JS/TS codecs, judge types and synchronous Node batch runtime. Numeric JSON tokens are checked before conversion; `long` binds to safe-integer `number`. Local tsc typechecks TS and emits ES2022/CommonJS with original-source maps. An independent worker watches a shared call clock, so synchronous loops can be interrupted. The inspector terminal frontend maps TS locations back to the original file; headless mode exposes Node inspector. `dependencies/` contains only the package manifest and integrity lockfile. Third-party sources are neither tracked nor embedded. Setup uses local npm to populate `.hc/node/<lock hash>`; completed environments are reused offline. Installations are serialized with a cross-process lock and staged before publication; doctor and cache cleanup never install or remove the environment. `hc env sync -l js/ts` repairs it. Plain Go builds and `go install` need no Node/npm or generated dependency artifact. Integration tests install into their temporary workspaces, using npm’s download cache; the first run may need network access. `TestECMAScriptReferences` adds JS and TS to the 50-problem corpus; CI exercises actual Node 22.0.0 / TS 5.7.3 on both platforms. These drivers implement `OrderedBaseliner`, like Java.
 

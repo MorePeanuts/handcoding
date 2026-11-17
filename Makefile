@@ -16,7 +16,7 @@ UV_RUN := UV_PROJECT_ENVIRONMENT=.venv-$(PY) uv run --locked --python $(PY)
 endif
 SHOW_PYTHON := echo "testing with $$(python3 -V) ($$(command -v python3))"
 
-.PHONY: build install test lint fmt tidy clean
+.PHONY: build install test test-unit test-integration test-regression lint fmt tidy clean
 
 build:
 	go build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/hc
@@ -24,10 +24,10 @@ build:
 install:
 	go install -trimpath -ldflags "$(LDFLAGS)" ./cmd/hc
 
-test:
+test test-unit test-integration test-regression:
 ifeq ($(PY),system)
 	@$(SHOW_PYTHON)
-	HC_TEST_REQUIRE_TOOLS=1 go test -race $(TEST_FLAGS) ./...
+	HC_TEST_REQUIRE_TOOLS=1 bash scripts/test.sh $(if $(filter test,$@),all,$(patsubst test-%,%,$@)) $(TEST_FLAGS)
 else
 	@command -v uv >/dev/null 2>&1 || { \
 		echo "make test needs uv: https://docs.astral.sh/uv/getting-started/installation/" >&2; \
@@ -35,7 +35,7 @@ else
 		exit 1; \
 	}
 	@$(UV_RUN) sh -c '$(SHOW_PYTHON)'
-	HC_TEST_REQUIRE_TOOLS=1 $(UV_RUN) go test -race $(TEST_FLAGS) ./...
+	HC_TEST_REQUIRE_TOOLS=1 $(UV_RUN) bash scripts/test.sh $(if $(filter test,$@),all,$(patsubst test-%,%,$@)) $(TEST_FLAGS)
 endif
 
 lint:
