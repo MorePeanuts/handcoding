@@ -15,7 +15,6 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
-	"github.com/MorePeanuts/handcoding/internal/regression"
 	"github.com/MorePeanuts/handcoding/internal/runner"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
@@ -171,9 +170,7 @@ func addFailingProblems(t *testing.T, a *app.App) {
 	t.Helper()
 	local := filepath.Join(a.WS.WritablePack().Dir, pack.ProblemsDir)
 	temp := filepath.Join(local, "2469-convert-the-temperature")
-	if err := os.CopyFS(temp, os.DirFS(filepath.Join(regression.ProblemsDir(), "2469-convert-the-temperature"))); err != nil {
-		t.Fatal(err)
-	}
+	copyBusinessProblem(t, temp, "2469-convert-the-temperature")
 	replaceIn(t, filepath.Join(temp, "cases.jsonl"), "[309.65,97.7]", "[309.65,97.8]")
 	replaceIn(t, filepath.Join(temp, "reference", "solution.py"), "class Solution", "import sys\nprint(\"from the local reference\", file=sys.stderr)\n\n\nclass Solution")
 	if err := os.MkdirAll(filepath.Join(local, "0002-broken"), 0o755); err != nil {
@@ -238,9 +235,7 @@ func TestValidateJobs(t *testing.T) {
 	local := filepath.Join(ws.WritablePack().Dir, pack.ProblemsDir)
 	// two-sum has generated cases, longest-palindromic-substring a checker.
 	for _, dir := range []string{"0001-two-sum", "0005-longest-palindromic-substring", "0027-remove-element"} {
-		if err := os.CopyFS(filepath.Join(local, dir), os.DirFS(filepath.Join(regression.ProblemsDir(), dir))); err != nil {
-			t.Fatal(err)
-		}
+		copyBusinessProblem(t, filepath.Join(local, dir), dir)
 	}
 	b := app.New(ws)
 	t.Cleanup(func() { b.Close() })
