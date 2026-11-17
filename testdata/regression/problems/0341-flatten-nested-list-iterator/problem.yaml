@@ -5,6 +5,12 @@ titles: {zh-CN: 扁平化嵌套列表迭代器}
 difficulty: medium
 tags: [stack, tree, depth-first-search, design, queue, iterator]
 kind: class
+c:
+  object: struct
+  type: NestedIterator
+  constructor: nestedIterCreate
+  destructor: nestedIterFree
+  methods: {next: nestedIterNext, hasNext: nestedIterHasNext}
 class:
   name: NestedIterator
   constructor:

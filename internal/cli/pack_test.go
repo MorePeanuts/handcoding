@@ -7,6 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-yaml"
+
+	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/regression"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
@@ -106,15 +109,16 @@ func TestListShowsPacks(t *testing.T) {
 func TestPackLanguages(t *testing.T) {
 	dir := packWorkspace(t)
 	manifest := filepath.Join(dir, workspace.PacksDir, regression.Name, "pack.yaml")
-	data, err := os.ReadFile(manifest)
+	m, err := pack.Load(filepath.Dir(manifest))
 	if err != nil {
 		t.Fatal(err)
 	}
-	limited := strings.Replace(string(data), "\nlanguages: [go, python, cpp, java, javascript, typescript]\n", "\nlanguages: [python]\n", 1)
-	if limited == string(data) {
-		t.Fatal("the regression set's pack.yaml has no languages: [go, python, cpp, java, javascript, typescript]")
+	m.Languages = []string{"python"}
+	limited, err := yaml.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if err := os.WriteFile(manifest, []byte(limited), 0o644); err != nil {
+	if err := os.WriteFile(manifest, limited, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	err = runHC(t, "-w", dir, "start", "regression/two-sum", "-l", "go")

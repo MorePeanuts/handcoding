@@ -4,8 +4,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/goccy/go-yaml"
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/regression"
@@ -66,12 +67,13 @@ func TestPackLanguageFallbackAndExplicitOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(k.Dir, "pack.yaml")
-	data, err := os.ReadFile(path)
+	// An updated pack drops Python; the preference should survive.
+	manifest := *k.Manifest
+	manifest.Languages = []string{"go"}
+	data, err := yaml.Marshal(manifest)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// An updated pack drops Python; the preference should survive.
-	data = []byte(strings.Replace(string(data), "languages: [go, python, cpp, java, javascript, typescript]", "languages: [go]", 1))
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}

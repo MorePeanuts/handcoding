@@ -9,7 +9,7 @@ Directory: /workspace/packs/regression ┃
 Title: hc regression set               ┃
 Version:                               ┃
 Protocol: 1                            ┃
-Languages: go, python, cpp, java,      ┃
+Languages: go, python, c, cpp, java,   ┃
 javascript, typescript                 ┃
 Locales: en, zh-CN                     ┃
 Authors:                               ┃
