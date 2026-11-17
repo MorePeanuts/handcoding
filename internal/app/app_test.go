@@ -78,12 +78,21 @@ func requireTools(t *testing.T, tools ...string) {
 // compiling all 50 references a second time.
 func TestRegressionReferences(t *testing.T) {
 	t.Parallel()
-	if tc, err := (java.Language{}).Toolchain(); err != nil {
-		testenv.Skip(t, err)
-	} else if err = tc.Err(); err != nil {
-		testenv.Skip(t, err)
+	want := regression.Select(t)
+	if !want("java", "") && !want("go", "") && !want("python", "") {
+		t.Skip("language regression not selected")
 	}
-	requireTools(t, "go", "python3")
+	if want("java", "") {
+		if tc, err := (java.Language{}).Toolchain(); err != nil {
+			testenv.Skip(t, err)
+		} else if err = tc.Err(); err != nil {
+			testenv.Skip(t, err)
+		}
+	}
+	requireTools(t, "python3")
+	if want("go", "") {
+		requireTools(t, "go")
+	}
 	a := newWorkspace(t)
 	probs, err := a.WS.Problems()
 	if err != nil {
@@ -96,6 +105,9 @@ func TestRegressionReferences(t *testing.T) {
 	// The problems run at once in the one workspace, as hc validate --jobs
 	// runs them: each has its own files in the caches.
 	for _, p := range probs {
+		if !want("python", p.Slug) && !want("go", p.Slug) && !want("java", p.Slug) {
+			continue
+		}
 		t.Run(p.Slug, func(t *testing.T) {
 			t.Parallel()
 			if err := p.Validate(); err != nil {
@@ -126,6 +138,9 @@ func TestRegressionReferences(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, langID := range []string{"python", "go", "java"} {
+				if !want(langID, p.Slug) {
+					continue
+				}
 				rep, _, err := a.RunReference(ctx, p, langID, sel, app.RunOptions{})
 				if err != nil {
 					t.Fatalf("%s: %v", langID, err)
@@ -147,6 +162,10 @@ func TestRegressionReferences(t *testing.T) {
 // the protocol's minimum Go version, as hc validate --run does.
 func TestGoMinimumVersion(t *testing.T) {
 	t.Parallel()
+	want := regression.Select(t)
+	if !want("go", "") {
+		t.Skip("Go regression not selected")
+	}
 	requireTools(t, "go")
 	a := newWorkspace(t)
 	probs, err := a.WS.Problems()
@@ -155,6 +174,9 @@ func TestGoMinimumVersion(t *testing.T) {
 	}
 	l := golang.Language{}
 	for _, p := range probs {
+		if !want("go", p.Slug) {
+			continue
+		}
 		ref, ok := p.Reference(l.SolutionFile())
 		if !ok {
 			continue
@@ -421,6 +443,10 @@ func TestSubmissionCases(t *testing.T) {
 // must not hide a reference/runtime dependency on C++20 or C++23.
 func TestCPPMinimumVersion(t *testing.T) {
 	t.Parallel()
+	want := regression.Select(t)
+	if !want("cpp", "") {
+		t.Skip("language regression not selected")
+	}
 	testenv.LookPath(t, cpp.DefaultCompiler())
 	requireTools(t, "python3")
 	a := newWorkspace(t)
@@ -431,6 +457,9 @@ func TestCPPMinimumVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, p := range probs {
+		if !want("cpp", p.Slug) {
+			continue
+		}
 		t.Run(p.Slug, func(t *testing.T) {
 			t.Parallel()
 			l := mustLang(t, a, "cpp").(cpp.Language)
@@ -465,6 +494,10 @@ func TestCPPMinimumVersion(t *testing.T) {
 // -pedantic-errors also rejects accidental GNU extensions in references.
 func TestCMinimumVersion(t *testing.T) {
 	t.Parallel()
+	want := regression.Select(t)
+	if !want("c", "") {
+		t.Skip("language regression not selected")
+	}
 	testenv.LookPath(t, clang.DefaultCompiler())
 	requireTools(t, "python3")
 	a := newWorkspace(t)
@@ -476,6 +509,9 @@ func TestCMinimumVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, p := range probs {
+		if !want("c", p.Slug) {
+			continue
+		}
 		t.Run(p.Slug, func(t *testing.T) {
 			t.Parallel()
 			l := mustLang(t, a, "c").(clang.Language)
@@ -513,13 +549,23 @@ func TestCMinimumVersion(t *testing.T) {
 
 func TestECMAScriptReferences(t *testing.T) {
 	t.Parallel()
-	requireTools(t, "node", "npm", "tsc", "python3")
+	want := regression.Select(t)
+	if !want("javascript", "") && !want("typescript", "") {
+		t.Skip("language regression not selected")
+	}
+	requireTools(t, "node", "npm", "python3")
+	if want("typescript", "") {
+		requireTools(t, "tsc")
+	}
 	a := newWorkspace(t)
 	probs, err := a.WS.Problems()
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, p := range probs {
+		if !want("javascript", p.Slug) && !want("typescript", p.Slug) {
+			continue
+		}
 		t.Run(p.Slug, func(t *testing.T) {
 			t.Parallel()
 			cases, err := p.LoadCases()
@@ -531,6 +577,9 @@ func TestECMAScriptReferences(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, id := range []string{"javascript", "typescript"} {
+				if !want(id, p.Slug) {
+					continue
+				}
 				rep, _, err := a.RunReference(context.Background(), p, id, sel, app.RunOptions{})
 				if err != nil {
 					t.Fatalf("%s: %v", id, err)

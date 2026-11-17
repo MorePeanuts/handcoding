@@ -2,36 +2,61 @@ name: CI
 
 on:
   push:
-    # Maintenance branches (v0.1.x) receive cherry-picks onto older code,
-    # which main's CI never tested.
     branches: [main, "v*.x"]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  workflow_dispatch: # Explicit full validation of the selected ref.
+
+defaults:
+  run:
+    shell: bash # pipefail must propagate go test failures through tee.
 
 permissions:
   contents: read
 
-# A new push to a PR supersedes its running checks. Pushes to main and
-# maintenance branches always finish, since any of them may be tagged.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      tests: ${{ steps.plan.outputs.tests }}
+      unit: ${{ steps.plan.outputs.unit }}
+      lint: ${{ steps.plan.outputs.lint }}
+      integration: ${{ steps.plan.outputs.integration }}
+      regression: ${{ steps.plan.outputs.regression }}
+      selection: ${{ steps.plan.outputs.selection }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.0.0"
+      - run: node --test .github/scripts/*.test.cjs
+      - id: plan
+        run: node .github/scripts/test-plan.cjs
+
   test:
+    needs: plan
+    if: needs.plan.outputs.tests == 'true'
     strategy:
       fail-fast: false
       matrix:
-        # Exercise the protocol minimums on both supported platforms.
-        # C11/C++17 and Go 1.22 are checked by the tests themselves;
-        # GCC on Linux and Clang on macOS cover both compiler families.
         os: [ubuntu-latest, macos-latest]
     name: test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    env:
+      HC_TEST_REQUIRE_TOOLS: "1"
+      HC_TEST_REQUIRE_GLIB: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      # The minimum protocol versions, on both compiler/OS families.
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -39,9 +64,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "22.0.0"
-      - run: node --test .github/scripts/require-ci.test.cjs
       - run: npm install --global --ignore-scripts typescript@5.7.3
-      # setup-uv publishes no major-version tags since v8.
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: false
@@ -54,18 +77,33 @@ jobs:
           echo "$RUNNER_TEMP/hc-tools" >> "$GITHUB_PATH"
       - if: runner.os == 'macOS'
         run: brew install pkgconf glib
-      # go vet runs once, as part of golangci-lint in the lint job.
-      # Keep short doctor/time-limit tests out of other packages' native
-      # compilation load. Give the active package up to four parallel tests.
-      # Verbose results expose individual test costs when a package is slow.
-      - run: make test TEST_FLAGS='-p=1 -parallel=4 -v'
+      # Each package belongs to one layer. Keep native compiler load away
+      # from timing-sensitive tests; don't increase Go's package timeout.
+      - name: Base tests (Linux)
+        if: runner.os == 'Linux' && needs.plan.outputs.unit == 'true'
+        run: make test-unit TEST_FLAGS='-p=1 -parallel=4 -json' | tee test-unit.jsonl
+      - name: Platform base tests (macOS)
+        if: runner.os == 'macOS' && needs.plan.outputs.unit == 'true'
+        run: make test-unit TEST_FLAGS='-p=1 -parallel=4 -json' | tee test-unit.jsonl
         env:
-          # make test sets it too: a missing or too old tool fails the tests
-          # instead of skipping them.
-          HC_TEST_REQUIRE_TOOLS: "1"
-          HC_TEST_REQUIRE_GLIB: "1"
+          TEST_PACKAGES: ./internal/git ./internal/workspace ./internal/store ./internal/termimg
+      - name: Selected integration tests
+        if: needs.plan.outputs.integration != ''
+        run: make test-integration TEST_FLAGS='-p=1 -parallel=4 -json' | tee test-integration.jsonl
+        env:
+          TEST_PACKAGES: ${{ needs.plan.outputs.integration }}
+      - name: Selected regression tests
+        if: needs.plan.outputs.regression == 'true'
+        run: make test-regression TEST_FLAGS='-p=1 -parallel=4 -json' | tee test-regression.jsonl
+        env:
+          HC_TEST_SELECTION: ${{ needs.plan.outputs.selection }}
+      - name: Test timing summary
+        if: always()
+        run: node .github/scripts/test-report.cjs test-unit.jsonl test-integration.jsonl test-regression.jsonl
 
   lint:
+    needs: plan
+    if: needs.plan.outputs.lint == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -74,5 +112,18 @@ jobs:
           go-version-file: go.mod
       - uses: golangci/golangci-lint-action@v9
         with:
-          # Pinned so CI and `make lint` agree; bump together.
           version: v2.15.0
+
+  result:
+    name: CI result
+    if: always()
+    needs: [plan, test, lint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.0.0"
+      - run: node .github/scripts/check-results.cjs
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
