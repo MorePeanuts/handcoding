@@ -29,8 +29,8 @@ import (
 // (internal/app) checks that the problems' references pass.
 func TestProtocolCoverage(t *testing.T) {
 	m, probs := loadSet(t)
-	// C binding fixtures are kept with their driver; the existing regression
-	// pack does not yet declare C and is deliberately left unchanged.
+	// Explicit function overrides and optional GLib requirements supplement
+	// the full, portable C11 corpus with driver-specific binding fixtures.
 	for _, name := range []string{"bound-counter", "bound-function"} {
 		p, err := problem.Load(filepath.Join("..", "lang", "c", "testdata", name))
 		if err != nil {
@@ -65,6 +65,30 @@ func TestProtocolCoverage(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		t.Errorf("no problem of the regression set covers:\n  %s\nadd a problem that needs each (see CLAUDE.md, \"Regression set\")", strings.Join(missing, "\n  "))
+	}
+}
+
+// Missing toolchains may skip integration tests in a developer's environment,
+// but must never hide a language omitted from the pack or a missing reference.
+func TestReferenceCoverage(t *testing.T) {
+	m, probs := loadSet(t)
+	files := map[string]string{
+		"go": "solution.go", "python": "solution.py", "c": "solution.c",
+		"cpp": "solution.cpp", "java": "Solution.java", "javascript": "solution.js", "typescript": "solution.ts",
+	}
+	for _, language := range problem.Languages(problem.Protocol) {
+		if !slices.Contains(m.Languages, language) {
+			t.Errorf("pack does not declare %s", language)
+		}
+		file, ok := files[language]
+		if !ok {
+			t.Fatalf("add the reference filename for %s", language)
+		}
+		for _, p := range probs {
+			if _, ok := p.Reference(file); !ok {
+				t.Errorf("%s: missing %s reference", p.Slug, language)
+			}
+		}
 	}
 }
 

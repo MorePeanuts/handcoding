@@ -5,6 +5,9 @@ titles: {zh-CN: TinyURL 的加密与解密}
 difficulty: medium
 tags: [hash-table, string, design, hash-function]
 kind: class
+c:
+  object: none
+  methods: {encode: encode, decode: decode}
 class:
   name: Codec
   constructor: []

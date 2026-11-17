@@ -13,6 +13,7 @@ import (
 
 	"github.com/MorePeanuts/handcoding/internal/app"
 	"github.com/MorePeanuts/handcoding/internal/lang"
+	clang "github.com/MorePeanuts/handcoding/internal/lang/c"
 	"github.com/MorePeanuts/handcoding/internal/lang/cpp"
 	"github.com/MorePeanuts/handcoding/internal/lang/golang"
 	"github.com/MorePeanuts/handcoding/internal/lang/java"
@@ -72,8 +73,9 @@ func requireTools(t *testing.T, tools ...string) {
 // end: its expected outputs must be reproduced by Python, Go and Java
 // reference solutions, exercising all drivers on every supported shape,
 // and the inputs of its generated cases must match their digests.
-// C++ runs the same corpus in TestCPPMinimumVersion; the driver tests cover
-// the default C++23 mode without compiling all 50 references a second time.
+// C and C++ run the same corpus in TestCMinimumVersion and
+// TestCPPMinimumVersion. Driver tests cover the default modes without
+// compiling all 50 references a second time.
 func TestRegressionReferences(t *testing.T) {
 	t.Parallel()
 	if tc, err := (java.Language{}).Toolchain(); err != nil {
@@ -453,6 +455,57 @@ func TestCPPMinimumVersion(t *testing.T) {
 			}
 			if rep.Verdict != runner.Accepted {
 				t.Fatalf("%s: %s", rep.Verdict, rep.CompileError)
+			}
+		})
+	}
+}
+
+// Run the complete corpus in the protocol's minimum C11 mode without GLib,
+// including generated inputs and Python checkers. Checking syntax with
+// -pedantic-errors also rejects accidental GNU extensions in references.
+func TestCMinimumVersion(t *testing.T) {
+	t.Parallel()
+	testenv.LookPath(t, clang.DefaultCompiler())
+	requireTools(t, "python3")
+	a := newWorkspace(t)
+	a.WS.Config.C.Standard = clang.MinStandard
+	a.WS.Config.C.GLib = "disabled"
+	a.Langs = app.Languages(a.WS)
+	probs, err := a.WS.Problems()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range probs {
+		t.Run(p.Slug, func(t *testing.T) {
+			t.Parallel()
+			l := mustLang(t, a, "c").(clang.Language)
+			file, ok := p.Reference(l.SolutionFile())
+			if !ok {
+				t.Fatal("missing C reference")
+			}
+			ctx := context.Background()
+			if err := l.CheckMinVersion(ctx, p, file); err != nil {
+				t.Fatal(err)
+			}
+			cases, err := p.LoadCases()
+			if err != nil {
+				t.Fatal(err)
+			}
+			sel, _ := app.Select(cases, nil, true)
+			if err := a.Materialize(ctx, p, mustLang(t, a, "python"), sel, app.RunOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			rep, _, err := a.RunReference(ctx, p, "c", sel, app.RunOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if rep.Verdict != runner.Accepted {
+				t.Errorf("%s: %s", rep.Verdict, rep.CompileError)
+				for _, c := range rep.Cases {
+					if c.Verdict != runner.Accepted {
+						t.Logf("case %d: %s output=%s err=%s message=%s", c.Index, c.Verdict, c.Output, c.Error, c.Message)
+					}
+				}
 			}
 		})
 	}
