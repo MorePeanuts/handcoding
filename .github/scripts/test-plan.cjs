@@ -23,6 +23,8 @@ function plan(files, {event = 'pull_request', full = false, knownProblems = []} 
     // Only known prose is exempt. Embedded docs/skills and unknown Markdown
     // are code inputs, so a blanket *.md exclusion would be unsafe.
     if (/^(README(?:_zh)?\.md|CONTRIBUTING\.md|CLAUDE\.md|LICENSE)$/.test(file) ||
+        /^testdata\/README(?:_zh)?\.md$/.test(file) ||
+        /^testdata\/(?:leetcode-regression|protocol-regression)\/\.gitignore$/.test(file) ||
         /^docs\/(how-to-use(?:_zh)?|packs(?:_zh)?|protocol_zh)\.md$/.test(file)) {
       reasons.add('Documentation only'); continue;
     }

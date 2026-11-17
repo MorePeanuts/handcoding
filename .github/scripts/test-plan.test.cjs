@@ -5,9 +5,10 @@ const knownProblems = [...SMOKE, 'reverse-linked-list'];
 const select = (files, extra = {}) => plan(files, {knownProblems, ...extra});
 
 test('prose skips expensive jobs, embedded content does not', () => {
-  const docs = select(['README.md', 'docs/how-to-use_zh.md']);
+  const docs = select(['README.md', 'docs/how-to-use_zh.md', 'testdata/README.md', 'testdata/README_zh.md',
+    'testdata/leetcode-regression/.gitignore', 'testdata/protocol-regression/.gitignore']);
   assert.equal(docs.unit, false); assert.deepEqual(docs.languages, []);
-  for (const file of ['docs/protocol.md', 'internal/builtin/foo/SKILL.md', 'new-package/README.md']) {
+  for (const file of ['docs/protocol.md', 'internal/builtin/foo/SKILL.md', 'new-package/README.md', 'testdata/unknown/README.md', 'testdata/leetcode-regression/problems/new/.gitignore']) {
     const p = select([file]); assert.equal(p.unit, true); assert.ok(p.integration.length);
   }
 });

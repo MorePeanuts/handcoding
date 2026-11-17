@@ -456,6 +456,7 @@ func TestCPPMinimumVersion(t *testing.T) {
 	requireTools(t, "python3")
 	a := newRegressionWorkspace(t)
 	a.WS.Config.CPP.Standard = cpp.MinStandard
+	a.WS.Config.CPP.Command = strictCompiler(t, cpp.DefaultCompiler())
 	a.Langs = app.Languages(a.WS)
 	probs, err := a.WS.Problems()
 	if err != nil {
@@ -468,12 +469,9 @@ func TestCPPMinimumVersion(t *testing.T) {
 		t.Run(p.Ref(), func(t *testing.T) {
 			t.Parallel()
 			l := mustLang(t, a, "cpp").(cpp.Language)
-			file, ok := p.Reference(l.SolutionFile())
+			_, ok := p.Reference(l.SolutionFile())
 			if !ok {
 				t.Fatal("missing C++ reference")
-			}
-			if err := l.CheckMinVersion(context.Background(), p, file); err != nil {
-				t.Fatal(err)
 			}
 			cases, err := p.LoadCases()
 			if err != nil {
@@ -508,6 +506,7 @@ func TestCMinimumVersion(t *testing.T) {
 	a := newRegressionWorkspace(t)
 	a.WS.Config.C.Standard = clang.MinStandard
 	a.WS.Config.C.GLib = "disabled"
+	a.WS.Config.C.Command = strictCompiler(t, clang.DefaultCompiler())
 	a.Langs = app.Languages(a.WS)
 	probs, err := a.WS.Problems()
 	if err != nil {
@@ -520,14 +519,11 @@ func TestCMinimumVersion(t *testing.T) {
 		t.Run(p.Ref(), func(t *testing.T) {
 			t.Parallel()
 			l := mustLang(t, a, "c").(clang.Language)
-			file, ok := p.Reference(l.SolutionFile())
+			_, ok := p.Reference(l.SolutionFile())
 			if !ok {
 				t.Fatal("missing C reference")
 			}
 			ctx := context.Background()
-			if err := l.CheckMinVersion(ctx, p, file); err != nil {
-				t.Fatal(err)
-			}
 			cases, err := p.LoadCases()
 			if err != nil {
 				t.Fatal(err)
