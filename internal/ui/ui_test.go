@@ -96,3 +96,25 @@ func TestStyleWithoutColors(t *testing.T) {
 		t.Errorf("rendered %q", got)
 	}
 }
+
+func TestPrintReportTiming(t *testing.T) {
+	p := &problem.Problem{Kind: problem.KindFunction, Function: &problem.Function{Name: "f", Returns: "integer"}}
+	rep := &runner.Report{Verdict: runner.TimeLimit, Total: 1, Stopped: true,
+		Timing: &runner.Timing{AlgorithmLimit: 50 * time.Millisecond, WallLimit: 10 * time.Second, WallScope: "batch", Baseline: &runner.Baseline{Elapsed: time.Millisecond, Floor: 1250 * time.Microsecond, Factor: 40, Cached: true, Mode: "ordered batch"}},
+		Cases:  []runner.CaseResult{{Index: 1, Verdict: runner.TimeLimit, Error: "cumulative algorithm budget exhausted", TimeoutCause: runner.AlgorithmTimeout}},
+	}
+	var out bytes.Buffer
+	PrintReport(&out, p, rep, ReportOptions{})
+	for _, want := range []string{"Reason", "cumulative algorithm budget exhausted", "50ms (cumulative)", "Reference: 1ms", "1.25ms", "40", "ordered batch", "cached", "10s for entire batch"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("missing %q in %s", want, out.String())
+		}
+	}
+	rep.Timing.AlgorithmLimit = 0
+	rep.Timing.Baseline = nil
+	rep.Timing.WallScope = "case"
+	lines := strings.Join(TimingLines(rep), "\n")
+	if !strings.Contains(lines, "Algorithm budget: none") || !strings.Contains(lines, "each case process") {
+		t.Fatal(lines)
+	}
+}

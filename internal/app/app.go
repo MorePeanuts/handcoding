@@ -654,9 +654,13 @@ func (a *App) run(ctx context.Context, p *problem.Problem, l lang.Language, dir 
 	if err != nil {
 		return nil, err
 	}
-	opts.TimeLimit = a.timeLimit(ctx, p, l, sel, o)
+	var baseline *runner.Baseline
+	opts.TimeLimit, baseline = a.timeLimit(ctx, p, l, sel, o)
 	rep, err := runner.Run(ctx, l, p, dir, sel, opts)
 	if rep != nil {
+		if rep.Timing != nil {
+			rep.Timing.Baseline = baseline
+		}
 		rep.Toolchain = tc
 	}
 	return rep, err

@@ -23,6 +23,10 @@ func TestIsolatedWorker(t *testing.T) {
 	if os.Getenv("HC_TEST_ISOLATED_WORKER") != "1" {
 		return
 	}
+	if os.Getenv("HC_TEST_WALL_TIMEOUT") == "1" {
+		time.Sleep(time.Minute)
+		os.Exit(0)
+	}
 	b, err := os.ReadFile(os.Getenv(lang.EnvCases))
 	if err != nil {
 		os.Exit(2)
@@ -86,7 +90,45 @@ func TestIsolatedCumulativeBudget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if rep.Cases[2].TimeoutCause != runner.AlgorithmTimeout || rep.Timing.AlgorithmLimit != 100*time.Nanosecond || !strings.Contains(rep.Cases[2].Error, "120ns") {
+		t.Fatalf("timing: %+v %+v", rep.Timing, rep.Cases)
+	}
 	if l.builds != 1 || rep.Passed != 2 || rep.Cases[2].Verdict != runner.TimeLimit || rep.Cases[3].Verdict != runner.NotRun {
 		t.Fatalf("builds=%d report=%+v cases=%+v", l.builds, rep, rep.Cases)
+	}
+}
+
+// Exercise the process deadline independently of any algorithm watchdog.
+type wallLanguage struct {
+	isolatedLanguage
+	isolated bool
+}
+
+func (l *wallLanguage) IsolatedCases() bool { return l.isolated }
+func (l *wallLanguage) Command(ctx context.Context, dir, work string) *exec.Cmd {
+	cmd := l.isolatedLanguage.Command(ctx, dir, work)
+	cmd.Env = append(cmd.Env, "HC_TEST_WALL_TIMEOUT=1")
+	return cmd
+}
+func TestWallTimeoutCause(t *testing.T) {
+	t.Parallel()
+	for _, isolated := range []bool{false, true} {
+		l := &wallLanguage{isolated: isolated}
+		p := &problem.Problem{Kind: problem.KindFunction, Function: &problem.Function{Name: "f", Returns: "integer"}}
+		cs, err := problem.ParseCases(strings.NewReader("{\"input\":{},\"expected\":1}\n"), "cases")
+		if err != nil {
+			t.Fatal(err)
+		}
+		rep, err := runner.Run(context.Background(), l, p, t.TempDir(), []runner.Selected{{Index: 1, Case: cs[0]}}, runner.Options{Timeout: 200 * time.Millisecond})
+		if err != nil {
+			t.Fatal(err)
+		}
+		scope := "batch"
+		if isolated {
+			scope = "case"
+		}
+		if rep.Cases[0].TimeoutCause != runner.WallTimeout || rep.Timing.WallScope != scope || rep.Timing.WallLimit != 200*time.Millisecond || rep.Timing.AlgorithmLimit != 0 || !strings.Contains(rep.Cases[0].Error, "200ms") {
+			t.Fatalf("scope %s: %+v %+v", scope, rep.Timing, rep.Cases)
+		}
 	}
 }

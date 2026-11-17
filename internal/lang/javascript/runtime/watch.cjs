@@ -12,17 +12,24 @@ function leave() {
 }
 setInterval(() => {
   enter();
-  const [spent, start, id, limit, base] = state;
+  const spent = Atomics.load(state, 0),
+    start = Atomics.load(state, 1),
+    now = process.hrtime.bigint(),
+    [, , id, limit, base] = state;
+  // A call may have ended while we sampled the clock. Retry on the next
+  // tick rather than charge decoding/output time to that finished call.
+  const active = start === Atomics.load(state, 1);
   if (
+    active &&
     start > 0n &&
     limit > 0n &&
-    spent + process.hrtime.bigint() - start > limit
+    spent + now - start > limit
   ) {
     fs.appendFileSync(
       workerData.out,
       JSON.stringify({
         id: Number(id),
-        elapsed_ns: Number(spent + process.hrtime.bigint() - start - base),
+        elapsed_ns: Number(spent + now - start - base),
         time_limit: true,
       }) + "\n",
     );

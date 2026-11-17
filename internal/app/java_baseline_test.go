@@ -88,9 +88,13 @@ func TestJavaBatchCacheRuns(t *testing.T) {
 		}
 		return out
 	}
-	for _, sel := range [][]runner.Selected{selected(1, 2), selected(1, 2), selected(2, 1), selected(1, 2, 1)} {
-		if _, err = a.baseline(context.Background(), p, l, sel, nil); err != nil {
+	for i, sel := range [][]runner.Selected{selected(1, 2), selected(1, 2), selected(2, 1), selected(1, 2, 1)} {
+		b, err := a.baseline(context.Background(), p, l, sel, nil)
+		if err != nil {
 			t.Fatal(err)
+		}
+		if b.cached != (i == 1) {
+			t.Fatalf("batch %d: cached=%v", i, b.cached)
 		}
 	}
 	b, err := os.ReadFile(log)

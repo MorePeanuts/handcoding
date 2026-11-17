@@ -122,6 +122,11 @@ func (m *model) renderCases(p *problem.Problem, rep *runner.Report, o ui.ReportO
 	} else {
 		l.add(verdictBadge(rep.Verdict) + "   " + ui.Bold.Render(fmt.Sprintf("%d/%d", rep.Passed, rep.Total)) + ui.Faint.Render(" passed"+total))
 	}
+	for _, line := range ui.TimingLines(rep) {
+		for _, part := range wrapCells(line, max(width, 1)) {
+			l.add(ui.Faint.Render(part))
+		}
+	}
 	l.add("")
 
 	// The verdict column is as wide as the widest verdict but Accepted.
@@ -258,6 +263,7 @@ func (m *model) caseBox(p *problem.Problem, c runner.CaseResult, b *browser, cas
 		case runner.RuntimeError:
 			field("Error", c.Error, ui.Red)
 		case runner.TimeLimit:
+			field("Reason", c.Error, ui.Red)
 		default:
 			switch {
 			case file != nil:

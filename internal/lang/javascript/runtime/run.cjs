@@ -4,7 +4,9 @@ const fs = require("node:fs"),
   vm = require("node:vm");
 const { Worker } = require("node:worker_threads");
 const { createRequire } = require("node:module");
-const { parse, scalar, decode, encode, nodes, check } = require("./codec.cjs");
+const {
+  parse, scalar, decode, encode, decoder, encoder, nodes, check,
+} = require("./codec.cjs");
 const types = require("./types.cjs");
 class Limit extends Error {}
 function run(options) {
@@ -12,38 +14,39 @@ function run(options) {
   const shared = new SharedArrayBuffer(8 + 8 * 5),
     lock = new Int32Array(shared, 0, 2),
     state = new BigInt64Array(shared, 8);
+  const limit = BigInt(process.env.HC_TIME_LIMIT_NS || "0");
   function enter() {
+    if (limit === 0n) return;
     while (Atomics.compareExchange(lock, 0, 0, 1) !== 0)
       Atomics.wait(lock, 0, 1);
   }
   function leave() {
+    if (limit === 0n) return;
     Atomics.store(lock, 0, 0);
     Atomics.notify(lock, 0);
   }
-  const limit = BigInt(process.env.HC_TIME_LIMIT_NS || "0");
   state[3] = limit;
-  function timed(fn) {
-    enter();
-    if (limit > 0n && state[0] >= limit) {
-      leave();
-      throw new Limit();
-    }
-    state[1] = process.hrtime.bigint();
-    leave();
+  let elapsed = 0n;
+  function timed(fn, receiver, argv) {
+    if (limit > 0n && elapsed >= limit) throw new Limit();
+    const start = process.hrtime.bigint();
+    if (limit > 0n) Atomics.store(state, 1, start);
     let value;
     try {
-      value = fn();
-      check(
-        !(value && typeof value.then === "function"),
-        "async/Promise solutions are not supported by this problem protocol",
-      );
+      value = Reflect.apply(fn, receiver, argv || []);
     } finally {
-      enter();
-      state[0] += process.hrtime.bigint() - state[1];
-      state[1] = 0n;
-      leave();
+      const end = process.hrtime.bigint();
+      // Clear the active call before publishing the new total. The watcher
+      // reads total first, so it can never count this call twice.
+      if (limit > 0n) Atomics.store(state, 1, 0n);
+      elapsed += end - start;
+      if (limit > 0n) Atomics.store(state, 0, elapsed);
     }
-    if (limit > 0n && state[0] > limit) throw new Limit();
+    if (limit > 0n && elapsed > limit) throw new Limit();
+    check(
+      !(value && typeof value.then === "function"),
+      "async/Promise solutions are not supported by this problem protocol",
+    );
     return value;
   }
   const localRequire = createRequire(options.source),
@@ -258,14 +261,25 @@ function run(options) {
     }
     return encode(f.returns, result);
   }
-  const methods = new Map((spec.class?.methods || []).map((m) => [m.name, m]));
-  function args(ps, vs) {
-    check(vs.length === (ps || []).length, "wrong argument count");
-    return (ps || []).map((p, i) => decode(p.type, vs[i]));
+  function argumentsDecoder(ps) {
+    const decoders = (ps || []).map((p) => decoder(p.type));
+    return (vs) => {
+      check(vs.length === decoders.length, "wrong argument count");
+      const args = new Array(decoders.length);
+      for (let i = 0; i < args.length; i++) args[i] = decoders[i](vs[i]);
+      return args;
+    };
   }
+  const methods = new Map(
+    (spec.class?.methods || []).map((m) => [
+      m.name,
+      { ...m, args: argumentsDecoder(m.params), output: encoder(m.returns) },
+    ]),
+  );
+  const constructorArgs = argumentsDecoder(spec.class?.constructor);
+
   function callClass(input) {
-    const c = spec.class,
-      round = spec.judge.round_trip;
+    const round = spec.judge.round_trip;
     if (round) {
       const enc = methods.get(round.encode),
         dec = methods.get(round.decode),
@@ -280,27 +294,22 @@ function run(options) {
         timed(() => second[dec.name](text)),
       );
     }
-    const argv = args(c.constructor, input.args[0]),
+    const argv = constructorArgs(input.args[0]),
       obj = timed(() => new entry(...argv)),
       out = [null];
     for (let i = 1; i < input.ops.length; i++) {
       const name = input.ops[i],
         m = methods.get(name);
       check(m && typeof obj[name] === "function", "unknown method " + name);
-      const argv = args(m.params, input.args[i]);
-      out.push(
-        encode(
-          m.returns,
-          timed(() => obj[name](...argv)),
-        ),
-      );
+      const argv = m.args(input.args[i]);
+      out.push(m.output(timed(obj[name], obj, argv)));
     }
     return out;
   }
   for (const c of cases) {
     enter();
-    state[2] = BigInt(c.id.text);
-    state[4] = state[0];
+    state[2] = BigInt(scalar("long", c.id));
+    state[4] = elapsed;
     leave();
     const result = { id: scalar("long", c.id) };
     try {
@@ -311,7 +320,7 @@ function run(options) {
       else result.error = String(e?.stack || e);
     }
     enter();
-    result.elapsed_ns = Number(state[0] - state[4]);
+    result.elapsed_ns = Number(elapsed - state[4]);
     fs.appendFileSync(process.env.HC_OUT, JSON.stringify(result) + "\n");
     leave();
     if (result.time_limit) break;
