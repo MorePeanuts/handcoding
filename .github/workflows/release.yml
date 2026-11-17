@@ -5,7 +5,12 @@ on:
     tags: ["v*"]
 
 permissions:
+  actions: read
   contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -14,13 +19,21 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # goreleaser builds the changelog from history
+      - name: Require CI success for the tagged commit
+        uses: actions/github-script@v9
+        with:
+          script: |
+            // Resolve HEAD so annotated tags are checked by commit, not tag object.
+            const { stdout } = await exec.getExecOutput('git', ['rev-parse', 'HEAD']);
+            const sha = stdout.trim();
+            const requireCI = require('./.github/scripts/require-ci.cjs');
+            const run = await requireCI({ github, ...context.repo, sha });
+            core.notice(`CI passed for ${sha}: ${run.html_url}`);
+            await core.summary.addHeading('Release CI gate')
+              .addLink(`CI passed for ${sha}`, run.html_url).write();
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-      - run: go test ./...
       - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"

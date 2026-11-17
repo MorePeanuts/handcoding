@@ -39,6 +39,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "22.0.0"
+      - run: node --test .github/scripts/require-ci.test.cjs
       - run: npm install --global --ignore-scripts typescript@5.7.3
       # setup-uv publishes no major-version tags since v8.
       - uses: astral-sh/setup-uv@v10.3.3

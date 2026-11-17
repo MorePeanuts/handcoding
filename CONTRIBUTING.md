@@ -124,6 +124,14 @@ Name branches `<type>/<issue>-<summary>`, with the same types as commit messages
 
 Versions are [SemVer](https://semver.org/) tags with a `v` prefix. Pushing a tag runs the release workflow.
 
+Release checks the latest `CI` push run on `main` or a maintenance branch for
+the tag's exact commit SHA. That run must have completed successfully; a PR's
+different merge commit, an older green run, a pending run or a failed run does
+not qualify. If CI is still running, rerun the failed Release workflow after it
+passes. Release only builds archives, checksums and changelog and publishes
+them with GoReleaser; it does not install solution toolchains or repeat tests.
+The CI gate's tests run with `node --test .github/scripts/require-ci.test.cjs`.
+
 | Change | Version |
 |---|---|
 | Fixes and small changes to the released line | Patch: `v0.1.1`, `v0.1.2` … |
