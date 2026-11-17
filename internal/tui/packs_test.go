@@ -69,11 +69,11 @@ func TestPackManagerInstallUpdateRemove(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	m := h.m
-	src := filepath.Join(m.app.WS.Root, "source with spaces")
+	src := filepath.Join(m.app.WS.Root, "source with spaces:pack")
 	packSource(t, src, "tiny")
 	h.press("p", "i")
 	m.packs.form.source.SetValue("")
-	m.Update(tea.PasteMsg{Content: "source with spaces"})
+	m.Update(tea.PasteMsg{Content: "source with spaces:pack"})
 	h.press("enter", "enter")
 	if op := m.packs.operation; op == nil || !strings.Contains(op.result, "Done") {
 		t.Fatalf("install: %s", h.view())

@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -62,8 +63,13 @@ func (m *model) startPackOperation(action, target, ref string) tea.Cmd {
 		case "install":
 			// Relative directories, like configured tool paths, use this workspace.
 			source := target
-			if !filepath.IsAbs(source) && !strings.Contains(source, ":") {
-				source = filepath.Join(root, source)
+			if !filepath.IsAbs(source) {
+				candidate := filepath.Join(root, source)
+				// An existing local path takes priority over Git's host:path
+				// syntax, including directory names containing a colon.
+				if _, e := os.Stat(candidate); e == nil || !strings.Contains(source, ":") {
+					source = candidate
+				}
 			}
 			var result *app.InstallResult
 			result, err = a.InstallPack(ctx, source, opts)
