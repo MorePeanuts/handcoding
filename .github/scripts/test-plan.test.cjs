@@ -26,7 +26,7 @@ test('driver PR smoke becomes full affected-language regression on main', () => 
   assert.deepEqual(select(['internal/lang/python/hc_checker.py']).languages, LANGUAGES);
 });
 test('changed reference selects its language and problem; shared cases select all languages', () => {
-  const path = 'testdata/regression/problems/0206-reverse-linked-list/';
+  const path = 'testdata/leetcode-regression/problems/0206-reverse-linked-list/';
   for (const [file, language] of [['solution.c', 'c'], ['Solution.java', 'java'], ['solution.ts', 'typescript']]) {
     const p = select([path + 'reference/' + file]);
     assert.deepEqual(p.languages, [language]); assert.deepEqual(p.selection[language], ['reverse-linked-list']);
@@ -37,7 +37,7 @@ test('changed reference selects its language and problem; shared cases select al
 });
 test('shared, unknown, deleted problems and unavailable diffs fail toward full coverage', () => {
   for (const files of [['internal/runner/run.go'], ['go.mod'], ['.github/workflows/ci.yml'],
-    ['scripts/test.sh'], ['new-file'], ['testdata/regression/problems/removed/cases.jsonl'], null]) {
+    ['scripts/test.sh'], ['new-file'], ['testdata/leetcode-regression/problems/removed/cases.jsonl'], null]) {
     assert.deepEqual(select(files).languages, LANGUAGES);
   }
   assert.equal(select(null).mode, 'full');
@@ -52,9 +52,18 @@ test('large diffs and both sides of renames retain coverage', () => {
 });
 
 test('a full C corpus does not expand every other language in a mixed PR', () => {
-  const p = select(['internal/app/app.go', 'testdata/regression/pack.yaml',
-    'testdata/regression/problems/0206-reverse-linked-list/reference/solution.c']);
+  const p = select(['internal/app/app.go', 'testdata/leetcode-regression/pack.yaml',
+    'testdata/leetcode-regression/problems/0206-reverse-linked-list/reference/solution.c']);
   assert.ok(p.selection.c.includes('reverse-linked-list'));
   assert.deepEqual(p.selection.java, [...SMOKE].sort());
   assert.deepEqual(select(['internal/lang/c/c.go'], {event: 'push'}).selection, {c: []});
+});
+
+test('protocol extension pack changes retain targeted regression coverage', () => {
+  const p = select(['testdata/protocol-regression/problems/prefix-sums-3d/reference/solution.c']);
+  assert.deepEqual(p.selection, {c: ['prefix-sums-3d']});
+  const cases = select(['testdata/protocol-regression/problems/prefix-sums-3d/cases.jsonl']);
+  assert.deepEqual(cases.languages, LANGUAGES);
+  assert.deepEqual(cases.selection.go, ['prefix-sums-3d']);
+  assert.deepEqual(select(['testdata/protocol-regression/pack.yaml']).languages, LANGUAGES);
 });

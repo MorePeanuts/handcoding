@@ -36,7 +36,7 @@ func TestCleanWithoutState(t *testing.T) {
 
 func TestCleanDryRunDoesNotWrite(t *testing.T) {
 	dir := packWorkspace(t)
-	file := filepath.Join(dir, ".hc/cache/cases/regression/two-sum/go.json")
+	file := filepath.Join(dir, ".hc/cache/cases/leetcode-regression/two-sum/go.json")
 	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -70,8 +70,8 @@ func TestCleanDryRunDoesNotWrite(t *testing.T) {
 		return files
 	}
 	before := snapshot()
-	out, err := capture(t, "-w", dir, "clean", "regression/two-sum", "--dry-run")
-	if err != nil || !strings.Contains(out, "6 bytes") || !strings.Contains(out, "cache/cases/regression/two-sum/go.json") {
+	out, err := capture(t, "-w", dir, "clean", "leetcode-regression/two-sum", "--dry-run")
+	if err != nil || !strings.Contains(out, "6 bytes") || !strings.Contains(out, "cache/cases/leetcode-regression/two-sum/go.json") {
 		t.Fatalf("%q %v", out, err)
 	}
 	if after := snapshot(); !reflect.DeepEqual(before, after) {

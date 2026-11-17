@@ -61,12 +61,12 @@ func TestInstalledPackIsReadOnly(t *testing.T) {
 	// hc cases add, rm and edit work on the user's own cases there
 	// (TestUserCasesCommands).
 	for _, args := range [][]string{
-		{"cases", "build", "regression/two-sum"},
-		{"gen", "regression/two-sum", "--dry-run"},
-		{"fix", "regression/two-sum", "-m", "x", "--dry-run"},
+		{"cases", "build", "leetcode-regression/two-sum"},
+		{"gen", "leetcode-regression/two-sum", "--dry-run"},
+		{"fix", "leetcode-regression/two-sum", "-m", "x", "--dry-run"},
 	} {
 		err := runHC(t, append([]string{"-w", dir}, args...)...)
-		if err == nil || !strings.Contains(err.Error(), "packs/regression is an installed pack and read-only") {
+		if err == nil || !strings.Contains(err.Error(), "packs/leetcode-regression is an installed pack and read-only") {
 			t.Errorf("%v: %v", args, err)
 		}
 	}
@@ -76,7 +76,7 @@ func TestInstalledPackIsReadOnly(t *testing.T) {
 	}
 	// A bare slug in both packs is ambiguous.
 	err := runHC(t, "-w", dir, "cases", "list", "two-sum")
-	if err == nil || !strings.Contains(err.Error(), "local/two-sum, regression/two-sum") {
+	if err == nil || !strings.Contains(err.Error(), "local/two-sum, leetcode-regression/two-sum") {
 		t.Errorf("cases list two-sum: %v", err)
 	}
 }
@@ -87,7 +87,7 @@ func TestListShowsPacks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"local/two-sum", "regression/two-sum", "regression/lru-cache"} {
+	for _, want := range []string{"local/two-sum", "leetcode-regression/two-sum", "leetcode-regression/lru-cache"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("list lacks %s:\n%s", want, out)
 		}
@@ -96,7 +96,7 @@ func TestListShowsPacks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out, "regression/") || !strings.Contains(out, "local/two-sum") {
+	if strings.Contains(out, "leetcode-regression/") || !strings.Contains(out, "local/two-sum") {
 		t.Errorf("list --pack local:\n%s", out)
 	}
 	if err := runHC(t, "-w", dir, "list", "--plain", "--group", "nope"); err == nil {
@@ -121,16 +121,16 @@ func TestPackLanguages(t *testing.T) {
 	if err := os.WriteFile(manifest, limited, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	err = runHC(t, "-w", dir, "start", "regression/two-sum", "-l", "go")
-	if err == nil || !strings.Contains(err.Error(), "pack regression is solved in python, not go") {
+	err = runHC(t, "-w", dir, "start", "leetcode-regression/two-sum", "-l", "go")
+	if err == nil || !strings.Contains(err.Error(), "pack leetcode-regression is solved in python, not go") {
 		t.Errorf("start -l go: %v", err)
 	}
 	// The workspace's default language is Go.
-	out, err := capture(t, "-w", dir, "start", "regression/two-sum")
+	out, err := capture(t, "-w", dir, "start", "leetcode-regression/two-sum")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := filepath.Join("solutions", "regression", "python", "0001-two-sum", "solution.py"); !strings.HasSuffix(strings.TrimSpace(out), want) {
+	if want := filepath.Join("solutions", "leetcode-regression", "python", "0001-two-sum", "solution.py"); !strings.HasSuffix(strings.TrimSpace(out), want) {
 		t.Errorf("start printed %q, want a path ending in %s", out, want)
 	}
 }
@@ -152,7 +152,7 @@ func TestPackCheckout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "two-sum") || strings.Contains(out, "regression/") {
+	if !strings.Contains(out, "two-sum") || strings.Contains(out, "leetcode-regression/") {
 		t.Errorf("list shows pack names:\n%s", out)
 	}
 	if _, err := capture(t, "-w", dir, "new", "my-thing"); err != nil {
@@ -178,7 +178,7 @@ func TestPackCheckout(t *testing.T) {
 	}
 
 	// A pack.yaml of a newer protocol is reported by validate.
-	if err := os.WriteFile(filepath.Join(dir, "pack.yaml"), []byte("protocol: 2\nname: regression\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "pack.yaml"), []byte("protocol: 2\nname: leetcode-regression\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	out, err = capture(t, "-w", dir, "validate")
@@ -195,7 +195,7 @@ func TestRootPackFlag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "two-sum") || strings.Contains(out, "regression") {
+	if !strings.Contains(out, "two-sum") || strings.Contains(out, "leetcode-regression") {
 		t.Errorf("hc --pack local:\n%s", out)
 	}
 	if _, err := capture(t, "-w", dir, "--group", "design"); err != nil {
@@ -243,7 +243,7 @@ func TestRm(t *testing.T) {
 	}
 
 	ws := packWorkspace(t)
-	if _, err := capture(t, "-w", ws, "rm", "regression/two-sum", "-y"); err == nil {
+	if _, err := capture(t, "-w", ws, "rm", "leetcode-regression/two-sum", "-y"); err == nil {
 		t.Error("rm in an installed pack")
 	}
 	solution := filepath.Join(ws, "solutions", "local", "go", "two-sum")

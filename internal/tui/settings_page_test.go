@@ -86,19 +86,19 @@ func TestSettingsPagePackScope(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	h.press(",", "s", "down", "enter")
-	if h.m.settings.scope != "regression" {
+	if h.m.settings.scope != "leetcode-regression" {
 		t.Fatal("current pack should be the first pack scope")
 	}
 	selectSetting(t, h.m, "language")
 	h.press("enter", "down", "down", "enter")
-	if h.m.app.WS.Config.PackSettings["regression"].Language != "python" {
+	if h.m.app.WS.Config.PackSettings["leetcode-regression"].Language != "python" {
 		t.Fatal("pack edit failed")
 	}
 	h.press("r")
-	if h.m.app.WS.Config.PackSettings["regression"].Language != "" {
+	if h.m.app.WS.Config.PackSettings["leetcode-regression"].Language != "" {
 		t.Fatalf("inherit did not delete override: %s, %+v", h.m.message, h.m.app.WS.Config.PackSettings)
 	}
-	rows, _ := h.m.app.Preferences("regression")
+	rows, _ := h.m.app.Preferences("leetcode-regression")
 	if !rows[0].Inherited {
 		t.Fatal(rows)
 	}
@@ -117,7 +117,7 @@ func TestSettingsPagePackScope(t *testing.T) {
 func TestSettingsNestedNavigation(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	h.native(Command{Action: "settings", Pack: "regression"})
+	h.native(Command{Action: "settings", Pack: "leetcode-regression"})
 	selectSetting(t, h.m, "locale")
 	page := h.m.settings
 	h.native(Command{Action: "help", Help: GuideTopics()[0]})

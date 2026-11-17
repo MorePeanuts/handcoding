@@ -1,0 +1,10 @@
+protocol: 1
+name: protocol-regression
+title: hc protocol extensions
+titles: {zh-CN: hc 协议扩展回归测试}
+description: >-
+  Synthetic problems covering hc protocol extensions beyond native LeetCode
+  interfaces. Kept separate from the LeetCode compatibility corpus.
+license: MIT
+languages: [go, python, c, cpp, java, javascript, typescript]
+locales: [en, zh-CN]

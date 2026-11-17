@@ -319,7 +319,7 @@ func TestLeetCodeCase(t *testing.T) {
 	}
 }
 
-// fakeLeetCode is LeetCode for regression/two-sum, which judges every
+// fakeLeetCode is LeetCode for leetcode-regression/two-sum, which judges every
 // submission Wrong Answer on [3,3], 6.
 func fakeLeetCode(t *testing.T, typed *string) *leetcode.Client {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -367,7 +367,7 @@ func TestLeetCodeTestAndSubmit(t *testing.T) {
 			t.Errorf("%s solutions cannot run on LeetCode", l.Name())
 		}
 	}
-	p, err := a.WS.Problem("regression/two-sum")
+	p, err := a.WS.Problem("leetcode-regression/two-sum")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,7 +416,7 @@ func TestLeetCodeTestAndSubmit(t *testing.T) {
 func TestLeetCodeCrossSite(t *testing.T) {
 	t.Parallel()
 	a := newWorkspace(t)
-	p, err := a.WS.Problem("regression/two-sum")
+	p, err := a.WS.Problem("leetcode-regression/two-sum")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -634,7 +634,7 @@ func TestLeetCodeCAvailability(t *testing.T) {
 		t.Run(fmt.Sprint(available), func(t *testing.T) {
 			t.Parallel()
 			a := newWorkspace(t)
-			p, e := a.WS.Problem("regression/two-sum")
+			p, e := a.WS.Problem("leetcode-regression/two-sum")
 			if e != nil {
 				t.Fatal(e)
 			}

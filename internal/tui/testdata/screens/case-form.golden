@@ -1,5 +1,5 @@
- hc   regression / 1. Two Sum  two-sum   Easy   array · hash-table                                en
- Add a case   one of your own, in cases/regression/two-sum.jsonl: t runs it, s does not
+ hc   leetcode-regression / 1. Two Sum  two-sum   Easy   array · hash-table                       en
+ Add a case   one of your own, in cases/leetcode-regression/two-sum.jsonl: t runs it, s does not
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 
 ▌ nums      [3,3,1,3]

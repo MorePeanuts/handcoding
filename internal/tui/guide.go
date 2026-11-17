@@ -35,7 +35,7 @@ Press p in the problem list to manage packs. Esc goes back. :list returns to the
 		{"navigation", "Browse, view & open", `# Navigate with keys or commands
 
 - :list / :ls returns to the list and retains its valid search, filters and position.
-- :list --pack regression or --group user:practice chooses another list and clears the previous search.
+- :list --pack leetcode-regression or --group user:practice chooses another list and clears the previous search.
 - :show two-sum / :view two-sum only reads the problem. No template is created and no path is copied.
 - :open two-sum creates a template only if missing, opens the same detail page and copies its path, just like Enter in the list. Existing solutions are never overwritten.
 - :cases list two-sum opens its cases; Tab switches between cases and statement.
@@ -64,7 +64,7 @@ While editing, Ctrl+e, Ctrl+f/b and Ctrl+u/d keep their text-editing meanings. P
 In this guide, / searches topic titles and their full text. Tab / Shift+Tab or Up/Down chooses a matching topic; Page Up/Down pages the matches; Enter reads it. Esc clears the search before returning to the previous page. Outside search editing, q returns directly.`},
 		{"settings", "Workspace & pack settings", `# Change settings without leaving the TUI
 
-Press , on a browsing page, or run :settings. :settings --pack regression opens that pack's preferences directly. Esc returns to your previous page and position.
+Press , on a browsing page, or run :settings. :settings --pack leetcode-regression opens that pack's preferences directly. Esc returns to your previous page and position.
 
 - The footer lists every action and wraps on narrow terminals.
 - s chooses Workspace or a pack. Pack scope exposes only solution language and statement locale; both can inherit workspace preferences.

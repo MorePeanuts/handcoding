@@ -70,22 +70,22 @@ func TestPreferenceEditing(t *testing.T) {
 func TestPreferenceInheritance(t *testing.T) {
 	t.Parallel()
 	a := newWorkspace(t)
-	for _, edit := range []struct{ scope, key, value string }{{"", "language", "python"}, {"regression", "language", "go"}, {"regression", "locale", "zh-CN"}} {
+	for _, edit := range []struct{ scope, key, value string }{{"", "language", "python"}, {"leetcode-regression", "language", "go"}, {"leetcode-regression", "locale", "zh-CN"}} {
 		if _, err := a.SavePreference(edit.scope, edit.key, edit.value, false); err != nil {
 			t.Fatal(err)
 		}
 	}
-	rows, err := a.Preferences("regression")
+	rows, err := a.Preferences("leetcode-regression")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(rows) != 2 || rows[0].Saved != "go" || rows[0].Source != "This pack" {
 		t.Fatal(rows)
 	}
-	if _, err := a.SavePreference("regression", "language", "", true); err != nil {
+	if _, err := a.SavePreference("leetcode-regression", "language", "", true); err != nil {
 		t.Fatal(err)
 	}
-	rows, err = a.Preferences("regression")
+	rows, err = a.Preferences("leetcode-regression")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,11 +95,11 @@ func TestPreferenceInheritance(t *testing.T) {
 	if _, err := a.SavePreference("", "language", "go", false); err != nil {
 		t.Fatal(err)
 	}
-	rows, _ = a.Preferences("regression")
+	rows, _ = a.Preferences("leetcode-regression")
 	if rows[0].Effective != "go" {
 		t.Fatal("reset copied rather than inherited the workspace default")
 	}
-	if _, err := a.SavePreference("regression", "theme", "dark", false); err == nil {
+	if _, err := a.SavePreference("leetcode-regression", "theme", "dark", false); err == nil {
 		t.Fatal("pack accepted global setting")
 	}
 	// All declared settings have explicit values, including empty defaults.

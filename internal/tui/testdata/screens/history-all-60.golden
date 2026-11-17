@@ -4,11 +4,11 @@
 
   ID       PROBLEM       VERDICT               LANG
 ────────────────────────────────────────────────────────────
-▌ 1        regression/…  Wrong Answer          go
+▌ 1        leetcode-re…  Wrong Answer          go
   1        local/Two S…  Wrong Answer          go
-  —        regression/…  Wrong Answer          go
-  LCR 001  regression/…  Wrong Answer          go
-  —        regression/…  Wrong Answer          go
+  —        leetcode-re…  Wrong Answer          go
+  LCR 001  leetcode-re…  Wrong Answer          go
+  —        leetcode-re…  Wrong Answer          go
   —        missing/two…  Wrong Answer          go
 
 

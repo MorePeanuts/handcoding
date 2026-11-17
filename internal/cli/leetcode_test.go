@@ -50,8 +50,8 @@ func TestLeetCodeCommands(t *testing.T) {
 		t.Errorf("login --paste --port: err = %v", err)
 	}
 	for ref, want := range map[string]string{
-		"local/two-sum":      "does not come from LeetCode",
-		"regression/two-sum": "not logged in to LeetCode; run hc leetcode login",
+		"local/two-sum":               "does not come from LeetCode",
+		"leetcode-regression/two-sum": "not logged in to LeetCode; run hc leetcode login",
 	} {
 		for _, sub := range []string{"test", "submit"} {
 			if _, err := capture(t, "-w", dir, "leetcode", sub, ref, "-l", "go"); err == nil || !strings.Contains(err.Error(), want) {
@@ -62,7 +62,7 @@ func TestLeetCodeCommands(t *testing.T) {
 	for _, sub := range []string{"test", "submit", "status", "logout"} {
 		args := []string{"-w", dir, "leetcode", sub, "--site", "cn"}
 		if sub == "test" || sub == "submit" {
-			args = append(args, "regression/two-sum")
+			args = append(args, "leetcode-regression/two-sum")
 		}
 		if _, err := capture(t, args...); err == nil || !strings.Contains(err.Error(), "unknown flag") {
 			t.Errorf("%s accepts obsolete --site: %v", sub, err)
@@ -89,7 +89,7 @@ func TestCaseSuggestion(t *testing.T) {
 	}
 	a := app.New(ws)
 	defer a.Close()
-	p, err := ws.Problem("regression/two-sum")
+	p, err := ws.Problem("leetcode-regression/two-sum")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestCaseSuggestion(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := captureFunc(t, func() { printCaseSuggestion(a, p, c, "Wrong Answer", false) })
-	want := `hc cases add regression/two-sum --input '{"nums":[3,3],"target":6}' --expected '[0,1]' --note 'from LeetCode: Wrong Answer'`
+	want := `hc cases add leetcode-regression/two-sum --input '{"nums":[3,3],"target":6}' --expected '[0,1]' --note 'from LeetCode: Wrong Answer'`
 	if !strings.Contains(out, want) {
 		t.Errorf("suggestion:\n%s\nwant %s", out, want)
 	}
@@ -142,7 +142,7 @@ func TestPrintLeetCodeResults(t *testing.T) {
 	}
 	a := app.New(ws)
 	defer a.Close()
-	p, err := ws.Problem("regression/two-sum")
+	p, err := ws.Problem("leetcode-regression/two-sum")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestLeetCodeCurrentLoginChoosesDestination(t *testing.T) {
 		t.Fatalf("fixture default: %+v, %v", defaultLogin, err)
 	}
 	called := false
-	err = withLeetCode(root, "regression/two-sum", &leetCodeOptions{lang: "go"}, func(a *app.App, p *problem.Problem, l lang.Language, source app.LeetCodeTarget, c *leetcode.Client) error {
+	err = withLeetCode(root, "leetcode-regression/two-sum", &leetCodeOptions{lang: "go"}, func(a *app.App, p *problem.Problem, l lang.Language, source app.LeetCodeTarget, c *leetcode.Client) error {
 		called = true
 		if source.Site.Name != "com" || c.Site.Name != "cn" || c.Session.Token != "current" {
 			t.Fatal("source/default overrode the current account")

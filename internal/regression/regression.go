@@ -1,11 +1,10 @@
-// Package regression locates hc's regression set for tests: the pack in
-// testdata/regression at the root of the repository, whose problems
-// together use the whole problem protocol, each with Go, Python, C, C++, Java, JavaScript and TypeScript
-// references. hc itself does not ship it; only tests import this package.
+// Package regression locates two independent test packs: LeetCode
+// compatibility in testdata/leetcode-regression and hc protocol extensions in
+// testdata/protocol-regression. Together they cover the protocol in all seven
+// languages. Neither pack is embedded in hc.
 //
-// The set is also an authoring workspace (hc -w testdata/regression), so its
-// directory may hold hc's state and a developer's solutions beside the pack.
-// Tests read only the pack: pack.yaml and problems/.
+// Each is also an authoring workspace; tests read only pack.yaml and problems/,
+// never developer settings, state or solutions beside them.
 package regression
 
 import (
@@ -16,8 +15,8 @@ import (
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
-// Name is the regression set's pack name.
-const Name = "regression"
+// Name is the LeetCode compatibility pack name.
+const Name = "leetcode-regression"
 
 // Dir is the directory of the regression set.
 func Dir() string {
@@ -25,11 +24,22 @@ func Dir() string {
 	return filepath.Join(filepath.Dir(file), "..", "..", "testdata", Name)
 }
 
+// ProtocolName is the separate synthetic protocol-extension pack.
+const ProtocolName = "protocol-regression"
+
+// Corpus identifies an independently installable regression pack.
+type Corpus struct{ Name, Dir string }
+
+// Packs returns both corpora; business fixtures may use only Dir/ProblemsDir.
+func Packs() []Corpus {
+	return []Corpus{{Name, Dir()}, {ProtocolName, filepath.Join(Dir(), "..", ProtocolName)}}
+}
+
 // ProblemsDir is the directory of the regression set's problems.
 func ProblemsDir() string { return filepath.Join(Dir(), pack.ProblemsDir) }
 
-// Install copies the regression set into the workspace ws as the installed
-// pack packs/regression. It is a copy, so tests cannot change the set.
+// Install copies an unmanaged LeetCode pack for business/UI fixtures.
+// Corpus execution tests instead run the hc pack install command for both Packs.
 func Install(ws *workspace.Workspace) error {
 	return Copy(filepath.Join(ws.Root, workspace.PacksDir, Name))
 }

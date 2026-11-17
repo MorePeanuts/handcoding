@@ -1,6 +1,6 @@
- hc    regression 0/50                                              lang Go   locale en   filter all
+ hc    leetcode-regression 0/49                                     lang Go   locale en   filter all
 
-50 problems    ✔ 0 solved    ● 0 attempted    ★ 1 starred               ━━━━━━━━━━━━━━━━━━━━━━━━  0%
+49 problems    ✔ 0 solved    ● 0 attempted    ★ 1 starred               ━━━━━━━━━━━━━━━━━━━━━━━━  0%
 
       #      TITLE                                  LEVEL    TAGS
 ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -27,4 +27,4 @@
   ·   162    Find Peak Element                      Medium   array · binary-search
 ────────────────────────────────────────────────────────────────────────────────────────────────────
 /title, slug, tag; id:707 | id:70* | id:700..800
- ctrl+o open    enter browse    esc clear    ctrl+n/p move                                1–21 of 50
+ ctrl+o open    enter browse    esc clear    ctrl+n/p move                                1–21 of 49

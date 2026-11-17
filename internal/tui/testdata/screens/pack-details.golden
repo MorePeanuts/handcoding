@@ -1,23 +1,23 @@
  hc   Pack manager · 2 packs
 Pack details
 ────────────────────────────────────────
-Name: regression                       ┃
+Name: leetcode-regression              ┃
 Status: unmanaged                      ┃
-Problems: 50                           ┃
+Problems: 49                           ┃
 Solved: 0                              ┃
-Directory: /workspace/packs/regression ┃
-Title: hc regression set               ┃
+Directory: /workspace/packs/leetcode-  ┃
+regression                             ┃
+Title: LeetCode compatibility          ┃
 Version:                               ┃
 Protocol: 1                            ┃
 Languages: go, python, c, cpp, java,   ┃
 javascript, typescript                 ┃
 Locales: en, zh-CN                     ┃
-Authors:                               ┃
-License: MIT                           ┃
+Authors:                               │
+License: MIT                           │
 Homepage:                              │
                                        │
-hc's own test data: problems that      │
-together use every type, kind, compare │
+LeetCode problems covering native      │
 ────────────────────────────────────────
 
  ↑↓ scroll   esc back   : command

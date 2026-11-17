@@ -248,7 +248,7 @@ func TestListPackTabs(t *testing.T) {
 	addLocal(t, h.m, "0001-two-sum")
 	view := h.view()
 	first, _, _ := strings.Cut(view, "\n")
-	if !strings.Contains(first, "local 0/1") || !strings.Contains(first, "regression 0/") {
+	if !strings.Contains(first, "local 0/1") || !strings.Contains(first, "leetcode-regression 0/") {
 		t.Errorf("tab bar %q", first)
 	}
 	if got := strings.Count(view, "\n") + 1; got != 30 {
@@ -262,8 +262,8 @@ func TestListPackTabs(t *testing.T) {
 		t.Fatalf("pack %s with %d problems", h.m.pack, len(h.m.probs))
 	}
 	h.press("/", "t", "w", "o", "-", "s", "u", "m", "enter")
-	if len(h.m.visible) != 1 || h.m.selected().Ref() != "regression/two-sum" {
-		t.Fatalf("search in regression: %d visible", len(h.m.visible))
+	if len(h.m.visible) != 1 || h.m.selected().Ref() != "leetcode-regression/two-sum" {
+		t.Fatalf("search in leetcode-regression: %d visible", len(h.m.visible))
 	}
 	h.press("tab") // wraps around to local
 	if h.m.pack != "local" || len(h.m.visible) != 1 || h.m.selected().Ref() != "local/two-sum" {
@@ -292,16 +292,17 @@ func TestListTabBarScrolls(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	addLocal(t, h.m, "0001-two-sum")
-	h.m.Update(tea.WindowSizeMsg{Width: 20, Height: 30})
-	if bar := h.m.tabBar(h.m.width); strings.Contains(bar, "local") || !strings.Contains(bar, "regression") || !strings.HasPrefix(bar, "‹") {
-		t.Errorf("tab bar on regression: %q", bar)
+	// Fit either tab individually, but not both together.
+	h.m.Update(tea.WindowSizeMsg{Width: 32, Height: 30})
+	if bar := h.m.tabBar(h.m.width); strings.Contains(bar, "local") || !strings.Contains(bar, "leetcode-regression") || !strings.HasPrefix(bar, "‹") {
+		t.Errorf("tab bar on leetcode-regression: %q", bar)
 	}
 	h.press("tab")
-	if bar := h.m.tabBar(h.m.width); !strings.Contains(bar, "local") || strings.Contains(bar, "regression") || !strings.HasSuffix(bar, "›") {
+	if bar := h.m.tabBar(h.m.width); !strings.Contains(bar, "local") || strings.Contains(bar, "leetcode-regression") || !strings.HasSuffix(bar, "›") {
 		t.Errorf("tab bar on local: %q", bar)
 	}
 	h.m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
-	if bar, want := h.m.tabBar(h.m.width), " local 0/1  regression 0/"+strconv.Itoa(len(h.m.tabs[1].probs))+" "; bar != want {
+	if bar, want := h.m.tabBar(h.m.width), " local 0/1  leetcode-regression 0/"+strconv.Itoa(len(h.m.tabs[1].probs))+" "; bar != want {
 		t.Errorf("wide tab bar: %q", bar)
 	}
 }
@@ -351,7 +352,7 @@ func TestListGroups(t *testing.T) {
 	}
 	h.press("esc", "tab")
 	if g := h.m.group(); g == nil || g.Name != "design" {
-		t.Fatalf("back in regression: group %v", g)
+		t.Fatalf("back in leetcode-regression: group %v", g)
 	}
 	m := h.openModel(Options{})
 	if g := m.group(); m.pack != regression.Name || g == nil || g.Name != "design" || len(m.probs) != 5 {
@@ -402,7 +403,7 @@ func TestPackPicker(t *testing.T) {
 		t.Fatalf("opened on screen %v, want the pack picker", p.m.top())
 	}
 	view := p.view()
-	for _, want := range []string{"2 packs", "Pack manager", "local", "0/1", "regression", "hc regression set", "enter open"} {
+	for _, want := range []string{"2 packs", "Pack manager", "local", "0/1", "leetcode-regression", "LeetCode compatibility", "enter open"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("picker lacks %q:\n%s", want, view)
 		}
@@ -650,8 +651,8 @@ func TestRunSubmitHistoryAndDiscard(t *testing.T) {
 	if h.m.run.report.Verdict != runner.Accepted || h.m.run.subID == 0 {
 		t.Fatalf("submit: %+v", h.m.run)
 	}
-	if h.m.statuses["regression/two-sum"] != app.StatusSolved {
-		t.Fatalf("status after accepted submit: %v", h.m.statuses["regression/two-sum"])
+	if h.m.statuses["leetcode-regression/two-sum"] != app.StatusSolved {
+		t.Fatalf("status after accepted submit: %v", h.m.statuses["leetcode-regression/two-sum"])
 	}
 
 	h.press("h")
@@ -698,8 +699,8 @@ func TestRunSubmitHistoryAndDiscard(t *testing.T) {
 	if subs, _ := st.List(context.Background(), regression.Name, "two-sum"); len(subs) != 0 {
 		t.Fatalf("%d submissions left", len(subs))
 	}
-	if h.m.statuses["regression/two-sum"] != app.StatusNew {
-		t.Fatalf("status after discard: %v", h.m.statuses["regression/two-sum"])
+	if h.m.statuses["leetcode-regression/two-sum"] != app.StatusNew {
+		t.Fatalf("status after discard: %v", h.m.statuses["leetcode-regression/two-sum"])
 	}
 }
 
@@ -826,14 +827,15 @@ func addSubs(t *testing.T, m *model, details string, refs ...string) {
 func TestHistoryOfEveryProblem(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
+	h.m.Update(tea.WindowSizeMsg{Width: 160, Height: 30})
 	addLocal(t, h.m, "0001-two-sum")
-	addSubs(t, h.m, "", "regression/lru-cache", "local/two-sum", "regression/two-sum")
+	addSubs(t, h.m, "", "leetcode-regression/lru-cache", "local/two-sum", "leetcode-regression/two-sum")
 	h.press("j", "h")
 	if h.m.top() != screenHistory || !h.m.historyAll() || len(h.m.subs) != 3 {
 		t.Fatalf("h on the list: screen %v, %d subs", h.m.top(), len(h.m.subs))
 	}
 	view := h.view()
-	for _, want := range []string{"All submissions", "3 submissions", "PROBLEM", "regression/LRU Cache", "local/Two Sum", "o problem"} {
+	for _, want := range []string{"All submissions", "3 submissions", "PROBLEM", "leetcode-regression/LRU Cache", "local/Two Sum", "o problem"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("history lacks %q:\n%s", want, view)
 		}
@@ -843,7 +845,7 @@ func TestHistoryOfEveryProblem(t *testing.T) {
 	}
 
 	h.press("o")
-	if h.m.top() != screenDetail || h.m.current.Ref() != "regression/lru-cache" || !h.m.viewing {
+	if h.m.top() != screenDetail || h.m.current.Ref() != "leetcode-regression/lru-cache" || !h.m.viewing {
 		t.Fatalf("o: screen %v, problem %v", h.m.top(), h.m.current)
 	}
 	if h.m.app.HasSolution(h.m.current, h.m.lang) {
@@ -885,7 +887,7 @@ func TestHistoryOfEveryProblem(t *testing.T) {
 func TestHistoryOfProblem(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	addSubs(t, h.m, "", "regression/lru-cache", "regression/two-sum", "regression/two-sum")
+	addSubs(t, h.m, "", "leetcode-regression/lru-cache", "leetcode-regression/two-sum", "leetcode-regression/two-sum")
 	h.press("v", "h")
 	if h.m.top() != screenHistory || h.m.historyAll() || len(h.m.subs) != 2 {
 		t.Fatalf("h in two-sum: screen %v, %d subs", h.m.top(), len(h.m.subs))
@@ -910,14 +912,14 @@ func TestHistoryOfRemovedProblem(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	details := app.EncodeReport(h.m.selected(), &runner.Report{Verdict: runner.WrongAnswer, Passed: 1, Total: 2})
-	addSubs(t, h.m, details, "regression/gone", "gone-pack/two-sum")
+	addSubs(t, h.m, details, "leetcode-regression/gone", "gone-pack/two-sum")
 	h.press("h")
 	if len(h.m.subs) != 2 || !strings.Contains(h.view(), "gone-pack/two-sum") {
 		t.Fatalf("history:\n%s", h.view())
 	}
 	for _, key := range []string{"o", "r", "d"} {
 		h.press(key)
-		if h.m.top() != screenHistory || h.m.confirm != nil || !strings.Contains(h.view(), "problem regression/gone no longer exists") {
+		if h.m.top() != screenHistory || h.m.confirm != nil || !strings.Contains(h.view(), "problem leetcode-regression/gone no longer exists") {
 			t.Errorf("%s: screen %v, confirm %v\n%s", key, h.m.top(), h.m.confirm, h.view())
 		}
 	}
@@ -926,16 +928,16 @@ func TestHistoryOfRemovedProblem(t *testing.T) {
 	if h.m.top() != screenSubmission || h.m.current != nil {
 		t.Fatalf("enter: screen %v, problem %v", h.m.top(), h.m.current)
 	}
-	for _, want := range []string{"regression/gone", "no longer exists", "1/2 passed"} {
+	for _, want := range []string{"leetcode-regression/gone", "no longer exists", "1/2 passed"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("submission lacks %q:\n%s", want, view)
 		}
 	}
-	if h.press("tab"); !strings.Contains(h.view(), "// regression/gone") {
+	if h.press("tab"); !strings.Contains(h.view(), "// leetcode-regression/gone") {
 		t.Errorf("submission's code:\n%s", h.view())
 	}
 	h.press("r")
-	if h.m.confirm != nil || !strings.Contains(h.view(), "problem regression/gone no longer exists") {
+	if h.m.confirm != nil || !strings.Contains(h.view(), "problem leetcode-regression/gone no longer exists") {
 		t.Errorf("r on the submission:\n%s", h.view())
 	}
 	h.press("x", "y")

@@ -126,8 +126,8 @@ func TestTUICommandExplicitCurrentProblemLanguage(t *testing.T) {
 	if err := regression.Install(ws); err != nil {
 		t.Fatal(err)
 	}
-	ctx := tui.CommandContext{Workspace: ws.Root, Problem: "regression/two-sum", Language: "python"}
-	for _, ref := range []string{"regression/two-sum", "two-sum", "1"} {
+	ctx := tui.CommandContext{Workspace: ws.Root, Problem: "leetcode-regression/two-sum", Language: "python"}
+	for _, ref := range []string{"leetcode-regression/two-sum", "two-sum", "1"} {
 		args, err := resolveTUICommand("test "+ref, ctx)
 		if err != nil || !slices.Contains(args, "python") {
 			t.Fatalf("explicit current target %s lost language: %q, %v", ref, args, err)
@@ -170,8 +170,8 @@ func TestResolveTUICommandRestrictions(t *testing.T) {
 
 func TestCompleteTUICommand(t *testing.T) {
 	ctx := tui.CommandContext{
-		Problems: []string{"leetcode/two-sum", "regression/two-sum"},
-		Packs:    []string{"leetcode", "regression"},
+		Problems: []string{"leetcode/two-sum", "leetcode-regression/two-sum"},
+		Packs:    []string{"leetcode", "leetcode-regression"},
 		Groups:   []string{"user:todo", "pack:trees"},
 	}
 	for _, tt := range []struct{ line, want string }{

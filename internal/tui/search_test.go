@@ -76,7 +76,7 @@ func TestGroupSearchNavigateAndActivate(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	for _, name := range []string{"a-review", "b-review"} {
-		if err := h.m.app.CreateGroup("regression", name, "Review"); err != nil {
+		if err := h.m.app.CreateGroup("leetcode-regression", name, "Review"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -106,7 +106,7 @@ func TestGroupSearchNavigateAndActivate(t *testing.T) {
 		t.Fatal("search navigation or text cursor movement lost the highlight")
 	}
 	h.press("ctrl+o")
-	g, err := h.m.app.ResolveGroup("regression", "user:b-review")
+	g, err := h.m.app.ResolveGroup("leetcode-regression", "user:b-review")
 	if err != nil || !slices.Equal(g.Problems, []string{problem}) || h.m.group().Key() != "user:b-review" || h.m.picking || h.m.groupSearching {
 		t.Fatalf("activated the wrong add destination: group %+v, error %v", g, err)
 	}
@@ -133,10 +133,10 @@ func TestGroupEditorSearchActivate(t *testing.T) {
 	for _, mode := range []string{"new", "edit", "copy"} {
 		t.Run(mode, func(t *testing.T) {
 			h := newHarness(t)
-			if err := h.m.app.SaveGroup("regression", "", workspace.UserGroup{Name: "review", Title: "Review"}); err != nil {
+			if err := h.m.app.SaveGroup("leetcode-regression", "", workspace.UserGroup{Name: "review", Title: "Review"}); err != nil {
 				t.Fatal(err)
 			}
-			g, err := h.m.app.ResolveGroup("regression", "user:review")
+			g, err := h.m.app.ResolveGroup("leetcode-regression", "user:review")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -166,7 +166,7 @@ func TestGroupEditorSearchActivate(t *testing.T) {
 			if !slices.Equal(f.selected, []string{first}) {
 				t.Fatal("activation did not toggle draft membership")
 			}
-			g, err = h.m.app.ResolveGroup("regression", "user:review")
+			g, err = h.m.app.ResolveGroup("leetcode-regression", "user:review")
 			if err != nil || len(g.Problems) != 0 {
 				t.Fatal("search activation wrote the draft before saving")
 			}

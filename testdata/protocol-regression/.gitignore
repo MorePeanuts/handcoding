@@ -1,0 +1,11 @@
+# What hc adds when the set is opened as a workspace (hc -w testdata/protocol-regression):
+# its state, your solutions and settings, and the agent skills.
+/.hc/
+/solutions/
+/hc.yaml
+/pyrightconfig.json
+/ty.toml
+/.claude/
+/.agents/
+/AGENTS.md
+/CLAUDE.md

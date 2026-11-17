@@ -74,7 +74,7 @@ func TestNativeNavigationScopesAndCases(t *testing.T) {
 	m := h.m
 	p := m.selected()
 	h.native(Command{Action: "show", Problem: p.Ref()})
-	h.native(Command{Action: "show", Problem: "regression/maximum-depth-of-binary-tree"})
+	h.native(Command{Action: "show", Problem: "leetcode-regression/maximum-depth-of-binary-tree"})
 	h.press("esc")
 	if m.top() != screenList || m.selected().ID != "104" {
 		t.Fatal("direct navigation did not return to the target list")
@@ -116,8 +116,8 @@ func TestNativeNavigationScopesAndCases(t *testing.T) {
 	if m.pack != "local" || !m.picking {
 		t.Fatal("explicit empty pack/group destination failed")
 	}
-	h.native(Command{Action: "group show", Pack: "regression", Group: "pack:design"})
-	if m.pack != "regression" || m.groups[m.pack] != "pack:design" || m.picking {
+	h.native(Command{Action: "group show", Pack: "leetcode-regression", Group: "pack:design"})
+	if m.pack != "leetcode-regression" || m.groups[m.pack] != "pack:design" || m.picking {
 		t.Fatal("group show did not browse its members")
 	}
 	h.native(Command{Action: "pack list"})
@@ -309,7 +309,7 @@ func TestNativeCrossPackAndResultStatement(t *testing.T) {
 
 	h.press("esc")
 	h.native(Command{Action: "show", Problem: original.Ref()})
-	target, err := m.app.WS.Problem("regression/maximum-depth-of-binary-tree")
+	target, err := m.app.WS.Problem("leetcode-regression/maximum-depth-of-binary-tree")
 	if err != nil {
 		t.Fatal(err)
 	}

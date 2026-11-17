@@ -102,18 +102,18 @@ func TestLanguageSwitchFromWorkspaceHistory(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	addLocal(t, h.m, "0001-two-sum")
-	if err := h.m.commandPack("regression"); err != nil {
+	if err := h.m.commandPack("leetcode-regression"); err != nil {
 		t.Fatal(err)
 	}
 	h.m.show()
 	// History can show a local problem while the underlying list is regression.
 	h.m.openHistory(nil)
 	h.m.openSubProblem(store.Submission{Pack: "local", Slug: "two-sum"})
-	if h.m.current.Pack != "local" || h.m.pack != "regression" {
+	if h.m.current.Pack != "local" || h.m.pack != "leetcode-regression" {
 		t.Fatal("unexpected navigation context")
 	}
 	h.press("L")
-	if h.m.lang.ID() != "python" || h.m.app.WS.Config.PackSettings["local"].Language != "python" || h.m.app.WS.Config.PackSettings["regression"].Language != "" {
+	if h.m.lang.ID() != "python" || h.m.app.WS.Config.PackSettings["local"].Language != "python" || h.m.app.WS.Config.PackSettings["leetcode-regression"].Language != "" {
 		t.Fatal("saved language to the wrong pack")
 	}
 	if err := h.m.reload(); err != nil {

@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -28,7 +29,7 @@ import (
 // default tolerance feature and the exemptions. It needs no toolchain: TestRegressionReferences
 // (internal/app) checks that the problems' references pass.
 func TestProtocolCoverage(t *testing.T) {
-	m, probs := loadSet(t)
+	manifests, probs := loadSet(t)
 	// Explicit function overrides and optional GLib requirements supplement
 	// the full, portable C11 corpus with driver-specific binding fixtures.
 	for _, name := range []string{"bound-counter", "bound-function"} {
@@ -47,10 +48,12 @@ func TestProtocolCoverage(t *testing.T) {
 		}
 	}
 	// pack.yaml's fields, used by the set itself.
-	packFields := map[string]bool{}
-	setFields(packFields, reflect.ValueOf(m).Elem())
-	for f := range packFields {
-		used[inPack(f)] = append(used[inPack(f)], regression.Name)
+	for _, m := range manifests {
+		packFields := map[string]bool{}
+		setFields(packFields, reflect.ValueOf(m).Elem())
+		for f := range packFields {
+			used[inPack(f)] = append(used[inPack(f)], m.Name)
+		}
 	}
 
 	var missing []string
@@ -68,25 +71,59 @@ func TestProtocolCoverage(t *testing.T) {
 	}
 }
 
+var solutionFiles = map[string]string{
+	"go": "solution.go", "python": "solution.py", "c": "solution.c",
+	"cpp": "solution.cpp", "java": "Solution.java", "javascript": "solution.js", "typescript": "solution.ts",
+}
+
 // Missing toolchains may skip integration tests in a developer's environment,
 // but must never hide a language omitted from the pack or a missing reference.
 func TestReferenceCoverage(t *testing.T) {
-	m, probs := loadSet(t)
-	files := map[string]string{
-		"go": "solution.go", "python": "solution.py", "c": "solution.c",
-		"cpp": "solution.cpp", "java": "Solution.java", "javascript": "solution.js", "typescript": "solution.ts",
-	}
+	manifests, probs := loadSet(t)
+
 	for _, language := range problem.Languages(problem.Protocol) {
-		if !slices.Contains(m.Languages, language) {
-			t.Errorf("pack does not declare %s", language)
+		for _, m := range manifests {
+			if !slices.Contains(m.Languages, language) {
+				t.Errorf("pack %s does not declare %s", m.Name, language)
+			}
 		}
-		file, ok := files[language]
+		file, ok := solutionFiles[language]
 		if !ok {
 			t.Fatalf("add the reference filename for %s", language)
 		}
 		for _, p := range probs {
 			if _, ok := p.Reference(file); !ok {
 				t.Errorf("%s: missing %s reference", p.Slug, language)
+			}
+		}
+	}
+}
+
+// The exceptions record native snippets absent from LeetCode CN's public
+// response. Premium problems retain their Go/Python starters.
+// This check itself never uses the network.
+func TestLeetCodeTemplateCoverage(t *testing.T) {
+	_, probs := loadSet(t)
+	unavailable := map[string][]string{
+		"clone-n-ary-tree":                           {"c", "cpp", "java", "javascript", "typescript"},
+		"minimum-flips-in-binary-tree-to-get-result": {"c", "cpp", "java", "javascript", "typescript"},
+		"construct-quad-tree":                        {"c"},
+		"employee-importance":                        {"c"},
+		"find-a-corresponding-node-of-a-binary-tree-in-a-clone-of-that-tree": {"go", "c"},
+		"flatten-a-multilevel-doubly-linked-list":                            {"c"},
+		"logical-or-of-two-binary-grids-represented-as-quad-trees":           {"c"},
+	}
+	for _, p := range probs {
+		if p.Pack != regression.Name {
+			continue
+		}
+		for language, file := range solutionFiles {
+			data, err := os.ReadFile(filepath.Join(p.Dir, problem.TemplatesDir, file))
+			if os.IsNotExist(err) && slices.Contains(unavailable[p.Slug], language) {
+				continue
+			}
+			if err != nil || strings.TrimSpace(string(data)) == "" {
+				t.Errorf("%s: missing/empty native %s template: %v", p.Ref(), language, err)
 			}
 		}
 	}
@@ -490,40 +527,49 @@ func setFields(fs map[string]bool, v reflect.Value) {
 // loadSet loads the regression set as hc loads an installed pack, and
 // requires the pack to be valid, its problems' statements and titles in
 // every locale included.
-func loadSet(t *testing.T) (*pack.Manifest, []*problem.Problem) {
+func loadSet(t *testing.T) ([]*pack.Manifest, []*problem.Problem) {
 	t.Helper()
-	m, err := pack.Load(regression.Dir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := m.Validate(); err != nil {
-		t.Fatal(err)
-	}
-	if m.Name != regression.Name {
-		t.Fatalf("pack.yaml names the pack %s, want %s", m.Name, regression.Name)
-	}
-	probs, failed, err := pack.LoadProblems(m.ProblemsPath(), m.Name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, f := range failed {
-		t.Error(f)
-	}
-	if err := m.ValidateProblems(probs); err != nil {
-		t.Error(err)
-	}
-	for _, p := range probs {
-		for _, err := range pack.IdentityErrors(p, probs) {
-			t.Errorf("%s: %v", p.Slug, err)
+	var manifests []*pack.Manifest
+	var all []*problem.Problem
+	for _, corpus := range regression.Packs() {
+		m, err := pack.Load(corpus.Dir)
+		if err != nil {
+			t.Fatal(err)
 		}
-		if err := p.ValidateLocales(m.Locales); err != nil {
-			t.Errorf("%s: %v", p.Slug, err)
+		if err := m.Validate(); err != nil {
+			t.Fatal(err)
 		}
+		if m.Name != corpus.Name {
+			t.Fatalf("pack.yaml names %s, want %s", m.Name, corpus.Name)
+		}
+		probs, failed, err := pack.LoadProblems(m.ProblemsPath(), m.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, f := range failed {
+			t.Error(f)
+		}
+		if err := m.ValidateProblems(probs); err != nil {
+			t.Error(err)
+		}
+		for _, p := range probs {
+			for _, err := range pack.IdentityErrors(p, probs) {
+				t.Errorf("%s: %v", p.Ref(), err)
+			}
+			if err := p.ValidateLocales(m.Locales); err != nil {
+				t.Errorf("%s: %v", p.Ref(), err)
+			}
+			if corpus.Name == regression.Name && (p.ID == "" || !strings.HasPrefix(p.Source.URL, "https://leetcode.com/problems/")) {
+				t.Errorf("%s: synthetic problems belong in %s", p.Ref(), regression.ProtocolName)
+			}
+		}
+		if len(probs) == 0 {
+			t.Fatalf("no problems in %s", corpus.Name)
+		}
+		manifests = append(manifests, m)
+		all = append(all, probs...)
 	}
-	if len(probs) == 0 {
-		t.Fatal("no problems in the regression set")
-	}
-	return m, probs
+	return manifests, all
 }
 
 // constant is a string constant of internal/problem.

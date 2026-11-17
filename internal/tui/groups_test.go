@@ -105,7 +105,7 @@ func TestPersonalGroupEmptyAndErrors(t *testing.T) {
 func TestPersonalGroupMissingAndMalformedTUI(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	if err := h.m.app.WS.UpdateUserGroups("regression", func(gs []workspace.UserGroup) ([]workspace.UserGroup, error) {
+	if err := h.m.app.WS.UpdateUserGroups("leetcode-regression", func(gs []workspace.UserGroup) ([]workspace.UserGroup, error) {
 		return append(gs, workspace.UserGroup{Name: "review", Problems: []string{"gone", "two-sum"}}), nil
 	}); err != nil {
 		t.Fatal(err)
@@ -119,13 +119,13 @@ func TestPersonalGroupMissingAndMalformedTUI(t *testing.T) {
 	if !strings.Contains(m.content(), "1 unavailable") {
 		t.Fatalf("picker omits missing count:\n%s", m.content())
 	}
-	path := h.m.app.WS.UserGroupsPath("regression")
+	path := h.m.app.WS.UserGroupsPath("leetcode-regression")
 	if err := os.WriteFile(path, []byte("groups: ["), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	m = h.openModel(Options{Pack: "regression"})
+	m = h.openModel(Options{Pack: "leetcode-regression"})
 	m.Update(keyMsg("c"))
-	if m.tab().groupErr == nil || !strings.Contains(m.message, "groups/regression.yaml") || len(m.tab().groups()) == 0 {
+	if m.tab().groupErr == nil || !strings.Contains(m.message, "groups/leetcode-regression.yaml") || len(m.tab().groups()) == 0 {
 		t.Fatal("corrupted personal file hid pack groups or its error")
 	}
 	m = h.openModel(Options{Group: "pack:design"})
@@ -138,7 +138,7 @@ func TestPersonalGroupRememberedSource(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	m := h.openModel(Options{Group: "pack:design"})
-	if err := m.app.CreateGroup("regression", "design", "My design problems"); err != nil {
+	if err := m.app.CreateGroup("leetcode-regression", "design", "My design problems"); err != nil {
 		t.Fatal(err)
 	}
 	m = h.openModel(Options{})
@@ -219,7 +219,7 @@ func TestGroupEditorSearchAndSelection(t *testing.T) {
 		t.Fatal("help closed the editor")
 	}
 	h.press("ctrl+s")
-	g, err := h.m.app.ResolveGroup("regression", "user:review")
+	g, err := h.m.app.ResolveGroup("leetcode-regression", "user:review")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,7 +231,7 @@ func TestGroupEditorSearchAndSelection(t *testing.T) {
 func TestGroupCopyEditsBeforeSaving(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	original, err := h.m.app.ResolveGroup("regression", "pack:design")
+	original, err := h.m.app.ResolveGroup("leetcode-regression", "pack:design")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +243,7 @@ func TestGroupCopyEditsBeforeSaving(t *testing.T) {
 	if strings.Contains(h.view(), "pack:") {
 		t.Fatal("copy view exposed the internal source prefix")
 	}
-	if _, err := h.m.app.ResolveGroup("regression", "user:design-copy"); err == nil {
+	if _, err := h.m.app.ResolveGroup("leetcode-regression", "user:design-copy"); err == nil {
 		t.Fatal("copy wrote before save")
 	}
 	// Remove and reorder inherited members, then add a title search result.
@@ -255,14 +255,14 @@ func TestGroupCopyEditsBeforeSaving(t *testing.T) {
 		t.Fatalf("copy draft: %v", want)
 	}
 	h.press("ctrl+s")
-	g, err := h.m.app.ResolveGroup("regression", "user:design-copy")
+	g, err := h.m.app.ResolveGroup("leetcode-regression", "user:design-copy")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(g.Problems, want) {
 		t.Fatalf("saved unedited source: %v", g.Problems)
 	}
-	source, err := h.m.app.ResolveGroup("regression", "pack:design")
+	source, err := h.m.app.ResolveGroup("leetcode-regression", "pack:design")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +270,7 @@ func TestGroupCopyEditsBeforeSaving(t *testing.T) {
 		t.Fatal("changed source group")
 	}
 	h.press("c", "C", "tab", "tab", "tab", "x", "esc")
-	if _, err := h.m.app.ResolveGroup("regression", "user:design-copy-copy"); err == nil {
+	if _, err := h.m.app.ResolveGroup("leetcode-regression", "user:design-copy-copy"); err == nil {
 		t.Fatal("cancelled copy was created")
 	}
 }
@@ -278,7 +278,7 @@ func TestGroupCopyEditsBeforeSaving(t *testing.T) {
 func TestGroupPickerSourceColumn(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	if err := h.m.app.CreateGroup("regression", "design", "My design"); err != nil {
+	if err := h.m.app.CreateGroup("leetcode-regression", "design", "My design"); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.m.reload(); err != nil {
@@ -324,7 +324,7 @@ func TestGroupEditorScreens(t *testing.T) {
 		t.Skip("stdout is a terminal: the screens would have colors")
 	}
 	h := newHarness(t)
-	if err := h.m.app.SaveGroup("regression", "", workspace.UserGroup{Name: "design", Title: "My design problems", Problems: []string{"two-sum", "lru-cache"}}); err != nil {
+	if err := h.m.app.SaveGroup("leetcode-regression", "", workspace.UserGroup{Name: "design", Title: "My design problems", Problems: []string{"two-sum", "lru-cache"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.m.reload(); err != nil {
@@ -393,7 +393,7 @@ func TestGroupPickerSearch(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	for _, g := range []workspace.UserGroup{{Name: "review", Title: "复习计划"}, {Name: "design", Title: "My design"}} {
-		if err := h.m.app.SaveGroup("regression", "", g); err != nil {
+		if err := h.m.app.SaveGroup("leetcode-regression", "", g); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -442,7 +442,7 @@ func TestGroupPickerSearch(t *testing.T) {
 		t.Fatal("filtered copy targeted the wrong group")
 	}
 	h.press("esc", "x", "y")
-	if _, err := h.m.app.ResolveGroup("regression", "user:review"); err == nil {
+	if _, err := h.m.app.ResolveGroup("leetcode-regression", "user:review"); err == nil {
 		t.Fatal("filtered delete did not remove review")
 	}
 	if h.m.groupCursor != 0 || len(h.m.groupChoices()) != 0 {
@@ -461,7 +461,7 @@ func TestGroupPickerSearch(t *testing.T) {
 func TestGroupPickerSearchAddAndIsolation(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	if err := h.m.app.CreateGroup("regression", "target", "My target"); err != nil {
+	if err := h.m.app.CreateGroup("leetcode-regression", "target", "My target"); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.m.reload(); err != nil {
@@ -478,7 +478,7 @@ func TestGroupPickerSearchAddAndIsolation(t *testing.T) {
 	h.press("a", "/")
 	h.m.Update(tea.PasteMsg{Content: "TARGET"})
 	h.press("enter", "enter")
-	g, err := h.m.app.ResolveGroup("regression", "user:target")
+	g, err := h.m.app.ResolveGroup("leetcode-regression", "user:target")
 	if err != nil {
 		t.Fatal(err)
 	}

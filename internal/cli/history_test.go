@@ -43,7 +43,7 @@ func TestHistoryOfRemovedProblem(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := ws.ProblemOf("regression", "linked-list-cycle")
+	p, err := ws.ProblemOf("leetcode-regression", "linked-list-cycle")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,13 +71,13 @@ func TestHistoryOfRemovedProblem(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, errOut, err = captureAll(t, "-w", dir, "history", "restore", "1", "-y")
-	if err == nil || err.Error() != "problem regression/linked-list-cycle no longer exists" {
+	if err == nil || err.Error() != "problem leetcode-regression/linked-list-cycle no longer exists" {
 		t.Errorf("restore: %v", err)
 	}
 	if strings.Contains(out+errOut, "restored") {
 		t.Errorf("restore printed:\n%s%s", out, errOut)
 	}
-	solutions := filepath.Join(dir, "solutions", "regression")
+	solutions := filepath.Join(dir, "solutions", "leetcode-regression")
 	if entries, err := os.ReadDir(solutions); !os.IsNotExist(err) {
 		t.Errorf("restore wrote into %s: %v, %v", solutions, entries, err)
 	}
@@ -89,8 +89,8 @@ func TestHistoryOfRemovedProblem(t *testing.T) {
 	if out != code {
 		t.Errorf("show printed the code:\n%s", out)
 	}
-	if !strings.Contains(errOut, "submission #1 regression/linked-list-cycle") ||
-		!strings.Contains(errOut, "problem regression/linked-list-cycle no longer exists; the judge details cannot be shown") ||
+	if !strings.Contains(errOut, "submission #1 leetcode-regression/linked-list-cycle") ||
+		!strings.Contains(errOut, "problem leetcode-regression/linked-list-cycle no longer exists; the judge details cannot be shown") ||
 		strings.Contains(errOut, "Case 1") {
 		t.Errorf("show of a removed problem, stderr:\n%s", errOut)
 	}
@@ -109,7 +109,7 @@ func TestHistoryNote(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sub := &store.Submission{Pack: "regression", Slug: "two-sum", Lang: "go", Verdict: "Accepted", Passed: 1, Total: 1, Code: "package main\n"}
+	sub := &store.Submission{Pack: "leetcode-regression", Slug: "two-sum", Lang: "go", Verdict: "Accepted", Passed: 1, Total: 1, Code: "package main\n"}
 	if err := st.Add(context.Background(), sub); err != nil {
 		t.Fatal(err)
 	}

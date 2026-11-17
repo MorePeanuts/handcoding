@@ -4,11 +4,11 @@
 
   ID       PROBLEM       VERDICT               LANG      SUBMITTED
 ────────────────────────────────────────────────────────────────────────────────
-▌ 1        regression/…  Wrong Answer          go        2026-11-14 12:00
+▌ 1        leetcode-re…  Wrong Answer          go        2026-11-14 12:00
   1        local/Two S…  Wrong Answer          go        2026-11-14 11:00
-  —        regression/…  Wrong Answer          go        2026-11-14 10:00
-  LCR 001  regression/…  Wrong Answer          go        2026-11-14 09:00
-  —        regression/…  Wrong Answer          go        2026-11-14 08:00
+  —        leetcode-re…  Wrong Answer          go        2026-11-14 10:00
+  LCR 001  leetcode-re…  Wrong Answer          go        2026-11-14 09:00
+  —        leetcode-re…  Wrong Answer          go        2026-11-14 08:00
   —        missing/two…  Wrong Answer          go        2026-11-14 07:00
 
 
