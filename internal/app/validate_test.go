@@ -73,6 +73,18 @@ func largest(nums []int) int { return slices.Max(nums) }
 			t.Errorf("case %s: %d runs in the baseline, want 1", cs.Generate, got)
 		}
 	}
+	// A language selection must also compute generated expectations using
+	// that language, without running the otherwise-first Go reference.
+	f = a.ValidateProblem(ctx, p, nil, p.Slug, app.ValidateOptions{Run: true, Strict: true, Languages: []string{"python"}})
+	if !f.OK() {
+		t.Fatalf("selected generated cases: %v", f.Errors)
+	}
+	for file, want := range map[string]int{goRuns: 1, pyRuns: 2} {
+		data, _ := os.ReadFile(file)
+		if got := strings.Count(string(data), "run\n"); got != want {
+			t.Errorf("%s ran %d times, want %d", file, got, want)
+		}
+	}
 }
 
 func pyQuote(s string) string { return "'" + strings.ReplaceAll(s, `\`, `\\`) + "'" }

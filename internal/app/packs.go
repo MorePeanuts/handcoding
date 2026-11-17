@@ -705,6 +705,19 @@ func (a *App) CheckPack(ctx context.Context, o ValidateOptions, report func(Find
 	if a.WS.Kind != workspace.Authoring {
 		return ValidateSummary{}, fmt.Errorf("%s is a practice workspace: hc pack check checks a pack checkout, so run it in one, or pass its directory", a.WS.Root)
 	}
+	// Resolve aliases before any tools are initialized. Reject typos and
+	// undeclared languages rather than reporting a vacuous successful check.
+	o.Languages = append([]string(nil), o.Languages...)
+	for i, id := range o.Languages {
+		if strings.TrimSpace(id) == "" {
+			return ValidateSummary{}, fmt.Errorf("language selection must not contain an empty name")
+		}
+		l, _, err := a.PackLanguage(a.WS.WritablePack(), id)
+		if err != nil {
+			return ValidateSummary{}, err
+		}
+		o.Languages[i] = l.ID()
+	}
 	o.Run, o.Strict = true, true
 	return a.ValidateWorkspace(ctx, o, report)
 }

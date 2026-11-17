@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 
@@ -40,6 +41,12 @@ type ValidateOptions struct {
 	// reported, and the runs add nothing to the references' baselines
 	// for time limits (see untimed). Findings are reported in the same order either way.
 	Jobs int
+	// Languages limits reference runs and language-specific checks to these
+	// canonical language IDs. Empty checks all languages as before.
+	Languages []string
+	// Problems limits workspace validation to these problem references. Pack
+	// manifests and groups are still checked against the complete pack.
+	Problems []string
 }
 
 // DefaultJobs is the number of problems hc validate and hc pack check
@@ -123,6 +130,14 @@ func (s ValidateSummary) OK() bool { return s.Failed == 0 && s.PackErrors == 0 }
 // ValidateProblem), o.Jobs problems at once.
 func (a *App) ValidateWorkspace(ctx context.Context, o ValidateOptions, report func(Finding)) (ValidateSummary, error) {
 	var sum ValidateSummary
+	selected := map[string]bool{}
+	for _, ref := range o.Problems {
+		p, err := a.WS.Problem(ref)
+		if err != nil {
+			return sum, err
+		}
+		selected[p.Ref()] = true
+	}
 	packs, err := a.WS.Packs()
 	if err != nil {
 		return sum, err
@@ -146,9 +161,15 @@ func (a *App) ValidateWorkspace(ctx context.Context, o ValidateOptions, report f
 			items = append(items, validateItem{f: Finding{Name: label, Errors: lines(err)}})
 		}
 		for _, f := range failed {
+			if len(selected) > 0 {
+				continue
+			}
 			items = append(items, validateItem{f: Finding{Name: a.WS.Rel(f.Dir), Errors: lines(f)}, failed: true})
 		}
 		for _, p := range probs {
+			if len(selected) > 0 && !selected[p.Ref()] {
+				continue
+			}
 			name := p.Slug
 			if qualify {
 				name = p.Ref()
@@ -225,7 +246,7 @@ func (a *App) validateItems(ctx context.Context, items []validateItem, o Validat
 		return nil
 	}
 	if o.Run {
-		a.setUp(ctx, items, o.Stderr)
+		a.setUp(ctx, items, o)
 	}
 	// A reference timed while other problems run makes a noisy baseline.
 	defer a.untimed()()
@@ -279,24 +300,30 @@ func (a *App) validateItems(ctx context.Context, items []validateItem, o Validat
 // language they run in (the Python environment, whose progress goes to w),
 // and the detection of its toolchain. A failure is left to each problem to
 // report, as it would be one problem at a time.
-func (a *App) setUp(ctx context.Context, items []validateItem, w io.Writer) {
+func (a *App) setUp(ctx context.Context, items []validateItem, o ValidateOptions) {
 	need := map[string]bool{}
 	for _, it := range items {
 		if it.p == nil {
 			continue
 		}
 		for _, l := range a.ReferenceLangs(it.p) {
-			need[l.ID()] = true
+			if o.includesLanguage(l.ID()) {
+				need[l.ID()] = true
+			}
 		}
 		if it.p.HasGenerator() || it.p.Judge.Compare == problem.CompareChecker {
 			need["python"] = true
 		}
 	}
 	for _, l := range a.Langs.All() {
-		if need[l.ID()] && l.Setup(ctx, w) == nil {
+		if need[l.ID()] && l.Setup(ctx, o.Stderr) == nil {
 			_, _ = l.Toolchain()
 		}
 	}
+}
+
+func (o ValidateOptions) includesLanguage(id string) bool {
+	return len(o.Languages) == 0 || slices.Contains(o.Languages, id)
 }
 
 func lines(err error) []string { return strings.Split(err.Error(), "\n") }
@@ -339,6 +366,9 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 	if len(errs) == 0 {
 		if k, err := a.WS.Pack(p.Pack); err == nil {
 			for _, id := range k.Languages() {
+				if !o.includesLanguage(id) {
+					continue
+				}
 				l, err := a.Langs.Get(id)
 				if err != nil {
 					continue
@@ -381,6 +411,9 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 	}
 	if len(errs) == 0 {
 		for _, l := range a.Langs.All() {
+			if !o.includesLanguage(l.ID()) {
+				continue
+			}
 			if _, err := l.Starter(p); err != nil {
 				errs = append(errs, err.Error())
 			}
@@ -420,12 +453,16 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 	}
 	warns = append(warns, imageWarnings(p)...)
 	refs := a.ReferenceLangs(p)
+	refs = slices.DeleteFunc(refs, func(l lang.Language) bool { return !o.includesLanguage(l.ID()) })
 	if len(refs) == 0 {
 		gap("no reference solution")
 	} else {
 		// A solution is judged only with a reference in its own language,
 		// so every language the pack is solved in needs one.
 		for _, l := range a.missingReferences(p) {
+			if !o.includesLanguage(l.ID()) {
+				continue
+			}
 			msg := fmt.Sprintf("no %s reference solution (%s/%s), so %s solutions are not judged: run `hc gen %s`, or write it", l.Name(), problem.ReferenceDir, l.SolutionFile(), l.Name(), name)
 			if o.Strict {
 				msg = "not ready: " + msg
@@ -463,14 +500,6 @@ func (a *App) ValidateProblem(ctx context.Context, p *problem.Problem, peers []*
 				break
 			}
 			expect = false
-			// The reference ran on the local toolchain, which may well be
-			// newer than the protocol's oldest.
-			if mc, ok := l.(lang.MinVersionChecker); ok && len(refErrs) == 0 {
-				file, _ := p.Reference(l.SolutionFile())
-				if err := mc.CheckMinVersion(ctx, p, file); err != nil {
-					refErrs = append(refErrs, fmt.Sprintf("%s reference fails minimum-version compatibility: %v", l.Name(), err))
-				}
-			}
 			errs = append(errs, refErrs...)
 		}
 	}

@@ -75,9 +75,12 @@ func TestInitPack(t *testing.T) {
 		t.Errorf("check.yml does not run on pull requests")
 	}
 	var runs []string
-	python := ""
+	python, referenceGo := "", ""
 	for _, s := range wf.Jobs["check"].Steps {
 		runs = append(runs, s.Run)
+		if strings.HasPrefix(s.Uses, "actions/setup-go@") {
+			referenceGo = s.With["go-version"]
+		}
 		if strings.HasPrefix(s.Uses, "actions/setup-python@") {
 			python = s.With["python-version"]
 		}
@@ -87,6 +90,9 @@ func TestInitPack(t *testing.T) {
 		if !strings.Contains(all, want) {
 			t.Errorf("check.yml does not run %q:\n%s", want, data)
 		}
+	}
+	if referenceGo != "1.22.x" {
+		t.Errorf("reference Go = %q, want 1.22.x", referenceGo)
 	}
 	if python != "3.12" {
 		t.Errorf("check.yml sets up Python %q, not 3.12", python)

@@ -164,7 +164,7 @@ func TestRegressionReferences(t *testing.T) {
 }
 
 // TestGoMinimumVersion checks every Go reference of the regression set at
-// the protocol's minimum Go version, as hc validate --run does.
+// the protocol's minimum Go version in CI.
 func TestGoMinimumVersion(t *testing.T) {
 	t.Parallel()
 	want := regression.Select(t)
@@ -195,10 +195,8 @@ func TestGoMinimumVersion(t *testing.T) {
 	}
 }
 
-// TestValidateGoMinimumVersion checks that hc validate --run fails a Go
-// reference that passes its cases on the local toolchain but uses a
-// standard library symbol newer than the protocol's minimum Go version.
-func TestValidateGoMinimumVersion(t *testing.T) {
+// Validation uses the current toolchain; CI owns minimum-version checks.
+func TestValidateCurrentGoVersion(t *testing.T) {
 	t.Parallel()
 	requireTools(t, "go")
 	a := newWorkspace(t)
@@ -208,21 +206,14 @@ func TestValidateGoMinimumVersion(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(ref), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for _, tt := range []struct{ loop, err string }{
-		{"range nums", ""},
-		{"range slices.Repeat(nums, 1)", "slices.Repeat requires go1.23"},
-	} {
-		code := "package main\n\nimport \"slices\"\n\nvar _ = slices.Contains[[]int]\n\nfunc total(nums []int) int {\n\ts := 0\n\tfor _, v := " + tt.loop + " {\n\t\ts += v\n\t}\n\treturn s\n}\n"
+	for _, loop := range []string{"range nums", "range slices.Repeat(nums, 1)"} {
+		code := "package main\n\nimport \"slices\"\n\nvar _ = slices.Contains[[]int]\n\nfunc total(nums []int) int {\n\ts := 0\n\tfor _, v := " + loop + " {\n\t\ts += v\n\t}\n\treturn s\n}\n"
 		if err := os.WriteFile(ref, []byte(code), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		f := a.ValidateProblem(context.Background(), p, nil, "total", app.ValidateOptions{Run: true})
-		got := strings.Join(f.Errors, "\n")
-		switch {
-		case tt.err == "" && got != "":
-			t.Errorf("%s: unexpected errors\n%s", tt.loop, got)
-		case tt.err != "" && (!strings.Contains(got, "Go reference fails minimum-version compatibility") || !strings.Contains(got, tt.err)):
-			t.Errorf("%s: errors\n%s\nwant %q", tt.loop, got, tt.err)
+		if !f.OK() {
+			t.Errorf("%s: %v", loop, f.Errors)
 		}
 	}
 }

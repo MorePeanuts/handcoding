@@ -129,3 +129,42 @@ func TestInvalidNodeOutputs(t *testing.T) {
 		t.Fatalf("%+v", rep.Cases)
 	}
 }
+
+// Different problems share the worker; each solution still compiles once, and
+// multiple cases execute in fresh processes without another compilation.
+func TestSharedWorkerBuilds(t *testing.T) {
+	compiler := testenv.LookPath(t, cpp.DefaultCompiler())
+	dir := t.TempDir()
+	log := filepath.Join(dir, "builds")
+	t.Setenv("HC_CPP_BUILD_COMPILER", compiler)
+	t.Setenv("HC_CPP_BUILD_LOG", log)
+	wrapper := filepath.Join(dir, "compiler")
+	script := `#!/bin/sh
+for arg do
+    case "$arg" in
+        -E) exec "$HC_CPP_BUILD_COMPILER" "$@" ;;
+        -c) echo worker >> "$HC_CPP_BUILD_LOG" ;;
+        zz_hc_driver.cpp) echo solution >> "$HC_CPP_BUILD_LOG" ;;
+    esac
+done
+exec "$HC_CPP_BUILD_COMPILER" "$@"
+`
+	if err := os.WriteFile(wrapper, []byte(script), 0755); err != nil {
+		t.Fatal(err)
+	}
+	l := cpp.Language{Compiler: wrapper, Standard: "c++17", Environment: filepath.Join(dir, "env")}
+	p := function([]problem.Param{{Name: "n", Type: "integer"}}, "integer")
+	rep := runLanguage(t, l, p, `class Solution {public:int f(int n){return n+1;}};`, "{\"input\":{\"n\":1},\"expected\":2}\n{\"input\":{\"n\":2},\"expected\":3}\n", runner.Options{})
+	if rep.Verdict != runner.Accepted {
+		t.Fatalf("%+v", rep)
+	}
+	p = function([]problem.Param{{Name: "s", Type: "string"}}, "string")
+	rep = runLanguage(t, l, p, `class Solution {public:string f(string s){return s+s;}};`, "{\"input\":{\"s\":\"a\"},\"expected\":\"aa\"}\n", runner.Options{})
+	if rep.Verdict != runner.Accepted {
+		t.Fatalf("%+v", rep)
+	}
+	b, err := os.ReadFile(log)
+	if err != nil || strings.Count(string(b), "worker\n") != 1 || strings.Count(string(b), "solution\n") != 2 {
+		t.Fatalf("builds = %q: %v", b, err)
+	}
+}

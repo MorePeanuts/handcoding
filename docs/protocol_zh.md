@@ -738,7 +738,7 @@ def distinct(rng, n):
 
 ### C 语言
 
-- 语言 ID 为 `c`，文件为 `solution.c`。使用原生顶层函数，无需 `main`。驱动按纯 C 编译，不经过 C++。协议最低 C11，默认模式 `gnu11`；参考解还会在严格 C11 模式下检查。用户解可显式选择编译器支持的更新标准。`main`、`hc_` 和 `HC_` 名称保留给驱动。
+- 语言 ID 为 `c`，文件为 `solution.c`。使用原生顶层函数，无需 `main`。驱动按纯 C 编译，不经过 C++。协议最低 C11，默认模式 `gnu11`；题目包的 CI 必须在严格 C11 模式下检查参考解，本地验证使用配置的标准。用户解可显式选择编译器支持的更新标准。`main`、`hc_` 和 `HC_` 名称保留给驱动。
 - 标量分别绑定为 32 位 `int`、64 位 `long long`、`double`、`bool`、ASCII `char` 和以 NUL 结束的 UTF-8 `char*`。C 的 `string` 输入和期望输出不得包含 U+0000；含零字节的数据使用 `character[]`。返回的字符串必须是合法且以 NUL 结束的 UTF-8，第一个 NUL 表示字符串结束。
 - `T[]` 输入展开为 `T* value, int size`；`T[][]` 展开为 `T** value, int size, int* columnSizes`，支持不等长行。返回数组时追加 `int* returnSize`，二维数组再追加 `int** returnColumnSizes`。每个数组的尺寸紧跟该参数，随后才是下一个参数。`string[]` 因此为 `char**` 加数量；节点数组为指针数组加数量。空数组可返回 NULL 且长度为零。输出尺寸必须初始化且非负，非空缓冲区和尺寸数组在编码完成前必须有效。
 - hc 的三维数组扩展使用 `T*** value, int size, int* rowSizes, int** columnSizes`；返回参数追加 `int* returnSize, int** returnColumnSizes, int*** returnDepthSizes`。可在本地使用，但 hc 的 LeetCode 命令不接受这种扩展的远端提交。
@@ -768,7 +768,7 @@ c:
 - 自动提供 `ListNode`、`TreeNode`、当前 `Node` 变体、`NestedInteger` 和 `Employee`，字段和构造函数采用 LeetCode 风格。节点映射为裸指针；`NestedInteger` 为值类型，提供 `isInteger`、`getInteger`、`setInteger`、`add` 和 `getList`。`Employee[]` 映射为 `vector<Employee*>`。不要重新定义这些类型。自动提供常用标准头文件和 `using namespace std`，解答也可以包含其他标准头文件；不保证 macOS 支持 GNU 专用头文件和扩展。
 - 每个用例在新的本地进程中运行。类题同一用例的构造和全部操作共享进程及对象；round-trip 保持声明的实例语义。全局和静态变量在用例之间重置。用例退出时由操作系统回收用户分配的内存，包括节点；hc 不遍历并删除用户指针。用户可以正常 `new`/`delete`，但悬空指针和重复释放仍然是错误。
 - 每次运行只编译一次，全部用例复用同一二进制。算法耗时只统计调用（类题为构造和方法调用），不包含启动、编解码和退出；累计算法时限在工作进程之间共享。墙钟运行上限分别约束每个工作进程，包括其启动和退出，因此多个用例的总时间可能超过该上限。致命退出停止后续用例；捕获的异常使当前用例成为运行错误。
-- 生成代码、参考解和模板最低兼容 C++17，默认编译标准为 C++23。可以显式选择 C++17、C++20 或编译器支持的更新标准，不会静默降级。参考解验证还会使用严格 C++17 模式编译。正常构建使用 `-O2`，终端调试使用 `-O0 -g`。可选的 address/undefined sanitizer 对用户解和参考解使用相同设置，其配置参与时间基线区分。因每个用例通过进程退出回收内存，关闭泄漏报告。
+- 生成代码、参考解和模板最低兼容 C++17，默认编译标准为 C++23。可以显式选择 C++17、C++20 或编译器支持的更新标准，不会静默降级。题目包的 CI 必须在严格 C++17 模式下检查参考解，本地验证使用配置的标准。正常构建使用 `-O2`，终端调试使用 `-O0 -g`。可选的 address/undefined sanitizer 对用户解和参考解使用相同设置，其配置参与时间基线区分。因每个用例通过进程退出回收内存，关闭泄漏报告。
 
 ### Java
 
@@ -778,7 +778,7 @@ c:
 - hc 提供 LeetCode 风格的 `ListNode`、`TreeNode`、对应变体的 `Node`、`NestedInteger` 和 `Employee`，不要重新声明。`NestedInteger` 支持构造、`isInteger`、`getInteger`、`setInteger`、`add`、`getList`。另外提供 `javafx.util.Pair<K,V>`（`getKey`、`getValue`、相等比较、哈希和字符串表示），不需要安装 JavaFX。这些评测器辅助类型是“仅使用标准库”的例外，不支持其他依赖。初始代码导入 `java.util.*`、`java.math.*` 和 `javafx.util.Pair`；参考解必须自行包含所需导入。
 - 每次完整运行启动一个新 JVM，按顺序执行全部用例。每个函数用例创建新的 `Solution` 并重新解码输入；每个设计题用例创建自己的对象，全部操作共享该对象。往返题遵循 `instances`。静态字段、JVM/JIT 状态及被持有的对象会跨用例保留。节点内存由 GC 管理，hc 不强制 GC、重新加载类或为每个用例另启 JVM。批次结束后进程退出，下一次运行不会复用该 JVM。
 - 编译失败是 Compile Error；普通未捕获异常及断言失败使当前用例 Runtime Error，后续用例继续。致命 VM 错误、显式退出进程及超时会停止后续用例。用户可以正常打印 stdout/stderr。算法计时只统计解答调用（设计题包含构造器和方法），包括调用期间的 JIT/GC 停顿，不包含启动和编解码；墙钟超时覆盖整个 JVM 运行。Java 参考解按相同的**有序用例批次，包括重复用例**计时，取三个新 JVM 运行的最小总耗时，不得把不同批次的单例最小耗时拼接。
-- 协议最低 Java 17，生成代码、参考解和模板都必须兼容。hc 普通编译直接使用所选本地 JDK，不固定 release 目标，也不启用预览功能。`--release 17` 检查参考解的语法、标准 API 和字节码兼容性，仍需在 Java 17 上验证实际运行。
+- 协议最低 Java 17，生成代码、参考解和模板都必须兼容。hc 普通编译直接使用所选本地 JDK，不固定 release 目标，也不启用预览功能。题目包的 CI 必须在 Java 17 上验证参考解。本地验证直接使用所选 JDK，不再额外执行 `--release 17` 编译。
 
 ### JavaScript / TypeScript
 

@@ -6,7 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/regression"
+	"github.com/MorePeanuts/handcoding/internal/testenv"
 	"github.com/MorePeanuts/handcoding/internal/workspace"
 )
 
@@ -81,5 +83,41 @@ func TestPackCommands(t *testing.T) {
 	out, err = capture(t, "pack", "check", src)
 	if err == nil || !strings.Contains(out, "this pack needs protocol 2") || !strings.Contains(out, "pack.yaml has errors") {
 		t.Errorf("check: %v\n%s", err, out)
+	}
+}
+
+func TestPackCheckSelectionFlags(t *testing.T) {
+	testenv.LookPath(t, "python3")
+	tc, err := (python.Language{}).Toolchain()
+	if err != nil {
+		testenv.Skip(t, err)
+	}
+	if err := tc.Err(); err != nil {
+		testenv.Skip(t, err)
+	}
+	dir := t.TempDir()
+	files := map[string]string{
+		"pack.yaml":                            "protocol: 1\nname: selected\nlanguages: [go, python]\nlocales: [en]\n",
+		"hc.yaml":                              "python:\n  interpreter: python3\n",
+		"problems/total/problem.yaml":          "slug: total\ntitle: Total\nkind: function\nfunction:\n  name: total\n  params: []\n  returns: integer\njudge:\n  compare: exact\n",
+		"problems/total/description.md":        "Return one.\n",
+		"problems/total/cases.jsonl":           "{\"input\":{},\"expected\":1,\"example\":true}\n",
+		"problems/total/reference/solution.py": "class Solution:\n    def total(self):\n        return 1\n",
+	}
+	for name, content := range files {
+		path := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out, err := capture(t, "pack", "check", dir, "--lang", "py", "--lang", "python", "--problems", "total,total", "--jobs", "1")
+	if err != nil || !strings.Contains(out, "1 problem(s), all pass") {
+		t.Fatalf("filtered check: %v\n%s", err, out)
+	}
+	if _, err := capture(t, "pack", "check", dir, "-l", "py,go", "--problems", "total"); err == nil {
+		t.Fatal("missing selected Go reference passed")
 	}
 }

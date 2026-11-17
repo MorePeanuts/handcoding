@@ -66,10 +66,12 @@ If a problem cannot be expressed in the protocol, do not work around it (with a 
 
 `.github/workflows/check.yml` runs on every push and pull request. It sets up Go, C11/C++17-capable compilers, GLib development files and pkg-config, JDK 17, Node.js 22, TypeScript 5.7 and Python 3.12, the oldest Python the protocol supports, so that references and checkers are checked where users may run them, and then:
 
-1. installs hc with `go install github.com/MorePeanuts/handcoding/cmd/hc@<version>`;
-2. writes a `hc.yaml` that sets `python.interpreter: python3`, `c.command: gcc-13`, `c.standard: c11`, `cpp.command: g++-13` and `cpp.standard: c++17`, so hc judges with that Python rather than creating a virtual environment (`hc.yaml` is not committed);
+1. installs hc with `go install github.com/MorePeanuts/handcoding/cmd/hc@<version>`, then selects Go 1.22 for reference execution;
+2. writes a `hc.yaml` that sets `python.interpreter: python3`, `c.command: hc-cc`, `c.standard: c11`, `cpp.command: hc-cxx` and `cpp.standard: c++17`, so hc judges with that Python rather than creating a virtual environment (`hc.yaml` is not committed);
 3. runs `hc pack check`, which checks as many problems at once as the runner has CPUs, up to 4 ([checking a pack](how-to-use.md#checking-a-pack));
 4. runs `hc skill install --force` and fails if that changes any committed skill, or `AGENTS.md`: the skills in the repository must be those of the hc that checks the pack.
+
+The `hc-cc` and `hc-cxx` wrappers add `-pedantic-errors` to GCC 13. CI owns minimum-version compatibility: `hc pack check` only builds and runs with the selected tools, without a second compatibility compilation. For focused checks, use `--lang cpp,java` and/or `--problems two-sum,lfu-cache`; omit filters to check the complete pack.
 
 **The pin.** `<version>` is the version of the hc that ran `hc pack init`. A development build of hc has no release to pin, so the workflow then installs `@latest`, with a comment saying to pin it: replace `latest` with a release such as `v0.2.0`. A pinned hc keeps CI from changing under you when hc releases.
 

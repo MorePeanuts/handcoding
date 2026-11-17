@@ -68,10 +68,12 @@ hc pack check               # 像 CI 那样检查整个题目包
 
 `.github/workflows/check.yml` 在每次 push 和 pull request 时运行。它安装 Go、支持 C11/C++17 的编译器、GLib 开发文件与 pkg-config、JDK 17、Node.js 22、TypeScript 5.7 和 Python 3.12（协议支持的最旧 Python），从而在用户可能使用的环境中检查参考解和判题程序，然后：
 
-1. 用 `go install github.com/MorePeanuts/handcoding/cmd/hc@<version>` 安装 hc；
-2. 写入一个设置了 `python.interpreter: python3`、`c.command: gcc-13`、`c.standard: c11`、`cpp.command: g++-13` 和 `cpp.standard: c++17` 的 `hc.yaml`，让 hc 用这个 Python 判题，而不是创建虚拟环境（`hc.yaml` 不提交）；
+1. 用 `go install github.com/MorePeanuts/handcoding/cmd/hc@<version>` 安装 hc，然后切换到 Go 1.22 运行参考解；
+2. 写入一个设置了 `python.interpreter: python3`、`c.command: hc-cc`、`c.standard: c11`、`cpp.command: hc-cxx` 和 `cpp.standard: c++17` 的 `hc.yaml`，让 hc 用这个 Python 判题，而不是创建虚拟环境（`hc.yaml` 不提交）；
 3. 运行 `hc pack check`，它同时检查的题数与运行器的 CPU 数相同，最多 4 道（见[检查题目包](how-to-use_zh.md#检查题目包)）；
 4. 运行 `hc skill install --force`，如果它改动了任何已提交的技能或 `AGENTS.md` 就失败：仓库中的技能必须属于检查这个题目包的 hc。
+
+`hc-cc` 和 `hc-cxx` 包装脚本向 GCC 13 添加 `-pedantic-errors`。最低版本兼容性由 CI 负责：`hc pack check` 只使用所选工具链构建并运行，不再额外进行兼容性编译。局部检查可以使用 `--lang cpp,java` 和／或 `--problems two-sum,lfu-cache`；不带筛选则检查整个题包。
 
 **固定版本。** `<version>` 是运行 `hc pack init` 的 hc 的版本。hc 的开发版没有可以固定的发布版本，这时工作流安装 `@latest`，并附一条注释提醒你固定它：把 `latest` 换成一个发布版本，例如 `v0.2.0`。固定 hc 的版本可以避免 hc 发布新版本时 CI 跟着改变。
 

@@ -480,6 +480,7 @@ pack again brings them back; --purge deletes them too. local, the workspace's ow
 
 func newPackCheckCmd(root *rootOptions) *cobra.Command {
 	var jobs int
+	var languages, problems []string
 	cmd := &cobra.Command{
 		Use:   "check [dir]",
 		Short: "Check a pack checkout before publishing it (what its CI runs)",
@@ -487,8 +488,12 @@ func newPackCheckCmd(root *rootOptions) *cobra.Command {
 checkout: its pack.yaml is valid and of a supported protocol, its groups
 name problems of the pack, and every problem loads, is valid (as
 ` + "`hc validate`" + ` checks it), is ready (judge.compare is set) and passes
-` + "`hc validate --run`" + `: every reference solution passes every case, so the Go
-and Python toolchains must be installed.
+` + "`hc validate --run`" + `: every selected reference solution passes every case
+on the current toolchain. Minimum-version compatibility belongs in CI.
+
+Use --lang cpp,java to check only those languages, and --problems two-sum,lfu-cache
+to check only those problems. Both flags may be repeated. Without filters,
+check every problem and reference. Pack manifests and groups are always checked.
 
 Checks --jobs problems at once, and prints one line per problem, in order,
 and a summary, and fails if anything is wrong.`,
@@ -513,7 +518,7 @@ and a summary, and fails if anything is wrong.`,
 			}
 			defer a.Close()
 			packSkillsHint(a)
-			opts := app.ValidateOptions{Stderr: os.Stderr, Jobs: jobs}
+			opts := app.ValidateOptions{Stderr: os.Stderr, Jobs: jobs, Languages: languages, Problems: problems}
 			sum, err := a.CheckPack(cmd.Context(), opts, func(f app.Finding) { printFinding(f) })
 			if err != nil {
 				printPythonSetup(sum.PythonSetup)
@@ -540,5 +545,7 @@ and a summary, and fails if anything is wrong.`,
 		},
 	}
 	jobsFlag(cmd, &jobs)
+	cmd.Flags().StringSliceVarP(&languages, "lang", "l", nil, "languages to check (comma-separated or repeated; default all)")
+	cmd.Flags().StringSliceVar(&problems, "problems", nil, "problem references to check (comma-separated or repeated; default all)")
 	return cmd
 }

@@ -153,7 +153,7 @@ func Driver(p *problem.Problem) (string, error) {
 			s.WriteString("return encode(result);\n")
 		}
 	}
-	s.WriteString("}\n}\nint main(){try{return hc::run();}catch(const std::exception& e){std::cerr<<e.what()<<'\\n';return 1;}}\n")
+	s.WriteString("}\n}\n")
 	return s.String(), nil
 }
 func emitArgs(s *strings.Builder, ps []problem.Param, from, prefix string) []string {
