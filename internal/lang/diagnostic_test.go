@@ -16,13 +16,10 @@ import (
 
 func TestProbeDeadline(t *testing.T) {
 	t.Parallel()
-	file := filepath.Join(t.TempDir(), "tool")
-	if err := os.WriteFile(file, []byte("#!/bin/sh\nwhile :; do :; done\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	sh := testenv.LookPath(t, "sh")
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	_, err := Probe(ctx, file, nil)
+	_, err := Probe(ctx, sh, nil, "-c", "while :; do :; done")
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("%v", err)
 	}
@@ -44,7 +41,8 @@ func TestProbeSlowStart(t *testing.T) {
 // descriptor in a child, or the copying goroutine is delayed under load.
 func TestProbeOutputDrain(t *testing.T) {
 	t.Parallel()
-	testenv.LookPath(t, "sleep")
+	sh := testenv.LookPath(t, "sh")
+	sleep := testenv.LookPath(t, "sleep")
 	for _, tc := range []struct {
 		name, delay string
 		wantError   bool
@@ -57,6 +55,11 @@ func TestProbeOutputDrain(t *testing.T) {
 			pidFile := filepath.Join(dir, "pid")
 			t.Cleanup(func() {
 				b, err := os.ReadFile(pidFile)
+				if errors.Is(err, os.ErrNotExist) {
+					// A failed process start has no child to clean up. Leave the
+					// probe assertion to report the original error.
+					return
+				}
 				if err != nil {
 					t.Error(err)
 					return
@@ -74,12 +77,11 @@ func TestProbeOutputDrain(t *testing.T) {
 				_ = p.Kill()
 				_ = p.Release()
 			})
-			file := filepath.Join(dir, "tool")
-			script := "#!/bin/sh\nsleep \"$1\" &\nprintf '%s\\n' \"$!\" > \"$2\"\nprintf 'v22.0.0\\n'\n"
-			if err := os.WriteFile(file, []byte(script), 0755); err != nil {
-				t.Fatal(err)
-			}
-			out, err := Probe(t.Context(), file, nil, tc.delay, pidFile)
+			// Execute the installed shell instead of a freshly written file:
+			// a concurrent fork can temporarily inherit its writable descriptor
+			// and make exec fail with ETXTBSY on Linux.
+			script := "\"$1\" \"$2\" &\nprintf '%s\\n' \"$!\" > \"$3\"\nprintf 'v22.0.0\\n'\n"
+			out, err := Probe(t.Context(), sh, nil, "-c", script, "probe", sleep, tc.delay, pidFile)
 			if tc.wantError {
 				if !errors.Is(err, exec.ErrWaitDelay) {
 					t.Fatalf("unclosed pipe: %v", err)
