@@ -1,4 +1,5 @@
 import java.io.*;
+import java.lang.invoke.*;
 import java.lang.reflect.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -544,11 +545,10 @@ final class HCRuntime {
   }
 
   static final class Call {
-    Executable executable;
+    final MethodHandle target;
     Codec[] inputs;
     Codec output;
     Call(Executable e, List<Object> params, String returns) throws Exception {
-      executable = e;
       e.setAccessible(true);
       Type[] ts = e.getGenericParameterTypes();
       check(ts.length == params.size(), "parameter count mismatch");
@@ -556,6 +556,13 @@ final class HCRuntime {
       for (int i = 0; i < ts.length; i++) inputs[i] = codec(ts[i], str(map(params.get(i)), "type"));
       if (e instanceof Method)
         output = codec(((Method) e).getGenericReturnType(), returns);
+      MethodHandles.Lookup lookup = MethodHandles.lookup();
+      MethodHandle handle = e instanceof Method method ? lookup.unreflect(method)
+          : lookup.unreflectConstructor((Constructor<?>) e);
+      handle = handle.asFixedArity().asSpreader(Object[].class, ts.length);
+      if (e instanceof Constructor<?> || Modifier.isStatic(e.getModifiers()))
+        handle = MethodHandles.dropArguments(handle, 0, Object.class);
+      target = handle.asType(MethodType.methodType(Object.class, Object.class, Object[].class));
     }
     Object[] decode(List<Object> args) throws Exception {
       Object[] a = new Object[inputs.length];
@@ -566,10 +573,7 @@ final class HCRuntime {
       if (timed)
         start();
       try {
-        return executable instanceof Method ? ((Method) executable).invoke(obj, args)
-                                            : ((Constructor<?>) executable).newInstance(args);
-      } catch (InvocationTargetException e) {
-        throw e.getCause();
+        return target.invokeExact(obj, args);
       } finally {
         if (timed)
           stop();

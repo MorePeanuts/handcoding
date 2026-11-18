@@ -2,7 +2,7 @@
 const fs = require("node:fs"),
   path = require("node:path"),
   vm = require("node:vm");
-const { Worker } = require("node:worker_threads");
+const { Worker, isMainThread } = require("node:worker_threads");
 const { createRequire } = require("node:module");
 const {
   parse, scalar, decode, encode, decoder, encoder, nodes, check,
@@ -10,6 +10,13 @@ const {
 const types = require("./types.cjs");
 class Limit extends Error {}
 function run(options) {
+  if (isMainThread && process.env.HC_JS_DEBUG !== "1") {
+    const batch = new Worker(process.argv[1], {
+      resourceLimits: { stackSizeMb: 64 },
+    });
+    batch.once("exit", (code) => { process.exitCode = code; });
+    return;
+  }
   const spec = JSON.parse(fs.readFileSync(options.spec, "utf8"));
   const shared = new SharedArrayBuffer(8 + 8 * 5),
     lock = new Int32Array(shared, 0, 2),

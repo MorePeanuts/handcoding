@@ -101,6 +101,18 @@ func TestSafeLongAndFailures(t *testing.T) {
 		}
 	}
 }
+func TestDeepRecursion(t *testing.T) {
+	t.Parallel()
+	report := runSource(t, false, `function f(depth) { return depth === 0 ? 0 : 1 + f(depth - 1); }`, `
+{"input":{"n":100000},"expected":100000}
+{"input":{"n":2000000},"expected":2000000}
+{"input":{"n":3},"expected":3}
+`, runner.Options{})
+	if len(report.Cases) != 3 || report.Cases[0].Verdict != runner.Accepted || report.Cases[1].Verdict != runner.RuntimeError || !strings.Contains(report.Cases[1].Error, "RangeError") || report.Cases[2].Verdict != runner.Accepted {
+		t.Fatalf("deep recursion: %+v", report.Cases)
+	}
+}
+
 func TestBatchStateAndWatchdog(t *testing.T) {
 	t.Parallel()
 	lines := "{\"input\":{\"n\":1},\"expected\":1}\n{\"input\":{\"n\":1},\"expected\":2}\n"
