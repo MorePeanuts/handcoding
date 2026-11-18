@@ -14,6 +14,7 @@ import (
 	"github.com/goccy/go-yaml"
 
 	"github.com/MorePeanuts/handcoding/internal/builtin"
+	"github.com/MorePeanuts/handcoding/internal/lang/golang"
 	"github.com/MorePeanuts/handcoding/internal/lang/python"
 	"github.com/MorePeanuts/handcoding/internal/pack"
 	"github.com/MorePeanuts/handcoding/internal/problem"
@@ -147,9 +148,9 @@ func packFiles(m *pack.Manifest, hcVersion string) ([]packFile, error) {
 	}
 	header := "# The manifest of this hc pack: `hc docs protocol packyaml` describes its fields.\n"
 	data := struct {
-		Name, Title, Version, Python string
-		Pinned                       bool
-	}{m.Name, m.DisplayTitle(), "latest", python.MinVersion, false}
+		Name, Title, Version, Python, Go string
+		Pinned                           bool
+	}{m.Name, m.DisplayTitle(), "latest", python.MinVersion, golang.MinVersion, false}
 	if version.IsRelease(hcVersion) {
 		data.Version, data.Pinned = hcVersion, true
 	}

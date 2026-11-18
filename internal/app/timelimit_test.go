@@ -116,6 +116,14 @@ func TestTimeLimit(t *testing.T) {
 		if got := verdicts(rep); !sameVerdicts(got, want) || rep.Verdict != runner.TimeLimit {
 			t.Errorf("%s: %v (%s), want %v", langID, got, rep.Verdict, want)
 		}
+		b := rep.Timing.Baseline
+		if b == nil || b.Cached || b.Factor != 3 || rep.Timing.AlgorithmLimit != 3*b.Elapsed || rep.Cases[1].TimeoutCause != runner.AlgorithmTimeout {
+			t.Fatalf("%s: actual budget missing: %+v %+v", langID, rep.Timing, b)
+		}
+		restored := app.DecodeReport(app.EncodeReport(p, rep))
+		if restored.Timing == nil || *restored.Timing.Baseline != *b || restored.Timing.AlgorithmLimit != rep.Timing.AlgorithmLimit || restored.Cases[1].TimeoutCause != runner.AlgorithmTimeout || restored.Cases[1].Error != rep.Cases[1].Error {
+			t.Fatalf("budget/cause lost in history: %+v", restored)
+		}
 		if !rep.Stopped {
 			t.Errorf("%s: a run that stopped at the time limit is not Stopped", langID)
 		}
@@ -279,6 +287,10 @@ func TestBaselineCache(t *testing.T) {
 		}
 		if rep.Verdict != runner.Accepted {
 			t.Errorf("cases %v: %s", indices, rep.Verdict)
+		}
+		b := rep.Timing.Baseline
+		if b == nil || b.Cached == strings.Contains(stderr.String(), "Timing the Python") || b.Floor != time.Minute || rep.Timing.AlgorithmLimit != 3*time.Minute {
+			t.Fatalf("baseline metadata: %+v %+v", rep.Timing, b)
 		}
 		return stderr.String()
 	}

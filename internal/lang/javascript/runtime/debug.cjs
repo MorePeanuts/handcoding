@@ -10,7 +10,6 @@ const child = spawn(
   process.argv[2],
   [
     "--enable-source-maps",
-    "--stack-size=8192",
     "--inspect-brk=127.0.0.1:0",
     process.argv[3],
   ],

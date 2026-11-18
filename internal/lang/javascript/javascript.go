@@ -340,7 +340,7 @@ func (l Language) Build(ctx context.Context, dir, work string) error {
 }
 func (l Language) Command(ctx context.Context, dir, work string) *exec.Cmd {
 	p, _ := os.ReadFile(filepath.Join(work, "node"))
-	cmd := exec.CommandContext(ctx, string(p), "--enable-source-maps", "--stack-size=8192", filepath.Join(work, "run.cjs"))
+	cmd := exec.CommandContext(ctx, string(p), "--enable-source-maps", filepath.Join(work, "run.cjs"))
 	cmd.Dir = dir
 	return cmd
 }
@@ -349,7 +349,7 @@ func (l Language) DebugCommand(dir, work string, p *problem.Problem, o lang.Debu
 		return nil, e
 	}
 	node, _ := os.ReadFile(filepath.Join(work, "node"))
-	args := []string{"--enable-source-maps", "--stack-size=8192"}
+	args := []string{"--enable-source-maps"}
 	if o.Headless {
 		addr := o.Addr
 		if addr == "" {

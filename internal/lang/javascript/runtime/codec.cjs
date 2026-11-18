@@ -10,12 +10,21 @@ class Numeric {
   }
 }
 function parse(text) {
+  // Integer tokens with at most 15 digits are exact Numbers. Most case files
+  // contain only these, so let the native parser handle the entire batch.
+  // Decimal/exponent tokens and longer integers need source-aware decoding.
+  // Matches inside strings merely select the slower path; they change no value.
+  if (!/\d[.eE]|\d{16}/.test(text)) return JSON.parse(text);
   return JSON.parse(text, (key, value, context) => {
     if (typeof value !== "number") return value;
     check(
       context && typeof context.source === "string",
       "Node.js lacks lossless JSON parsing",
     );
+    // Safe integer tokens already have an exact Number representation. Keep
+    // the source only where rounding could hide an invalid integer input.
+    if (Number.isSafeInteger(value) && /^-?\d+$/.test(context.source))
+      return value;
     return new Numeric(context.source);
   });
 }
@@ -78,7 +87,7 @@ function decode(t, v) {
   }
   if (scalars.has(t)) return scalar(t, v);
   if (t === "NestedInteger") {
-    if (v instanceof Numeric)
+    if (typeof v === "number" || v instanceof Numeric)
       return new types.NestedInteger(scalar("integer", v));
     check(Array.isArray(v), "expected nested integer");
     const n = new types.NestedInteger();
@@ -191,6 +200,30 @@ function decode(t, v) {
     return root;
   }
   throw new Error("unknown node " + t);
+}
+// Resolve array/scalar types once per signature, outside class operation loops.
+function decoder(t) {
+  if (scalars.has(t)) return (v) => scalar(t, v);
+  if (t.endsWith("[]")) {
+    const item = decoder(t.slice(0, -2));
+    return (v) => {
+      check(Array.isArray(v), "expected array");
+      return v.map(item);
+    };
+  }
+  return (v) => decode(t, v);
+}
+function encoder(t) {
+  if (scalars.has(t)) return (v) => scalar(t, v);
+  if (t.endsWith("[]")) {
+    const item = encoder(t.slice(0, -2));
+    return (v) => {
+      if (v === null) return [];
+      check(Array.isArray(v), "expected array result");
+      return v.map(item);
+    };
+  }
+  return (v) => encode(t, v);
 }
 function trim(a) {
   while (a.length && a.at(-1) === null) a.pop();
@@ -384,4 +417,4 @@ function nodes(t, root, unique = true) {
   }
   return unique ? q : [...seen];
 }
-module.exports = { parse, scalar, decode, encode, nodes, check };
+module.exports = { parse, scalar, decode, encode, decoder, encoder, nodes, check };

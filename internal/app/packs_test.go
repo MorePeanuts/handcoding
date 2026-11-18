@@ -817,3 +817,60 @@ func TestPackCommandsNeedPractice(t *testing.T) {
 		t.Errorf("packs %+v, %v", packs, err)
 	}
 }
+
+// Filters must limit execution, tool setup and missing-reference requirements,
+// while preserving pack-wide manifest validation and reference resolution.
+func TestCheckPackSelection(t *testing.T) {
+	t.Parallel()
+	requireTools(t, "python3")
+	dir := t.TempDir()
+	writeTinyPack(t, dir)
+	writeFile(t, filepath.Join(dir, "hc.yaml"), "python:\n  interpreter: python3\ngo:\n  command: missing-go-for-selection-test\n")
+	selectedDir := filepath.Join(dir, "problems", tinyProblems[0])
+	if err := os.Remove(filepath.Join(selectedDir, "reference", "solution.go")); err != nil {
+		t.Fatal(err)
+	}
+	// An invalid unselected problem must not be run or block the selection.
+	writeFile(t, filepath.Join(dir, "problems", tinyProblems[1], "cases.jsonl"), "not json\n")
+	ws, err := workspace.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := app.New(ws)
+	defer a.Close()
+	check := func(o app.ValidateOptions) (app.ValidateSummary, []app.Finding, error) {
+		var findings []app.Finding
+		sum, err := a.CheckPack(t.Context(), o, func(f app.Finding) { findings = append(findings, f) })
+		return sum, findings, err
+	}
+	o := app.ValidateOptions{Languages: []string{"py"}, Problems: []string{"two-sum", "tiny/two-sum"}, Jobs: 4}
+	sum, findings, err := check(o)
+	if err != nil || !sum.OK() || sum.Problems != 1 || len(findings) != 1 || findings[0].Problem.Slug != "two-sum" {
+		t.Fatalf("selection: %+v %+v %v", sum, findings, err)
+	}
+	parallel := o
+	parallel.Problems = []string{"two-sum", "convert-the-temperature"}
+	if sum, findings, err := check(parallel); err != nil || !sum.OK() || sum.Problems != 2 {
+		t.Fatalf("parallel selection initialized an unselected tool: %+v %+v %v", sum, findings, err)
+	}
+	for _, bad := range []app.ValidateOptions{
+		{Languages: []string{"typo"}},
+		{Languages: []string{"cpp"}},
+		{Problems: []string{"missing-problem"}},
+	} {
+		if _, _, err := check(bad); err == nil {
+			t.Errorf("invalid selection accepted: %+v", bad)
+		}
+	}
+	o.Languages = []string{"go"}
+	sum, findings, err = check(o)
+	if err != nil || sum.OK() || sum.Failed != 1 {
+		t.Fatalf("missing selected reference passed: %+v %+v %v", sum, findings, err)
+	}
+	o.Languages = []string{"python"}
+	replaceIn(t, filepath.Join(dir, "pack.yaml"), "[two-sum, remove-element]", "[two-sum, absent]")
+	sum, _, err = check(o)
+	if err != nil || sum.PackErrors != 1 {
+		t.Fatalf("filtered check ignored invalid group: %+v %v", sum, err)
+	}
+}

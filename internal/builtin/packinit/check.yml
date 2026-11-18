@@ -13,9 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # Any Go builds hc; hc pack check vets the Go references against the
-      # oldest Go the protocol supports itself. No cache: a pack has no go.sum
-      # to key it by.
+      # Build hc with a current Go, then select the protocol minimum below
+      # for reference execution. No cache: a pack has no go.sum to key it by.
       - uses: actions/setup-go@v7
         with:
           go-version: stable
@@ -48,12 +47,25 @@ jobs:
 <%- end %>
       - name: Install hc
         run: go install github.com/MorePeanuts/handcoding/cmd/hc@<% .Version %>
+      # pack check runs on the selected tools, without a second compatibility
+      # compilation. CI owns the minimum-version environment.
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "<% .Go %>.x"
+          cache: false
+      - name: Select strict C/C++ compilers
+        run: |
+          mkdir -p "$RUNNER_TEMP/hc-tools"
+          printf '#!/bin/sh\nexec gcc-13 -pedantic-errors "$@"\n' > "$RUNNER_TEMP/hc-tools/hc-cc"
+          printf '#!/bin/sh\nexec g++-13 -pedantic-errors "$@"\n' > "$RUNNER_TEMP/hc-tools/hc-cxx"
+          chmod +x "$RUNNER_TEMP/hc-tools/hc-cc" "$RUNNER_TEMP/hc-tools/hc-cxx"
+          echo "$RUNNER_TEMP/hc-tools" >> "$GITHUB_PATH"
       # hc.yaml is not committed (.gitignore): it holds the settings of a
       # checkout, here the Python set up above instead of a virtual
       # environment of hc's.
       - name: Configure hc
         run: |
-          printf 'python:\n  interpreter: python3\nc:\n  command: gcc-13\n  standard: c11\ncpp:\n  command: g++-13\n  standard: c++17\n' > hc.yaml
+          printf 'python:\n  interpreter: python3\nc:\n  command: hc-cc\n  standard: c11\ncpp:\n  command: hc-cxx\n  standard: c++17\n' > hc.yaml
       - name: Check the pack
         run: hc pack check
       # --force: the committed copies of hc's skills must be exactly the

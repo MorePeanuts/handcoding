@@ -1,0 +1,83 @@
+#include "hc_core.hpp"
+#include <sys/resource.h>
+namespace hc {
+atomic<unsigned long long> sequence{0};
+atomic<long long> started{0}, elapsed{0};
+mutex result_mutex;
+bool finished = false;
+int run() {
+    // Deep linked structures must not depend on a shell's small stack limit.
+    rlimit stack{};
+    if (getrlimit(RLIMIT_STACK, &stack) == 0) {
+        stack.rlim_cur = min<rlim_t>(512ULL * 1024 * 1024, stack.rlim_max);
+        setrlimit(RLIMIT_STACK, &stack);
+    }
+    ifstream in(getenv("HC_CASES"));
+    J cases;
+    in >> cases;
+    ofstream out(getenv("HC_OUT"));
+    check(out.good(), "cannot open HC_OUT");
+    // Normal runs supply exactly one case. Debugging uses the same worker.
+    check(cases.size() == 1, "C++ worker expects exactly one case");
+    const auto& c = cases[0];
+    int id = c.at("id").get<int>();
+    long long limit = 0;
+    const char* limit_text = getenv("HC_TIME_LIMIT_NS");
+    if (limit_text) limit = stoll(limit_text);
+    struct Watch {
+        atomic<bool> done{false};
+        thread worker;
+        ~Watch() {
+            done = true;
+            if (worker.joinable()) worker.join();
+        }
+    } watch;
+    // An explicitly exhausted budget (0) is different from an untimed run.
+    if (limit_text)
+        watch.worker = thread([&] {
+            while (!watch.done.load()) {
+                auto e = spent();
+                if (e > limit) {
+                    lock_guard<mutex> lock(result_mutex);
+                    if (!finished) {
+                        out << J{{"id", id},
+                                 {"time_limit", true},
+                                 {"elapsed_ns", e}}
+                                   .dump()
+                            << endl;
+                        out.flush();
+                        _Exit(0);
+                    }
+                    return;
+                }
+                this_thread::sleep_for(chrono::milliseconds(1));
+            }
+        });
+    J res = {{"id", id}, {"output", nullptr}};
+    try {
+        res["output"] = call(c.at("input"));
+    } catch (const exception& e) {
+        stop();
+        res["error"] = e.what();
+    } catch (...) {
+        stop();
+        res["error"] = "unknown C++ exception";
+    }
+    res["elapsed_ns"] = elapsed.load();
+    {
+        lock_guard<mutex> lock(result_mutex);
+        finished = true;
+        out << res.dump() << endl;
+    }
+    watch.done = true;
+    return 0;
+}
+}  // namespace hc
+int main() {
+    try {
+        return hc::run();
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << '\n';
+        return 1;
+    }
+}

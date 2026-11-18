@@ -240,6 +240,7 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 		case runner.RuntimeError:
 			fmt.Fprintln(w, indent(Red.Render(c.Error), "    "))
 		case runner.TimeLimit:
+			field("Reason", c.Error)
 		default:
 			field("Output", string(c.Output))
 			if c.Case.HasExpected() {
@@ -257,6 +258,9 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 		fmt.Fprintln(w, Faint.Render("  stderr (tail):"))
 		fmt.Fprintln(w, indent(strings.TrimSpace(rep.Stderr), "    "))
 	}
+	for _, line := range TimingLines(rep) {
+		fmt.Fprintln(w, Faint.Render(line))
+	}
 	if rep.Verdict == runner.NotJudged {
 		summary := fmt.Sprintf("%s · %d case(s) ran", VerdictStyle(rep.Verdict).Render(string(rep.Verdict)), rep.Total) + totalTime(rep)
 		fmt.Fprintln(w, "\n"+summary)
@@ -265,6 +269,31 @@ func PrintReport(w io.Writer, p *problem.Problem, rep *runner.Report, o ReportOp
 	}
 	summary := fmt.Sprintf("%s · %d/%d passed", VerdictStyle(rep.Verdict).Render(string(rep.Verdict)), rep.Passed, rep.Total) + totalTime(rep)
 	fmt.Fprintln(w, "\n"+summary)
+}
+
+// TimingLines describes the limits actually used, including for restored history.
+func TimingLines(rep *runner.Report) []string {
+	t := rep.Timing
+	if t == nil {
+		return nil
+	}
+	algorithm := "Algorithm budget: none"
+	if t.AlgorithmLimit > 0 {
+		algorithm = fmt.Sprintf("Algorithm budget: %s (cumulative)", t.AlgorithmLimit)
+	}
+	lines := []string{algorithm}
+	if b := t.Baseline; b != nil {
+		source := "measured this run"
+		if b.Cached {
+			source = "cached"
+		}
+		lines = append(lines, fmt.Sprintf("Reference: %s; budget = max(reference, %s) × %d; %s; %s", b.Elapsed, b.Floor, b.Factor, b.Mode, source))
+	}
+	scope := "entire batch"
+	if t.WallScope == "case" {
+		scope = "each case process"
+	}
+	return append(lines, fmt.Sprintf("Wall-clock limit: %s for %s; total process time %s", t.WallLimit, scope, t.WallElapsed.Round(time.Microsecond)))
 }
 
 // totalTime is the summary's total time, empty for a run that stopped early.

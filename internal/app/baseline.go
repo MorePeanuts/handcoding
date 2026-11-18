@@ -35,27 +35,38 @@ const baselineRuns = 3
 // timeLimit is the time limit of a run of a solution in l on sel, 0 for
 // none: only a problem ready for l has one. When the reference cannot be
 // timed, the run has none either, with a warning on o.Stderr.
-func (a *App) timeLimit(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, o RunOptions) time.Duration {
+func (a *App) timeLimit(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, o RunOptions) (time.Duration, *runner.Baseline) {
 	if a.timeFactor <= 0 || !p.ReadyFor(l.SolutionFile()) {
-		return 0
+		return 0, nil
 	}
 	b, err := a.baseline(ctx, p, l, sel, o.Stderr)
 	if err != nil {
 		fmt.Fprintf(orDiscard(o.Stderr), "%s the run has no time limit: %v\n", ui.Yellow.Render("warning:"), err)
-		return 0
+		return 0, nil
 	}
-	return time.Duration(a.timeFactor) * max(b, a.baselineFloor)
+	mode := "per-case minima"
+	if ordered, ok := l.(lang.OrderedBaseliner); ok && ordered.OrderedBaseline() {
+		mode = "ordered batch"
+	}
+	return time.Duration(a.timeFactor) * max(b.elapsed, a.baselineFloor), &runner.Baseline{
+		Elapsed: b.elapsed, Floor: a.baselineFloor, Factor: a.timeFactor, Cached: b.cached, Mode: mode,
+	}
+}
+
+type baselineMeasurement struct {
+	elapsed time.Duration
+	cached  bool
 }
 
 // baseline is the time the reference in l takes on sel: the sum, over the
 // cases, of the fastest of baselineRuns runs. The times are kept by input
 // in .hc/cache/baseline/, so only cases without enough runs there run the
 // reference, best effort.
-func (a *App) baseline(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, w io.Writer) (time.Duration, error) {
+func (a *App) baseline(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, w io.Writer) (baselineMeasurement, error) {
 	path := a.baselinePath(p, l)
 	key, err := a.baselineKey(p, l)
 	if err != nil {
-		return 0, err
+		return baselineMeasurement{}, err
 	}
 	c := readBaseline(path, key)
 	if ordered, ok := l.(lang.OrderedBaseliner); ok && ordered.OrderedBaseline() {
@@ -64,9 +75,10 @@ func (a *App) baseline(ctx context.Context, p *problem.Problem, l lang.Language,
 	digests := make([]string, len(sel))
 	for i, s := range sel {
 		if digests[i], err = caseDigest(s.Case); err != nil {
-			return 0, err
+			return baselineMeasurement{}, err
 		}
 	}
+	cached := true
 	for round := range baselineRuns {
 		var todo []runner.Selected
 		var todoDigests []string
@@ -88,12 +100,13 @@ func (a *App) baseline(ctx context.Context, p *problem.Problem, l lang.Language,
 		if round == 0 && w != nil {
 			fmt.Fprintln(w, ui.Faint.Render(fmt.Sprintf("Timing the %s reference on %d case(s)…", l.Name(), len(todo))))
 		}
+		cached = false
 		rep, _, err := a.RunReference(ctx, p, l.ID(), todo, RunOptions{Stderr: w})
 		if err != nil {
-			return 0, err
+			return baselineMeasurement{}, err
 		}
 		if err := c.record(l, rep, todoDigests); err != nil {
-			return 0, err
+			return baselineMeasurement{}, err
 		}
 	}
 	writeCacheFile(path, c)
@@ -101,7 +114,7 @@ func (a *App) baseline(ctx context.Context, p *problem.Problem, l lang.Language,
 	for _, d := range digests {
 		b += time.Duration(c.Cases[d].Ns)
 	}
-	return b, nil
+	return baselineMeasurement{b, cached}, nil
 }
 
 // recordBaseline adds the times of a run of the reference in l on sel to
@@ -266,31 +279,32 @@ func batchDigest(digests []string) string {
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }
-func (a *App) batchBaseline(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, w io.Writer, path string, c *baselineCache) (time.Duration, error) {
+func (a *App) batchBaseline(ctx context.Context, p *problem.Problem, l lang.Language, sel []runner.Selected, w io.Writer, path string, c *baselineCache) (baselineMeasurement, error) {
 	digests := make([]string, len(sel))
 	todo := make([]runner.Selected, len(sel))
 	for i, s := range sel {
 		d, err := caseDigest(s.Case)
 		if err != nil {
-			return 0, err
+			return baselineMeasurement{}, err
 		}
 		digests[i] = d
 		s.Case.Expected = nil
 		todo[i] = s
 	}
 	key := batchDigest(digests)
-	if c.Batches[key].Runs < baselineRuns && w != nil {
+	cached := c.Batches[key].Runs >= baselineRuns
+	if !cached && w != nil {
 		fmt.Fprintln(w, ui.Faint.Render(fmt.Sprintf("Timing the %s reference on the ordered batch of %d case(s)…", l.Name(), len(sel))))
 	}
 	for c.Batches[key].Runs < baselineRuns {
 		rep, _, err := a.RunReference(ctx, p, l.ID(), todo, RunOptions{Stderr: w})
 		if err != nil {
-			return 0, err
+			return baselineMeasurement{}, err
 		}
 		if err = c.record(l, rep, digests); err != nil {
-			return 0, err
+			return baselineMeasurement{}, err
 		}
 	}
 	writeCacheFile(path, c)
-	return time.Duration(c.Batches[key].Ns), nil
+	return baselineMeasurement{time.Duration(c.Batches[key].Ns), cached}, nil
 }

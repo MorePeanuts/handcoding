@@ -14,7 +14,7 @@ import (
 // execute keeps isolation below judging: build once, then collect the same
 // driver results as a batch language. A fatal exit stops the batch; ordinary
 // caught exceptions can still report a result and proceed to the next case.
-func execute(ctx context.Context, l lang.Language, dir, work string, cases []Selected, opts Options) (map[int]driverResult, error, bool, *tailBuffer, error) {
+func execute(ctx context.Context, l lang.Language, dir, work string, cases []Selected, opts Options, timing *Timing) (map[int]driverResult, error, bool, *tailBuffer, error) {
 	batches := [][]Selected{cases}
 	isolate, ok := l.(lang.CaseIsolator)
 	isolated := ok && isolate.IsolatedCases()
@@ -45,7 +45,9 @@ func execute(ctx context.Context, l lang.Language, dir, work string, cases []Sel
 		cmd.Stdout = orDiscard(opts.Stdout)
 		cmd.Stderr = io.MultiWriter(orDiscard(opts.Stderr), stderr)
 		cmd.WaitDelay = time.Second
+		started := time.Now()
 		runErr := cmd.Run()
+		timing.WallElapsed += time.Since(started)
 		timedOut := errors.Is(runCtx.Err(), context.DeadlineExceeded)
 		cancel()
 		rs, err := readResults(outPath)

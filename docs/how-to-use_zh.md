@@ -65,7 +65,7 @@ Python 在 hc 管理的虚拟环境 `.hc/venv` 中运行：包括 Python 解答�
 
 环境中装有 debugpy，用于 headless 调试。下载 Python 和安装 debugpy 需要联网，但只需一次；判题始终离线。如果环境失效（工作区被移动，或者它所用的 Python 被删除），hc 会重新创建。环境的 Python 低于 3.12 时（由最低版本更低的旧版 hc 创建），只要 uv 或 PATH 上的 Python 3.12+ 能建出新环境，hc 也会重新创建；否则保留它，`hc test`、`submit` 和 `debug` 会警告版本过旧。`hc env sync` 可以随时重建它：hc 无法创建环境时，在装好 uv 或 Python 之后运行它；或者用它补装 debugpy。Python 解答从 `hc_runtime` 导入 `ListNode`、`TreeNode` 等类型，hc 把它在每个工作区中只保存一份，放在 `.hc/runtime/python/`，而不是放在每个解答旁边。虚拟环境通过 `hc_runtime.pth` 把这个目录加入 `sys.path`；hc 还会在工作区根目录写入 `pyrightconfig.json` 和 `ty.toml`（已有时不覆盖），让 pyright、basedpyright 和 ty 用同一个解释器检查你的解答，并能解析 `hc_runtime`。其他编辑器或语言服务器只要指向 `.hc/venv` 中的 Python，也能找到它。如果想用自己的 Python（conda、自行编译的版本），在 `hc.yaml` 中设置 `python.interpreter`，hc 就原样使用它，不再创建虚拟环境，不显示指引，也不写编辑器配置：要让编辑器解析 `hc_runtime`，把 `.hc/runtime/python` 加入它的搜索路径（pyright 的 `extraPaths`，ty 的 `environment.extra-paths`）。
 
-支持的最低版本是 Python 3.12 和 Go 1.22（见协议的[语言版本](protocol_zh.md#语言版本)）。你自己的解答可以使用工具链支持的任何特性：`hc test`、`hc submit` 和 `hc debug` 会注明所用的工具链（`[Python 3.12.9]`），版本过旧时只给出警告。题目附带的代码必须能在最低版本上运行，所以 `hc cases build` 和 `hc validate --run` 拒绝在过旧的工具链上运行参考解。更新的工具链没有问题：`hc validate --run`（因而 `hc pack check`）还会对照 Go 1.22 检查每个 Go 参考解，做法是在 go 指令为 `go 1.22` 的模块中对它运行 go vet，它会报告更新的语言特性和标准库符号。
+支持的最低版本是 Python 3.12 和 Go 1.22（见协议的[语言版本](protocol_zh.md#语言版本)）。你自己的解答可以使用工具链支持的任何特性：`hc test`、`hc submit` 和 `hc debug` 会注明所用的工具链（`[Python 3.12.9]`），版本过旧时只给出警告。题目附带的代码必须能在最低版本上运行，所以 `hc cases build` 和 `hc validate --run` 拒绝在过旧的工具链上运行参考解。受支持的更新工具链没有问题：`hc validate --run` 和 `hc pack check` 只检查参考解在所选本地工具链上能否运行，不再额外进行最低版本编译或 vet 检查。题目包的 CI 负责选择协议最低版本和标准。
 
 建议在工作区里执行 `git init`，记录下自己的练习过程。`hc init` 写入的 `.gitignore` 排除了 `.hc/`、已安装的题目包（可以由 `hc pack install` 根据 `hc.yaml` 重新安装），以及 hc 每次运行前在解答旁生成的文件（`zz_hc_driver.go`、`go.mod`、`_hc_runner.py`、`__pycache__/`，以及 v0.1.0-alpha.12 之前的版本写在那里的 `hc_runtime.py`），这样仓库里只有你自己的代码。这些规则位于 `# hc:begin` 和 `# hc:end` 之间的区块中，更新的 hc 打开工作区时会刷新它；你自己的规则请写在区块之外。没有这个区块的 `.gitignore`（例如 v0.1.0-alpha.12 之前的 hc 写入的）归你所有，hc 不会改动它：要使用这个区块，从新工作区中复制一份（在临时目录中运行 `hc init`），并用 `git rm -r --cached solutions` 再 `git add solutions` 把已提交的生成文件移出仓库。
 
@@ -85,7 +85,7 @@ C++ 使用 `solution.cpp`，保持 LeetCode 的 `class Solution` / 设计类签�
 
 `hc_json.hpp` 仅保留很小的 include 引用，JSON 库本体留在 `.hc/cpp`，编译命令与编辑器数据库共用其 include 路径。打开 C++ 解答时，会在旁边生成 `hc_types.hpp`、驱动及运行时头文件和 `compile_commands.json`。编辑器中的 clangd（或兼容语言服务器）读取这份编译数据库，就能识别相同的标准、头文件和评测器定义类型。解答不需要 hc 专用导入或 `main`，提交到 LeetCode 时保留源码。题目包需要声明 `cpp` 并提供 C++ 参考解，才能判定 C++ 解答；更新 hc 不会自动给现有题包增加参考解。
 
-每个 C++ 用例使用独立进程；类题同一用例的全部操作共享对象。一次运行只编译一次。累计算法时限只统计调用，不包含启动、退出和编解码；配置的墙钟超时分别约束每个 C++ 工作进程。正常构建使用 `-O2`，`hc debug -l cpp` 使用 `-O0 -g`，在 GDB/LLDB 中停在解答入口。进程退出回收节点分配的内存，因此关闭 sanitizer 的泄漏报告，仍可诊断非法访问及未定义行为。
+每个 C++ 用例使用独立进程；类题同一用例的全部操作共享对象。一次运行只编译一次。与题目无关的公共 worker（JSON 输入输出、超时监控和进程入口）编译为 `.hc/cpp/json-<版本>-<摘要>/objects/` 下的共享目标文件，其他题目直接复用。缓存键包含预处理后的源码和头文件、编译器身份、编译选项与环境；并发构建通过可取消的锁和原子写入发布结果。每道题只编译其调用代码、类型编解码与解答，并链接公共目标文件；调试和 sanitizer 使用独立缓存键。累计算法时限只统计调用，不包含启动、退出和编解码；配置的墙钟超时分别约束每个 C++ 工作进程。正常构建使用 `-O2`，`hc debug -l cpp` 使用 `-O0 -g`，在 GDB/LLDB 中停在解答入口。进程退出回收节点分配的内存，因此关闭 sanitizer 的泄漏报告，仍可诊断非法访问及未定义行为。
 
 Java 使用同一个本地 JDK：按 `java.home`（绝对路径或相对工作区的目录）、`JAVA_HOME`、PATH 中 `java` 所选 JDK 的顺序查找；`java`、`javac` 和终端调试器 `jdb` 都来自该目录。最低要求为 **JDK 17**。普通编译直接使用该 JDK 的语言级别、标准 API 和字节码目标，不传入 `--release`、`--source` 或 `--target`。不再设置默认 JDK 版本或 `java.release`；正常打开工作区时会自动移除旧字段，保留 `java.home` 和 `java.jvm_args`。hc 不安装或升级 Java。`java.jvm_args` 是 VM 调优和系统属性参数数组，解答和参考解共用，显式默认值为 `[-Xss16m]`。JDK、VM 选项或驱动变化会使 Java 构建和计时缓存失效。`hc doctor -l java --debug` 检查 JDK 版本、VM 参数形式、jdb 和 Python 基础环境。诊断时不会执行自定义 VM 参数（日志选项可能写文件），具体 VM 选项由实际运行时的 JVM 验证。
 
@@ -106,7 +106,7 @@ JavaScript 和 TypeScript 使用本地 **Node.js 22+**，由 `javascript.command
 `hc debug -l javascript` / `-l typescript` 打开终端 inspector 界面，先停在驱动入口，`cont` 后停在解答入口。它显示原始 TS 源码，支持 `next`、`step`、`out`、`cont`、`list`、`exec 表达式`、`backtrace`、`sb(行号)` / `sb("文件", 行号)` 和 `quit`，保留解答 stderr。`--headless` 则暴露 Node inspector，默认地址 `127.0.0.1:38697`（通过 `--addr` 修改），可连接编辑器的 Node 调试器。这是 Node inspector，不是 DAP 服务；TS 调试需启用编辑器的 source map 支持。
 
 
-Go 版本检测、模块准备、编译、最低版本检查和调试都使用指定的编译器。调试时先关闭优化编译出程序，再由指定的 Delve 通过 `exec` 启动，避免 Delve 从 PATH 选择另一个 Go。编译缓存和参考解计时的标识包含编译器路径。`execution.backend` 默认是 `local`，目前也只实现了 `local`；设置 `docker` 或其他值会报错，不会悄悄在本地执行。
+Go 版本检测、模块准备、编译和调试都使用指定的编译器。调试时先关闭优化编译出程序，再由指定的 Delve 通过 `exec` 启动，避免 Delve 从 PATH 选择另一个 Go。编译缓存和参考解计时的标识包含编译器路径。`execution.backend` 默认是 `local`，目前也只实现了 `local`；设置 `docker` 或其他值会报错，不会悄悄在本地执行。
 
 ```sh
 hc doctor                                  # 默认解答语言及 Python 基础依赖
@@ -481,8 +481,9 @@ hc cases edit two-sum               # 在编辑器中编辑你的用例文件
 
 - 40 倍给同一个算法的不同写法留出了余地，比如参考解用数组而你用 map，但在题目约束允许的最大输入上容不下更差的复杂度。较慢的解答会不会失败取决于题目的用例：有些题目在约束范围内拉不开两种复杂度的差距，这时较慢的解答会通过，在 LeetCode 上也一样。
 - 一道题第一次运行时，hc 会给参考解计时：每个用例运行三次，取最快的一次，保存在 `.hc/cache/baseline/<pack>/<problem>/<language>.json`。hc 会在 stderr 上提示（"Timing the Go reference…"），之后的运行无论选哪些用例都复用这些时间。hc、你的工具链、`problem.yaml` 或参考解改变时会重新测量。
-- 题目没有你所用语言的参考解时不作评判（见[就绪](protocol_zh.md#就绪)），所以也没有时间限制。参考解、`hc cases build` 和 `hc validate --run` 从不受限，`hc debug` 也一样。它们在生成用例上运行参考解以算出期望输出，这次运行也算作参考解的三次计时之一；但 `hc validate` 或 `hc pack check` 同时检查多道题时（`--jobs`）除外。
-- `hc.yaml` 中的 `timeout` 是另一个限制，针对整次运行的墙钟时间：它用来防止解答卡死。它也可能先于时间限制生效：参考解在本次运行用例上的总用时超过它的四十分之一时（默认 10s 下即 250ms，Python 参考解在大用例较多的题目上可能如此），慢得多的解答会先用完 `timeout`。判定结果相同，都是超时（Time Limit Exceeded），只是要等满整个 `timeout`。
+- 题目没有你所用语言的参考解时不作评判（见[就绪](protocol_zh.md#就绪)），所以也没有时间限制。参考解、`hc cases build`、`hc validate --run` 和 `hc debug` 都没有算法预算。它们在生成用例上运行参考解以算出期望输出，这次运行也算作参考解的三次计时之一；但 `hc validate` 或 `hc pack check` 同时检查多道题时（`--jobs`）除外。
+- `hc.yaml` 中的 `timeout` 是独立的墙钟时限：C/C++ 限制每个用例进程，其他语言限制整批有序用例。它包括进程启动、输入输出、驱动开销和解答执行，不包括编译；参考解也受它限制。超时报告会区分墙钟时限与累计算法预算，并给出实际限制。整批运行中第一个未完成的用例，不一定是独自耗尽墙钟时限的那个用例。
+- CLI 和 TUI 报告显示当次实际使用的算法预算、参考基线、下限、倍数、基线模式（逐用例最小值或整批最小值）、是否直接复用缓存或在本次运行中补充测量，以及墙钟时限和进程总耗时。提交历史保留这些信息。没有算法预算时显示 `Algorithm budget: none`，墙钟时限仍然生效。
 
 Java、JavaScript 和 TypeScript 的基线按完整有序批次运行三个新的运行时进程，取最小**总耗时**。顺序和重复用例都是缓存键的一部分，改变选择会重新计时，不使用上述按单例拼接的规则。计算生成用例期望输出的运行，仅能为它实际执行的完整批次贡献一次计时，不能抽取子集。这样保留实际 JIT 预热影响，不额外添加人工预热轮次。
 
@@ -663,7 +664,17 @@ hc 只修改这个列表，`hc.yaml` 的其余部分保留原有的注释和顺�
 
 `hc pack check` 是题目包的 CI 在发布前运行的检查。在题目包的检出目录中运行它（见[编写题目包](#编写题目包)），或者传入它的目录：`hc pack check ./my-pack`。它检查 `pack.yaml` 合法且协议版本受支持，分组中列出的都是本包的题目，并且每道题都能加载、合法、目录名规范、slug 和 ID 唯一、已就绪（设置了 `judge.compare`）、有用例且每个用例都有期望输出（生成用例则有摘要）、没有超过 100 KB 的用例、对题目包 `languages` 中的每种语言都有参考解，并通过 `hc validate --run`：每个参考解都通过每个用例，生成用例重新构造。因此它需要 Python 3.12+ 及题目包声明语言的工具链，无法运行的参考解也算错误。它为每道题输出一行，最后输出汇总，任何一项失败都以非零状态退出。
 
-`hc pack check` 和 `hc validate` 会同时检查多道题：同时检查 `--jobs`（`-j`）道，默认每个 CPU 一道，最多 4 道。各行的顺序与逐道检查时相同，每道题和它之前的题都检查完后立即输出它的一行，题目的参考解运行时的输出紧接在它这一行之前。同时进行的参考解运行不用于[时间限制](#时间限制)的计时，因为它们在争用机器；`-j 1` 逐道检查，并像以前一样计时。
+可以使用筛选检查部分内容：
+
+```sh
+hc pack check --lang cpp,java
+hc pack check --problems two-sum,lfu-cache
+hc pack check ./my-pack -l cpp --problems two-sum --problems lfu-cache -j 2
+```
+
+`--lang`（`-l`）和 `--problems` 接受逗号分隔列表，也可以重复传入。题目引用与其他命令相同（slug、ID、带题包的引用或唯一 slug 前缀），重复项只检查一次。未知题目、未知语言或题包未声明的语言会报错。只要求所选题目在所选语言中有参考解并运行它们；需要生成器或判题程序时仍使用 Python。清单和分组始终针对整个题包检查，所选题目的身份仍与其他题目核对。筛选后的成功仅覆盖所选范围；发布前不带筛选运行完整检查。验证使用当前受支持的工具链，不再额外进行最低版本编译或 vet；CI 应自行选择最低版本。
+
+`hc pack check` 和 `hc validate` 会同时检查多道题：同时检查 `--jobs`（`-j`）道，默认每个 CPU 一道，最多 4 道。这是 hc 的默认值，不是 CI 的限制；显式指定 `--jobs` 可以超过这个上限。同一道题的各语言依次运行。各行的顺序与逐道检查时相同，每道题和它之前的题都检查完后立即输出它的一行，题目的参考解运行时的输出紧接在它这一行之前。同时进行的参考解运行不用于[时间限制](#时间限制)的计时，因为它们在争用机器；`-j 1` 逐道检查，并像以前一样计时。
 
 ## 用编码智能体生成用例
 
@@ -875,6 +886,8 @@ TUI 的 `L` 只在当前包支持的编程语言之间切换，`i` 在它提供�
 - `hc fetch` 可以导入使用 [LeetCode 的 `Node` 类型](protocol_zh.md#leetcode-的-node-类型)、`NestedInteger`、`Employee` 的题目，签名取自 LeetCode 的 Go 初始代码。`returns_copy`（克隆图）留给 `hc gen` 设置；扁平化嵌套列表迭代器这类迭代器题目的示例只给出输入、没有给出调用序列，也留给 `hc gen` 补写。
 - 把一个值编码再解码回来的题目（297、449、535）按[编解码往返题](protocol_zh.md#编解码往返题)评测：只比较解码得到的值，所以对编码本身的要求（449 的"尽可能紧凑"）不会检查。`hc fetch` 可以导入这类题目，编码器、解码器以及二者是否共用一个实例取自 LeetCode 初始代码注释中的调用方式。回归测试集中的 297 和 535 分别展示了两种情况。
 - 限制运行时间（见[时间限制](#时间限制)），但不限制内存。
+- Java 在首例开始前绑定构造器和方法。首次实际调用照常计时，hc 不预跑解答；解答调用期间的 JIT 和 GC 停顿仍计入耗时。
+- JavaScript 和 TypeScript 的整批用例在同一个 Node 工作线程上运行，线程栈为 64 MiB。可递归的深度仍取决于函数。`hc debug` 使用 Node 主线程和默认栈，让 inspector 能停在解答源码中；深递归在调试时可能更早达到上限。
 - Python 代码运行时的递归上限是 10^6，而不是 Python 默认的 1000，并且运行在一个 512 MB 栈的线程中（虚拟内存，递归多深才用多少），所以普通的递归解答不必调用 `sys.setrecursionlimit` 就能深入输入。经过 C 代码的递归（`functools.cache` 函数，`sorted` 或 `max` 进行的比较）从 Python 3.14 起能深入到这个栈允许的深度，但 Python 3.12 和 3.13 无论上限多少，都把它限制在约 3000 层。在 `hc debug` 下，代码运行在主线程中，它的栈要小一些。
 - 无法获取 LeetCode 会员题目。
 - 合法答案很多、无法全部列出的题目（"返回任意一个合法答案"）和随机题由[判题程序](protocol_zh.md#判题程序)评测，判题程序由 `hc gen` 编写，回归测试集中的 5、108、210、324、384 和 528 都带有判题程序。判题程序用 Python 编写，所以即使用 Go 作答，这些题目也需要 Python 3.12 或更新版本；hc 管理的虚拟环境会提供它。

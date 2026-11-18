@@ -17,10 +17,11 @@ import (
 const maxStoredValue = 2048
 
 type storedCase struct {
-	Index     int    `json:"index"`
-	Verdict   string `json:"verdict"`
-	ElapsedNs int64  `json:"elapsed_ns"`
-	Note      string `json:"note,omitempty"`
+	TimeoutCause runner.TimeoutCause `json:"timeout_cause,omitempty"`
+	Index        int                 `json:"index"`
+	Verdict      string              `json:"verdict"`
+	ElapsedNs    int64               `json:"elapsed_ns"`
+	Note         string              `json:"note,omitempty"`
 	// The fields below are only kept for failing cases.
 	Input    string `json:"input,omitempty"`
 	Output   string `json:"output,omitempty"`
@@ -31,10 +32,11 @@ type storedCase struct {
 }
 
 type storedReport struct {
-	Verdict   string `json:"verdict"`
-	Passed    int    `json:"passed"`
-	Total     int    `json:"total"`
-	ElapsedNs int64  `json:"elapsed_ns"`
+	Timing    *runner.Timing `json:"timing,omitempty"`
+	Verdict   string         `json:"verdict"`
+	Passed    int            `json:"passed"`
+	Total     int            `json:"total"`
+	ElapsedNs int64          `json:"elapsed_ns"`
 	// Problem identifies the problem's files the submission was judged on
 	// (problemKey).
 	Problem string `json:"problem,omitempty"`
@@ -51,11 +53,12 @@ type storedReport struct {
 // EncodeReport serializes a report for the submission history.
 func EncodeReport(p *problem.Problem, rep *runner.Report) string {
 	sr := storedReport{
+		Timing:  rep.Timing,
 		Verdict: string(rep.Verdict), Passed: rep.Passed, Total: rep.Total, Problem: problemKey(p), CasesKey: casesKey(p),
 		ElapsedNs: rep.Elapsed.Nanoseconds(), Stopped: rep.Stopped, CompileError: rep.CompileError, Stderr: clipText(rep.Stderr),
 	}
 	for _, c := range rep.Cases {
-		sc := storedCase{Index: c.Index, Verdict: string(c.Verdict), ElapsedNs: c.Elapsed.Nanoseconds(), Note: c.Case.Note}
+		sc := storedCase{TimeoutCause: c.TimeoutCause, Index: c.Index, Verdict: string(c.Verdict), ElapsedNs: c.Elapsed.Nanoseconds(), Note: c.Case.Note}
 		if c.Verdict != runner.Accepted && c.Verdict != runner.NotRun {
 			sc.Input = clipText(p.FormatInput(c.Case))
 			sc.Output = clipText(string(c.Output))
@@ -83,12 +86,14 @@ func DecodeReport(s string) *runner.Report {
 		return nil
 	}
 	rep := &runner.Report{
+		Timing:  sr.Timing,
 		Verdict: runner.Verdict(sr.Verdict), Passed: sr.Passed, Total: sr.Total,
 		Elapsed: time.Duration(sr.ElapsedNs), Stopped: sr.Stopped, CompileError: sr.CompileError, Stderr: sr.Stderr,
 	}
 	for _, sc := range sr.Cases {
 		cr := runner.CaseResult{
-			Index: sc.Index, Verdict: runner.Verdict(sc.Verdict), Elapsed: time.Duration(sc.ElapsedNs),
+			TimeoutCause: sc.TimeoutCause,
+			Index:        sc.Index, Verdict: runner.Verdict(sc.Verdict), Elapsed: time.Duration(sc.ElapsedNs),
 			Error: sc.Error, Message: sc.Message, InputText: sc.Input, Output: json.RawMessage(sc.Output),
 		}
 		cr.Case.Note = sc.Note

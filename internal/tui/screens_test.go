@@ -223,3 +223,25 @@ func golden(t *testing.T, name, screen string) {
 		t.Errorf("screen %s differs from %s (go test ./internal/tui -run TestScreens -update rewrites it):\n%s", name, path, got)
 	}
 }
+
+func TestReportTimingWrap(t *testing.T) {
+	t.Parallel()
+	m := model{st: newStyles("dark")}
+	p := &problem.Problem{Kind: problem.KindFunction, Function: &problem.Function{Name: "f", Returns: "integer"}}
+	rep := &runner.Report{Verdict: runner.TimeLimit, Total: 1, Stopped: true,
+		Timing: &runner.Timing{AlgorithmLimit: 50 * time.Millisecond, WallLimit: 10 * time.Second, WallScope: "batch"},
+		Cases:  []runner.CaseResult{{Index: 1, InputText: "{}", Verdict: runner.TimeLimit, Error: "algorithm budget exhausted"}},
+	}
+	b := browser{}
+	text, _, _ := m.renderCases(p, rep, ui.ReportOptions{}, &b, nil, false, 60)
+	for _, want := range []string{"Algorithm budget: 50ms", "Wall-clock limit: 10s", "Reason", "algorithm budget exhausted"} {
+		if !strings.Contains(ansi.Strip(text), want) {
+			t.Errorf("missing %q in %s", want, text)
+		}
+	}
+	for _, line := range strings.Split(text, "\n") {
+		if ansi.StringWidth(line) > 60 {
+			t.Errorf("report exceeds width: %q", line)
+		}
+	}
+}

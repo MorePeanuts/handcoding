@@ -101,6 +101,18 @@ func TestSafeLongAndFailures(t *testing.T) {
 		}
 	}
 }
+func TestDeepRecursion(t *testing.T) {
+	t.Parallel()
+	report := runSource(t, false, `function f(depth) { return depth === 0 ? 0 : 1 + f(depth - 1); }`, `
+{"input":{"n":100000},"expected":100000}
+{"input":{"n":2000000},"expected":2000000}
+{"input":{"n":3},"expected":3}
+`, runner.Options{})
+	if len(report.Cases) != 3 || report.Cases[0].Verdict != runner.Accepted || report.Cases[1].Verdict != runner.RuntimeError || !strings.Contains(report.Cases[1].Error, "RangeError") || report.Cases[2].Verdict != runner.Accepted {
+		t.Fatalf("deep recursion: %+v", report.Cases)
+	}
+}
+
 func TestBatchStateAndWatchdog(t *testing.T) {
 	t.Parallel()
 	lines := "{\"input\":{\"n\":1},\"expected\":1}\n{\"input\":{\"n\":1},\"expected\":2}\n"
@@ -182,3 +194,57 @@ func TestWorkspaceDependenciesOffline(t *testing.T) {
 	}
 }
 func lfile(ts bool) string { return (javascript.Language{TypeScript: ts}).SolutionFile() }
+
+// Many short calls, a caught exception, and a hung call share one cumulative
+// clock. Cover both reference timing (no watchdog) and a judged solution.
+func TestClassClock(t *testing.T) {
+	t.Parallel()
+	testenv.LookPath(t, "node")
+	testenv.LookPath(t, "npm")
+	dir := t.TempDir()
+	l := javascript.Language{}
+	p := &problem.Problem{Dir: dir, Kind: problem.KindClass, Class: &problem.Class{Name: "Counter", Methods: []problem.Method{{Name: "step", Params: []problem.Param{{Name: "n", Type: "integer"}}, Returns: "integer"}}}, Judge: problem.Judge{Compare: problem.CompareExact}}
+	code := `class Counter {step(n) {if(n===-1)throw Error("boom");if(n===-2)for(;;){};if(n===-3)return Promise.resolve(1);return n;}}`
+	for _, file := range []string{"solution.js", "reference/solution.js"} {
+		path := filepath.Join(dir, file)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(code), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	long := `{"input":{"ops":["Counter"` + strings.Repeat(`,"step"`, 10000) + `],"args":[[]` + strings.Repeat(`,[1]`, 10000) + `]},"expected":[null` + strings.Repeat(`,1`, 10000) + "]}\n"
+	ordinary := long + `{"input":{"ops":["Counter","step"],"args":[[],[-1]]},"expected":[null,0]}` + "\n"
+	for _, watched := range []bool{false, true} {
+		last := "-3"
+		opts := runner.Options{Timeout: 5 * time.Second}
+		if watched {
+			last = "-2"
+			opts.TimeLimit = 200 * time.Millisecond
+		}
+		lines := ordinary + `{"input":{"ops":["Counter","step"],"args":[[],[` + last + `]]},"expected":[null,0]}` + "\n" + long
+		cases, err := problem.ParseCases(strings.NewReader(lines), "cases")
+		if err != nil {
+			t.Fatal(err)
+		}
+		sel := make([]runner.Selected, len(cases))
+		for i, c := range cases {
+			sel[i] = runner.Selected{Index: i + 1, Case: c}
+		}
+		rep, err := runner.Run(context.Background(), l, p, dir, sel, opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if rep.Cases[0].Verdict != runner.Accepted || rep.Cases[1].Verdict != runner.RuntimeError || rep.Cases[0].Elapsed <= 0 {
+			t.Fatalf("class clock: %+v", rep.Cases)
+		}
+		if watched {
+			if rep.Cases[2].TimeoutCause != runner.AlgorithmTimeout || rep.Cases[3].Verdict != runner.NotRun {
+				t.Fatalf("watchdog: %+v", rep.Cases)
+			}
+		} else if rep.Cases[2].Verdict != runner.RuntimeError || !strings.Contains(rep.Cases[2].Error, "Promise") || rep.Cases[3].Verdict != runner.Accepted {
+			t.Fatalf("reference clock: %+v", rep.Cases)
+		}
+	}
+}

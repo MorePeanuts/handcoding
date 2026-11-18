@@ -107,6 +107,15 @@ func TestGenericListsAndStrings(t *testing.T) {
 		})
 	}
 }
+func TestStaticVarargsBinding(t *testing.T) {
+	t.Parallel()
+	report := run(t, function("integer[]"), `class Solution {
+  private static int[] f(int... values) { return values; }
+}`, `{"input":{"n":[1,2,3]},"expected":[1,2,3]}`, runner.Options{})
+	if report.Verdict != runner.Accepted {
+		t.Fatalf("static varargs: %+v", report)
+	}
+}
 func TestCompilationAndSignatureErrors(t *testing.T) {
 	t.Parallel()
 	for _, code := range []string{`class Solution { nope }`, `class Solution {public double f(double n){return n;}}`} {

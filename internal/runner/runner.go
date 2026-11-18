@@ -53,13 +53,14 @@ func (v Verdict) Unjudged() bool { return v == NoExpected || v == NotJudged }
 
 // CaseResult is the result of one case.
 type CaseResult struct {
-	Index    int
-	Case     problem.Case
-	Verdict  Verdict
-	Output   json.RawMessage
-	Error    string
-	Elapsed  time.Duration
-	JudgeErr error
+	Index        int
+	Case         problem.Case
+	Verdict      Verdict
+	Output       json.RawMessage
+	Error        string
+	Elapsed      time.Duration
+	TimeoutCause TimeoutCause
+	JudgeErr     error
 	// Message is the checker's reason for rejecting the output (judge.compare:
 	// checker).
 	Message string
@@ -68,8 +69,36 @@ type CaseResult struct {
 	InputText string
 }
 
+// TimeoutCause distinguishes algorithm work from the process deadline, which
+// also includes startup, codecs and driver overhead.
+type TimeoutCause string
+
+const (
+	AlgorithmTimeout TimeoutCause = "algorithm"
+	WallTimeout      TimeoutCause = "wall"
+)
+
+// Timing keeps the effective limits used for this run, not estimates obtained
+// from a later reference run. Durations are serialized as nanoseconds.
+type Timing struct {
+	AlgorithmLimit time.Duration `json:"algorithm_limit_ns"`
+	WallLimit      time.Duration `json:"wall_limit_ns"`
+	WallScope      string        `json:"wall_scope"`      // "batch" or "case"
+	WallElapsed    time.Duration `json:"wall_elapsed_ns"` // sum of worker lifetimes, excluding builds/checkers
+	Baseline       *Baseline     `json:"baseline,omitempty"`
+}
+
+type Baseline struct {
+	Elapsed time.Duration `json:"elapsed_ns"`
+	Floor   time.Duration `json:"floor_ns"`
+	Factor  int           `json:"factor"`
+	Cached  bool          `json:"cached"`
+	Mode    string        `json:"mode"` // "per-case minima" or "ordered batch"
+}
+
 // Report is the result of a run.
 type Report struct {
+	Timing       *Timing
 	Verdict      Verdict
 	Cases        []CaseResult
 	Passed       int
@@ -149,6 +178,10 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 		}
 		return nil, fmt.Errorf("build: %w", err)
 	}
+	rep.Timing = &Timing{AlgorithmLimit: opts.TimeLimit, WallLimit: opts.Timeout, WallScope: "batch"}
+	if isolated, ok := l.(lang.CaseIsolator); ok && isolated.IsolatedCases() {
+		rep.Timing.WallScope = "case"
+	}
 	// Driver/checker IDs identify occurrences, not displayed case numbers:
 	// `--case 1,2,1` must retain both executions of case 1 and their timings.
 	executions := make([]Selected, len(cases))
@@ -156,7 +189,7 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 		executions[i] = c
 		executions[i].Index = i + 1
 	}
-	results, runErr, timedOut, stderr, err := execute(ctx, l, dir, work, executions, opts)
+	results, runErr, timedOut, stderr, err := execute(ctx, l, dir, work, executions, opts, rep.Timing)
 	if err != nil {
 		return nil, err
 	}
@@ -178,6 +211,12 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 			cr.Verdict = NotRun
 		case !ok && timedOut:
 			cr.Verdict, stopped = TimeLimit, true
+			cr.TimeoutCause = WallTimeout
+			scope := "entire batch"
+			if rep.Timing.WallScope == "case" {
+				scope = "this case process"
+			}
+			cr.Error = fmt.Sprintf("wall-clock deadline exceeded: %s for %s (includes startup, input/output and driver overhead)", opts.Timeout, scope)
 		case !ok:
 			cr.Verdict, stopped = RuntimeError, true
 			cr.Error = "program exited before finishing this case"
@@ -186,6 +225,8 @@ func Run(ctx context.Context, l lang.Language, p *problem.Problem, dir string, c
 			}
 		case res.TimeLimit || opts.TimeLimit > 0 && total > opts.TimeLimit:
 			cr.Verdict, stopped = TimeLimit, true
+			cr.TimeoutCause = AlgorithmTimeout
+			cr.Error = fmt.Sprintf("cumulative algorithm time %s exceeded the %s budget for the selected cases", total, opts.TimeLimit)
 		case res.Error != "":
 			cr.Verdict = RuntimeError
 			cr.Error = res.Error
